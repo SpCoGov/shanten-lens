@@ -1,0 +1,6 @@
+fastapi==0.112.2
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+mitmproxy>=10.2.4
+platformdirs
+watchfiles

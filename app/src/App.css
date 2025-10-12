@@ -1,0 +1,217 @@
+/* ========== 主题 & 基础 ========== */
+:root {
+    --border: #e5e7eb;
+    --muted: #6b7280;
+    --bg: #fafafa;
+    --ring: #3b82f6;
+    --text: #0f172a;
+
+    --content-max: 1280px;   /* ↑ 放宽内容区 */
+    --field-max: 560px;      /* 表单控件最大宽度 */
+    --label-w: 260px;        /* 左侧标签列宽（大屏） */
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    -webkit-font-smoothing: antialiased;
+}
+
+/* 全局禁选，白名单可选 */
+html, body, #root, .app { -webkit-user-select: none; user-select: none; }
+input, textarea, select, code, pre, .selectable { -webkit-user-select: text; user-select: text; }
+
+/* ========== 布局壳 ========== */
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+
+.app-header {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+}
+.brand { font-weight: 700; }
+.nav { display: flex; gap: 6px; }
+.nav-btn {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+}
+.nav-btn.active, .nav-btn:hover { background: #f3f4f6; }
+.status { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+
+/* 内容区：放宽到 1280px，仍居中，边距自适应 */
+.app-main {
+    width: 100%;
+    margin: 0 auto;
+    padding: clamp(12px, 2vw, 16px);
+    max-width: var(--content-max);
+}
+
+/* ========== 卡片/按钮/徽章/状态点 ========== */
+.card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+
+.hero { display: grid; gap: 8px; }
+.hero-status { display: flex; align-items: center; gap: 8px; }
+
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
+.badge.ok { color: #166534; border-color: #86efac; background: #f0fdf4; }
+.badge.down { color: #7f1d1d; border-color: #fecaca; background: #fef2f2; }
+
+.dot { width: 10px; height: 10px; border-radius: 10px; display: inline-block; }
+.dot.ok { background: #16a34a; }
+.dot.down { background: #ef4444; }
+
+.btn {
+    padding: 8px 14px;
+    border: 1px solid #d1d5db;
+    background: #f9fafb;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, transform .02s ease;
+}
+.btn:hover { background: #f3f4f6; }
+.btn:active { transform: translateY(1px); }
+.btn.ghost { background: #fff; }
+.btn.loading { opacity: .7; pointer-events: none; }
+
+/* 顶部下滑通知（SettingsPage 用） */
+.toast {
+    position: fixed;
+    top: -48px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    box-shadow: 0 6px 20px rgba(0,0,0,.08);
+    transition: top .24s ease, opacity .2s ease;
+    opacity: 0;
+    z-index: 50;
+    pointer-events: none;
+}
+.toast.visible { top: 16px; opacity: 1; }
+.toast.info { border-color: #cbd5e1; }
+.toast.success { border-color: #86efac; background: #f0fdf4; }
+
+/* 提示块 */
+.notice {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid #fde68a;
+    background: #fffbeb;
+    color: #92400e;
+    border-radius: 8px;
+}
+.hint { color:#6b7280; font-size:12px; }
+
+/* ========== 表单控件：统一外观 ========== */
+/* 给所有普通输入统一用 .form-input 类，select/textarea 也用 */
+.form-input,
+select,
+textarea {
+    width: 100%;
+    max-width: var(--field-max);
+    padding: 9px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    background: #fff;
+    color: var(--text);
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+    outline: none;
+    line-height: 1.3;
+}
+
+.form-input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, .15);
+    background: #fff;
+}
+
+.form-input[disabled], select[disabled], textarea[disabled] {
+    background: #f3f4f6;
+    color: #9ca3af;
+    cursor: not-allowed;
+}
+
+/* number 输入：去掉默认小箭头（更干净） */
+.form-input[type="number"]::-webkit-outer-spin-button,
+.form-input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.form-input[type="number"] { -moz-appearance: textfield; }
+
+/* 复选框：加大尺寸 + 主题色 */
+.form-checkbox {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--ring);
+    transform: translateY(1px);
+}
+
+/* ========== 表单布局（设置页/通用） ========== */
+.settings-wrap { padding:16px; margin:0 auto; max-width: 1100px; } /* 设置页稍窄，视觉更集中 */
+.title { margin:0 0 12px 0; }
+.settings-header { display:flex; align-items:center; justify-content:space-between; flex-wrap: wrap; gap: 8px; }
+.toolbar { display:flex; gap:8px; }
+
+.rows { display: grid; gap: 12px; }
+.row {
+    display: grid;
+    grid-template-columns: var(--label-w) minmax(260px, 1fr); /* 右侧列可扩展 */
+    align-items: center;
+    gap: 12px;
+}
+.row > label { color: #111827; }
+
+/* 控件容器内再限制控件最大宽度，避免超宽拉伸 */
+.row > *:not(label) > .form-input,
+.row > *:not(label) .form-input,
+.row > .form-input,
+.row > select,
+.row > textarea {
+    max-width: var(--field-max);
+}
+
+/* 小屏：上下布局 */
+@media (max-width: 900px) {
+    .row { grid-template-columns: 1fr; }
+    .row label { margin-bottom: 4px; }
+}
+
+/* 操作行 */
+.actions { margin-top:16px; display:flex; align-items:center; gap:8px; }
+
+/* ========== 诊断页通用容器（颜色在模块里） ========== */
+.diag-wrap { display: grid; gap: 12px; }
+.diag-top { display: flex; align-items: center; justify-content: space-between; }
+.diag-status { display: flex; align-items: center; gap: 8px; }
+.tail { color: var(--muted); user-select: none; }
+
+.log {
+    height: 420px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    background: #0b1220;
+    color: #e5e7eb;
+    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.empty { color: #9ca3af; }
