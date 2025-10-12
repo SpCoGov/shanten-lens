@@ -1,0 +1,26 @@
+.line {
+}
+
+.ts {
+    color: #9ca3af;
+}
+
+.lv {
+    font-weight: 600;
+}
+
+.info .lv {
+    color: #a7f3d0;
+}
+
+.warn .lv {
+    color: #fde68a;
+}
+
+.out .lv {
+    color: #93c5fd;
+}
+
+.err .lv {
+    color: #fca5a5;
+}

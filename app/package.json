@@ -1,0 +1,34 @@
+{
+  "name": "shanten-lens-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "backend:dev-win": "cd .. && .venv\\Scripts\\python.exe -m uvicorn backend.app:app --host 127.0.0.1 --port 8787 --reload",
+    "tauri:dev-all": "concurrently -k -n UI,API -c \"auto\" \"tauri dev\" \"npm run backend:dev-win\""
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.8.0",
+    "@tauri-apps/plugin-fs": "^2.4.2",
+    "@tauri-apps/plugin-log": "^2.2.0",
+    "@tauri-apps/plugin-opener": "^2.5.0",
+    "@tauri-apps/plugin-shell": "^2.3.1",
+    "react": "^18",
+    "react-dom": "^18",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "^4",
+    "concurrently": "^9.2.1",
+    "typescript": "^5",
+    "vite": "^5"
+  }
+}
