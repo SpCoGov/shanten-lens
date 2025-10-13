@@ -4,3 +4,8 @@ pydantic==2.9.2
 mitmproxy>=10.2.4
 platformdirs
 watchfiles
+
+protobuf>=4.25.0
+googleapis-common-protos>=1.63.0
+google>=3.0.0
+loguru>=0.7.2

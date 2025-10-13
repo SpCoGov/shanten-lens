@@ -57,8 +57,6 @@ fn resolve_backend_path(app: &AppHandle) -> Option<PathBuf> {
   None
 }
 
-// —— 内部实现：直接用 Arc<Mutex<...>>，外层命令只是薄包装 ——
-
 fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Result<String, String> {
   // 已在运行就直接返回
   {
@@ -137,9 +135,6 @@ fn stop_backend_with(st: Arc<Mutex<BackendProcState>>) -> Result<String, String>
   }
 }
 
-// —— tauri command 薄包装 ——
-// 前端如果要手动触发也能用（例如“重启后端”按钮）
-
 #[tauri::command]
 fn start_backend(app: AppHandle, state: State<BackendState>) -> Result<String, String> {
   let st = state.0.clone();
@@ -169,17 +164,33 @@ fn kill_all_backends_silently() {
 
 pub fn run() {
   tauri::Builder::default()
-  .plugin(tauri_plugin_fs::init())
-  .plugin(tauri_plugin_opener::init())
+    .plugin(tauri_plugin_fs::init())
+    .plugin(tauri_plugin_opener::init())
     .manage(BackendState(Arc::new(Mutex::new(BackendProcState::default()))))
     .invoke_handler(tauri::generate_handler![start_backend, stop_backend])
     .setup(|app| {
-      // 启动应用就拉起后端（非阻塞 spawn）
       let ah = app.handle().clone();
       let st = app.state::<BackendState>().0.clone();
-      let _ = start_backend_with(ah, st.clone());
 
-      // 窗口关闭时：先优雅结束自己托管的子进程，再兜底强杀所有同名进程
+      // 开发态默认不自启；如需临时自启：FORCE_AUTOSTART_BACKEND=1 npm run tauri:dev
+      let force_autostart = std::env::var("FORCE_AUTOSTART_BACKEND")
+        .map(|v| v == "1")
+        .unwrap_or(false);
+
+      #[cfg(debug_assertions)]
+      {
+        if force_autostart {
+          let _ = start_backend_with(ah.clone(), st.clone());
+        }
+      }
+
+      #[cfg(not(debug_assertions))]
+      {
+        // release / 打包构建中仍然自启后端
+        let _ = start_backend_with(ah.clone(), st.clone());
+      }
+
+      // 关闭窗口时收尾
       if let Some(win) = app.get_webview_window("main") {
         let st2 = st.clone();
         win.on_window_event(move |e| {

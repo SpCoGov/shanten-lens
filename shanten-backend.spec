@@ -5,7 +5,7 @@ a = Analysis(
     ['backend\\run_server.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('proto', 'proto')],
     hiddenimports=['uvicorn', 'fastapi', 'pydantic'],
     hookspath=[],
     hooksconfig={},
