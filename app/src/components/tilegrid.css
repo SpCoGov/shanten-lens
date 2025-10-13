@@ -1,0 +1,27 @@
+.tile-card {
+    background: #0b1020;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 16px;
+    padding: 16px;
+    color: #e5e7eb;
+    box-shadow: 0 6px 20px rgba(0,0,0,.35);
+}
+
+.tile-card__header {
+    font-size: 14px;
+    opacity: .85;
+    margin-bottom: 12px;
+}
+
+.tile-grid {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    grid-auto-rows: 84px;
+    gap: 8px;
+}
+
+.tile-grid__cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}

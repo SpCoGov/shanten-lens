@@ -1,0 +1,16 @@
+.mj-tile {
+    display: inline-block;
+    border-radius: 6px;
+    transition: transform 120ms ease, box-shadow 120ms ease, outline-color 120ms ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,.15);
+    outline: 2px solid transparent;
+}
+
+.mj-tile:hover {
+    transform: translateY(-2px);
+}
+
+.mj-tile--highlight {
+    outline-color: #2dd4bf; /* 青绿 */
+    box-shadow: 0 0 0 3px rgba(45,212,191,.25), 0 8px 20px rgba(0,0,0,.3);
+}
