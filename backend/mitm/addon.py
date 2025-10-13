@@ -97,5 +97,9 @@ class WsAddon:
         try:
             return hook(view)
         except Exception as e:
-            logger.error(f"hook 执行异常: {e}")
+            logger.exception(
+                "hook 执行异常 (hook={}, view_keys={})",
+                getattr(hook, "__name__", repr(hook)),
+                view.keys(),
+            )
             return "pass", None

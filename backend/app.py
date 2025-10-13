@@ -47,7 +47,7 @@ CLIENTS: Set[WebSocketServerProtocol] = set()
 CLIENTS_LOCK = asyncio.Lock()
 
 
-async def _ws_send(ws: WebSocketServerProtocol, pkt: Dict[str, Any]):
+async def ws_send(ws: WebSocketServerProtocol, pkt: Dict[str, Any]):
     try:
         await ws.send(json.dumps(pkt, ensure_ascii=False))
     except Exception:
@@ -55,7 +55,7 @@ async def _ws_send(ws: WebSocketServerProtocol, pkt: Dict[str, Any]):
         pass
 
 
-async def _broadcast(pkt: Dict[str, Any]):
+async def broadcast(pkt: Dict[str, Any]):
     dead: list[WebSocketServerProtocol] = []
     async with CLIENTS_LOCK:
         for c in list(CLIENTS):
@@ -88,8 +88,8 @@ async def ws_handler(ws: WebSocketServerProtocol):
     async with CLIENTS_LOCK:
         CLIENTS.add(ws)
 
-    # 初次连接：发送全量配置
-    await _ws_send(ws, {"type": "update_config", "data": MANAGER.to_payload()})
+    await ws_send(ws, {"type": "update_config", "data": MANAGER.to_payload()})
+    await ws_send(ws, {"type": "update_gamestate", "data": GAME_STATE.to_dict()})
 
     try:
         async for raw in ws:
@@ -114,17 +114,18 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     for p in written_paths:
                         recent_writes[str(p)] = now_ms
                     # 主动广播一次（监听器会抑制自写，避免重复）
-                    await _broadcast({"type": "update_config", "data": MANAGER.to_payload()})
+                    await broadcast({"type": "update_config", "data": MANAGER.to_payload()})
 
             elif t == "request_update":
-                await _ws_send(ws, {"type": "update_config", "data": MANAGER.to_payload()})
+                await ws_send(ws, {"type": "update_config", "data": MANAGER.to_payload()})
+                await ws_send(ws, {"type": "update_gamestate", "data": GAME_STATE.to_dict()})
 
             elif t == "open_config_dir":
                 try:
                     _open_dir(str(CONF_DIR))
-                    await _ws_send(ws, {"type": "open_result", "data": {"ok": True}})
+                    await ws_send(ws, {"type": "open_result", "data": {"ok": True}})
                 except Exception as e:
-                    await _ws_send(ws, {"type": "open_result", "data": {"ok": False, "error": str(e)}})
+                    await ws_send(ws, {"type": "open_result", "data": {"ok": False, "error": str(e)}})
 
             # 其余类型保留拓展
 
@@ -153,7 +154,7 @@ async def _watch_configs():
             should_broadcast = should_broadcast or changed
 
         if should_broadcast:
-            await _broadcast({"type": "update_config", "data": MANAGER.to_payload()})
+            await broadcast({"type": "update_config", "data": MANAGER.to_payload()})
             logger.info("config updated & broadcast")
 
 
