@@ -13,9 +13,10 @@ export default function App() {
     const [route, setRoute] = React.useState<Route>("home");
     const [connected, setConnected] = React.useState(false);
 
-    const demoIds = [1,
-        2,
-        3,
+    const demoIds = [
+        36,
+        37,
+        38,
         4,
         5,
         6,
@@ -87,6 +88,9 @@ export default function App() {
         34: "4z",
         35: "5z",
         36: "6z",
+        37: "7z",
+        38: "bd",
+        39: "5z"
     };
     const tiles = repeatedIds.map((id) => idToTile[id] ?? "bd");
 

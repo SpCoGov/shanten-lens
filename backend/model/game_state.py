@@ -1,9 +1,11 @@
 from __future__ import annotations
-from dataclasses import dataclass, field, asdict
-from collections import OrderedDict
-from typing import List
-from loguru import logger
+
+import asyncio
 import json
+from loguru import logger
+from collections import OrderedDict
+from dataclasses import dataclass, field
+from typing import List
 
 
 @dataclass
@@ -17,8 +19,9 @@ class GameState:
     dora_tiles: List[int] = field(default_factory=list)  # 宝牌指示牌（包含未翻开的）
     replacement_tiles: List[int] = field(default_factory=list)  # 替换牌（换牌阶段）
     wall_tiles: List[int] = field(default_factory=list)  # 牌山顺序（打牌阶段能摸到的）
-    dropped_tiles: List[int] = field(default_factory=list)  # 打出的牌
     ended: bool = field(default_factory=bool)  # 游戏是否结束
+    desktop_remain: int = field(default_factory=int)  # 剩余可摸的牌
+    locked_tiles: List[int] = field(default_factory=list)  # 被锁住的牌
 
     def to_dict(self) -> dict:
         """
@@ -26,13 +29,14 @@ class GameState:
         """
         return {
             "stage": self.stage,
-            "deck_map": list(self.deck_map.items()),  # 转为列表保持顺序
+            "deck_map": self.deck_map,  # 转为列表保持顺序
             "hand_tiles": self.hand_tiles,
             "dora_tiles": self.dora_tiles,
             "replacement_tiles": self.replacement_tiles,
             "wall_tiles": self.wall_tiles,
-            "dropped_tiles": self.dropped_tiles,
             "ended": self.ended,
+            "desktop_remain": self.desktop_remain,
+            "locked_tiles": self.locked_tiles,
         }
 
     def to_json(self, *, indent: int | None = 2, ensure_ascii: bool = False) -> str:
@@ -41,40 +45,23 @@ class GameState:
         """
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=ensure_ascii)
 
-    @classmethod
-    def from_json(cls, data: str | dict) -> GameState:
-        """
-        从 JSON（字符串或字典）反序列化为 GameState 实例
-        """
-        if isinstance(data, str):
-            data = json.loads(data)
+    async def on_gamestage_change(self):
+        from backend.app import broadcast
+        await broadcast({"type": "update_gamestate", "data": self.to_dict()})
 
-        deck_items = data.get("deck_map", [])
-        deck = OrderedDict((int(k), str(v)) for k, v in deck_items)
-
-        return cls(
-            stage=int(data.get("stage", 0)),
-            deck_map=deck,
-            hand_tiles=[int(x) for x in data.get("hand_tiles", [])],
-            dora_tiles=data.get("dora_tiles", []),
-            replacement_tiles=[int(x) for x in data.get("replacement_tiles", [])],
-            wall_tiles=[int(x) for x in data.get("wall_tiles", [])],
-            dropped_tiles=data.get("dropped_tiles", []),
-            ended=data.get("ended", False),
-        )
-
-    def update_pool(self, pool: list[dict], tehai: list[int]):
+    def update_pool(self, pool: list[dict], hand_tiles: list[int], locked_tiles: list[int], push_gamestage: bool = True):
         self.deck_map.clear()
         self.hand_tiles.clear()
         self.dora_tiles.clear()
         self.replacement_tiles.clear()
         self.wall_tiles.clear()
-        self.dropped_tiles.clear()
+        self.locked_tiles.clear()
         for item in pool:
             self.deck_map[item["id"]] = item["tile"]
         temp = self.deck_map.copy()
-        for tehai_id in tehai:
-            temp.pop(tehai_id)
+        self.hand_tiles = hand_tiles.copy()
+        for hand_tile_id in hand_tiles:
+            temp.pop(hand_tile_id)
         ids = list(temp.keys())
         cursor = 0
 
@@ -89,5 +76,23 @@ class GameState:
         # 剩下全部 → replacement
         self.replacement_tiles = ids[cursor:]
 
-    def update_dropped_tiles(self, tiles: list[int]):
-        self.dropped_tiles = list(tiles)
+        self.locked_tiles = locked_tiles.copy()
+        for locked_id in self.locked_tiles:
+            self.wall_tiles.remove(locked_id)
+        if push_gamestage:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.on_gamestage_change())
+
+    def on_draw_tile(self, tile_id: int, push_gamestage: bool = True):
+        self.wall_tiles.remove(tile_id)
+        if push_gamestage:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.on_gamestage_change())
+
+    def update_other_info(self, desktop_remain: int, stage: int, ended: bool, push_gamestage: bool = True):
+        self.desktop_remain = desktop_remain
+        self.stage = stage
+        self.ended = ended
+        if push_gamestage:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.on_gamestage_change())
