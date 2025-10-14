@@ -6,9 +6,24 @@
     --ring: #3b82f6;
     --text: #0f172a;
 
+    --panel-radius: 12px;
+    --panel-bg: #fff;
+    --panel-border: 1px solid var(--border, rgba(0,0,0,.08));
+    --panel-shadow: 0 2px 12px rgba(0,0,0,.06);
+    --panel-padding: 12px;
+
     --content-max: 1280px;   /* ↑ 放宽内容区 */
     --field-max: 560px;      /* 表单控件最大宽度 */
     --label-w: 260px;        /* 左侧标签列宽（大屏） */
+}
+
+.mj-panel {
+    border-radius: var(--panel-radius);
+    background: var(--panel-bg);
+    border: var(--panel-border);
+    box-shadow: var(--panel-shadow);
+    padding: var(--panel-padding);
+    box-sizing: border-box;
 }
 
 * { box-sizing: border-box; }

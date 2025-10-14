@@ -1,7 +1,7 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {useLayoutEffect, useMemo, useRef, useState} from "react";
 import Tile from "./Tile";
 import "./tilegrid.css";
-import type { Cell } from "../lib/gamestate";
+import type {Cell} from "../lib/gamestate";
 
 const ROWS = 4;
 const COLS = 9;
@@ -13,7 +13,7 @@ const BASE_GAP_Y = 12;
 const MIN_SCALE = 0.45;
 const MAX_SCALE = 1.0;
 
-export default function TileGrid({ cells }: { cells: Cell[] }) {
+export default function TileGrid({cells}: { cells: Cell[] }) {
     const [hovered, setHovered] = useState<string | null>(null);
     const [scale, setScale] = useState(1);
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -27,6 +27,9 @@ export default function TileGrid({ cells }: { cells: Cell[] }) {
         window.addEventListener("shanten:hover-tile", onHover as EventListener);
         return () => window.removeEventListener("shanten:hover-tile", onHover as EventListener);
     }, []);
+    React.useEffect(() => {
+        window.dispatchEvent(new CustomEvent("shanten:hover-tile", {detail: hovered}));
+    }, [hovered]);
 
     useLayoutEffect(() => {
         const el = containerRef.current;
@@ -63,18 +66,14 @@ export default function TileGrid({ cells }: { cells: Cell[] }) {
 
     return (
         <section
-            className="card tilegrid-card"
+            className="mj-panel card tilegrid-card"
             style={{
                 width: "100%",
                 boxSizing: "border-box",
                 overflow: "hidden",
-                borderRadius: 12,
-                border: "1px solid var(--border)",
-                background: "#fff",
-                padding: 12,
             }}
         >
-            <div ref={containerRef} style={{ width: "100%" }}>
+            <div ref={containerRef} style={{width: "100%"}}>
                 <div
                     className="tilegrid-grid"
                     style={{
@@ -112,7 +111,7 @@ export default function TileGrid({ cells }: { cells: Cell[] }) {
                             return (
                                 <div
                                     key={`${c.tile}-${c.dim ? "d" : "n"}-${i}`}
-                                    style={{ gridRow: r + 1, gridColumn: cIdx + 1 }}
+                                    style={{gridRow: r + 1, gridColumn: cIdx + 1}}
                                 >
                                     <Tile
                                         tile={c.tile}

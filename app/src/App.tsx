@@ -1,11 +1,12 @@
 import React from "react";
-import { listen } from "@tauri-apps/api/event";
+import {listen} from "@tauri-apps/api/event";
 import SettingsPage from "./pages/SettingsPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
-import { ws } from "./lib/ws";
-import { useLogStore, type LogLevel } from "./lib/logStore";
+import {ws} from "./lib/ws";
+import {useLogStore, type LogLevel} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
 import WallStats from "./components/WallStats";
+import ReplacementPanel from "./components/ReplacementPanel";
 import "./App.css";
 
 import {
@@ -30,6 +31,9 @@ export default function App() {
 
     const [wallStatsTiles, setWallStatsTiles] = React.useState<string[]>([]);
 
+    const [replacementTiles, setReplacementTiles] = React.useState<string[]>([]);
+    const [switchUsedCount, setSwitchUsedCount] = React.useState<number>(0);
+
     React.useEffect(() => {
         ws.connect();
         setConnected(ws.connected);
@@ -47,6 +51,13 @@ export default function App() {
                 setEnded(!!d.ended);
                 setRemain(d.desktop_remain ?? 0);
                 setHasGame(d.stage !== undefined && d.ended !== undefined && d.stage >= 0);
+
+                const repl = Array.isArray(d.replacement_tiles)
+                    ? d.replacement_tiles.map((id) => deck.get(id) ?? "5m") : [];
+                const used = Array.isArray((d as any).switch_used_tiles)
+                    ? (d as any).switch_used_tiles.length : 0;
+                setReplacementTiles(repl);
+                setSwitchUsedCount(used);
 
                 const wallList = Array.isArray(d.wall_tiles)
                     ? d.wall_tiles.map((id) => deck.get(id) ?? "5m")
@@ -82,8 +93,8 @@ export default function App() {
         };
     }, []);
 
-    const Dot = ({ ok }: { ok: boolean }) => (
-        <span className={`dot ${ok ? "ok" : "down"}`} aria-label={ok ? "connected" : "disconnected"} />
+    const Dot = ({ok}: { ok: boolean }) => (
+        <span className={`dot ${ok ? "ok" : "down"}`} aria-label={ok ? "connected" : "disconnected"}/>
     );
 
     return (
@@ -102,7 +113,7 @@ export default function App() {
                     </button>
                 </nav>
                 <div className="status">
-                    <Dot ok={connected} />
+                    <Dot ok={connected}/>
                     <span>{connected ? "已连接后端" : "未连接"}</span>
                 </div>
             </header>
@@ -124,10 +135,17 @@ export default function App() {
                             height: "100%",
                         }}
                     >
-                        <WallStats wallTiles={wallStatsTiles} />
+                        <WallStats wallTiles={wallStatsTiles}/>
 
-                        <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
-                            <TileGrid cells={cells} />
+                        <div style={{flex: 1, position: "relative", minWidth: 0}}>
+                            <TileGrid cells={cells}/>
+
+                            {stage === 2 && replacementTiles.length > 0 && (
+                                <ReplacementPanel
+                                    replacementTiles={replacementTiles}
+                                    usedCount={switchUsedCount}
+                                />
+                            )}
 
                             <div
                                 style={{
@@ -148,7 +166,7 @@ export default function App() {
                             >
                                 {hasGame ? (
                                     <>
-                                        <span style={{ fontWeight: 600 }}>状态</span>
+                                        <span style={{fontWeight: 600}}>状态</span>
                                         <span className="badge">{`剩余：${remain}`}</span>
                                         <span className="badge">{`阶段：${stage}`}</span>
                                         <span className={`badge ${ended ? "down" : "ok"}`}>{ended ? "已结束" : "进行中"}</span>
@@ -161,8 +179,8 @@ export default function App() {
                     </div>
                 )}
 
-                {route === "settings" && <SettingsPage />}
-                {route === "diagnostics" && <DiagnosticsPage />}
+                {route === "settings" && <SettingsPage/>}
+                {route === "diagnostics" && <DiagnosticsPage/>}
             </main>
         </div>
     );

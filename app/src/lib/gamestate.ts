@@ -8,6 +8,7 @@ export interface GameStateData {
     ended: boolean;
     desktop_remain: number;
     locked_tiles: number[];
+    switch_used_tiles: number[];
 }
 
 export interface WsEnvelope<T = any> {

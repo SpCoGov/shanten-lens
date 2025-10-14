@@ -24,6 +24,8 @@ class GameState:
     desktop_remain: int = field(default_factory=int)  # 剩余可摸的牌
     locked_tiles: List[int] = field(default_factory=list)  # 被锁住的牌
 
+    update_reason: List[str] = field(default_factory=list)
+
     def to_dict(self) -> dict:
         """
         转为 Python 原生字典（保持顺序）
@@ -39,6 +41,7 @@ class GameState:
             "ended": self.ended,
             "desktop_remain": self.desktop_remain,
             "locked_tiles": self.locked_tiles,
+            "update_reason": self.update_reason,
         }
 
     def to_json(self, *, indent: int | None = 2, ensure_ascii: bool = False) -> str:
@@ -50,8 +53,9 @@ class GameState:
     async def on_gamestage_change(self):
         from backend.app import broadcast
         await broadcast({"type": "update_gamestate", "data": self.to_dict()})
+        self.update_reason.clear()
 
-    def update_pool(self, pool: list[dict], hand_tiles: list[int], locked_tiles: list[int], push_gamestate: bool = True):
+    def update_pool(self, pool: list[dict], hand_tiles: list[int], locked_tiles: list[int], push_gamestate: bool = True, reason: str = ""):
         self.deck_map.clear()
         self.hand_tiles.clear()
         self.dora_tiles.clear()
@@ -84,11 +88,13 @@ class GameState:
         self.locked_tiles = locked_tiles.copy()
         for locked_id in self.locked_tiles:
             self.wall_tiles.remove(locked_id)
+
+        self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
-    def refresh_wall_by_remaning(self, push_gamestate: bool = True):
+    def refresh_wall_by_remaning(self, push_gamestate: bool = True, reason: str = ""):
         temp = self.deck_map.copy()
         hand_tiles = self.hand_tiles.copy()
         for hand_tile_id in hand_tiles:
@@ -98,27 +104,52 @@ class GameState:
         cursor = 10 + 36 - self.desktop_remain - 1
         # 取后 剩余多少张 → wall
         self.wall_tiles = ids[cursor:cursor + self.desktop_remain]
+
+        self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
-    def on_draw_tile(self, tile_id: int, push_gamestate: bool = True):
+    def on_draw_tile(self, tile_id: int, push_gamestate: bool = True, reason: str = ""):
         self.wall_tiles.remove(tile_id)
+
+        self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
-    def update_switch_used_tiles(self, used: list[int], push_gamestate: bool = True):
+    def update_switch_used_tiles(self, used: list[int], push_gamestate: bool = True, reason: str = ""):
         if self.stage == 2:
             self.switch_used_tiles = used.copy()
+
+        self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
-    def update_other_info(self, desktop_remain: int, stage: int, ended: bool, push_gamestate: bool = True):
+    def update_other_info(self, desktop_remain: int, stage: int, ended: bool, push_gamestate: bool = True, reason: str = ""):
         self.desktop_remain = desktop_remain
         self.stage = stage
         self.ended = ended
+
+        self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
+
+    def on_giveup(self):
+        self.stage = -1
+        self.deck_map.clear()
+        self.hand_tiles.clear()
+        self.dora_tiles.clear()
+        self.replacement_tiles.clear()
+        self.wall_tiles.clear()
+        self.switch_used_tiles.clear()
+        self.ended = True
+        self.desktop_remain = 0
+        self.locked_tiles.clear()
+        self.update_reason.clear()
+        self.update_reason.append(".lq.Lobby.amuletActivityGiveup")
+
+        loop = asyncio.get_running_loop()
+        loop.create_task(self.on_gamestage_change())

@@ -12,6 +12,7 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
 def on_inbound(view: Dict) -> Tuple[str, Any]:
     """
     .lq.Lobby.fetchAmuletActivityData           进入青云之志界面
+    .lq.Lobby.amuletActivityGiveup              放弃
     .lq.Lobby.amuletActivityOperate             游戏中打牌等操作
     .lq.Lobby.amuletActivityStartGame           游戏开始，这回合获得的牌山数组似乎没有任何作用
     .lq.Lobby.amuletActivityUpgrade             回合开始
@@ -50,8 +51,15 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             if hands and pool:
                 GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, push_gamestate=False)
                 desktop_remain = round_info.get("desktopRemain", {}).get("value", 0)
-                stage = value_changes.get("stage", -1)
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=GAME_STATE.ended)
+                # 进入换牌阶段
+                switch_stage_event = next((e for e in events if e.get("type") == 19), None)
+                if switch_stage_event:
+                    value_changes_19 = switch_stage_event.get("valueChanges", {})
+                    stage = value_changes_19.get("stage", -1)
+                    ended = value_changes_19.get("ended", False)
+                    GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, reason=".lq.Lobby.amuletActivityUpgrade:19")
+                else:
+                    GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=GAME_STATE.stage, ended=GAME_STATE.ended, reason=".lq.Lobby.amuletActivityUpgrade:23")
                 if MANAGER.get("game.public_all"):
                     show_desktop_tiles = round_info.get("showDesktopTiles", {}).get("value", [])
                     show_desktop_tiles.clear()
@@ -74,7 +82,7 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             value_changes = end_event.get("valueChanges", {})
             stage = value_changes.get("stage", -1)
             ended = value_changes.get("ended", True)
-            GAME_STATE.update_other_info(desktop_remain=GAME_STATE.desktop_remain, stage=stage, ended=ended)
+            GAME_STATE.update_other_info(desktop_remain=GAME_STATE.desktop_remain, stage=stage, ended=ended, reason=".lq.Lobby.amuletActivityOperate:100")
             return "pass", None
         # type = 4: 换牌
         switch_event = next((e for e in events if e.get("type") == 4), None)
@@ -82,7 +90,7 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             value_changes = switch_event.get("valueChanges", {})
             round_info = value_changes.get("round", {})
             used = round_info.get("used", {}).get("value", [])
-            GAME_STATE.update_switch_used_tiles(used=used, push_gamestate=False)
+            GAME_STATE.update_switch_used_tiles(used=used, push_gamestate=False, reason=".lq.Lobby.amuletActivityOperate:4")
             stage = value_changes.get("stage", -1)
             GAME_STATE.update_other_info(desktop_remain=GAME_STATE.desktop_remain, stage=stage, ended=GAME_STATE.ended)
 
@@ -99,7 +107,7 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             if after_draw_hands:
                 GAME_STATE.on_draw_tile(after_draw_hands[len(after_draw_hands) - 1], push_gamestate=False)
 
-            GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended)
+            GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, reason=".lq.Lobby.amuletActivityOperate:6")
     # 进入青云之志界面时获取已经开始的游戏数据
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.fetchAmuletActivityData":
         data = view.get("data", {}).get("data", {})
@@ -109,7 +117,7 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             hands = round_info.get("hands", [])
             pool = round_info.get("pool", [])
             locked_tiles = round_info.get("lockedTile", [])
-            GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, push_gamestate=False)
+            GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, push_gamestate=False, reason=".lq.Lobby.fetchAmuletActivityData")
             desktop_remain = round_info.get("desktopRemain", 0)
             stage = game.get("stage", -1)
             ended = game.get("ended", False)
@@ -120,6 +128,16 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             else:
                 GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended)
     # 只是用来更新一下状态
+    if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityGiveup":
+        GAME_STATE.on_giveup()
+    if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivitySelectFreeEffect":
+        data = view.get("data", {})
+        events = data.get("events", [])
+        start_event = next((e for e in events if e.get("type") == 2), None)
+        value_changes = start_event.get("valueChanges", {})
+        stage = value_changes.get("stage", -1)
+        ended = value_changes.get("ended", False)
+        GAME_STATE.update_other_info(desktop_remain=GAME_STATE.desktop_remain, stage=stage, ended=ended, reason=".lq.Lobby.amuletActivitySelectFreeEffect:2")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityStartGame":
         data = view.get("data", {})
         events = data.get("events", [])
@@ -127,7 +145,7 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
         value_changes = start_event.get("valueChanges", {})
         stage = value_changes.get("stage", -1)
         ended = value_changes.get("ended", False)
-        GAME_STATE.update_other_info(desktop_remain=GAME_STATE.desktop_remain, stage=stage, ended=ended)
+        GAME_STATE.update_other_info(desktop_remain=GAME_STATE.desktop_remain, stage=stage, ended=ended, reason=".lq.Lobby.amuletActivityStartGame:1")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityBuy":
         data = dict(view["data"])
         events = data.get("events", [])
@@ -135,7 +153,7 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
         if buy_amulet_event:
             value_changes = buy_amulet_event.get("valueChanges", {})
             stage = value_changes.get("stage", -1)
-            GAME_STATE.update_other_info(desktop_remain=GAME_STATE.desktop_remain, stage=stage, ended=GAME_STATE.ended)
+            GAME_STATE.update_other_info(desktop_remain=GAME_STATE.desktop_remain, stage=stage, ended=GAME_STATE.ended, reason=".lq.Lobby.amuletActivityBuy:13")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivitySelectPack":
         data = view.get("data", {})
         events = data.get("events", [])
@@ -143,7 +161,7 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
         if select_amulet_event:
             value_changes = select_amulet_event.get("valueChanges", {})
             stage = value_changes.get("stage", -1)
-            GAME_STATE.update_other_info(desktop_remain=GAME_STATE.desktop_remain, stage=stage, ended=GAME_STATE.ended)
+            GAME_STATE.update_other_info(desktop_remain=GAME_STATE.desktop_remain, stage=stage, ended=GAME_STATE.ended, reason=".lq.Lobby.amuletActivitySelectPack:14")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityEndShopping":
         data = view.get("data", {})
         events = data.get("events", [])
@@ -151,5 +169,5 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
         if end_shopping_event:
             value_changes = end_shopping_event.get("valueChanges", {})
             stage = value_changes.get("stage", -1)
-            GAME_STATE.update_other_info(desktop_remain=GAME_STATE.desktop_remain, stage=stage, ended=GAME_STATE.ended)
+            GAME_STATE.update_other_info(desktop_remain=GAME_STATE.desktop_remain, stage=stage, ended=GAME_STATE.ended, reason=".lq.Lobby.amuletActivityEndShopping:22")
     return "pass", None

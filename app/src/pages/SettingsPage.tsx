@@ -35,7 +35,6 @@ export default function SettingsPage() {
         if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
     }, []);
 
-    // WS 一次性订阅
     useEffect(() => {
         ws.connect();
         const off = ws.on((pkt: any) => {
@@ -64,7 +63,6 @@ export default function SettingsPage() {
             off();
             clearTimeout(t);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const onChange = (tname: string, key: string, val: any) => {
@@ -123,8 +121,7 @@ export default function SettingsPage() {
                 </div>
             )}
 
-            {/* 单卡片 + 居中分隔线 */}
-            <div className={`card ${styles.bigCard}`}>
+            <div className={`mj-panel card ${styles.bigCard}`}>
                 {sections.map(([tname, kv], idx) => (
                     <div key={tname} className={styles.section}>
                         <h3 className={styles.sectionTitle}>{tname}</h3>
@@ -169,7 +166,7 @@ export default function SettingsPage() {
                 ))}
             </div>
 
-            <div className="actions">
+                <div className="actions">
                 <button className={`btn ${saving ? "loading" : ""}`} onClick={save} disabled={!ws.connected || saving}>
                     {saving ? "保存中…" : "保存"}
                 </button>
