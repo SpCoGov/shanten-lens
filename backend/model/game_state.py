@@ -19,6 +19,7 @@ class GameState:
     dora_tiles: List[int] = field(default_factory=list)  # 宝牌指示牌（包含未翻开的）
     replacement_tiles: List[int] = field(default_factory=list)  # 替换牌（换牌阶段）
     wall_tiles: List[int] = field(default_factory=list)  # 牌山顺序（打牌阶段能摸到的）
+    switch_used_tiles: List[int] = field(default_factory=list)  # 交换阶段交换到的牌
     ended: bool = field(default_factory=bool)  # 游戏是否结束
     desktop_remain: int = field(default_factory=int)  # 剩余可摸的牌
     locked_tiles: List[int] = field(default_factory=list)  # 被锁住的牌
@@ -34,6 +35,7 @@ class GameState:
             "dora_tiles": self.dora_tiles,
             "replacement_tiles": self.replacement_tiles,
             "wall_tiles": self.wall_tiles,
+            "switch_used_tiles": self.switch_used_tiles,
             "ended": self.ended,
             "desktop_remain": self.desktop_remain,
             "locked_tiles": self.locked_tiles,
@@ -49,13 +51,16 @@ class GameState:
         from backend.app import broadcast
         await broadcast({"type": "update_gamestate", "data": self.to_dict()})
 
-    def update_pool(self, pool: list[dict], hand_tiles: list[int], locked_tiles: list[int], push_gamestage: bool = True):
+    def update_pool(self, pool: list[dict], hand_tiles: list[int], locked_tiles: list[int], push_gamestate: bool = True):
         self.deck_map.clear()
         self.hand_tiles.clear()
         self.dora_tiles.clear()
         self.replacement_tiles.clear()
         self.wall_tiles.clear()
         self.locked_tiles.clear()
+        self.switch_used_tiles.clear()
+        self.ended = True
+        self.stage = -1
         for item in pool:
             self.deck_map[item["id"]] = item["tile"]
         temp = self.deck_map.copy()
@@ -79,20 +84,41 @@ class GameState:
         self.locked_tiles = locked_tiles.copy()
         for locked_id in self.locked_tiles:
             self.wall_tiles.remove(locked_id)
-        if push_gamestage:
+        if push_gamestate:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
-    def on_draw_tile(self, tile_id: int, push_gamestage: bool = True):
+    def refresh_wall_by_remaning(self, push_gamestate: bool = True):
+        temp = self.deck_map.copy()
+        hand_tiles = self.hand_tiles.copy()
+        for hand_tile_id in hand_tiles:
+            temp.pop(hand_tile_id)
+        ids = list(temp.keys())
+        # 跳过 dora 和 已经摸牌的数量
+        cursor = 10 + 36 - self.desktop_remain - 1
+        # 取后 剩余多少张 → wall
+        self.wall_tiles = ids[cursor:cursor + self.desktop_remain]
+        if push_gamestate:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.on_gamestage_change())
+
+    def on_draw_tile(self, tile_id: int, push_gamestate: bool = True):
         self.wall_tiles.remove(tile_id)
-        if push_gamestage:
+        if push_gamestate:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
-    def update_other_info(self, desktop_remain: int, stage: int, ended: bool, push_gamestage: bool = True):
+    def update_switch_used_tiles(self, used: list[int], push_gamestate: bool = True):
+        if self.stage == 2:
+            self.switch_used_tiles = used.copy()
+        if push_gamestate:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.on_gamestage_change())
+
+    def update_other_info(self, desktop_remain: int, stage: int, ended: bool, push_gamestate: bool = True):
         self.desktop_remain = desktop_remain
         self.stage = stage
         self.ended = ended
-        if push_gamestage:
+        if push_gamestate:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())

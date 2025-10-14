@@ -1,15 +1,12 @@
 import asyncio
-import contextlib
-import logging
-import os
 from typing import Dict, Any, Callable, List, Optional
 
 from loguru import logger
 from mitmproxy.options import Options
 from mitmproxy.tools.dump import DumpMaster
 
-from .addon import WsAddon
-from .codec import LiqiCodec
+from backend.mitm.addon import WsAddon
+from backend.mitm.codec import LiqiCodec
 
 
 class MitmBridge:

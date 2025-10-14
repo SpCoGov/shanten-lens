@@ -1,66 +1,65 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import Tile from "./Tile";
 import "./tilegrid.css";
+import type { Cell } from "../lib/gamestate";
 
-/** UI 基准（与裁剪无关） */
+const ROWS = 4;
 const COLS = 9;
-const BASE_TILE_W = 64;   // 基准牌宽
-const BASE_TILE_H = 84;   // 基准牌高
-const BASE_GAP_X = 8;     // 基准列间距
-const BASE_GAP_Y = 12;    // 基准行间距
 
-// 最小/最大缩放：不让放大超过 1（基准尺寸），避免撑破卡片
+const BASE_TILE_W = 64;
+const BASE_TILE_H = 84;
+const BASE_GAP_X = 8;
+const BASE_GAP_Y = 12;
 const MIN_SCALE = 0.45;
 const MAX_SCALE = 1.0;
 
-export default function TileGrid({ tiles }: { tiles: string[] }) {
+export default function TileGrid({ cells }: { cells: Cell[] }) {
     const [hovered, setHovered] = useState<string | null>(null);
     const [scale, setScale] = useState(1);
-
-    // 观察这个容器的“实际可用宽度”，而不是 window 或 grid 自己
     const containerRef = useRef<HTMLDivElement | null>(null);
+
+    // 侧栏/其它处发出的单值 hover 事件（例如 "5p" 或 "0p"）
+    React.useEffect(() => {
+        const onHover = (e: Event) => {
+            const ce = e as CustomEvent<string | null>;
+            setHovered(ce.detail ?? null);
+        };
+        window.addEventListener("shanten:hover-tile", onHover as EventListener);
+        return () => window.removeEventListener("shanten:hover-tile", onHover as EventListener);
+    }, []);
 
     useLayoutEffect(() => {
         const el = containerRef.current;
         if (!el) return;
 
         const calc = (w: number) => {
-            // 基于“9 列 + 8 个列间距”需要的基准宽度
-            const need =
-                COLS * BASE_TILE_W + (COLS - 1) * BASE_GAP_X;
-
-            // 根据容器可用宽度计算 scale，并夹在 [MIN_SCALE, MAX_SCALE]
-            const s = Math.min(MAX_SCALE, Math.max(MIN_SCALE, w / need));
-            setScale(s);
+            const need = COLS * BASE_TILE_W + (COLS - 1) * BASE_GAP_X;
+            setScale(Math.min(MAX_SCALE, Math.max(MIN_SCALE, w / need)));
         };
 
-        // 初次
         calc(el.clientWidth);
-
-        // 观察容器（content-box 尺寸变化）
         const ro = new ResizeObserver((entries) => {
             const w = entries[0]?.contentRect?.width ?? el.clientWidth;
             calc(w);
         });
         ro.observe(el);
-
-        // 窗口变化兜底
         const onWin = () => calc(el.clientWidth);
         window.addEventListener("resize", onWin);
-
         return () => {
             ro.disconnect();
             window.removeEventListener("resize", onWin);
         };
     }, []);
 
-    const data = useMemo(() => tiles.slice(0, 36), [tiles]);
+    // 截断到 36 张
+    const data = useMemo(() => cells.slice(0, ROWS * COLS), [cells]);
 
-    // 渲染尺寸 = 基准 * scale
     const tileW = Math.round(BASE_TILE_W * scale);
     const tileH = Math.round(BASE_TILE_H * scale);
-    const gapX  = Math.round(BASE_GAP_X * scale);
-    const gapY  = Math.round(BASE_GAP_Y * scale);
+    const gapX = Math.round(BASE_GAP_X * scale);
+    const gapY = Math.round(BASE_GAP_Y * scale);
+
+    const totalSlots = ROWS * COLS;
 
     return (
         <section
@@ -68,37 +67,65 @@ export default function TileGrid({ tiles }: { tiles: string[] }) {
             style={{
                 width: "100%",
                 boxSizing: "border-box",
-                overflow: "hidden", // 双保险：避免偶发像素误差导致溢出
+                overflow: "hidden",
+                borderRadius: 12,
+                border: "1px solid var(--border)",
+                background: "#fff",
+                padding: 12,
             }}
         >
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>牌山（按服务器顺序）</div>
-
-            {/* 只观察这个容器，宽度为卡片内可用空间 */}
             <div ref={containerRef} style={{ width: "100%" }}>
                 <div
                     className="tilegrid-grid"
                     style={{
+                        position: "relative",
                         display: "grid",
                         gridTemplateColumns: `repeat(${COLS}, ${tileW}px)`,
-                        gridAutoRows: `${tileH}px`,
+                        gridTemplateRows: `repeat(${ROWS}, ${tileH}px)`,
                         columnGap: gapX,
                         rowGap: gapY,
                         justifyContent: "center",
-                        justifyItems: "center",
-                        alignItems: "center",
                         width: "100%",
+                        minHeight: ROWS * tileH + (ROWS - 1) * gapY,
                     }}
                 >
-                    {data.map((t, i) => (
-                        <Tile
-                            key={`${t}-${i}`}
-                            tile={t}
-                            hoveredTile={hovered}
-                            setHoveredTile={setHovered}
-                            width={tileW}
-                            height={tileH}
-                        />
-                    ))}
+                    {data.length === 0 ? (
+                        <div
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                display: "grid",
+                                placeItems: "center",
+                                color: "#6b7280",
+                                fontSize: 14,
+                            }}
+                        >
+                            牌山为空
+                        </div>
+                    ) : (
+                        data.map((c, i) => {
+                            // 让第 0 个元素落在右下角；随后依次向左、向上回填
+                            const posIndex = totalSlots - 1 - i;
+                            const r = Math.floor(posIndex / COLS);
+                            const cIdx = posIndex % COLS;
+
+                            return (
+                                <div
+                                    key={`${c.tile}-${c.dim ? "d" : "n"}-${i}`}
+                                    style={{ gridRow: r + 1, gridColumn: cIdx + 1 }}
+                                >
+                                    <Tile
+                                        tile={c.tile}
+                                        dim={c.dim}
+                                        hoveredTile={hovered}
+                                        setHoveredTile={setHovered}
+                                        width={tileW}
+                                        height={tileH}
+                                    />
+                                </div>
+                            );
+                        })
+                    )}
                 </div>
             </div>
         </section>

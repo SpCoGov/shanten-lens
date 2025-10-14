@@ -2,7 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
 
-from .table import ConfigTable
+from backend.config.table import ConfigTable
 
 
 class ConfigManager:
