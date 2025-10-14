@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 import json
 
-from .items import ConfigItem
+from backend.config.items import ConfigItem
 
 
 class ConfigTable:

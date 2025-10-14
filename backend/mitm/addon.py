@@ -1,13 +1,21 @@
 from typing import Callable, Tuple, Any, Dict, List, Optional
 from mitmproxy import http, ctx
 from loguru import logger
-from .codec import LiqiCodec
+
+import backend.app
+from backend.mitm.codec import LiqiCodec
 
 HookFn = Callable[[Dict], Tuple[str, Any]]
 
 ignore_methods = [
     '.lq.Lobby.oauth2Login',
-    '.lq.Route.heartbeat'
+    '.lq.Route.heartbeat',
+    '.lq.Lobby.prepareLogin',
+    '.lq.Route.requestConnection',
+    '.lq.Lobby.fetchServerTime',
+    '.lq.Lobby.loginSuccess',
+    '.lq.Lobby.loginBeat',
+
 ]
 
 class WsAddon:
@@ -52,15 +60,16 @@ class WsAddon:
         #   - view['raw'] 是原始 bytes（我们也以 base64/hex 打印）
         try:
             if view['method'] not in ignore_methods:
-                # 简洁信息（info）
-                logger.info(f"{'已发送' if message.from_client else '接收到'}：{view['method']} (id={view['id']})")
+                if backend.app.MANAGER.get("general.debug"):
+                    # 简洁信息（info）
+                    logger.info(f"{'已发送' if message.from_client else '接收到'}：{view['method']} (id={view['id']})")
 
-                # 详细内容（debug）——包括序列化后的 JSON 和原始二进制（base64）
-                import json, base64
-                pretty = json.dumps(view['data'], ensure_ascii=False, indent=2)
-                raw_b64 = base64.b64encode(view['raw']).decode()
+                    # 详细内容（debug）——包括序列化后的 JSON 和原始二进制（base64）
+                    import json, base64
+                    pretty = json.dumps(view['data'], ensure_ascii=False, indent=2)
+                    raw_b64 = base64.b64encode(view['raw']).decode()
 
-                logger.debug(f"== FULL MESSAGE BEGIN ==\nmethod: {view['method']}\nfrom_client: {view['from_client']}\nmsg_id: {view['id']}\nparsed:\n{pretty}\nraw_base64:\n{raw_b64}\n== FULL MESSAGE END ==")
+                    logger.debug(f"== FULL MESSAGE BEGIN ==\nmethod: {view['method']}\nfrom_client: {view['from_client']}\nmsg_id: {view['id']}\nparsed:\n{pretty}\nraw_base64:\n{raw_b64}\n== FULL MESSAGE END ==")
         except Exception as e:
             logger.error(f"logging full message failed: {e}")
 

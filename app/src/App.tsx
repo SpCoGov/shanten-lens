@@ -1,11 +1,20 @@
 import React from "react";
-import {listen} from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
 import SettingsPage from "./pages/SettingsPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
-import {ws} from "./lib/ws";
-import {useLogStore, type LogLevel} from "./lib/logStore";
+import { ws } from "./lib/ws";
+import { useLogStore, type LogLevel } from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
+import WallStats from "./components/WallStats";
 import "./App.css";
+
+import {
+    type GameStateData,
+    type WsEnvelope,
+    toDeckMap,
+    buildCells,
+    type Cell,
+} from "./lib/gamestate";
 
 type Route = "home" | "settings" | "diagnostics";
 
@@ -13,99 +22,39 @@ export default function App() {
     const [route, setRoute] = React.useState<Route>("home");
     const [connected, setConnected] = React.useState(false);
 
-    const demoIds = [
-        36,
-        37,
-        38,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16,
-        17,
-        18,
-        19,
-        20,
-        21,
-        22,
-        23,
-        24,
-        25,
-        26,
-        27,
-        28,
-        29,
-        30,
-        31,
-        32,
-        33,
-        34,
-        35,
-        36,];
-    const repeatedIds = React.useMemo(() => Array.from({length: 36}, (_, i) => demoIds[i % demoIds.length]), []);
-    const idToTile: Record<number, string> = {
-        1:  "0m",
-        2:  "1m",
-        3:  "2m",
-        4:  "3m",
-        5:  "4m",
-        6:  "5m",
-        7:  "6m",
-        8:  "7m",
-        9:  "8m",
-        10: "9m",
-        11: "0p",
-        12: "1p",
-        13: "2p",
-        14: "3p",
-        15: "4p",
-        16: "5p",
-        17: "6p",
-        18: "7p",
-        19: "8p",
-        20: "9p",
-        21: "0s",
-        22: "1s",
-        23: "2s",
-        24: "3s",
-        25: "4s",
-        26: "5s",
-        27: "6s",
-        28: "7s",
-        29: "8s",
-        30: "9s",
-        31: "1z",
-        32: "2z",
-        33: "3z",
-        34: "4z",
-        35: "5z",
-        36: "6z",
-        37: "7z",
-        38: "bd",
-        39: "5z"
-    };
-    const tiles = repeatedIds.map((id) => idToTile[id] ?? "bd");
+    const [cells, setCells] = React.useState<Cell[]>([]);
+    const [stage, setStage] = React.useState<number>(0);
+    const [ended, setEnded] = React.useState<boolean>(false);
+    const [remain, setRemain] = React.useState<number>(0);
+    const [hasGame, setHasGame] = React.useState<boolean>(false);
+
+    const [wallStatsTiles, setWallStatsTiles] = React.useState<string[]>([]);
 
     React.useEffect(() => {
         ws.connect();
         setConnected(ws.connected);
-        const off = ws.on(() => setConnected(true));
-        const iv = setInterval(() => setConnected(ws.connected), 1500);
-        return () => {
-            off();
-            clearInterval(iv);
-        };
-    }, []);
+        const offOpen = ws.onOpen(() => setConnected(true));
+        const offClose = ws.onClose(() => setConnected(false));
 
-    React.useEffect(() => {
+        const offPkt = ws.onPacket((pkt: WsEnvelope) => {
+            if (pkt.type === "update_gamestate") {
+                const d = pkt.data as GameStateData;
+                const deck = toDeckMap(d.deck_map);
+
+                const list = buildCells(deck, d.locked_tiles ?? [], d.wall_tiles ?? [], 36);
+                setCells(list);
+                setStage(d.stage ?? 0);
+                setEnded(!!d.ended);
+                setRemain(d.desktop_remain ?? 0);
+                setHasGame(d.stage !== undefined && d.ended !== undefined && d.stage >= 0);
+
+                const wallList = Array.isArray(d.wall_tiles)
+                    ? d.wall_tiles.map((id) => deck.get(id) ?? "5m")
+                    : [];
+                setWallStatsTiles(wallList);
+            }
+        });
+
         const addLog = useLogStore.getState().addLog;
         let unsubs: Array<() => void> = [];
         (async () => {
@@ -123,38 +72,97 @@ export default function App() {
             await sub("backend:exit", "WARN");
             await sub("backend:error", "ERROR");
         })();
+
         return () => {
+            offOpen();
+            offClose();
+            offPkt();
             unsubs.forEach((u) => u());
             unsubs = [];
         };
     }, []);
 
-    const Dot = ({ok}: { ok: boolean }) => (
-        <span className={`dot ${ok ? "ok" : "down"}`} aria-label={ok ? "connected" : "disconnected"}/>
+    const Dot = ({ ok }: { ok: boolean }) => (
+        <span className={`dot ${ok ? "ok" : "down"}`} aria-label={ok ? "connected" : "disconnected"} />
     );
-
 
     return (
         <div className="app">
             <header className="app-header">
                 <div className="brand">Shanten Lens</div>
                 <nav className="nav">
-                    <button className={`nav-btn ${route === "home" ? "active" : ""}`} onClick={() => setRoute("home")}>主页</button>
-                    <button className={`nav-btn ${route === "settings" ? "active" : ""}`} onClick={() => setRoute("settings")}>设置</button>
-                    <button className={`nav-btn ${route === "diagnostics" ? "active" : ""}`} onClick={() => setRoute("diagnostics")}>诊断</button>
+                    <button className={`nav-btn ${route === "home" ? "active" : ""}`} onClick={() => setRoute("home")}>
+                        主页
+                    </button>
+                    <button className={`nav-btn ${route === "settings" ? "active" : ""}`} onClick={() => setRoute("settings")}>
+                        设置
+                    </button>
+                    <button className={`nav-btn ${route === "diagnostics" ? "active" : ""}`} onClick={() => setRoute("diagnostics")}>
+                        诊断
+                    </button>
                 </nav>
                 <div className="status">
-                    <Dot ok={connected}/>
+                    <Dot ok={connected} />
                     <span>{connected ? "已连接后端" : "未连接"}</span>
                 </div>
             </header>
 
-            <main className="app-main">
+            <main
+                className="app-main"
+                style={{
+                    padding: 16,
+                    boxSizing: "border-box",
+                    height: "calc(100vh - var(--header-height, 56px))",
+                }}
+            >
                 {route === "home" && (
-                    <TileGrid tiles={tiles}/>
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "stretch",
+                            gap: 16,
+                            height: "100%",
+                        }}
+                    >
+                        <WallStats wallTiles={wallStatsTiles} />
+
+                        <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
+                            <TileGrid cells={cells} />
+
+                            <div
+                                style={{
+                                    position: "fixed",
+                                    left: "50%",
+                                    transform: "translateX(-50%)",
+                                    bottom: 24,
+                                    background: "#fff",
+                                    border: "1px solid var(--border)",
+                                    borderRadius: 12,
+                                    boxShadow: "0 8px 24px rgba(0,0,0,.08)",
+                                    padding: "8px 12px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 12,
+                                    zIndex: 60,
+                                }}
+                            >
+                                {hasGame ? (
+                                    <>
+                                        <span style={{ fontWeight: 600 }}>状态</span>
+                                        <span className="badge">{`剩余：${remain}`}</span>
+                                        <span className="badge">{`阶段：${stage}`}</span>
+                                        <span className={`badge ${ended ? "down" : "ok"}`}>{ended ? "已结束" : "进行中"}</span>
+                                    </>
+                                ) : (
+                                    <span className="badge down">未找到游戏</span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 )}
-                {route === "settings" && <SettingsPage/>}
-                {route === "diagnostics" && <DiagnosticsPage/>}
+
+                {route === "settings" && <SettingsPage />}
+                {route === "diagnostics" && <DiagnosticsPage />}
             </main>
         </div>
     );
