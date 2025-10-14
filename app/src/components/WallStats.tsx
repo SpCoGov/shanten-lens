@@ -107,7 +107,7 @@ export default function WallStats({ wallTiles, className }: WallStatsProps) {
 
     return (
         <aside className={[styles.wrap, className].filter(Boolean).join(" ")}>
-            <div className={styles.panel}>
+            <div className={`mj-panel ${styles.panel}`}>
                 <div className={styles.header}>
                     <div className={styles.title}>牌山统计</div>
                 </div>

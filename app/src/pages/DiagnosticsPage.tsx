@@ -36,7 +36,7 @@ export default function DiagnosticsPage() {
                 </label>
             </section>
 
-            <section className="card">
+            <section className="mj-panel card">
                 <h3 style={{marginTop:0}}>WS 封包（收/发）</h3>
                 <div id="ws-frames" className="log">
                     {frames.map((f, i) => (
@@ -50,7 +50,7 @@ export default function DiagnosticsPage() {
                 </div>
             </section>
 
-            <section className="card">
+            <section className="mj-panel card">
                 <h3 style={{marginTop:0}}>后端事件日志</h3>
                 <div id="diag-logpanel" className="log">
                     {logs.map((l, i) => {

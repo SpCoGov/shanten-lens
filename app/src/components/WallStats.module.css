@@ -1,16 +1,9 @@
-/* 外围：与程序四周留白、与其他模块留出间距（靠 App 容器的 gap 控制） */
 .wrap {
-    width: 256px;            /* 统一侧栏宽度 */
+    width: 256px;
     flex: 0 0 256px;
 }
 
-/* 与牌山模块一致的“卡片面板”风格：圆角、边框、淡阴影、面板内边距 */
 .panel {
-    border: 1px solid var(--border, rgba(0,0,0,.08));
-    border-radius: 12px;
-    background: #fff;
-    box-shadow: 0 2px 12px rgba(0,0,0,.04);
-    padding: 12px;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -26,7 +19,7 @@
     gap: 8px;
     overflow-y: auto;
     max-height: calc(100vh - 240px);
-    padding-right: 4px; /* 让滚动条不压内容 */
+    padding-right: 4px;
 }
 
 .item {
