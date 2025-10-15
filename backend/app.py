@@ -126,7 +126,24 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     await ws_send(ws, {"type": "open_result", "data": {"ok": True}})
                 except Exception as e:
                     await ws_send(ws, {"type": "open_result", "data": {"ok": False, "error": str(e)}})
-
+            elif t == "inject_select_pack_now":
+                # data = { activityId: int, type: int, tileList?: int[], peerKey?: string }
+                from backend.mitm.addon import WS_ADDON_INSTANCE, WsAddon
+                addon: WsAddon = WS_ADDON_INSTANCE
+                if not addon:
+                    await ws_send(ws, {"type": "inject_ack", "data": {"ok": False, "detail": "ws-addon-not-ready"}})
+                else:
+                    ok, detail = addon.inject_now(
+                        method=".lq.Lobby.amuletActivitySelectPack",
+                        data={
+                            "activityId": int(data.get("activityId")),
+                            "type": int(data.get("type")),
+                            "tileList": list(map(int, data.get("tileList", []))),
+                        },
+                        t="Req",
+                        peer_key=data.get("peerKey"),
+                    )
+                    await ws_send(ws, {"type": "inject_ack", "data": {"ok": ok, "detail": detail}})
             # 其余类型保留拓展
 
     except Exception:

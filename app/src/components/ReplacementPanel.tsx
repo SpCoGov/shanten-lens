@@ -1,7 +1,6 @@
 import React from "react";
 import Tile from "./Tile";
 
-// 发出全局 hover 事件（与其它模块一致）
 const emitHover = (tile: string | null) =>
     window.dispatchEvent(new CustomEvent("shanten:hover-tile", { detail: tile }));
 
@@ -13,6 +12,8 @@ export default function ReplacementPanel({
     usedCount: number;
 }) {
     const [hovered, setHovered] = React.useState<string | null>(null);
+    const scrollRef = React.useRef<HTMLDivElement | null>(null);
+
     React.useEffect(() => {
         const onHover = (e: Event) => {
             const ce = e as CustomEvent<string | null>;
@@ -20,6 +21,45 @@ export default function ReplacementPanel({
         };
         window.addEventListener("shanten:hover-tile", onHover as EventListener);
         return () => window.removeEventListener("shanten:hover-tile", onHover as EventListener);
+    }, []);
+
+    const rafRef = React.useRef<number | null>(null);
+    const targetRef = React.useRef(0);
+
+    const animate = React.useCallback(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const current = el.scrollLeft;
+        const target = targetRef.current;
+        const diff = target - current;
+
+        if (Math.abs(diff) < 0.5) {
+            el.scrollLeft = target;
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+            return;
+        }
+        el.scrollLeft = current + diff * 0.22; // 缓动系数：越大越快
+        rafRef.current = requestAnimationFrame(animate);
+    }, []);
+
+    const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const multiplier = 1.3;
+        const max = el.scrollWidth - el.clientWidth;
+
+        targetRef.current = Math.max(0, Math.min(max, targetRef.current + e.deltaY * multiplier));
+        if (rafRef.current == null) rafRef.current = requestAnimationFrame(animate);
+        e.preventDefault();
+    };
+
+    React.useEffect(() => {
+        const el = scrollRef.current;
+        if (el) targetRef.current = el.scrollLeft;
+        return () => {
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
     }, []);
 
     const lastIdx = Math.max(-1, usedCount - 1);
@@ -34,6 +74,8 @@ export default function ReplacementPanel({
             </div>
 
             <div
+                ref={scrollRef}
+                onWheel={onWheel}
                 style={{
                     display: "grid",
                     gridAutoFlow: "column",
@@ -45,6 +87,7 @@ export default function ReplacementPanel({
                     paddingLeft: 5,
                     paddingBottom: 8,
                     paddingTop: 8,
+                    overscrollBehaviorX: "contain",
                 }}
             >
                 {replacementTiles.map((t, idx) => {
@@ -73,7 +116,6 @@ export default function ReplacementPanel({
                                     height={72}
                                 />
 
-                                {/* ✅ 置中、半透明底、文字白色、视觉更强 */}
                                 {used && (
                                     <div
                                         style={{
@@ -84,11 +126,11 @@ export default function ReplacementPanel({
                                             fontSize: 13,
                                             fontWeight: 700,
                                             color: "#fff",
-                                            background: "rgba(16,185,129,0.85)", // 更高不透明度
+                                            background: "rgba(16,185,129,0.88)",
                                             padding: "4px 10px",
                                             borderRadius: 8,
                                             boxShadow: "0 0 6px rgba(0,0,0,0.25)",
-                                            pointerEvents: "none", // 不遮挡鼠标事件
+                                            pointerEvents: "none",
                                         }}
                                     >
                                         已替
@@ -96,7 +138,6 @@ export default function ReplacementPanel({
                                 )}
                             </div>
 
-                            {/* 当前指示器 */}
                             <div style={{ height: 18, display: "grid", placeItems: "center" }}>
                                 {idx === lastIdx && usedCount > 0 && (
                                     <div style={{ display: "grid", justifyItems: "center", gap: 2 }}>
