@@ -160,9 +160,18 @@ class LiqiCodec:
         dom = self.jsonProto["nested"][lq]["nested"][svc]["methods"][rpc]
         name = dom["requestType"] if t == "Req" else dom["responseType"]
         obj = ParseDict(data, getattr(pb, name)())
-        blk = [{"id": 1, "type": "string", "data": method.encode()},
-               {"id": 2, "type": "string", "data": obj.SerializeToString()}]
+        blk = [
+            {"id": 1, "type": "string", "data": method.encode()},
+            {"id": 2, "type": "string", "data": obj.SerializeToString()},
+        ]
         head = b"\x02" if t == "Req" else b"\x03"
+
+        if t == "Req":
+            resp_t = dom["responseType"]
+            resp_cls = getattr(pb, resp_t)
+            self._res_map[msg_id] = (method, resp_cls)
+            self._last_req_id = msg_id
+
         return head + struct.pack("<H", msg_id) + _to_protobuf(blk)
 
     def _compose_notify(self, method: str, data: dict) -> bytes:

@@ -110,9 +110,9 @@ class GameState:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
-    def on_draw_tile(self, tile_id: int, push_gamestate: bool = True, reason: str = ""):
+    def on_draw_tile(self, hand_tiles: list[int] ,tile_id: int, push_gamestate: bool = True, reason: str = ""):
         self.wall_tiles.remove(tile_id)
-
+        self.hand_tiles = hand_tiles.copy()
         self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()

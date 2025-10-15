@@ -12,6 +12,8 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         ConfigTable("game", file=conf_dir / "game.json")
         .add("modify_announcement", True, desc="修改公告", kind="bool")
         .add("public_all", False, desc="公开全部", kind="bool")
+        .add("auto_discard", False, desc="自动打牌", kind="bool")
+        .add("auto_tsumo", False, desc="自动自摸", kind="bool")
     )
     mgr.add_table(
         ConfigTable("general", file=conf_dir / "general.json")

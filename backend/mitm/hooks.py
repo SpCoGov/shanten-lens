@@ -1,7 +1,11 @@
 from typing import Tuple, Any, Dict, List
-
+import threading
+from mitmproxy import ctx
 from loguru import logger
+
+from backend.bot.chiitoi_recommender import chiitoi_recommendation_json
 from backend.app import MANAGER, GAME_STATE
+import backend.mitm.addon as _addon
 
 
 def on_outbound(view: Dict) -> Tuple[str, Any]:
@@ -105,9 +109,64 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
 
             after_draw_hands = draw_event.get("valueChanges", {}).get("round", {}).get("hands", {}).get("value", None)
             if after_draw_hands:
-                GAME_STATE.on_draw_tile(after_draw_hands[len(after_draw_hands) - 1], push_gamestate=False)
+                GAME_STATE.on_draw_tile(after_draw_hands, after_draw_hands[len(after_draw_hands) - 1], push_gamestate=False)
 
             GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, reason=".lq.Lobby.amuletActivityOperate:6")
+
+            json = chiitoi_recommendation_json(deck_map=GAME_STATE.deck_map,
+                                               hand_ids=GAME_STATE.hand_tiles,  # 此时 14 张
+                                               wall_ids=GAME_STATE.wall_tiles,
+                                               policy="count")
+            logger.info(json)
+
+            if not json.get("data", {}).get("win_now", False):
+                if MANAGER.get("game.auto_discard"):
+                    discard_id = int(json["data"]["discard_id"])
+
+                    # 固定 peer_key，尽量发到同一条 WS
+                    peer_key = None
+                    addon_now = _addon.WS_ADDON_INSTANCE
+                    if addon_now and addon_now._last_flow:
+                        f = addon_now._last_flow
+                        peer_key = f"{f.client_conn.address[0]}|{f.server_conn.address[0]}"
+
+                    def _do_inject():
+                        addon = _addon.WS_ADDON_INSTANCE
+                        if not addon:
+                            logger.warning("WS_ADDON_INSTANCE not ready; skip inject")
+                            return
+                        ok, reason = addon.inject_now(
+                            method=".lq.Lobby.amuletActivityOperate",
+                            data={"activityId": 250811, "type": 1, "tileList": [discard_id]},
+                            t="Req",
+                            peer_key=peer_key,
+                        )
+                        logger.info(f"success: {ok}, reason: {reason}")
+
+                    ctx.master.event_loop.call_later(1.0, _do_inject)
+            else:
+                if MANAGER.get("game.auto_tsumo"):
+                    peer_key = None
+                    addon_now = _addon.WS_ADDON_INSTANCE
+                    if addon_now and addon_now._last_flow:
+                        f = addon_now._last_flow
+                        peer_key = f"{f.client_conn.address[0]}|{f.server_conn.address[0]}"
+
+                    def _do_inject():
+                        addon = _addon.WS_ADDON_INSTANCE
+                        if not addon:
+                            logger.warning("WS_ADDON_INSTANCE not ready; skip inject")
+                            return
+                        ok, reason = addon.inject_now(
+                            method=".lq.Lobby.amuletActivityOperate",
+                            data={"activityId": 250811, "type": 8, "tileList": []},
+                            t="Req",
+                            peer_key=peer_key,
+                        )
+                        logger.info(f"success: {ok}, reason: {reason}")
+
+                    ctx.master.event_loop.call_later(1.0, _do_inject)
+
     # 进入青云之志界面时获取已经开始的游戏数据
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.fetchAmuletActivityData":
         data = view.get("data", {}).get("data", {})
