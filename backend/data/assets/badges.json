@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "items": [
+    { "id": 600010, "icon_id": 600010, "name": "濃霧の印", "rarity": "BROWN"},
+    { "id": 600020, "icon_id": 600020, "name": "口封じの印", "rarity": "BROWN"},
+    { "id": 600030, "icon_id": 600030, "name": "見通しの印", "rarity": "BROWN"},
+    { "id": 600040, "icon_id": 600040, "name": "封鎖の印", "rarity": "BROWN"},
+    { "id": 600050, "icon_id": 600050, "name": "金塊の印", "rarity": "BROWN"},
+    { "id": 600060, "icon_id": 600060, "name": "利息の印", "rarity": "BROWN"},
+    { "id": 600070, "icon_id": 600070, "name": "先導の印", "rarity": "BROWN"},
+
+    { "id": 600080, "icon_id": 600080, "name": "再生の印", "rarity": "BLUE"},
+    { "id": 600090, "icon_id": 600090, "name": "成長の印", "rarity": "BLUE"},
+    { "id": 600100, "icon_id": 600100, "name": "生命の印", "rarity": "BLUE"},
+    { "id": 600110, "icon_id": 600110, "name": "幸福の印", "rarity": "BLUE"},
+    { "id": 600120, "icon_id": 600120, "name": "交換の印", "rarity": "BLUE"},
+    { "id": 600130, "icon_id": 600130, "name": "忠犬の印", "rarity": "BLUE"},
+    { "id": 600140, "icon_id": 600140, "name": "植物の印", "rarity": "BLUE"},
+    { "id": 600150, "icon_id": 600150, "name": "仲良しの印", "rarity": "BLUE"},
+
+    { "id": 600160, "icon_id": 600160, "name": "拡張の印", "rarity": "RED"},
+    { "id": 600170, "icon_id": 600170, "name": "伝導の印", "rarity": "RED"},
+    { "id": 600180, "icon_id": 600180, "name": "こだまの印", "rarity": "RED"},
+    { "id": 600190, "icon_id": 600190, "name": "天使の印", "rarity": "RED"},
+    { "id": 600200, "icon_id": 600200, "name": "王牌の印", "rarity": "RED"},
+    { "id": 600210, "icon_id": 600210, "name": "臨時の印", "rarity": "RED"}
+  ]
+}

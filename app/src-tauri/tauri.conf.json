@@ -16,7 +16,8 @@
         "title": "Shanten Lens",
         "width": 1200,
         "height": 800,
-        "resizable": true
+        "resizable": true,
+        "devtools": false
       }
     ]
   },

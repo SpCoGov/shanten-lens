@@ -19,11 +19,10 @@ def _ids_to_tiles(ids: List[int], deck_map: Dict[int, str]) -> List[str]:
     return [_norm_tile(deck_map[i]) for i in ids]
 
 
-# ---------- 严格“七种不同对子”用到的统计 ----------
 def _distinct_pairs_singles_bd(tiles: List[str]) -> Tuple[int, int, int]:
     """
     返回 (pairs_distinct, singles_distinct, B)
-    - pairs_distinct: 非癞子中 计数(v>=2) 的“不同对子牌种数”；v=3或v=4 也只算 1 个对子（不能算两对）
+    - pairs_distinct: 非癞子中 计数(v>=2) 的“不同对子牌种数”；v=3或v=4 也只算 1 个对子
     - singles_distinct: 非癞子中 计数(v==1) 的“不同单张牌种数”
     - B: 癞子张数（bd）
     """
@@ -35,28 +34,35 @@ def _distinct_pairs_singles_bd(tiles: List[str]) -> Tuple[int, int, int]:
 
 
 def _can_pick_14_as_chiitoi_distinct(pool: List[str]) -> bool:
-    """
-    严格“七对=七种不同对子”的可行性判定。
-    允许 pool>=14（表示可从中挑14张）。
-    """
+    """严格“七对=七种不同对子”的可行性判定。允许 pool>=14（可从中挑14张）。"""
     if len(pool) < 14:
         return False
     P, S, B = _distinct_pairs_singles_bd(pool)
     need_pairs = max(0, 7 - P)
-    # 先用癞子补“不同单张牌种”各1张 → 成对
-    use_bd_on_singles = min(need_pairs, S)
+    use_bd_on_singles = min(need_pairs, S)  # 先把不同单张用癞子各补一张 → 成对
     remain_pairs = need_pairs - use_bd_on_singles
-    # 剩余完全缺的对子，只能用两张癞子自成一对
     bd_needed = use_bd_on_singles * 1 + remain_pairs * 2
     return B >= bd_needed
 
 
-# ---------- 14张“立胡”判定（严格七种不同对子） ----------
-def _is_chiitoi_now_14(hand14: List[str]) -> bool:
-    return _can_pick_14_as_chiitoi_distinct(hand14)
+def _win_now_draw_sensitive_14(hand14: List[str]) -> bool:
+    """
+    14张，最后一张为新摸：
+    - 若手里无癞子(B=0)：14 张本身严格七对即可立刻和
+    - 若手里有癞子(B>=1)：仅当去掉最后一张的前13张为 L+6对+0单 时，才允许立刻和
+    """
+    if len(hand14) != 14:
+        return False
+    pre13 = hand14[:-1]
+    P, S, B = _distinct_pairs_singles_bd(pre13)
+    if B == 0:
+        # 纯自然七对：14 张本身严格可胡即可
+        return _can_pick_14_as_chiitoi_distinct(hand14)
+    else:
+        # 有癞子时，必须是“真听癞子”（pre13=L+6对+0单）才允许即胡
+        return P == 6 and S == 0
 
 
-# ---------- 打掉一张（13张）后，最早第几摸可胡（忽略牌山的bd） ----------
 def _earliest_draws_after_discard_to_chiitoi(hand13: List[str], wall_tiles_norm_no_bd: List[str]) -> int:
     for k in range(1, len(wall_tiles_norm_no_bd) + 1):
         if _can_pick_14_as_chiitoi_distinct(hand13 + wall_tiles_norm_no_bd[:k]):
@@ -64,7 +70,6 @@ def _earliest_draws_after_discard_to_chiitoi(hand13: List[str], wall_tiles_norm_
     return inf
 
 
-# ---------- 次数优先：available-first 受入（忽略牌山中的bd） ----------
 def _uke_ire_from_wall_available_first(
         hand13_norm: List[str],
         wall_ids: List[int],
@@ -95,7 +100,6 @@ def _uke_ire_from_wall_available_first(
     return total, dict(face_counter)
 
 
-# ---------- 并列打破启发式 ----------
 def _first_idx(arr: List[str], target: str) -> int:
     try:
         return arr.index(target)
@@ -142,7 +146,7 @@ def _prefer_plain_five_over_red(
 
 def chiitoi_recommendation_json(
         deck_map: Dict[int, str],
-        hand_ids: List[int],  # 14张
+        hand_ids: List[int],  # 14张（最后一张为新摸）
         wall_ids: List[int],
         policy: Literal["speed", "count"] = "speed",
 ):
@@ -171,10 +175,8 @@ def chiitoi_recommendation_json(
     W_norm = _ids_to_tiles(wall_ids, deck_map)
     W_norm_no_bd = [t for t in W_norm if t != JOKER]  # 牌山不含癞子
 
-    could_win_now = _is_chiitoi_now_14(H)
-
-    # speed：能胡就胡
-    if policy == "speed" and could_win_now:
+    could_win_now = _win_now_draw_sensitive_14(H)
+    if could_win_now:
         return {
             "type": "chiitoi_recommendation",
             "data": {
@@ -192,7 +194,7 @@ def chiitoi_recommendation_json(
             }
         }
 
-    # 进入候选比较（count 一定进入；speed 仅当当前14张未成和）
+    # 进入候选比较（当下不能立刻和）
     hand_cnt = Counter(H)
     candidates = []  # (idx, k, tie_score, uke_total, uke_detail, prefer_penalty)
 
@@ -246,12 +248,11 @@ def chiitoi_recommendation_json(
     discard_tile_norm = H[final_idx]
 
     if policy == "count":
-        # 即使当前已可胡，也选择“次数优先”的打牌；标记牺牲即胡
         data = {
             "policy": policy,
             "applicable": True,
-            "could_win_now": bool(could_win_now),
-            "sacrifice_for_count": bool(could_win_now),
+            "could_win_now": False,
+            "sacrifice_for_count": False,
             "win_now": False,
             "discard_id": discard_id,
             "discard_tile": discard_tile_norm,  # 归一面（0x→5x）

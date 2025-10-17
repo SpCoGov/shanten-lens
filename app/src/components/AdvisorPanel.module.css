@@ -1,0 +1,217 @@
+.wrap {
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.card {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.cardHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.cardHead h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.badgeBlue {
+    background: #2563eb;
+    color: #fff;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.badgeGreen {
+    background: #059669;
+    color: #fff;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.badgeMuted {
+    background: #e5e7eb;
+    color: #111827;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.cardBody {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cardBodyMuted {
+    padding: 12px;
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.rowBetween {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.label {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+.tileRow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.idHint {
+    font-size: 12px;
+    color: #9ca3af;
+    margin-left: 6px;
+}
+
+.grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.metric {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.metricLabel {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.metricValue {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.ukeBox {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tableWrap {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+    max-height: 180px;
+}
+
+.tableHead {
+    display: grid;
+    grid-template-columns: 1fr 60px 60px;
+    gap: 8px;
+    padding: 6px 10px;
+    background: #f8fafc;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.tableBody {
+    max-height: 150px;
+    overflow: auto;
+}
+
+.tableRow {
+    display: grid;
+    grid-template-columns: 1fr 60px 60px;
+    gap: 8px;
+    padding: 6px 10px;
+    border-top: 1px solid #f1f5f9;
+    font-size: 13px;
+    align-items: center;
+}
+
+.center {
+    text-align: center;
+}
+
+.right {
+    text-align: right;
+}
+
+.legend {
+    display: flex;
+    gap: 8px;
+    font-size: 12px;
+    color: #6b7280;
+    padding: 0 4px;
+}
+
+.info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: #e5e7eb;
+    color: #111827;
+    font-weight: 700;
+}
+
+/* 牌容器：去掉背景/阴影/边框；圆角单独控制 */
+.tileReset :global(*) {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* 恢复圆角：大牌 */
+.tileRound :global(img), .tileRound :global(canvas), .tileRound :global(svg), .tileRound :global(div) {
+    border-radius: 8px !important;
+}
+
+/* 小牌尺寸 + 圆角 */
+.tileSmall :global(img), .tileSmall :global(canvas), .tileSmall :global(svg), .tileSmall :global(div) {
+    max-width: 22px;
+    max-height: 28px;
+}
+
+.tileRoundSm :global(img), .tileRoundSm :global(canvas), .tileRoundSm :global(svg), .tileRoundSm :global(div) {
+    border-radius: 6px !important;
+}
+
+/* 大牌高度限制（推荐打牌行） */
+.tilePill :global(img), .tilePill :global(canvas), .tilePill :global(svg), .tilePill :global(div) {
+    max-height: 36px;
+}
+
+/* 可立刻和的提示块 */
+.winNow {
+    margin: 12px;
+    border: 1px solid #bbf7d0;
+    background: #ecfdf5;
+    color: #065f46;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.winNowTitle {
+    font-weight: 600;
+}

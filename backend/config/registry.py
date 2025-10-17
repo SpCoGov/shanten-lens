@@ -20,11 +20,24 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         .add("language", "zh-CN", desc="界面语言", kind="string")
         .add("theme", "system", desc="主题", kind="string")
         .add("debug", False, desc="调试模式", kind="bool")
-    ).add_table(
+    )
+    mgr.add_table(
         ConfigTable("backend", file=conf_dir / "backend.json")
         .add("host", "127.0.0.1", kind="string")
         .add("port", 8787, kind="number")
         .add("mitm_port", 10999, kind="number")
     )
-    mgr.load_all()  # 生成/补全/合并
+    mgr.add_table(
+        ConfigTable("fuse", file=conf_dir / "fuse.json")
+        .add(
+            "guard_skip_contains",
+            {"amulets": [], "badges": []},
+            desc="当卡包包含以下护身符/印章时，禁止跳过",
+            kind="object",
+        )
+        .add("enable_prestart_kavi_guard", False, kind="bool")
+        .add("conduction_min_count", 3, kind="int")
+        .add("enable_anti_steal_eat", False, kind="bool")
+    )
+    mgr.load_all()
     return mgr

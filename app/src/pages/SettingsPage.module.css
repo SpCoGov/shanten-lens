@@ -1,15 +1,13 @@
 .bigCard { padding: 6px 0; }
 
-/* 每个表一节 */
 .section { padding: 14px 16px; }
 .sectionTitle { margin: 0 0 10px 0; font-size: 16px; }
 
-/* 居中分割线（不是满宽） */
 .divider {
     border: 0;
     height: 1px;
     width: min(92%, 720px);
-    margin: 16px auto 0 auto;          /* 居中 */
+    margin: 16px auto 0 auto;
     background: var(--border);
     opacity: .7;
     border-radius: 999px;

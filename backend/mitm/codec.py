@@ -148,7 +148,9 @@ class LiqiCodec:
 
     def _decode_res(self, msg_id: int, method: str, payload: bytes):
         if msg_id not in self._res_map:
-            return method or "(unknown_res)", {"_raw": base64.b64encode(payload).decode()}
+            dbg = {"last_req_id": getattr(self, "_last_req_id", None),
+                   "res_map_size": len(self._res_map)}
+            return method or "(unknown_res)", {"_raw": base64.b64encode(payload).decode(), "_dbg": dbg}
         m, cls = self._res_map.pop(msg_id)
         obj = cls.FromString(payload)
         d = MessageToDict(obj, always_print_fields_with_no_presence=True)

@@ -39,7 +39,15 @@ class ConfigManager:
         return any_changed
 
     def to_payload(self) -> Dict[str, Dict[str, Any]]:
-        return {name: t.to_values_dict() for name, t in self.tables.items()}
+        return {
+            name: t.to_values_dict()
+            for name, t in self.tables.items()
+            if not (isinstance(name, str) and name == "fuse")
+        }
+
+    def to_table_payload(self, name: str) -> Dict[str, Any]:
+        tb = self.tables.get(name)
+        return tb.to_values_dict() if tb else {}
 
     def apply_patch(self, edit: Dict[str, Dict[str, Any]]) -> List[Path]:
         """

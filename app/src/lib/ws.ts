@@ -1,4 +1,6 @@
 import {useLogStore} from "./logStore";
+import {setRegistry, type RegistryPayload} from "./registryStore";
+import { setFuseConfig, type FuseConfig } from "./fuseStore";
 
 export type UpdateConfigPacket = { type: "update_config"; data: Record<string, Record<string, any>> };
 export type Packet =
@@ -8,7 +10,7 @@ export type Packet =
     | { type: "request_update"; data: {} }
     | { type: "open_config_dir"; data: {} }
     | { type: "open_result"; data: { ok: boolean; error?: string } }
-    | { type: string; data: any }; // 兼容未来扩展
+    | { type: string; data: any };
 
 type PacketHandler = (pkt: Packet) => void;
 type RawHandler = (raw: string) => void;
@@ -170,5 +172,21 @@ class WS {
     }
 }
 
-// 如需可配置，替换成读取配置的地址
 export const ws = new WS("http://127.0.0.1:8787");
+ws.onPacket((pkt) => {
+    if (pkt.type     === "update_registry") {
+        const data = pkt.data as RegistryPayload;
+        if (data && Array.isArray(data.amulets) && Array.isArray(data.badges)) {
+            setRegistry(data);
+        }
+    }
+});
+
+ws.onPacket((pkt) => {
+    if (pkt.type === "update_fuse_config") {
+        const cfg = pkt.data as FuseConfig;
+        if (cfg && cfg.guard_skip_contains) {
+            setFuseConfig(cfg);
+        }
+    }
+});
