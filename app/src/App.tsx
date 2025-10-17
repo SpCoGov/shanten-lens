@@ -2,11 +2,15 @@ import React from "react";
 import {listen} from "@tauri-apps/api/event";
 import SettingsPage from "./pages/SettingsPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
+import FusePage from "./pages/FusePage";
 import {ws} from "./lib/ws";
 import {useLogStore, type LogLevel} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
 import WallStats from "./components/WallStats";
 import ReplacementPanel from "./components/ReplacementPanel";
+import AdvisorPanel, {type ChiitoiData} from "./components/AdvisorPanel";
+import AmuletBar from "./components/AmuletBar";
+import {type EffectItem} from "./lib/gamestate";
 import "./App.css";
 
 import {
@@ -17,7 +21,11 @@ import {
     type Cell,
 } from "./lib/gamestate";
 
-type Route = "home" | "settings" | "diagnostics";
+type Route = "home" | "fuse" | "settings" | "diagnostics";
+
+const OUTER_PADDING = 16;
+const SIDEBAR_WIDTH = 320;
+const MAIN_GAP = 12;
 
 export default function App() {
     const [route, setRoute] = React.useState<Route>("home");
@@ -25,6 +33,7 @@ export default function App() {
 
     const [cells, setCells] = React.useState<Cell[]>([]);
     const [stage, setStage] = React.useState<number>(0);
+    const [coin, setCoin] = React.useState<number>(0);
     const [ended, setEnded] = React.useState<boolean>(false);
     const [remain, setRemain] = React.useState<number>(0);
     const [hasGame, setHasGame] = React.useState<boolean>(false);
@@ -33,6 +42,10 @@ export default function App() {
 
     const [replacementTiles, setReplacementTiles] = React.useState<string[]>([]);
     const [switchUsedCount, setSwitchUsedCount] = React.useState<number>(0);
+
+    const [speedData, setSpeedData] = React.useState<ChiitoiData | null>(null);
+    const [countData, setCountData] = React.useState<ChiitoiData | null>(null);
+    const [amulets, setAmulets] = React.useState<EffectItem[]>([]);
 
     React.useEffect(() => {
         ws.connect();
@@ -48,14 +61,17 @@ export default function App() {
                 const list = buildCells(deck, d.locked_tiles ?? [], d.wall_tiles ?? [], 36);
                 setCells(list);
                 setStage(d.stage ?? 0);
+                setCoin(d.coin ?? 0);
                 setEnded(!!d.ended);
                 setRemain(d.desktop_remain ?? 0);
                 setHasGame(d.stage !== undefined && d.ended !== undefined && d.stage >= 0);
 
                 const repl = Array.isArray(d.replacement_tiles)
-                    ? d.replacement_tiles.map((id) => deck.get(id) ?? "5m") : [];
+                    ? d.replacement_tiles.map((id) => deck.get(id) ?? "5m")
+                    : [];
                 const used = Array.isArray((d as any).switch_used_tiles)
-                    ? (d as any).switch_used_tiles.length : 0;
+                    ? (d as any).switch_used_tiles.length
+                    : 0;
                 setReplacementTiles(repl);
                 setSwitchUsedCount(used);
 
@@ -63,6 +79,15 @@ export default function App() {
                     ? d.wall_tiles.map((id) => deck.get(id) ?? "5m")
                     : [];
                 setWallStatsTiles(wallList);
+
+                setSpeedData(null);
+                setCountData(null);
+
+                setAmulets(Array.isArray(d.effect_list) ? d.effect_list : []);
+            } else if (pkt.type === "chiitoi_recommendation" && pkt.data) {
+                const data = pkt.data as ChiitoiData;
+                if (data.policy === "speed") setSpeedData(data);
+                if (data.policy === "count") setCountData(data);
             }
         });
 
@@ -71,7 +96,8 @@ export default function App() {
         (async () => {
             const sub = async (event: string, level: LogLevel = "INFO") => {
                 const un = await listen<string>(event, (e) => {
-                    const payload = typeof e.payload === "string" ? e.payload : JSON.stringify(e.payload);
+                    const payload =
+                        typeof e.payload === "string" ? e.payload : JSON.stringify(e.payload);
                     addLog(level, `${event}: ${payload}`);
                 });
                 unsubs.push(un);
@@ -94,21 +120,40 @@ export default function App() {
     }, []);
 
     const Dot = ({ok}: { ok: boolean }) => (
-        <span className={`dot ${ok ? "ok" : "down"}`} aria-label={ok ? "connected" : "disconnected"}/>
+        <span
+            className={`dot ${ok ? "ok" : "down"}`}
+            aria-label={ok ? "connected" : "disconnected"}
+        />
     );
 
     return (
         <div className="app">
+
             <header className="app-header">
                 <div className="brand">Shanten Lens</div>
                 <nav className="nav">
-                    <button className={`nav-btn ${route === "home" ? "active" : ""}`} onClick={() => setRoute("home")}>
+                    <button
+                        className={`nav-btn ${route === "home" ? "active" : ""}`}
+                        onClick={() => setRoute("home")}
+                    >
                         主页
                     </button>
-                    <button className={`nav-btn ${route === "settings" ? "active" : ""}`} onClick={() => setRoute("settings")}>
+                    <button
+                        className={`nav-btn ${route === "fuse" ? "active" : ""}`}
+                        onClick={() => setRoute("fuse")}
+                    >
+                        熔断
+                    </button>
+                    <button
+                        className={`nav-btn ${route === "settings" ? "active" : ""}`}
+                        onClick={() => setRoute("settings")}
+                    >
                         设置
                     </button>
-                    <button className={`nav-btn ${route === "diagnostics" ? "active" : ""}`} onClick={() => setRoute("diagnostics")}>
+                    <button
+                        className={`nav-btn ${route === "diagnostics" ? "active" : ""}`}
+                        onClick={() => setRoute("diagnostics")}
+                    >
                         诊断
                     </button>
                 </nav>
@@ -121,23 +166,39 @@ export default function App() {
             <main
                 className="app-main"
                 style={{
-                    padding: 16,
+                    padding: `${OUTER_PADDING}px`,
                     boxSizing: "border-box",
                     height: "calc(100vh - var(--header-height, 56px))",
                 }}
             >
                 {route === "home" && (
                     <div
+                        className="full-bleed"
                         style={{
                             display: "flex",
                             alignItems: "stretch",
-                            gap: 16,
+                            gap: 12,
                             height: "100%",
                         }}
                     >
-                        <WallStats wallTiles={wallStatsTiles}/>
+                        <div style={{width: 320, flex: "0 0 auto"}}>
+                            <AdvisorPanel speed={speedData} count={countData}/>
+                        </div>
 
-                        <div style={{flex: 1, position: "relative", minWidth: 0}}>
+                        <div style={{flex: 1, minWidth: 0, position: "relative"}}>
+                            <div
+                                style={{
+                                    border: "1px solid var(--border, #ddd)",
+                                    borderRadius: 12,
+                                    background: "#fff",
+                                    padding: 8,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                <div style={{fontWeight: 600, marginBottom: 6}}>护身符</div>
+                                <AmuletBar items={amulets} scale={0.55}/>
+                            </div>
+
                             <TileGrid cells={cells}/>
 
                             {stage === 2 && replacementTiles.length > 0 && (
@@ -169,6 +230,7 @@ export default function App() {
                                         <span style={{fontWeight: 600}}>状态</span>
                                         <span className="badge">{`剩余：${remain}`}</span>
                                         <span className="badge">{`阶段：${stage}`}</span>
+                                        <span className="badge">{`⭐ ${coin}`}</span>
                                         <span className={`badge ${ended ? "down" : "ok"}`}>{ended ? "已结束" : "进行中"}</span>
                                     </>
                                 ) : (
@@ -176,9 +238,12 @@ export default function App() {
                                 )}
                             </div>
                         </div>
+
+                        <div style={{flex: "0 0 auto", width: "auto", marginRight: 0,}}><WallStats wallTiles={wallStatsTiles}/></div>
                     </div>
                 )}
 
+                {route === "fuse" && <FusePage/>}
                 {route === "settings" && <SettingsPage/>}
                 {route === "diagnostics" && <DiagnosticsPage/>}
             </main>

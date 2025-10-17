@@ -1,6 +1,6 @@
 import React, {useLayoutEffect, useMemo, useRef, useState} from "react";
 import Tile from "./Tile";
-import "./tilegrid.css";
+import "./TileGrid.module.css";
 import type {Cell} from "../lib/gamestate";
 
 const ROWS = 4;

@@ -1,6 +1,7 @@
 export interface GameStateData {
     stage: number;
-    deck_map: Record<string, string>;   // id(string) -> tile("1m"/"0p"/"6z"/"bd"...)
+    coin: number;
+    deck_map: Record<string, string>;
     hand_tiles: number[];
     dora_tiles: number[];
     replacement_tiles: number[];
@@ -9,6 +10,23 @@ export interface GameStateData {
     desktop_remain: number;
     locked_tiles: number[];
     switch_used_tiles: number[];
+    effect_list?: EffectItem[];
+}
+
+export interface BadgeAffix {
+    id: number;
+    uid: number;
+    random: number;
+    store: string[];
+}
+
+export interface EffectItem {
+    id: number;
+    uid: number;
+    volume: 1 | 2;
+    store: string[];
+    tags: string[];
+    badge?: BadgeAffix;
 }
 
 export interface WsEnvelope<T = any> {

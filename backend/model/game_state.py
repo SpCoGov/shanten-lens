@@ -5,7 +5,7 @@ import json
 from loguru import logger
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Dict
 
 
 @dataclass
@@ -23,6 +23,10 @@ class GameState:
     ended: bool = field(default_factory=bool)  # 游戏是否结束
     desktop_remain: int = field(default_factory=int)  # 剩余可摸的牌
     locked_tiles: List[int] = field(default_factory=list)  # 被锁住的牌
+    coin: int = field(default_factory=int)
+    level: int = field(default_factory=int)
+    effect_list: List[Dict] = field(default_factory=list)
+    candidate_effect_list: List[Dict] = field(default_factory=list)
 
     update_reason: List[str] = field(default_factory=list)
 
@@ -41,6 +45,11 @@ class GameState:
             "ended": self.ended,
             "desktop_remain": self.desktop_remain,
             "locked_tiles": self.locked_tiles,
+            "coin": self.coin,
+            "level": self.level,
+            "effect_list": self.effect_list,
+            "candidate_effect_list": self.candidate_effect_list,
+
             "update_reason": self.update_reason,
         }
 
@@ -63,6 +72,7 @@ class GameState:
         self.wall_tiles.clear()
         self.locked_tiles.clear()
         self.switch_used_tiles.clear()
+        self.candidate_effect_list.clear()
         self.ended = True
         self.stage = -1
         for item in pool:
@@ -110,7 +120,7 @@ class GameState:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
-    def on_draw_tile(self, hand_tiles: list[int] ,tile_id: int, push_gamestate: bool = True, reason: str = ""):
+    def on_draw_tile(self, hand_tiles: list[int], tile_id: int, push_gamestate: bool = True, reason: str = ""):
         self.wall_tiles.remove(tile_id)
         self.hand_tiles = hand_tiles.copy()
         self.update_reason.append(reason)
@@ -127,11 +137,22 @@ class GameState:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
-    def update_other_info(self, desktop_remain: int, stage: int, ended: bool, push_gamestate: bool = True, reason: str = ""):
-        self.desktop_remain = desktop_remain
-        self.stage = stage
-        self.ended = ended
-
+    def update_other_info(self, desktop_remain: int = None, stage: int = None, ended: bool = None, coin: int = None, level: int = None, effect_list: List[Dict] = None, candidate_effect_list: List[Dict] = None
+                          , push_gamestate: bool = True, reason: str = ""):
+        if desktop_remain is not None:
+            self.desktop_remain = desktop_remain
+        if stage is not None:
+            self.stage = stage
+        if ended is not None:
+            self.ended = ended
+        if coin is not None:
+            self.coin = coin
+        if level is not None:
+            self.level = level
+        if effect_list is not None:
+            self.effect_list = effect_list.copy()
+        if candidate_effect_list is not None:
+            self.candidate_effect_list = candidate_effect_list.copy()
         self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()
@@ -148,6 +169,11 @@ class GameState:
         self.ended = True
         self.desktop_remain = 0
         self.locked_tiles.clear()
+        self.coin = 0
+        self.level = 0
+        self.effect_list.clear()
+        self.candidate_effect_list.clear()
+
         self.update_reason.clear()
         self.update_reason.append(".lq.Lobby.amuletActivityGiveup")
 
