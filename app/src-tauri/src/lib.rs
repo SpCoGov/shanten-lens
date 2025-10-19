@@ -6,6 +6,7 @@ use std::{
   sync::{Arc, Mutex},
   thread,
 };
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -17,18 +18,38 @@ struct BackendProcState {
   child: Option<Child>,
 }
 
-// 用 Arc<Mutex<...>> 避免临时借用生命周期问题
+#[derive(Default)]
+struct GateState {
+  backend_ready: AtomicBool,
+  frontend_ready: AtomicBool,
+  switched: AtomicBool,
+}
+
+struct SharedGate(pub Arc<GateState>);
+
+fn maybe_switch(app: &AppHandle, gate: &GateState) {
+  if gate.switched.load(Ordering::SeqCst) { return; }
+  if gate.backend_ready.load(Ordering::SeqCst) && gate.frontend_ready.load(Ordering::SeqCst) {
+    if gate.switched.swap(true, Ordering::SeqCst) == false {
+      if let Some(s) = app.get_webview_window("splash") { let _ = s.close(); }
+      if let Some(m) = app.get_webview_window("main") {
+        let _ = m.show();
+        let _ = m.set_focus();
+        let _ = m.set_title("向听镜 - Shanten Lens");
+      }
+    }
+  }
+}
+
 struct BackendState(pub Arc<Mutex<BackendProcState>>);
 
 fn resolve_backend_path(app: &AppHandle) -> Option<PathBuf> {
-  // 1) 打包后的资源目录 <app dir>/resources/bin/shanten-backend.exe
   if let Ok(res_dir) = app.path().resource_dir() {
     let p = res_dir.join("bin").join("shanten-backend.exe");
     if p.exists() {
       return Some(p);
     }
   }
-  // 2) 开发路径：src-tauri/resources/bin/shanten-backend.exe
   let dev = Path::new("src-tauri")
     .join("resources")
     .join("bin")
@@ -36,12 +57,10 @@ fn resolve_backend_path(app: &AppHandle) -> Option<PathBuf> {
   if dev.exists() {
     return Some(dev);
   }
-  // 3) 兼容 src-tauri/bin/shanten-backend.exe
   let dev2 = Path::new("src-tauri").join("bin").join("shanten-backend.exe");
   if dev2.exists() {
     return Some(dev2);
   }
-  // 4) 兼容 <exe dir>/resources/bin/...
   if let Ok(exe) = env::current_exe() {
     if let Some(dir) = exe.parent() {
       let p = dir.join("resources").join("bin").join("shanten-backend.exe");
@@ -58,7 +77,6 @@ fn resolve_backend_path(app: &AppHandle) -> Option<PathBuf> {
 }
 
 fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Result<String, String> {
-  // 已在运行就直接返回
   {
     let mut g = st.lock().map_err(|_| "mutex poisoned".to_string())?;
     if let Some(ch) = g.child.as_mut() {
@@ -76,7 +94,6 @@ fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Resul
   let data_root_str = data_root.to_string_lossy().to_string();
 
   let mut cmd = Command::new(&exe);
-  // 固定端口 + 传递数据根
   cmd.args([
       "--host", "127.0.0.1",
       "--port", "8787",
@@ -86,7 +103,6 @@ fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Resul
     .stdout(Stdio::piped())
     .stderr(Stdio::piped());
 
-  // 隐藏控制台窗口（Windows）
   #[cfg(windows)]
   {
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -95,7 +111,6 @@ fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Resul
 
   let mut child = cmd.spawn().map_err(|e| format!("spawn failed: {e}"))?;
 
-  // 后端日志转发到前端
   if let Some(out) = child.stdout.take() {
     let app2 = app.clone();
     thread::spawn(move || {
@@ -147,6 +162,12 @@ fn stop_backend(state: State<BackendState>) -> Result<String, String> {
   stop_backend_with(st)
 }
 
+#[tauri::command]
+fn frontend_ready(app: AppHandle, gate: State<SharedGate>) {
+  gate.0.frontend_ready.store(true, Ordering::SeqCst);
+  maybe_switch(&app, &gate.0);
+}
+
 // Windows 下兜底强杀所有同名后端进程（静默）
 #[cfg(windows)]
 fn kill_all_backends_silently() {
@@ -159,7 +180,6 @@ fn kill_all_backends_silently() {
 
 #[cfg(not(windows))]
 fn kill_all_backends_silently() {
-  // 其他平台可按需实现 pkill，这里留空
 }
 
 pub fn run() {
@@ -167,12 +187,13 @@ pub fn run() {
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_opener::init())
     .manage(BackendState(Arc::new(Mutex::new(BackendProcState::default()))))
-    .invoke_handler(tauri::generate_handler![start_backend, stop_backend])
+    .manage(SharedGate(Arc::new(GateState::default())))
+    .invoke_handler(tauri::generate_handler![start_backend, stop_backend, frontend_ready])
     .setup(|app| {
       let ah = app.handle().clone();
       let st = app.state::<BackendState>().0.clone();
+      let gate = app.state::<SharedGate>().0.clone();
 
-      // 开发态默认不自启；如需临时自启：FORCE_AUTOSTART_BACKEND=1 npm run tauri:dev
       let force_autostart = std::env::var("FORCE_AUTOSTART_BACKEND")
         .map(|v| v == "1")
         .unwrap_or(false);
@@ -180,23 +201,44 @@ pub fn run() {
       #[cfg(debug_assertions)]
       {
         if force_autostart {
-          let _ = start_backend_with(ah.clone(), st.clone());
+          if start_backend_with(ah.clone(), st.clone()).is_ok() {
+            gate.backend_ready.store(true, Ordering::SeqCst);
+            maybe_switch(&ah, &gate);
+          }
+        }
+      }
+      #[cfg(not(debug_assertions))]
+      {
+        if start_backend_with(ah.clone(), st.clone()).is_ok() {
+          gate.backend_ready.store(true, Ordering::SeqCst);
+          maybe_switch(&ah, &gate);
         }
       }
 
-      #[cfg(not(debug_assertions))]
-      {
-        // release / 打包构建中仍然自启后端
-        let _ = start_backend_with(ah.clone(), st.clone());
-      }
-
-      // 关闭窗口时收尾
       if let Some(win) = app.get_webview_window("main") {
         let st2 = st.clone();
         win.on_window_event(move |e| {
           if matches!(e, WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed) {
             let _ = stop_backend_with(st2.clone());
             kill_all_backends_silently();
+          }
+        });
+      }
+
+      {
+        let ah2 = ah.clone();
+        let gate2 = gate.clone();
+        tauri::async_runtime::spawn(async move {
+          std::thread::sleep(std::time::Duration::from_secs(5));
+          if !gate2.switched.load(Ordering::SeqCst) {
+            if let Some(s) = ah2.get_webview_window("splash") { let _ = s.close(); }
+            if let Some(m) = ah2.get_webview_window("main") {
+              let _ = m.show();
+              let _ = m.set_focus();
+            }
+            gate2.switched.store(true, Ordering::SeqCst);
+            gate2.backend_ready.store(true, Ordering::SeqCst);
+            gate2.frontend_ready.store(true, Ordering::SeqCst);
           }
         });
       }

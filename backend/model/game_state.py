@@ -27,6 +27,7 @@ class GameState:
     level: int = field(default_factory=int)
     effect_list: List[Dict] = field(default_factory=list)
     candidate_effect_list: List[Dict] = field(default_factory=list)
+    record: Dict = field(default_factory=dict)
 
     update_reason: List[str] = field(default_factory=list)
 
@@ -49,6 +50,7 @@ class GameState:
             "level": self.level,
             "effect_list": self.effect_list,
             "candidate_effect_list": self.candidate_effect_list,
+            "record": self.record,
 
             "update_reason": self.update_reason,
         }
@@ -173,9 +175,24 @@ class GameState:
         self.level = 0
         self.effect_list.clear()
         self.candidate_effect_list.clear()
+        self.record = {}
 
         self.update_reason.clear()
         self.update_reason.append(".lq.Lobby.amuletActivityGiveup")
 
         loop = asyncio.get_running_loop()
         loop.create_task(self.on_gamestage_change())
+
+    def update_record(self, record: dict):
+        if not record or not isinstance(record, dict):
+            return
+        is_patch = any(
+            isinstance(v, dict) and ("dirty" in v) and ("value" in v)
+            for v in record.values()
+        )
+        if is_patch:
+            for k, v in record.items():
+                if isinstance(v, dict) and v.get("dirty") is True:
+                    self.record[k] = v.get("value")
+            return
+        self.record = record

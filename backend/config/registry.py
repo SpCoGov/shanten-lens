@@ -26,6 +26,7 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         .add("host", "127.0.0.1", kind="string")
         .add("port", 8787, kind="number")
         .add("mitm_port", 10999, kind="number")
+        .add("api_port", 8788, kind="number")
     )
     mgr.add_table(
         ConfigTable("fuse", file=conf_dir / "fuse.json")
@@ -35,9 +36,9 @@ def build_manager(conf_dir: Path) -> ConfigManager:
             desc="当卡包包含以下护身符/印章时，禁止跳过",
             kind="object",
         )
-        .add("enable_prestart_kavi_guard", False, kind="bool")
+        .add("enable_prestart_kavi_guard", True, kind="bool")
         .add("conduction_min_count", 3, kind="int")
-        .add("enable_anti_steal_eat", False, kind="bool")
+        .add("enable_anti_steal_eat", True, kind="bool")
     )
     mgr.load_all()
     return mgr

@@ -13,6 +13,18 @@ from backend.bot.chiitoi_recommender import chiitoi_recommendation_json
 
 ID_KAVI = 230
 BADGE_CONDUCTION = 600170
+BADGE_EXPANSION = 600160
+ID_UNSTABLE = 228
+ID_THEFT = 229
+ID_HACKER = 232
+
+
+def _first_src_base(row: dict) -> int:
+    try:
+        s = row.get("store") or []
+        return _base(s[0]) if s else 0
+    except:
+        return 0
 
 
 def _base(x: Any) -> int:
@@ -187,7 +199,52 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
 
             msg = _build_kavi_msg(_plus(nb["kavi_raw_id"]), min_cnt, cnt, left, right)
             return ("pass", None) if _confirm("熔断确认：确认开局？", msg) else ("drop", None)
-        # 黑客、不稳定存的第一个数据为复制或变身的护身符：{"id":2320,"store":[2290,1234]} 2290为盗印，不稳定228、黑客232、卡维230
+        # 黑客、不稳定存的第一个数据为复制或变身的护身符：{"id":2320,"store":[2290,1234]} 229为盗印，不稳定228、黑客232、卡维230
+        if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityOperate":
+            cfg = MANAGER.to_table_payload("fuse") or {}
+            if not bool(cfg.get("enable_anti_steal_eat", True)):
+                return "pass", None
+            if view.get("data").get("type") != 8:
+                return "pass", None
+            prot_badges: List[int] = list(map(int, [BADGE_CONDUCTION, BADGE_CONDUCTION]))
+
+            ef = _effects()
+
+            kavi_idxs: List[int] = []
+            for i, r in enumerate(ef):
+                if _base(r.get("id")) == ID_KAVI and _bid(r) in prot_badges:
+                    kavi_idxs.append(i)
+            if not kavi_idxs:
+                return "pass", None
+
+            def theft_like(row: Optional[dict]) -> bool:
+                if not isinstance(row, dict): return False
+                b = _base(row.get("id"))
+                if b == ID_THEFT: return True
+                if b in (ID_HACKER, ID_UNSTABLE) and _first_src_base(row) == ID_THEFT: return True
+                return False
+
+            n = len(ef)
+            risky_pairs: List[tuple[Optional[dict], dict, Optional[dict]]] = []
+            for i in kavi_idxs:
+                left = ef[i - 1] if i - 1 >= 0 else None
+                right = ef[i + 1] if i + 1 < n else None
+                if theft_like(left) or theft_like(right):
+                    risky_pairs.append((left, ef[i], right))
+
+            if not risky_pairs:
+                return "pass", None
+
+            # 组织提示
+            lines: List[str] = ["检测到：盗印/伪装盗印与卡维相邻，可能吃掉受保护印章。", "受保护印章：{}".format("、".join(str(x) for x in prot_badges)), ""]
+            for (l, k, r) in risky_pairs:
+                lines.append(f"卡维：{_name(k)}，印章：{_badge_label(k)}")
+                lines.append(f"  左邻：{_name(l)}，印章：{_badge_label(l)}")
+                lines.append(f"  右邻：{_name(r)}，印章：{_badge_label(r)}")
+                lines.append("")
+            lines.append("是否仍然继续执行该操作？")
+
+            return ("pass", None) if _confirm("熔断确认：可能吞噬卡维印章", "\n".join(lines)) else ("drop", None)
         return "pass", None
     except Exception:
         return "pass", None
@@ -234,6 +291,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             pool = round_info.get("pool", {}).get("value", None)
             locked_tiles = round_info.get("lockedTile", {}).get("value", None)
             effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
+            record = value_changes.get("record", None)
+            GAME_STATE.update_record(record)
             if hands and pool:
                 GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, push_gamestate=False)
                 desktop_remain = round_info.get("desktopRemain", {}).get("value", 0)
@@ -281,6 +340,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             value_changes = end_event.get("valueChanges", {})
             stage = value_changes.get("stage", -1)
             ended = value_changes.get("ended", True)
+            record = value_changes.get("record", None)
+            GAME_STATE.update_record(record)
             GAME_STATE.update_other_info(stage=stage, ended=ended, reason=".lq.Lobby.amuletActivityOperate:100")
             return "pass", None
         # type = 4: 换牌
@@ -291,6 +352,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             used = round_info.get("used", {}).get("value", [])
             GAME_STATE.update_switch_used_tiles(used=used, push_gamestate=False, reason=".lq.Lobby.amuletActivityOperate:4")
             stage = value_changes.get("stage", -1)
+            record = value_changes.get("record", None)
+            GAME_STATE.update_record(record)
             GAME_STATE.update_other_info(stage=stage)
 
         # type = 6: 摸牌
@@ -302,6 +365,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             stage = value_changes.get("stage", -1)
             ended = value_changes.get("ended", False)
             effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
+            record = value_changes.get("record", None)
+            GAME_STATE.update_record(record)
             after_draw_hands = draw_event.get("valueChanges", {}).get("round", {}).get("hands", {}).get("value", None)
             if after_draw_hands:
                 GAME_STATE.on_draw_tile(after_draw_hands, after_draw_hands[len(after_draw_hands) - 1], push_gamestate=False)
@@ -392,6 +457,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             level = game.get("level", None)
             shop = game.get("shop", -1)
             candidate_effect_list = shop.get("candidateEffectList", [])
+            record = game.get("record", None)
+            GAME_STATE.update_record(record)
             if desktop_remain < 36:
                 GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, push_gamestate=False)
                 GAME_STATE.refresh_wall_by_remaning()
@@ -408,6 +475,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
         stage = value_changes.get("stage", -1)
         effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
         ended = value_changes.get("ended", False)
+        record = value_changes.get("record", None)
+        GAME_STATE.update_record(record)
         GAME_STATE.update_other_info(stage=stage, ended=ended, effect_list=effect_list, reason=".lq.Lobby.amuletActivitySelectFreeEffect:2")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityStartGame":
         data = view.get("data", {})
@@ -416,6 +485,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
         value_changes = start_event.get("valueChanges", {})
         stage = value_changes.get("stage", -1)
         ended = value_changes.get("ended", False)
+        record = value_changes.get("record", None)
+        GAME_STATE.update_record(record)
         GAME_STATE.update_other_info(stage=stage, ended=ended, reason=".lq.Lobby.amuletActivityStartGame:1")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityBuy":
         data = dict(view["data"])
@@ -428,6 +499,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             ended = value_changes.get("ended", False)
             coin = int(game.get("coin", {}).get("value", None))
             shop = value_changes.get("shop", {})
+            record = value_changes.get("record", None)
+            GAME_STATE.update_record(record)
             candidate_effect_list = shop.get("candidateEffectList", {}).get("value", None)
             GAME_STATE.update_other_info(stage=stage, coin=coin, ended=ended, candidate_effect_list=candidate_effect_list, reason=".lq.Lobby.amuletActivityBuy:13")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivitySelectPack":
@@ -438,6 +511,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             value_changes = select_amulet_event.get("valueChanges", {})
             effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
             stage = value_changes.get("stage", -1)
+            record = value_changes.get("record", None)
+            GAME_STATE.update_record(record)
             GAME_STATE.update_other_info(stage=stage, effect_list=effect_list, reason=".lq.Lobby.amuletActivitySelectPack:14")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivitySellEffect":
         data = dict(view["data"])
@@ -450,6 +525,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             coin = int(game.get("coin", {}).get("value", None))
             effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
             ended = value_changes.get("ended", False)
+            record = value_changes.get("record", None)
+            GAME_STATE.update_record(record)
             GAME_STATE.update_other_info(stage=stage, coin=coin, ended=ended, effect_list=effect_list, reason=".lq.Lobby.amuletActivitySellEffect:17")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityRefreshShop":
         data = dict(view["data"])
@@ -460,6 +537,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             game = value_changes.get("game", {})
             stage = value_changes.get("stage", -1)
             coin = int(game.get("coin", {}).get("value", None))
+            record = value_changes.get("record", None)
+            GAME_STATE.update_record(record)
             GAME_STATE.update_other_info(stage=stage, coin=coin, reason=".lq.Lobby.amuletActivitySellEffect:18")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityEndShopping":
         data = view.get("data", {})
@@ -485,4 +564,15 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             value_changes = select_reward_event.get("valueChanges", {})
             effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
             GAME_STATE.update_other_info(effect_list=effect_list, reason=".lq.Lobby.amuletActivitySelectRewardPack:16")
+    if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityUpgradeShopBuff":
+        data = view.get("data", {})
+        events = data.get("events", [])
+        upgrade_shop_buff = next((e for e in events if e.get("type") == 21), None)
+        if upgrade_shop_buff:
+            value_changes = upgrade_shop_buff.get("valueChanges", {})
+            game = value_changes.get("game", {})
+            coin = int(game.get("coin", {}).get("value", None))
+            record = value_changes.get("record", None)
+            GAME_STATE.update_record(record)
+            GAME_STATE.update_other_info(coin=coin, reason=".lq.Lobby.amuletActivityUpgradeShopBuff:21")
     return "pass", None

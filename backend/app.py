@@ -10,14 +10,16 @@ from pathlib import Path
 from time import monotonic
 from typing import Dict, Set, Any
 
+import uvicorn
+from fastapi import FastAPI
 from loguru import logger
 from platformdirs import user_data_dir
 from watchfiles import awatch
 from websockets.legacy.server import WebSocketServerProtocol, serve
 
 from backend.config import build_manager
-from backend.model.game_state import GameState
 from backend.data.registry_loader import load_registry_list
+from backend.model.game_state import GameState
 from backend.model.items import AmuletRegistry, BadgeRegistry
 
 GAME_STATE = GameState()
@@ -108,6 +110,29 @@ def _open_dir(path: str):
 
 recent_writes: dict[str, float] = {}
 SELF_WIN_MS = 500  # 毫秒
+
+api_app = FastAPI(title="Shanten Lens API", version="1.0.0")
+
+
+@api_app.get("/api/gamestate/record")
+def api_health():
+    return {"type": "request_gamestate", "data": GAME_STATE.record}
+
+
+@api_app.get("/api/gamestate/effect_list")
+def api_health():
+    return {"type": "request_effect_list", "data": GAME_STATE.effect_list}
+
+
+@api_app.get("/api/gamestate/level")
+def api_health():
+    return {"type": "request_level", "data": GAME_STATE.level}
+
+
+async def run_http_server(host: str, port: int):
+    config = uvicorn.Config(api_app, host=host, port=port, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
 
 
 async def ws_handler(ws: WebSocketServerProtocol):
@@ -210,6 +235,8 @@ async def run_ws_server(host: str, port: int):
     watcher_cfg = asyncio.create_task(_watch_configs())
     watcher_reg = asyncio.create_task(_watch_data_tables())
 
+    api_port = int(MANAGER.get("api_port", 8788))
+    api_task = asyncio.create_task(run_http_server(host, api_port))
     async with serve(ws_handler, host, port, max_size=2 ** 20):
         logger.info(f"Websocket listening on ws://{host}:{port}/")
         try:
@@ -217,6 +244,8 @@ async def run_ws_server(host: str, port: int):
         finally:
             watcher_cfg.cancel()
             watcher_reg.cancel()
+            api_task.cancel()
             with contextlib.suppress(Exception):
                 await watcher_cfg
                 await watcher_reg
+                await api_task

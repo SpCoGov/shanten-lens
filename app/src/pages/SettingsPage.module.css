@@ -1,7 +1,15 @@
-.bigCard { padding: 6px 0; }
+.bigCard {
+    padding: 6px 0;
+}
 
-.section { padding: 14px 16px; }
-.sectionTitle { margin: 0 0 10px 0; font-size: 16px; }
+.section {
+    padding: 14px 16px;
+}
+
+.sectionTitle {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+}
 
 .divider {
     border: 0;
