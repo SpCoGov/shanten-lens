@@ -3,7 +3,6 @@ setlocal EnableDelayedExpansion
 chcp 65001 >nul
 title Shanten Lens - One-Key Build (fixed pip)
 
-REM === 进入项目根目录 ===
 pushd "%~dp0\.."
 set "PROJECT_ROOT=%CD%"
 echo.
@@ -13,7 +12,6 @@ echo ===========================
 echo Project root: %PROJECT_ROOT%
 echo.
 
-REM === 路径与工具 ===
 set "PYTHON=.venv\Scripts\python.exe"
 set "APP_DIR=app"
 set "BACKEND_ENTRY=backend\run_server.py"
@@ -24,7 +22,6 @@ set "BUNDLE_DIR=%APP_DIR%\src-tauri\target\release\bundle"
 set "PORTABLE_DIR=%BUNDLE_DIR%\windows\Shanten Lens"
 set "PORTABLE_ZIP=%PROJECT_ROOT%\Shanten-Lens-portable.zip"
 
-REM --- 基础检查 ---
 if not exist "%PYTHON%" (
   echo [ERROR] venv Python 未找到: %PYTHON%
   echo 請先創建並安裝依賴：py -3 -m venv .venv ^& .venv\Scripts\python.exe -m pip install -r requirements.txt
@@ -49,7 +46,6 @@ echo.
 echo [3/6] 打包後端（PyInstaller）...
 if exist "%DIST_EXE%" del /q "%DIST_EXE%" >nul 2>nul
 
-REM 把 proto 整個資料夾打進 EXE（Windows 用 ; 分隔 src;dest）
 "%PYTHON%" -m PyInstaller ^
   --noconfirm ^
   --onefile ^
@@ -58,6 +54,7 @@ REM 把 proto 整個資料夾打進 EXE（Windows 用 ; 分隔 src;dest）
   --hidden-import uvicorn ^
   --hidden-import fastapi ^
   --hidden-import pydantic ^
+  --collect-all backend.data.assets ^
   --add-data "proto;proto" ^
   "%BACKEND_ENTRY%"
 if errorlevel 1 (echo [ERROR] PyInstaller 打包失敗 & popd & exit /b 1)

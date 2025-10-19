@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"/>
+    <title>向听镜 正在启动…</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            background: #ffffff;
+            display: grid;
+            place-items: center;
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            color: #111827;
+            -webkit-user-select: none;
+            user-select: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        ::selection {
+            background: transparent;
+            color: inherit;
+        }
+
+        .drag-layer {
+            position: fixed;
+            inset: 0;
+            -webkit-app-region: drag;
+            z-index: 0;
+        }
+
+        .no-drag {
+            -webkit-app-region: no-drag;
+        }
+
+        /* 你的原有内容盒子 */
+        .box {
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .appname {
+            font-size: 18px;
+            font-weight: 700;
+            margin-top: 12px;
+        }
+
+        .sub {
+            font-size: 12px;
+            opacity: .65;
+        }
+
+        .spinner {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 3px solid #e5e7eb;
+            border-top-color: #3b82f6;
+            margin: 14px auto 0;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="drag-layer"></div>
+
+<div class="box no-drag">
+    <div class="appname">向听镜 <span class="sub">Shanten Lens</span></div>
+    <div class="spinner"></div>
+</div>
+</body>
+</html>

@@ -1,5 +1,8 @@
 {
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.8.0"
   }
 }

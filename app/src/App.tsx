@@ -3,6 +3,7 @@ import {listen} from "@tauri-apps/api/event";
 import SettingsPage from "./pages/SettingsPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
 import FusePage from "./pages/FusePage";
+import AboutPage from "./pages/AboutPage";
 import {ws} from "./lib/ws";
 import {useLogStore, type LogLevel} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
@@ -21,7 +22,7 @@ import {
     type Cell,
 } from "./lib/gamestate";
 
-type Route = "home" | "fuse" | "settings" | "diagnostics";
+type Route = "home" | "fuse" | "settings" | "diagnostics" | "about";
 
 const OUTER_PADDING = 16;
 const SIDEBAR_WIDTH = 320;
@@ -130,7 +131,7 @@ export default function App() {
         <div className="app">
 
             <header className="app-header">
-                <div className="brand">Shanten Lens</div>
+                <div className="brand">向听镜</div>
                 <nav className="nav">
                     <button
                         className={`nav-btn ${route === "home" ? "active" : ""}`}
@@ -156,10 +157,16 @@ export default function App() {
                     >
                         诊断
                     </button>
+                    <button
+                        className={`nav-btn ${route === "about" ? "active" : ""}`}
+                        onClick={() => setRoute("about")}
+                    >
+                        关于
+                    </button>
                 </nav>
                 <div className="status">
                     <Dot ok={connected}/>
-                    <span>{connected ? "已连接后端" : "未连接"}</span>
+                    <span>{connected ? "已连接" : "未连接"}</span>
                 </div>
             </header>
 
@@ -246,6 +253,7 @@ export default function App() {
                 {route === "fuse" && <FusePage/>}
                 {route === "settings" && <SettingsPage/>}
                 {route === "diagnostics" && <DiagnosticsPage/>}
+                {route === "about" && <AboutPage/>}
             </main>
         </div>
     );

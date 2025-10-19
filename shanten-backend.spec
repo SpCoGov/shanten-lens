@@ -1,12 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all
+
+datas = [('proto', 'proto')]
+binaries = []
+hiddenimports = ['uvicorn', 'fastapi', 'pydantic']
+tmp_ret = collect_all('backend.data.assets')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
     ['backend\\run_server.py'],
     pathex=[],
-    binaries=[],
-    datas=[('proto', 'proto')],
-    hiddenimports=['uvicorn', 'fastapi', 'pydantic'],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

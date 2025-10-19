@@ -12,11 +12,25 @@
   "app": {
     "windows": [
       {
+        "label": "splash",
+        "title": "向听镜 - 正在启动…",
+        "width": 420,
+        "height": 300,
+        "resizable": false,
+        "decorations": false,
+        "center": true,
+        "alwaysOnTop": true,
+        "url": "splash.html"
+      },
+      {
         "label": "main",
-        "title": "Shanten Lens",
-        "width": 1200,
-        "height": 800,
+        "title": "向听镜 - Shanten Lens",
+        "width": 1500,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 640,
         "resizable": true,
+        "visible": false,
         "devtools": false
       }
     ]
