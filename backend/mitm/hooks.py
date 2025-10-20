@@ -12,6 +12,7 @@ from backend.app import MANAGER, GAME_STATE, broadcast
 from backend.bot.chiitoi_recommender import chiitoi_recommendation_json
 
 ID_KAVI = 230
+BADGE_LIFE = 600100
 BADGE_CONDUCTION = 600170
 BADGE_EXPANSION = 600160
 ID_UNSTABLE = 228
@@ -173,14 +174,71 @@ def _build_kavi_plus_buffer_msg(left_row: dict | None, right_row: dict | None,
     return "\n".join(lines)
 
 
+def _must_pick_guard(selected_raw_id: int) -> tuple[bool, bool, str]:
+    """
+    返回: (候选是否存在命中项, 选中的是否为命中项, 提示文案)
+    用于“强制选择监控项”。
+    """
+    cfg = MANAGER.to_table_payload("fuse") or {}
+    guard = (cfg.get("guard_skip_contains") or {}) if isinstance(cfg.get("guard_skip_contains"), dict) else {}
+    watch_a = set(map(int, guard.get("amulets", []) or []))
+    watch_b = set(map(int, guard.get("badges", []) or []))
+
+    cand_a, cand_b, cand_list = _collect_candidate_sets()
+    # 候选中是否有命中项
+    hit_a_all = cand_a & watch_a
+    hit_b_all = cand_b & watch_b
+    hit_exist = bool(hit_a_all or hit_b_all)
+
+    # 当前选择的是否为命中项
+    picked = None
+    sel_raw = int(selected_raw_id)
+    for row in cand_list:
+        try:
+            if int(row.get("id", 0)) == sel_raw:
+                picked = row
+                break
+        except Exception:
+            pass
+
+    picked_is_hit = False
+    if picked:
+        base = _base(picked.get("id", 0))
+        bid = int(picked.get("badgeId", 0))
+        if base in watch_a or (bid > 0 and bid in watch_b):
+            picked_is_hit = True
+
+    # 组织提示
+    if hit_exist and not picked_is_hit:
+        lines = ["检测到：卡包出现监控项，但未选择其一", ""]
+        if hit_a_all:
+            lines += ["护身符（可选其一）：", *_fmt_amulets(hit_a_all), ""]
+        if hit_b_all:
+            lines += ["印章（可选其一）：", *_fmt_badges(hit_b_all), ""]
+        base_sel = _base(sel_raw)
+        lines.append(f"当前选择：护身符 ID={base_sel}（raw={sel_raw}）不在监控项中。是否仍然继续？")
+        return hit_exist, picked_is_hit, "\n".join(lines)
+
+    return hit_exist, picked_is_hit, ""
+
+
 def on_outbound(view: Dict) -> Tuple[str, Any]:
     try:
         if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivitySelectPack":
-            is_skip = int((view.get("data") or {}).get("id", 0)) == 0
-            if not is_skip: return "pass", None
-            a, b, text = _fuse_hits()
-            if a or b:
-                return ("pass", None) if _confirm("熔断确认：跳过卡包？", text) else ("drop", None)
+            data = view.get("data") or {}
+            raw_id = int(data.get("id", 0))
+            cfg = MANAGER.to_table_payload("fuse") or {}
+            if raw_id == 0:
+                if bool(cfg.get("enable_skip_guard", True)):
+                    a, b, text = _fuse_hits()
+                    if a or b:
+                        return ("pass", None) if _confirm("熔断确认：跳过卡包？", text) else ("drop", None)
+                return "pass", None
+            if bool(cfg.get("enable_shop_force_pick", False)):
+                hit_exist, picked_is_hit, msg = _must_pick_guard(raw_id)
+                if hit_exist and not picked_is_hit:
+                    return ("pass", None) if _confirm("熔断确认：购物必须选择监控项", msg) else ("drop", None)
+
             return "pass", None
 
         if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityUpgrade":
@@ -260,7 +318,7 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
             for i in kavi_idxs:
                 left = ef[i - 1] if i - 1 >= 0 else None
                 right = ef[i + 1] if i + 1 < n else None
-                if theft_like(left) or theft_like(right):
+                if theft_like(right):
                     risky_pairs.append((left, ef[i], right))
 
             if not risky_pairs:
@@ -273,9 +331,31 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
                 lines.append(f"  左邻：{_name(l)}，印章：{_badge_label(l)}")
                 lines.append(f"  右邻：{_name(r)}，印章：{_badge_label(r)}")
                 lines.append("")
-            lines.append("是否仍然继续执行该操作？")
+            lines.append("是否仍然继续和牌？")
 
             return ("pass", None) if _confirm("熔断确认：可能吞噬卡维印章", "\n".join(lines)) else ("drop", None)
+        if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityEndShopping":
+            cfg = MANAGER.to_table_payload("fuse") or {}
+            if not bool(cfg.get("enable_exit_life_guard", True)):
+                return "pass", None
+
+            ef = _effects()
+            has_life = any(_bid(e) == BADGE_LIFE for e in ef)
+            if has_life:
+                return "pass", None
+
+            lines: list[str] = [
+                "检测到：当前护身符中没有携带「生命」印章（600100）。",
+                "",
+                "当前护身符列表：",
+            ]
+            for r in ef:
+                lines.append(f"  • {_name(r)}，印章：{_badge_label(r)}")
+            lines.append("")
+            lines.append("是否仍然继续退出商店？")
+
+            # 用户确认：继续=放行；取消=拦截
+            return ("pass", None) if _confirm("熔断确认：无生命印章", "\n".join(lines)) else ("drop", None)
         return "pass", None
     except Exception:
         return "pass", None
@@ -320,6 +400,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             round_info = value_changes.get("round", {})
             hands = round_info.get("hands", {}).get("value", None)
             pool = round_info.get("pool", {}).get("value", None)
+            ting_list = round_info.get("tingList", {}).get("value", None)
+            next_operation = round_info.get("nextOperation", {}).get("value", None)
             locked_tiles = round_info.get("lockedTile", {}).get("value", None)
             effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
             record = value_changes.get("record", None)
@@ -334,9 +416,9 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
                     value_changes_19 = switch_stage_event.get("valueChanges", {})
                     stage = value_changes_19.get("stage", -1)
                     ended = value_changes_19.get("ended", False)
-                    GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, reason=".lq.Lobby.amuletActivityUpgrade:19")
+                    GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, ting_list=ting_list, next_operation=next_operation, reason=".lq.Lobby.amuletActivityUpgrade:19")
                 else:
-                    GAME_STATE.update_other_info(desktop_remain=desktop_remain, level=level, effect_list=effect_list, reason=".lq.Lobby.amuletActivityUpgrade:23")
+                    GAME_STATE.update_other_info(desktop_remain=desktop_remain, level=level, effect_list=effect_list, ting_list=ting_list, next_operation=next_operation, reason=".lq.Lobby.amuletActivityUpgrade:23")
                 if MANAGER.get("game.public_all"):
                     show_desktop_tiles = round_info.get("showDesktopTiles", {}).get("value", [])
                     show_desktop_tiles.clear()
@@ -397,12 +479,14 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             ended = value_changes.get("ended", False)
             effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
             record = value_changes.get("record", None)
+            ting_list = round_info.get("tingList", {}).get("value", None)
+            next_operation = round_info.get("nextOperation", {}).get("value", None)
             GAME_STATE.update_record(record)
             after_draw_hands = draw_event.get("valueChanges", {}).get("round", {}).get("hands", {}).get("value", None)
             if after_draw_hands:
                 GAME_STATE.on_draw_tile(after_draw_hands, after_draw_hands[len(after_draw_hands) - 1], push_gamestate=False)
 
-            GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, effect_list=effect_list, reason=".lq.Lobby.amuletActivityOperate:6")
+            GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, effect_list=effect_list, ting_list=ting_list, next_operation=next_operation, reason=".lq.Lobby.amuletActivityOperate:6")
 
             json = chiitoi_recommendation_json(deck_map=GAME_STATE.deck_map,
                                                hand_ids=GAME_STATE.hand_tiles,
@@ -489,12 +573,14 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             shop = game.get("shop", -1)
             candidate_effect_list = shop.get("candidateEffectList", [])
             record = game.get("record", None)
+            ting_list = round_info.get("tingList", None)
+            next_operation = round_info.get("nextOperation", None)
             GAME_STATE.update_record(record)
             if desktop_remain < 36:
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, push_gamestate=False)
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, push_gamestate=False)
                 GAME_STATE.refresh_wall_by_remaning()
             else:
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin)
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation)
     # 只是用来更新一下状态
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityGiveup":
         GAME_STATE.on_giveup()

@@ -28,6 +28,9 @@ class GameState:
     effect_list: List[Dict] = field(default_factory=list)
     candidate_effect_list: List[Dict] = field(default_factory=list)
     record: Dict = field(default_factory=dict)
+    ting_list: List[Dict] = field(default_factory=dict)
+    # nextOperationType: 1=打牌、4=杠、8=自摸、100=跳过换牌、101=换牌（杠的时候会显示被杠的牌"gang": [{"tiles": [22,49,76,103]}]）
+    next_operation: List[Dict] = field(default_factory=dict)
 
     update_reason: List[str] = field(default_factory=list)
 
@@ -51,6 +54,8 @@ class GameState:
             "effect_list": self.effect_list,
             "candidate_effect_list": self.candidate_effect_list,
             "record": self.record,
+            "ting_list": self.ting_list,
+            "next_operation": self.next_operation,
 
             "update_reason": self.update_reason,
         }
@@ -139,7 +144,7 @@ class GameState:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
-    def update_other_info(self, desktop_remain: int = None, stage: int = None, ended: bool = None, coin: int = None, level: int = None, effect_list: List[Dict] = None, candidate_effect_list: List[Dict] = None
+    def update_other_info(self, desktop_remain: int = None, stage: int = None, ended: bool = None, coin: int = None, level: int = None, effect_list: List[Dict] = None, candidate_effect_list: List[Dict] = None, ting_list: List[Dict] = None, next_operation: List[Dict] = None
                           , push_gamestate: bool = True, reason: str = ""):
         if desktop_remain is not None:
             self.desktop_remain = desktop_remain
@@ -155,6 +160,11 @@ class GameState:
             self.effect_list = effect_list.copy()
         if candidate_effect_list is not None:
             self.candidate_effect_list = candidate_effect_list.copy()
+        if ting_list is not None:
+            self.ting_list = ting_list
+        if next_operation is not None:
+            self.next_operation = next_operation
+
         self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()
