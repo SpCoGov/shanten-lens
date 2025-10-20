@@ -36,10 +36,13 @@ def build_manager(conf_dir: Path) -> ConfigManager:
             desc="当卡包包含以下护身符/印章时，禁止跳过",
             kind="object",
         )
+        .add("enable_skip_guard", True, kind="bool")
+        .add("enable_shop_force_pick", False, kind="bool")
         .add("enable_prestart_kavi_guard", True, kind="bool")
         .add("conduction_min_count", 3, kind="int")
         .add("enable_anti_steal_eat", True, kind="bool")
         .add("enable_kavi_plus_buffer_guard", True, kind="bool")
+        .add("enable_exit_life_guard", False, kind="bool")
     )
     mgr.load_all()
     return mgr

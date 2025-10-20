@@ -43,9 +43,12 @@ export default function FusePage() {
                     marginBottom: 12,
                 }}
             >
-                <div style={{ fontWeight: 600, marginBottom: 6 }}>跳过守护</div>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>购物守护</div>
                 <p style={{ marginTop: 0, color: "#666", fontSize: 13, lineHeight: 1.5 }}>
-                    当卡包内包含下列护身符或印章时，拦截并丢弃与「跳过」相关的请求，防止误点跳过导致错过需要的护身符/印章。
+                    维护监控列表后，在购物时应用两条规则：
+                    <br />
+                    1）出现监控项时<strong>禁止“跳过”</strong>（启用下方“禁止跳过”）；<br />
+                    2）出现监控项但你<strong>没有选择监控项之一</strong>则阻止（启用下方“强制选择监控项”）。
                 </p>
 
                 <FuseBar />
@@ -67,6 +70,26 @@ export default function FusePage() {
                     >
                         取消选择
                     </button>
+                </div>
+
+                <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <input
+                            type="checkbox"
+                            checked={Boolean(config.enable_skip_guard)}
+                            onChange={(e) => patchFuseConfig({ enable_skip_guard: e.target.checked })}
+                        />
+                        <span>禁止跳过（出现监控项时阻止“跳过”）</span>
+                    </label>
+
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <input
+                            type="checkbox"
+                            checked={Boolean(config.enable_shop_force_pick)}
+                            onChange={(e) => patchFuseConfig({ enable_shop_force_pick: e.target.checked })}
+                        />
+                        <span>强制选择监控项（出现监控项但未选其一时阻止）</span>
+                    </label>
                 </div>
             </section>
 
@@ -163,6 +186,30 @@ export default function FusePage() {
                         onChange={(e) => patchFuseConfig({ enable_kavi_plus_buffer_guard: e.target.checked })}
                     />
                     <span>启用卡维+缓冲守护</span>
+                </label>
+            </section>
+
+            <section
+                style={{
+                    border: "1px solid var(--border, #ddd)",
+                    borderRadius: 12,
+                    background: "#fff",
+                    padding: 12,
+                    marginBottom: 12,
+                }}
+            >
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>退出商店守护</div>
+                <p style={{ marginTop: 0, color: "#666", fontSize: 13, lineHeight: 1.5 }}>
+                    若当前护身符中<strong>没有</strong>携带「生命」印章（600100），阻止退出商店。
+                </p>
+
+                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                        type="checkbox"
+                        checked={Boolean(config.enable_exit_life_guard)}
+                        onChange={(e) => patchFuseConfig({ enable_exit_life_guard: e.target.checked })}
+                    />
+                    <span>启用退出商店守护</span>
                 </label>
             </section>
 
