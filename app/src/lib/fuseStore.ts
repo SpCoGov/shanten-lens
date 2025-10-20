@@ -8,6 +8,7 @@ export type FuseConfig = {
     enable_prestart_kavi_guard?: boolean;
     conduction_min_count?: number;
     enable_anti_steal_eat?: boolean;
+    enable_kavi_plus_buffer_guard?: boolean;
 };
 
 const defaultConfig: FuseConfig = {

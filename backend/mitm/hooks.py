@@ -157,14 +157,19 @@ def _confirm(title: str, msg: str) -> bool:
 
 
 def _build_kavi_msg(is_plus: bool, min_cnt: int, cnt: int, left: Optional[dict], right: Optional[dict]) -> str:
-    lines: List[str] = []
-    lines.append(f"检测到：传导卡维已装备（{'Plus' if is_plus else '普通'}）")
-    lines.append(f"传导卡数量：{cnt}（阈值：{min_cnt}）")
+    lines: List[str] = [f"检测到：传导卡维已装备（{'Plus' if is_plus else '普通'}）", f"传导卡数量：{cnt}（阈值：{min_cnt}）"]
     lines += ["", "邻位：",
               f"  左邻：{_name(left)}，印章：{_badge_label(left)}",
               f"  右邻：{_name(right)}，印章：{_badge_label(right)}", "",
               "规则：为避免误触发，请确保卡维相邻至少有一侧是「没有印章」的护身符。",
               "当前：两侧均带有印章。是否仍然继续开局？"]
+    return "\n".join(lines)
+
+
+def _build_kavi_plus_buffer_msg(left_row: dict | None, right_row: dict | None,
+                                left_state: str, right_state: str) -> str:
+    state_text = {"hit": "紧邻即膨胀", "ok": "最近为非膨胀", "none": "无护身符"}
+    lines = ["检测到：卡维 Plus 与膨胀（600170）之间缺少缓冲护身符。", "", f"左侧：{state_text.get(left_state, '?')}  " + (f"（{_name(left_row)}，印章：{_badge_label(left_row)}）" if left_row else ""), f"右侧：{state_text.get(right_state, '?')} " + (f"（{_name(right_row)}，印章：{_badge_label(right_row)}）" if right_row else ""), "", "建议：为避免误触发，至少让卡维一侧与膨胀之间隔一个“非膨胀”的护身符。", "是否仍然继续开局？"]
     return "\n".join(lines)
 
 
@@ -180,25 +185,51 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
 
         if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityUpgrade":
             cfg = MANAGER.to_table_payload("fuse") or {}
-            if not bool(cfg.get("enable_prestart_kavi_guard", True)):
-                return "pass", None
+            if bool(cfg.get("enable_prestart_kavi_guard", True)):
+                ef = _effects()
+                has_kavi = any(_base(e.get("id")) == ID_KAVI and _bid(e) == BADGE_CONDUCTION for e in ef)
+                if not has_kavi: return "pass", None
 
-            ef = _effects()
-            has_kavi = any(_base(e.get("id")) == ID_KAVI and _bid(e) == BADGE_CONDUCTION for e in ef)
-            if not has_kavi: return "pass", None
+                min_cnt = int(cfg.get("conduction_min_count", 3))
+                cnt = sum(1 for e in ef if _bid(e) == BADGE_CONDUCTION)
+                if cnt < min_cnt: return "pass", None
 
-            min_cnt = int(cfg.get("conduction_min_count", 3))
-            cnt = sum(1 for e in ef if _bid(e) == BADGE_CONDUCTION)
-            if cnt < min_cnt: return "pass", None
+                nb = _neighbors_of_kavi()
+                if nb["kavi_index"] < 0: return "pass", None
+                left, right = nb["left"], nb["right"]
+                if (left is not None and _bid(left) == 0) or (right is not None and _bid(right) == 0):
+                    return "pass", None
 
-            nb = _neighbors_of_kavi()
-            if nb["kavi_index"] < 0: return "pass", None
-            left, right = nb["left"], nb["right"]
-            if (left is not None and _bid(left) == 0) or (right is not None and _bid(right) == 0):
-                return "pass", None
+                msg = _build_kavi_msg(_plus(nb["kavi_raw_id"]), min_cnt, cnt, left, right)
+                return ("pass", None) if _confirm("熔断确认：确认开局？", msg) else ("drop", None)
+            if bool(cfg.get("enable_kavi_plus_buffer_guard", True)):
+                ef = _effects()
+                # 找到卡维 Plus
+                try:
+                    k_idx = next((i for i, e in enumerate(ef) if _base(e.get("id")) == ID_KAVI and _plus(e.get("id"))), -1)
+                except Exception:
+                    k_idx = -1
+                if k_idx >= 0:
+                    # 只有场上真的存在膨胀时才需要检查
+                    if any(_bid(e) == BADGE_EXPANSION for e in ef):
+                        n = len(ef)
 
-            msg = _build_kavi_msg(_plus(nb["kavi_raw_id"]), min_cnt, cnt, left, right)
-            return ("pass", None) if _confirm("熔断确认：确认开局？", msg) else ("drop", None)
+                        def first_seen(step: int) -> tuple[str, dict | None]:
+                            j = k_idx + step
+                            while 0 <= j < n:
+                                row = ef[j]
+                                return "hit" if _bid(row) == BADGE_EXPANSION else "ok", row
+                            return "none", None
+
+                        l_state, l_row = first_seen(-1)
+                        r_state, r_row = first_seen(1)
+
+                        # 只要有一侧“紧邻即膨胀”（无缓冲），就提示
+                        if l_state == "hit" or r_state == "hit":
+                            msg2 = _build_kavi_plus_buffer_msg(l_row, r_row, l_state, r_state)
+                            return ("pass", None) if _confirm("熔断确认：确认开局？", msg2) else ("drop", None)
+
+            return "pass", None
         # 黑客、不稳定存的第一个数据为复制或变身的护身符：{"id":2320,"store":[2290,1234]} 229为盗印，不稳定228、黑客232、卡维230
         if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityOperate":
             cfg = MANAGER.to_table_payload("fuse") or {}
