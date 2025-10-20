@@ -139,6 +139,33 @@ export default function FusePage() {
                     <span>启用印章守护</span>
                 </label>
             </section>
+
+
+            <section
+                style={{
+                    border: "1px solid var(--border, #ddd)",
+                    borderRadius: 12,
+                    background: "#fff",
+                    padding: 12,
+                    marginBottom: 12,
+                }}
+            >
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>卡维+缓冲守护</div>
+                <p style={{ marginTop: 0, color: "#666", fontSize: 13, lineHeight: 1.5 }}>
+                    当存在「卡维+」与「膨胀」时，若二者之间没有至少隔一个
+                    <b>非膨胀</b>护身符作为缓冲，阻止开局。
+                </p>
+
+                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                        type="checkbox"
+                        checked={Boolean(config.enable_kavi_plus_buffer_guard)}
+                        onChange={(e) => patchFuseConfig({ enable_kavi_plus_buffer_guard: e.target.checked })}
+                    />
+                    <span>启用卡维+缓冲守护</span>
+                </label>
+            </section>
+
             <button className="nav-btn" onClick={onSave} disabled={saving}>
                 {saving ? "保存中…" : "保存熔断配置"}
             </button>
