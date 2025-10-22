@@ -149,9 +149,7 @@
           }
         },
         "NotifyRoomKickOut": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "NotifyFriendStateChange": {
           "fields": {
@@ -234,14 +232,10 @@
           }
         },
         "NotifyAnotherLogin": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "NotifyAccountLogout": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "NotifyAnnouncementUpdate": {
           "fields": {
@@ -453,24 +447,16 @@
           }
         },
         "NotifyNewComment": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "NotifyRollingNotice": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "NotifyMaintainNotice": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "NotifyGiftSendRefresh": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "NotifyShopUpdate": {
           "fields": {
@@ -481,9 +467,7 @@
           }
         },
         "NotifyIntervalUpdate": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "NotifyVipLevelChange": {
           "fields": {
@@ -671,9 +655,7 @@
           }
         },
         "NotifyLoginQueueFinished": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "NotifyGameFinishRewardV2": {
           "fields": {
@@ -924,15 +906,63 @@
           }
         },
         "ReqCommon": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "ResCommon": {
           "fields": {
             "error": {
               "type": "Error",
               "id": 1
+            }
+          }
+        },
+        "StringDirty": {
+          "fields": {
+            "dirty": {
+              "type": "bool",
+              "id": 1
+            },
+            "value": {
+              "type": "string",
+              "id": 2
+            }
+          }
+        },
+        "StringArrayDirty": {
+          "fields": {
+            "dirty": {
+              "type": "bool",
+              "id": 1
+            },
+            "value": {
+              "rule": "repeated",
+              "type": "string",
+              "id": 2
+            }
+          }
+        },
+        "UInt32ArrayDirty": {
+          "fields": {
+            "dirty": {
+              "type": "bool",
+              "id": 1
+            },
+            "value": {
+              "rule": "repeated",
+              "type": "uint32",
+              "id": 2
+            }
+          }
+        },
+        "UInt32Dirty": {
+          "fields": {
+            "dirty": {
+              "type": "bool",
+              "id": 1
+            },
+            "value": {
+              "type": "uint32",
+              "id": 2
             }
           }
         },
@@ -2255,6 +2285,11 @@
             "beishuizhizhan_mode": {
               "type": "uint32",
               "id": 73
+            },
+            "amusement_switches": {
+              "rule": "repeated",
+              "type": "uint32",
+              "id": 74
             }
           }
         },
@@ -3374,10 +3409,15 @@
               "type": "lq.SimulationV2Data",
               "id": 16
             },
+            "quest_crew_data": {
+              "rule": "repeated",
+              "type": "lq.ActivityQuestCrewChanges",
+              "id": 17
+            },
             "shoot_data": {
               "rule": "repeated",
               "type": "lq.ActivityShootData",
-              "id": 17
+              "id": 18
             }
           }
         },
@@ -3994,6 +4034,161 @@
             }
           }
         },
+        "QCMember": {
+          "fields": {
+            "member_id": {
+              "type": "uint32",
+              "id": 1
+            },
+            "consumed_sta": {
+              "type": "TimeCounterData",
+              "id": 2
+            }
+          }
+        },
+        "ActivityQuestCrewEffectResult": {
+          "fields": {
+            "result_change": {
+              "type": "QCQuestResultChange",
+              "id": 1
+            },
+            "consumed_change": {
+              "rule": "repeated",
+              "type": "QCQuestConsumeChange",
+              "id": 2
+            },
+            "reward": {
+              "type": "QCItemReward",
+              "id": 3
+            }
+          },
+          "nested": {
+            "QCQuestResultChange": {
+              "fields": {
+                "from": {
+                  "type": "uint32",
+                  "id": 1
+                },
+                "to": {
+                  "type": "uint32",
+                  "id": 2
+                }
+              }
+            },
+            "QCQuestConsumeChange": {
+              "fields": {
+                "member_id": {
+                  "type": "uint32",
+                  "id": 1
+                },
+                "from": {
+                  "type": "uint32",
+                  "id": 2
+                },
+                "to": {
+                  "type": "uint32",
+                  "id": 3
+                }
+              }
+            },
+            "QCItemReward": {
+              "fields": {
+                "execute_reward": {
+                  "rule": "repeated",
+                  "type": "ExecuteReward",
+                  "id": 1
+                }
+              }
+            }
+          }
+        },
+        "QCQuest": {
+          "fields": {
+            "quest_id": {
+              "type": "uint32",
+              "id": 1
+            },
+            "finished": {
+              "type": "uint32",
+              "id": 2
+            },
+            "finished_time": {
+              "type": "uint32",
+              "id": 3
+            }
+          }
+        },
+        "ActivityQuestCrewData": {
+          "fields": {
+            "activity_id": {
+              "type": "uint32",
+              "id": 1
+            },
+            "members": {
+              "rule": "repeated",
+              "type": "QCMember",
+              "id": 2
+            },
+            "quest_board": {
+              "rule": "repeated",
+              "type": "QCQuest",
+              "id": 3
+            },
+            "market_board": {
+              "rule": "repeated",
+              "type": "uint32",
+              "id": 4
+            }
+          }
+        },
+        "ActivityQuestCrewChanges": {
+          "fields": {
+            "activity_id": {
+              "type": "uint32",
+              "id": 1
+            },
+            "members": {
+              "type": "QCMemberArrayDirty",
+              "id": 2
+            },
+            "quest_board": {
+              "type": "QCQuestArrayDirty",
+              "id": 3
+            },
+            "market_board": {
+              "type": "UInt32ArrayDirty",
+              "id": 4
+            }
+          },
+          "nested": {
+            "QCMemberArrayDirty": {
+              "fields": {
+                "dirty": {
+                  "type": "bool",
+                  "id": 1
+                },
+                "value": {
+                  "rule": "repeated",
+                  "type": "QCMember",
+                  "id": 2
+                }
+              }
+            },
+            "QCQuestArrayDirty": {
+              "fields": {
+                "dirty": {
+                  "type": "bool",
+                  "id": 1
+                },
+                "value": {
+                  "rule": "repeated",
+                  "type": "QCQuest",
+                  "id": 2
+                }
+              }
+            }
+          }
+        },
         "ActivityChooseUpData": {
           "fields": {
             "activity_id": {
@@ -4463,9 +4658,7 @@
           }
         },
         "GameNoopAction": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "CommentItem": {
           "fields": {
@@ -8068,7 +8261,7 @@
               "responseType": "ResCommon"
             },
             "fastLogin": {
-              "requestType": "ReqCommon",
+              "requestType": "ReqFastLogin",
               "responseType": "ResFastLogin"
             },
             "fetchInfo": {
@@ -9602,6 +9795,22 @@
             "fetchProgressRewardActivityInfo": {
               "requestType": "ReqFetchProgressRewardActivityInfo",
               "responseType": "ResFetchProgressRewardActivityInfo"
+            },
+            "questCrewActivityStartQuest": {
+              "requestType": "ReqQuestCrewActivityStartQuest",
+              "responseType": "ResQuestCrewActivityStartQuest"
+            },
+            "questCrewActivityHire": {
+              "requestType": "ReqQuestCrewActivityHire",
+              "responseType": "ResQuestCrewActivityHire"
+            },
+            "questCrewActivityFeed": {
+              "requestType": "ReqQuestCrewActivityFeed",
+              "responseType": "ResQuestCrewActivityFeed"
+            },
+            "questCrewActivityRefreshMarket": {
+              "requestType": "ReqQuestCrewActivityRefreshMarket",
+              "responseType": "ResQuestCrewActivityRefreshMarket"
             }
           }
         },
@@ -9797,6 +10006,14 @@
             "type": {
               "type": "uint32",
               "id": 2
+            }
+          }
+        },
+        "ReqFastLogin": {
+          "fields": {
+            "client_version_string": {
+              "type": "string",
+              "id": 1
             }
           }
         },
@@ -10171,9 +10388,7 @@
           }
         },
         "ReqLogout": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "ResLogout": {
           "fields": {
@@ -10400,9 +10615,7 @@
           }
         },
         "ReqRoomStart": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "ReqRoomKickPlayer": {
           "fields": {
@@ -14654,10 +14867,15 @@
               "type": "lq.ActivityProgressRewardData",
               "id": 32
             },
+            "quest_crew_data": {
+              "rule": "repeated",
+              "type": "lq.ActivityQuestCrewData",
+              "id": 33
+            },
             "shoot_data": {
               "rule": "repeated",
               "type": "lq.ActivityShootData",
-              "id": 33
+              "id": 34
             }
           },
           "nested": {
@@ -19347,6 +19565,146 @@
             }
           }
         },
+        "ReqQuestCrewActivityStartQuest": {
+          "fields": {
+            "activity_id": {
+              "type": "uint32",
+              "id": 1
+            },
+            "joined_members": {
+              "rule": "repeated",
+              "type": "uint32",
+              "id": 2
+            },
+            "quest_id": {
+              "type": "uint32",
+              "id": 3
+            }
+          }
+        },
+        "ResQuestCrewActivityStartQuest": {
+          "fields": {
+            "error": {
+              "type": "Error",
+              "id": 1
+            },
+            "result": {
+              "type": "uint32",
+              "id": 2
+            },
+            "value_changes": {
+              "type": "ActivityQuestCrewChanges",
+              "id": 3
+            },
+            "effect_info": {
+              "rule": "repeated",
+              "type": "ActivityQuestCrewEffectInfo",
+              "id": 4
+            }
+          },
+          "nested": {
+            "ActivityQuestCrewEffectInfo": {
+              "fields": {
+                "member_id": {
+                  "type": "uint32",
+                  "id": 1
+                },
+                "effect_id": {
+                  "type": "uint32",
+                  "id": 2
+                },
+                "result": {
+                  "type": "ActivityQuestCrewEffectResult",
+                  "id": 3
+                }
+              }
+            }
+          }
+        },
+        "ReqQuestCrewActivityHire": {
+          "fields": {
+            "activity_id": {
+              "type": "uint32",
+              "id": 1
+            },
+            "member_id": {
+              "type": "uint32",
+              "id": 2
+            }
+          }
+        },
+        "ResQuestCrewActivityHire": {
+          "fields": {
+            "error": {
+              "type": "Error",
+              "id": 1
+            },
+            "value_changes": {
+              "type": "ActivityQuestCrewChanges",
+              "id": 2
+            },
+            "execute_result": {
+              "rule": "repeated",
+              "type": "ExecuteResult",
+              "id": 3
+            }
+          }
+        },
+        "ReqQuestCrewActivityFeed": {
+          "fields": {
+            "activity_id": {
+              "type": "uint32",
+              "id": 1
+            },
+            "member_id": {
+              "rule": "repeated",
+              "type": "uint32",
+              "id": 2
+            }
+          }
+        },
+        "ResQuestCrewActivityFeed": {
+          "fields": {
+            "error": {
+              "type": "Error",
+              "id": 1
+            },
+            "value_changes": {
+              "type": "ActivityQuestCrewChanges",
+              "id": 2
+            },
+            "execute_result": {
+              "rule": "repeated",
+              "type": "ExecuteResult",
+              "id": 3
+            }
+          }
+        },
+        "ReqQuestCrewActivityRefreshMarket": {
+          "fields": {
+            "activity_id": {
+              "type": "uint32",
+              "id": 1
+            }
+          }
+        },
+        "ResQuestCrewActivityRefreshMarket": {
+          "fields": {
+            "error": {
+              "type": "Error",
+              "id": 1
+            },
+            "value_changes": {
+              "type": "ActivityQuestCrewChanges",
+              "id": 2
+            },
+            "execute_result": {
+              "rule": "repeated",
+              "type": "ExecuteResult",
+              "id": 3
+            }
+          }
+        },
         "AmuletBadgeData": {
           "fields": {
             "id": {
@@ -20510,44 +20868,6 @@
             }
           }
         },
-        "StringDirty": {
-          "fields": {
-            "dirty": {
-              "type": "bool",
-              "id": 1
-            },
-            "value": {
-              "type": "string",
-              "id": 2
-            }
-          }
-        },
-        "StringArrayDirty": {
-          "fields": {
-            "dirty": {
-              "type": "bool",
-              "id": 1
-            },
-            "value": {
-              "rule": "repeated",
-              "type": "string",
-              "id": 2
-            }
-          }
-        },
-        "UInt32ArrayDirty": {
-          "fields": {
-            "dirty": {
-              "type": "bool",
-              "id": 1
-            },
-            "value": {
-              "rule": "repeated",
-              "type": "uint32",
-              "id": 2
-            }
-          }
-        },
         "AmuletMingInfoArrayDirty": {
           "fields": {
             "dirty": {
@@ -20557,18 +20877,6 @@
             "value": {
               "rule": "repeated",
               "type": "AmuletMingInfo",
-              "id": 2
-            }
-          }
-        },
-        "UInt32Dirty": {
-          "fields": {
-            "dirty": {
-              "type": "bool",
-              "id": 1
-            },
-            "value": {
-              "type": "uint32",
               "id": 2
             }
           }
@@ -21779,9 +22087,7 @@
           }
         },
         "ActionMJStart": {
-          "fields": {
-
-          }
+          "fields": {}
         },
         "NewRoundOpenedTiles": {
           "fields": {
@@ -21870,6 +22176,15 @@
             "shouqie_bonus": {
               "type": "uint32",
               "id": 5
+            }
+          }
+        },
+        "XiaKeShangInfo": {
+          "fields": {
+            "score_coefficients": {
+              "rule": "repeated",
+              "type": "uint32",
+              "id": 1
             }
           }
         },
@@ -21980,6 +22295,10 @@
             "saltSha256": {
               "type": "string",
               "id": 21
+            },
+            "xia_ke_shang": {
+              "type": "XiaKeShangInfo",
+              "id": 26
             }
           }
         },
@@ -22093,6 +22412,10 @@
             "salt": {
               "type": "string",
               "id": 25
+            },
+            "xia_ke_shang": {
+              "type": "XiaKeShangInfo",
+              "id": 26
             }
           },
           "nested": {
@@ -22455,6 +22778,10 @@
             "liqi_type_beishuizhizhan": {
               "type": "uint32",
               "id": 5
+            },
+            "xia_ke_shang": {
+              "type": "XiaKeShangInfo",
+              "id": 6
             }
           }
         },
@@ -22587,6 +22914,10 @@
             "hu_tile_baiDa_changed": {
               "type": "string",
               "id": 26
+            },
+            "xia_ke_shang_coefficient": {
+              "type": "uint32",
+              "id": 27
             }
           }
         },

@@ -13,7 +13,7 @@ class GameState:
     """
     表示游戏状态（可序列化为 JSON）
     """
-    stage: int = 0  # 1=开始阶段、2=换牌阶段、3=打牌阶段、4=卡包购买、5=卡包选择、6=关卡确认阶段
+    stage: int = 0  # 1=选择免费卡包、2=换牌阶段、3=打牌阶段、4=卡包购买、5=卡包选择、6=关卡确认阶段、7=选择关卡奖励卡包
     deck_map: OrderedDict[int, str] = field(default_factory=OrderedDict)  # 牌山：id→牌面
     hand_tiles: List[int] = field(default_factory=list)  # 手牌
     dora_tiles: List[int] = field(default_factory=list)  # 宝牌指示牌（包含未翻开的）
@@ -31,6 +31,8 @@ class GameState:
     ting_list: List[Dict] = field(default_factory=dict)
     # nextOperationType: 1=打牌、4=杠、8=自摸、100=跳过换牌、101=换牌（杠的时候会显示被杠的牌"gang": [{"tiles": [22,49,76,103]}]）
     next_operation: List[Dict] = field(default_factory=dict)
+    goods: List[Dict] = field(default_factory=dict)
+    refresh_price: int = field(default_factory=int)
 
     update_reason: List[str] = field(default_factory=list)
 
@@ -56,6 +58,8 @@ class GameState:
             "record": self.record,
             "ting_list": self.ting_list,
             "next_operation": self.next_operation,
+            "goods": self.goods,
+            "refresh_price": self.refresh_price,
 
             "update_reason": self.update_reason,
         }
@@ -144,7 +148,9 @@ class GameState:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
-    def update_other_info(self, desktop_remain: int = None, stage: int = None, ended: bool = None, coin: int = None, level: int = None, effect_list: List[Dict] = None, candidate_effect_list: List[Dict] = None, ting_list: List[Dict] = None, next_operation: List[Dict] = None
+    def update_other_info(self, desktop_remain: int = None, stage: int = None, ended: bool = None, coin: int = None, level: int = None,
+                          effect_list: List[Dict] = None, candidate_effect_list: List[Dict] = None, ting_list: List[Dict] = None, next_operation: List[Dict] = None,
+                          goods: List[Dict] = None, refresh_price: int = None
                           , push_gamestate: bool = True, reason: str = ""):
         if desktop_remain is not None:
             self.desktop_remain = desktop_remain
@@ -164,7 +170,10 @@ class GameState:
             self.ting_list = ting_list
         if next_operation is not None:
             self.next_operation = next_operation
-
+        if goods is not None:
+            self.goods = goods.copy()
+        if refresh_price is not None:
+            self.refresh_price = refresh_price
         self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()

@@ -7,9 +7,9 @@ from loguru import logger
 from mitmproxy import ctx
 
 import backend.mitm.addon as _addon
-from backend.app import AMULET_REG, BADGE_REG
+from backend.app import AMULET_REG, BADGE_REG, pipeline
 from backend.app import MANAGER, GAME_STATE, broadcast
-from backend.bot.chiitoi_recommender import chiitoi_recommendation_json
+from backend.bot.logic.chiitoi_recommender import chiitoi_recommendation_json
 
 ID_KAVI = 230
 BADGE_LIFE = 600100
@@ -378,6 +378,9 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
     .lq.Lobby.amuletActivityRefreshShop         刷新商店
     .lq.Lobby.amuletActivityEndShopping         购买结束
     """
+    if dict(view["data"]).get("error", None) is not None:
+        logger.error(f"error occurred: {dict(view['data'])['error']}")
+        return "pass", None
     # 服务器下发公告
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.fetchAnnouncement" and MANAGER.get("game.modify_announcement"):
         newd = dict(view["data"])
@@ -505,33 +508,43 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             if not json.get("data", {}).get("win_now", False):
                 if MANAGER.get("game.auto_discard"):
                     discard_id = int(json["data"]["discard_id"])
+                    loop = asyncio.get_running_loop()
 
-                    peer_key = None
-                    addon_now = _addon.WS_ADDON_INSTANCE
-                    if addon_now and addon_now._last_flow:
-                        f = addon_now._last_flow
-                        peer_key = f"{f.client_conn.address[0]}|{f.server_conn.address[0]}"
-
-                    def _do_inject():
-                        addon = _addon.WS_ADDON_INSTANCE
-                        if not addon:
-                            logger.warning("WS_ADDON_INSTANCE not ready; skip inject")
-                            return
-                        ok, reason = addon.inject_now(
-                            method=".lq.Lobby.amuletActivityOperate",
-                            data={"activityId": 250811, "type": 1, "tileList": [discard_id]},
-                            t="Req",
-                            peer_key=peer_key,
+                    def _do():
+                        pipeline.click_discard_by_tile_id(
+                            tile_id=discard_id,
+                            hand_ids_with_draw=GAME_STATE.hand_tiles,
+                            id2label=GAME_STATE.deck_map,
+                            allow_tsumogiri=True
                         )
-                        logger.info(f"success: {ok}, reason: {reason}")
 
-                    ctx.master.event_loop.call_later(0.3, _do_inject)
+                    loop.call_later(1, _do)
+                    # peer_key = None
+                    # addon_now = _addon.WS_ADDON_INSTANCE
+                    # if addon_now and addon_now._last_flow:
+                    #     f = addon_now._last_flow
+                    #     peer_key = f"{f.client_conn.address[0]}|{f.server_conn.address[0]}"
+                    #
+                    # def _do_inject():
+                    #     addon = _addon.WS_ADDON_INSTANCE
+                    #     if not addon:
+                    #         logger.warning("WS_ADDON_INSTANCE not ready; skip inject")
+                    #         return
+                    #     ok, reason = addon.inject_now(
+                    #         method=".lq.Lobby.amuletActivityOperate",
+                    #         data={"activityId": 250811, "type": 1, "tileList": [discard_id]},
+                    #         t="Req",
+                    #         peer_key=peer_key,
+                    #     )
+                    #     logger.info(f"success: {ok}, reason: {reason}")
+                    #
+                    # ctx.master.event_loop.call_later(0.3, _do_inject)
             else:
                 if MANAGER.get("game.auto_tsumo"):
                     peer_key = None
                     addon_now = _addon.WS_ADDON_INSTANCE
-                    if addon_now and addon_now._last_flow:
-                        f = addon_now._last_flow
+                    if addon_now and addon_now.last_flow:
+                        f = addon_now.last_flow
                         peer_key = f"{f.client_conn.address[0]}|{f.server_conn.address[0]}"
 
                     def _do_inject():
@@ -548,12 +561,31 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
                         logger.info(f"success: {ok}, reason: {reason}")
 
                     ctx.master.event_loop.call_later(0.3, _do_inject)
-        finish_event = next((e for e in events if e.get("type") == 11), None)
-        if finish_event:
-            value_changes = finish_event.get("valueChanges", {})
+        coin_event = next((e for e in events if e.get("type") == 11), None)
+        if coin_event:
+            value_changes = coin_event.get("valueChanges", {})
             effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
             coin = int(value_changes.get("game", {}).get("coin", {}).get("value", None))
             GAME_STATE.update_other_info(coin=coin, effect_list=effect_list, reason=".lq.Lobby.amuletActivityOperate:11")
+        shop_event = next((e for e in events if e.get("type") == 12), None)
+        if shop_event:
+            value_changes = shop_event.get("valueChanges", {})
+            shop = value_changes.get("shop", {})
+            goods = shop.get("goods", {}).get("value", None)
+            refresh_price = shop.get("refreshPrice", {}).get("value", None)
+            GAME_STATE.update_other_info(goods=goods, refresh_price=refresh_price, reason=".lq.Lobby.amuletActivityOperate:12")
+        reward_pack_event = next((e for e in events if e.get("type") == 15), None)
+        if reward_pack_event:
+            value_changes = reward_pack_event.get("valueChanges", {})
+            effect = value_changes.get("effect", {})
+            level_reward_candidates = effect.get("levelRewardCandidates", {}).get("value", None)
+            stage = value_changes.get("stage", -1)
+            GAME_STATE.update_other_info(candidate_effect_list=level_reward_candidates, stage=stage, reason=".lq.Lobby.amuletActivityOperate:15")
+        finish_event = next((e for e in events if e.get("type") == 24), None)
+        if finish_event:
+            value_changes = finish_event.get("valueChanges", {})
+            stage = value_changes.get("stage", -1)
+            GAME_STATE.update_other_info(stage=stage, reason=".lq.Lobby.amuletActivityOperate:24")
     # 进入青云之志界面时获取已经开始的游戏数据
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.fetchAmuletActivityData":
         data = view.get("data", {}).get("data", {})
@@ -570,17 +602,23 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             ended = game.get("ended", False)
             coin = int(game.get("game", {}).get("coin", ""))
             level = game.get("level", None)
-            shop = game.get("shop", -1)
+            shop = game.get("shop", {})
+            free_candidate_effect_list = game.get("effect", {}).get("freeRewardCandidates", None)
             candidate_effect_list = shop.get("candidateEffectList", [])
+            if free_candidate_effect_list:
+                candidate_effect_list = free_candidate_effect_list
+            goods = shop.get("goods", [])
+            refresh_price = shop.get("refreshPrice", 0)
             record = game.get("record", None)
             ting_list = round_info.get("tingList", None)
             next_operation = round_info.get("nextOperation", None)
             GAME_STATE.update_record(record)
             if desktop_remain < 36:
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, push_gamestate=False)
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, push_gamestate=False)
                 GAME_STATE.refresh_wall_by_remaning()
             else:
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation)
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price)
+        # return "modify", dict({"error": {"code": 2689, "u32Params": [], "strParams": [], "jsonParam": ""}})
     # 只是用来更新一下状态
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityGiveup":
         GAME_STATE.on_giveup()
@@ -603,8 +641,10 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
         stage = value_changes.get("stage", -1)
         ended = value_changes.get("ended", False)
         record = value_changes.get("record", None)
+        effect = value_changes.get("effect", None)
+        free_candidate_effect_list = effect.get("freeRewardCandidates", {}).get("value", [])
         GAME_STATE.update_record(record)
-        GAME_STATE.update_other_info(stage=stage, ended=ended, reason=".lq.Lobby.amuletActivityStartGame:1")
+        GAME_STATE.update_other_info(stage=stage, ended=ended, candidate_effect_list=free_candidate_effect_list, reason=".lq.Lobby.amuletActivityStartGame:1")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityBuy":
         data = dict(view["data"])
         events = data.get("events", [])
@@ -655,8 +695,11 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             stage = value_changes.get("stage", -1)
             coin = int(game.get("coin", {}).get("value", None))
             record = value_changes.get("record", None)
+            shop = value_changes.get("shop", {})
+            goods = shop.get("goods", {}).get("value", None)
+            refresh_price = shop.get("refreshPrice", {}).get("value", None)
             GAME_STATE.update_record(record)
-            GAME_STATE.update_other_info(stage=stage, coin=coin, reason=".lq.Lobby.amuletActivitySellEffect:18")
+            GAME_STATE.update_other_info(stage=stage, coin=coin, goods=goods, refresh_price=refresh_price, reason=".lq.Lobby.amuletActivitySellEffect:18")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityEndShopping":
         data = view.get("data", {})
         events = data.get("events", [])

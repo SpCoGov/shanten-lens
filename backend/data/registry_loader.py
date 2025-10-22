@@ -58,7 +58,7 @@ def _validate_table(data: Any, kind: REGISTRY_KINDS) -> Tuple[bool, str]:
         key = name.lower()
         if key in names:
             return False, f"[{i}] dup name: {name}"
-        ids.add(row["id"]);
+        ids.add(row["id"])
         names.add(key)
 
     return True, "ok"
