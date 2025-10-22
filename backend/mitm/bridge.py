@@ -19,15 +19,13 @@ class MitmBridge:
         self._listeners: List[Callable[[Dict[str, Any]], None]] = []
 
     async def start(self):
-        """
-        Start mitmproxy DumpMaster in quiet mode:
-          - lower mitmproxy term log verbosity if option exists
-          - remove terminal/event log addons if present
-          - redirect stdout/stderr to devnull as a final guard
-        """
         try:
             opts = Options(listen_host=self.host, listen_port=self.port, ssl_insecure=True)
             self._master = DumpMaster(opts)
+            try:
+                self.addon.set_master(self._master)
+            except Exception:
+                pass
 
             try:
                 self._master.options.termlog_verbosity = "error"
@@ -38,7 +36,6 @@ class MitmBridge:
             except Exception:
                 pass
 
-            # 添加我们的 addon
             self._master.addons.add(self.addon)
             self.addon.subscribe(self._emit)
 

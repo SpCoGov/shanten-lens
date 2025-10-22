@@ -9,20 +9,53 @@ import sys
 from pathlib import Path
 from time import monotonic
 from typing import Dict, Set, Any
-
+import ctypes
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from loguru import logger
 from platformdirs import user_data_dir
 from watchfiles import awatch
 from websockets.legacy.server import WebSocketServerProtocol, serve
 
+from backend.bot import BotPipeline, BotConfig
+from backend.bot.drivers.packet.packet_bot import PacketBot
 from backend.config import build_manager
 from backend.data.registry_loader import load_registry_list
 from backend.model.game_state import GameState
 from backend.model.items import AmuletRegistry, BadgeRegistry
 
 GAME_STATE = GameState()
+PACKET_BOT: PacketBot
+
+try:
+    ctypes.windll.user32.SetProcessDPIAware()
+except Exception:
+    pass
+
+cfg = BotConfig(
+    screen_width=1920,
+    screen_height=1080,
+    window_title_keyword="雀魂",
+
+    hand_bar_norm=(0.10243, 0.85450, 0.82811, 0.99513),
+    button_bar_norm=(0.47454, 0.70785, 0.82542, 0.81008),
+
+    hand_slots=14,
+    hand_margin=0.02,
+    hand_left_comp_px=0,
+    hand_right_comp_px=10,
+    button_order=[4, 8, 100],
+    button_margin=0.06,
+
+    btn_x_left=6.40, btn_x_right=10.875, btn_y_line=6.45,
+
+    # 点击确认参数
+    ack_timeout_sec=1.6, ack_retry=2, ack_settle_ms=140, ack_check_ms=70,
+)
+pipeline = BotPipeline(cfg)
+
+
+# pipeline.selftest_move()
 
 
 def default_data_root() -> Path:
@@ -115,18 +148,57 @@ api_app = FastAPI(title="Shanten Lens API", version="1.0.0")
 
 
 @api_app.get("/api/gamestate/record")
-def api_health():
+def api_record():
     return {"type": "request_gamestate", "data": GAME_STATE.record}
 
 
 @api_app.get("/api/gamestate/effect_list")
-def api_health():
+def api_effect_list():
     return {"type": "request_effect_list", "data": GAME_STATE.effect_list}
 
 
 @api_app.get("/api/gamestate/level")
-def api_health():
+def api_level():
     return {"type": "request_level", "data": GAME_STATE.level}
+
+
+@api_app.get("/api/discard")
+def api_discard(tile_id: int = Query(..., description="要丢的牌的 tile_id")):
+    return {"type": "discard", "data": {"ok": pipeline.click_discard_by_tile_id(
+        tile_id=tile_id,
+        hand_ids_with_draw=GAME_STATE.hand_tiles,
+        id2label=GAME_STATE.deck_map,
+        allow_tsumogiri=False
+    )}}
+
+
+@api_app.get("/api/testmove")
+def api_testmove():
+    pipeline.selftest_move()
+    return {"type": "discard", "data": {"ok": True}}
+
+
+@api_app.get("/api/give_up")
+def api_give_up():
+    try:
+        return {"type": "discard", "data": {"ok": PACKET_BOT.giveup()}}
+    except Exception as e:
+        logger.error(f"reload give_up failed: {e}")
+
+
+@api_app.get("/api/start")
+def api_start():
+    try:
+        return {"type": "discard", "data": {"ok": PACKET_BOT.start_game()}}
+    except Exception as e:
+        logger.error(f"reload start failed: {e}")
+
+@api_app.get("/api/fetch_amulet_activity_data")
+def api_fetch_amulet_activity_data():
+    try:
+        return {"type": "discard", "data": {"ok": PACKET_BOT.fetch_amulet_activity_data(delay_sec=3)}}
+    except Exception as e:
+        logger.error(f"reload start failed: {e}")
 
 
 async def run_http_server(host: str, port: int):
@@ -178,23 +250,6 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     await ws_send(ws, {"type": "open_result", "data": {"ok": True}})
                 except Exception as e:
                     await ws_send(ws, {"type": "open_result", "data": {"ok": False, "error": str(e)}})
-            elif t == "inject_select_pack_now":
-                from backend.mitm.addon import WS_ADDON_INSTANCE, WsAddon
-                addon: WsAddon = WS_ADDON_INSTANCE
-                if not addon:
-                    await ws_send(ws, {"type": "inject_ack", "data": {"ok": False, "detail": "ws-addon-not-ready"}})
-                else:
-                    ok, detail = addon.inject_now(
-                        method=".lq.Lobby.amuletActivitySelectPack",
-                        data={
-                            "activityId": int(data.get("activityId")),
-                            "type": int(data.get("type")),
-                            "tileList": list(map(int, data.get("tileList", []))),
-                        },
-                        t="Req",
-                        peer_key=data.get("peerKey"),
-                    )
-                    await ws_send(ws, {"type": "inject_ack", "data": {"ok": ok, "detail": detail}})
 
     except Exception:
         pass
