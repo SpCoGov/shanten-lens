@@ -44,5 +44,11 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         .add("enable_kavi_plus_buffer_guard", True, kind="bool")
         .add("enable_exit_life_guard", False, kind="bool")
     )
+    mgr.add_table(
+        ConfigTable("autorun", file=conf_dir / "autorun.json")
+        .add("end_count", 1, desc="达成的目标数量（护身符/印章混计）", kind="int")
+        .add("targets", [], desc="结束判定的目标清单", kind="object")
+        .add("cutoff_level", 0, desc="截止关卡（101..503；0=不限制）", kind="int")
+    )
     mgr.load_all()
     return mgr

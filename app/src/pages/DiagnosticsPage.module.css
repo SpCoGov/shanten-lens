@@ -24,3 +24,7 @@
 .err .lv {
     color: #fca5a5;
 }
+
+.noAnchor {
+    overflow-anchor: none;
+}

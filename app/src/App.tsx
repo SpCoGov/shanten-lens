@@ -2,6 +2,7 @@ import React from "react";
 import {listen} from "@tauri-apps/api/event";
 import SettingsPage from "./pages/SettingsPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
+import AutoRunnerPage from "./pages/AutoRunnerPage";
 import FusePage from "./pages/FusePage";
 import AboutPage from "./pages/AboutPage";
 import {ws} from "./lib/ws";
@@ -22,7 +23,7 @@ import {
     type Cell,
 } from "./lib/gamestate";
 
-type Route = "home" | "fuse" | "settings" | "diagnostics" | "about";
+type Route = "home" | "fuse" | "autorun" | "settings" | "diagnostics" | "about";
 
 const OUTER_PADDING = 16;
 const SIDEBAR_WIDTH = 320;
@@ -146,6 +147,12 @@ export default function App() {
                         熔断
                     </button>
                     <button
+                        className={`nav-btn ${route === "autorun" ? "active" : ""}`}
+                        onClick={() => setRoute("autorun")}
+                    >
+                        自动化
+                    </button>
+                    <button
                         className={`nav-btn ${route === "settings" ? "active" : ""}`}
                         onClick={() => setRoute("settings")}
                     >
@@ -251,6 +258,7 @@ export default function App() {
                 )}
 
                 {route === "fuse" && <FusePage/>}
+                {route === "autorun" && <AutoRunnerPage/>}
                 {route === "settings" && <SettingsPage/>}
                 {route === "diagnostics" && <DiagnosticsPage/>}
                 {route === "about" && <AboutPage/>}

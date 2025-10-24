@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import ctypes
 import json
 import os
 import subprocess
@@ -9,7 +10,7 @@ import sys
 from pathlib import Path
 from time import monotonic
 from typing import Dict, Set, Any
-import ctypes
+
 import uvicorn
 from fastapi import FastAPI, Query
 from loguru import logger
@@ -17,6 +18,8 @@ from platformdirs import user_data_dir
 from watchfiles import awatch
 from websockets.legacy.server import WebSocketServerProtocol, serve
 
+from backend.autorun.runner import AutoRunner
+from backend.autorun.util.retry_1004 import call_with_1004_retry_async
 from backend.bot import BotPipeline, BotConfig
 from backend.bot.drivers.packet.packet_bot import PacketBot
 from backend.config import build_manager
@@ -69,6 +72,11 @@ DATA_DIR: Path = DATA_ROOT / "data"
 MANAGER = build_manager(CONF_DIR)
 AMULET_REG: AmuletRegistry | None = None
 BADGE_REG: BadgeRegistry | None = None
+
+AUTORUNNER = AutoRunner(
+    get_config=lambda: MANAGER.to_table_payload("autorun"),
+    get_game_state=lambda: GAME_STATE,
+)
 
 
 def _load_registries() -> None:
@@ -175,13 +183,14 @@ def api_discard(tile_id: int = Query(..., description="要丢的牌的 tile_id")
 @api_app.get("/api/testmove")
 def api_testmove():
     pipeline.selftest_move()
-    return {"type": "discard", "data": {"ok": True}}
+    return {"type": "testmove", "data": {"ok": True}}
 
 
 @api_app.get("/api/give_up")
 def api_give_up():
     try:
-        return {"type": "discard", "data": {"ok": PACKET_BOT.giveup()}}
+        ok, reason = PACKET_BOT.giveup()
+        return {"type": "give_up", "data": {"ok": ok, "reason": reason}}
     except Exception as e:
         logger.error(f"reload give_up failed: {e}")
 
@@ -189,14 +198,15 @@ def api_give_up():
 @api_app.get("/api/start")
 def api_start():
     try:
-        return {"type": "discard", "data": {"ok": PACKET_BOT.start_game()}}
+        return {"type": "start", "data": {"ok": PACKET_BOT.start_game()}}
     except Exception as e:
         logger.error(f"reload start failed: {e}")
+
 
 @api_app.get("/api/fetch_amulet_activity_data")
 def api_fetch_amulet_activity_data():
     try:
-        return {"type": "discard", "data": {"ok": PACKET_BOT.fetch_amulet_activity_data(delay_sec=3)}}
+        return {"type": "fetch_amulet_activity_data", "data": {"ok": PACKET_BOT.fetch_amulet_activity_data(delay_sec=3)}}
     except Exception as e:
         logger.error(f"reload start failed: {e}")
 
@@ -212,9 +222,11 @@ async def ws_handler(ws: WebSocketServerProtocol):
         CLIENTS.add(ws)
 
     await ws_send(ws, {"type": "update_fuse_config", "data": MANAGER.to_table_payload("fuse")})
+    await ws_send(ws, {"type": "update_autorun_config", "data": MANAGER.to_table_payload("autorun")})
     await ws_send(ws, {"type": "update_registry", "data": _registry_payload()})
     await ws_send(ws, {"type": "update_config", "data": MANAGER.to_payload()})
     await ws_send(ws, {"type": "update_gamestate", "data": GAME_STATE.to_dict()})
+    await ws_send(ws, {"type": "autorun_status", "data": await AUTORUNNER.status_payload_async()})
 
     try:
         async for raw in ws:
@@ -227,7 +239,6 @@ async def ws_handler(ws: WebSocketServerProtocol):
             data = pkt.get("data", {})
 
             if t == "keep_alive":
-                # no-op
                 pass
 
             elif t == "edit_config":
@@ -236,10 +247,17 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     now_ms = monotonic() * 1000
                     for p in written_paths:
                         recent_writes[str(p)] = now_ms
+                    if "autorun" in data:
+                        AUTORUNNER.update_config(MANAGER.to_table_payload("autorun"))
+                        await broadcast({"type": "update_autorun_config", "data": MANAGER.to_table_payload("autorun")})
+                        await broadcast({"type": "autorun_status", "data": await AUTORUNNER.status_payload_async()})
+                    if "fuse" in data:
+                        await broadcast({"type": "update_fuse_config", "data": MANAGER.to_table_payload("fuse")})
                     await broadcast({"type": "update_config", "data": MANAGER.to_payload()})
 
             elif t == "request_update":
                 await ws_send(ws, {"type": "update_fuse_config", "data": MANAGER.to_table_payload("fuse")})
+                await ws_send(ws, {"type": "update_autorun_config", "data": MANAGER.to_table_payload("autorun")})
                 await ws_send(ws, {"type": "update_config", "data": MANAGER.to_payload()})
                 await ws_send(ws, {"type": "update_gamestate", "data": GAME_STATE.to_dict()})
                 await ws_send(ws, {"type": "update_registry", "data": _registry_payload()})
@@ -250,6 +268,83 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     await ws_send(ws, {"type": "open_result", "data": {"ok": True}})
                 except Exception as e:
                     await ws_send(ws, {"type": "open_result", "data": {"ok": False, "error": str(e)}})
+
+            elif t == "autorun_control":
+                action = (data or {}).get("action")
+                force = bool((data or {}).get("force", False))
+
+                async def _result(ok: bool, reason: str = "", **extra):
+                    await ws_send(ws, {"type": "autorun_control_result", "data": {"ok": ok, "reason": reason, **extra}})
+                    await ws_send(ws, {"type": "autorun_status", "data": await AUTORUNNER.status_payload_async()})
+
+                if action == "probe":
+                    await AUTORUNNER.refresh_probe_now(push=True)
+                    continue
+                if action == "start":
+                    bot = getattr(sys.modules.get("backend.app"), "PACKET_BOT", None)
+
+                    ok, reason, resp = await call_with_1004_retry_async(
+                        bot.fetch_amulet_activity_data,
+                        delay_sec=8,
+                        interval=0.4,
+                        timeout=20,
+                        to_thread=True,
+                    )
+
+                    if not ok:
+                        low = (reason or "").lower()
+                        if "addon-or-flow-not-ready" in low or "not ready" in low:
+                            return await _result(False, "游戏未启动或流程未就绪")
+                        if "timeout" in low:
+                            return await _result(False, "连接超时，请检查游戏/代理")
+                        return await _result(False, f"探测失败：{reason or 'unknown'}")
+
+                    has_game = bool((resp or {}).get("data", {}).get("data", {}).get("game"))
+                    if has_game and not force:
+                        return await _result(False, "检测到已有对局，是否放弃当前对局并开始？", requires_confirmation=True)
+
+                    if has_game and force:
+                        logger.info("force start")
+                        ok2, reason2, _ = await call_with_1004_retry_async(
+                            bot.giveup,
+                            delay_sec=8,
+                            interval=0.6,
+                            timeout=30,
+                            to_thread=True,
+                        )
+                        if not ok2:
+                            return await _result(False, f"放弃当前对局失败：{reason2 or 'unknown'}")
+
+                        await call_with_1004_retry_async(
+                            bot.fetch_amulet_activity_data,
+                            delay_sec=8,
+                            interval=0.6,
+                            timeout=10,
+                            to_thread=True,
+                        )
+
+                    try:
+                        await AUTORUNNER.start()
+                    except Exception as e:
+                        return await _result(False, f"开启自动化失败：{e}")
+
+                    return await _result(True, "")
+                elif action == "stop":
+                    if not AUTORUNNER.running:
+                        return await _result(True, "")
+                    await AUTORUNNER.stop()
+                    return await _result(True, "")
+                if action == "set_mode":
+                    mode = (data or {}).get("mode")
+                    await AUTORUNNER.set_mode(mode)
+                    return await _result(True, "")
+
+                elif action == "step":
+                    try:
+                        await AUTORUNNER.step_once()
+                        return await _result(True, "")
+                    except Exception as e:
+                        return await _result(False, str(e))
 
     except Exception:
         pass
@@ -265,6 +360,7 @@ async def _watch_configs():
         now = monotonic() * 1000
         should_broadcast_normal = False
         should_broadcast_fuse = False
+        should_broadcast_autorun = False
 
         for _typ, path in changes:
             ts = recent_writes.get(str(path))
@@ -274,6 +370,8 @@ async def _watch_configs():
             if changed:
                 if tname == "fuse":
                     should_broadcast_fuse = True
+                elif tname == "autorun":
+                    should_broadcast_autorun = True
                 else:
                     should_broadcast_normal = True
 
@@ -284,6 +382,11 @@ async def _watch_configs():
         if should_broadcast_fuse:
             await broadcast({"type": "update_fuse_config", "data": MANAGER.to_table_payload("fuse")})
             logger.info("fuse config updated & broadcast")
+
+        if should_broadcast_autorun:
+            await broadcast({"type": "update_autorun_config", "data": MANAGER.to_table_payload("autorun")})
+            AUTORUNNER.update_config(MANAGER.to_table_payload("autorun"))
+            logger.info("autorun config updated & broadcast")
 
 
 async def run_ws_server(host: str, port: int):

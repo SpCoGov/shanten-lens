@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+from idlelib.configdialog import changes
+
 from loguru import logger
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -33,6 +35,9 @@ class GameState:
     next_operation: List[Dict] = field(default_factory=dict)
     goods: List[Dict] = field(default_factory=dict)
     refresh_price: int = field(default_factory=int)
+    change_tile_count: int = field(default_factory=int)
+    total_change_tile_count: int = field(default_factory=int)
+    max_effect_volume: int = field(default_factory=int)
 
     update_reason: List[str] = field(default_factory=list)
 
@@ -60,6 +65,9 @@ class GameState:
             "next_operation": self.next_operation,
             "goods": self.goods,
             "refresh_price": self.refresh_price,
+            "change_tile_count": self.change_tile_count,
+            "total_change_tile_count": self.total_change_tile_count,
+            "max_effect_volume": self.max_effect_volume,
 
             "update_reason": self.update_reason,
         }
@@ -139,6 +147,13 @@ class GameState:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
+    def update_hand_tiles(self, hand_tiles: list[int], push_gamestate: bool = True, reason: str = ""):
+        self.hand_tiles = hand_tiles.copy()
+        self.update_reason.append(reason)
+        if push_gamestate:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.on_gamestage_change())
+
     def update_switch_used_tiles(self, used: list[int], push_gamestate: bool = True, reason: str = ""):
         if self.stage == 2:
             self.switch_used_tiles = used.copy()
@@ -150,8 +165,8 @@ class GameState:
 
     def update_other_info(self, desktop_remain: int = None, stage: int = None, ended: bool = None, coin: int = None, level: int = None,
                           effect_list: List[Dict] = None, candidate_effect_list: List[Dict] = None, ting_list: List[Dict] = None, next_operation: List[Dict] = None,
-                          goods: List[Dict] = None, refresh_price: int = None
-                          , push_gamestate: bool = True, reason: str = ""):
+                          goods: List[Dict] = None, refresh_price: int = None, change_tile_count: int = None, total_change_tile_count: int = None, max_effect_volume: int = None,
+                          push_gamestate: bool = True, reason: str = ""):
         if desktop_remain is not None:
             self.desktop_remain = desktop_remain
         if stage is not None:
@@ -174,6 +189,12 @@ class GameState:
             self.goods = goods.copy()
         if refresh_price is not None:
             self.refresh_price = refresh_price
+        if total_change_tile_count is not None:
+            self.total_change_tile_count = total_change_tile_count
+        if change_tile_count is not None:
+            self.change_tile_count = change_tile_count
+        if max_effect_volume is not None:
+            self.max_effect_volume = max_effect_volume
         self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()
@@ -195,6 +216,12 @@ class GameState:
         self.effect_list.clear()
         self.candidate_effect_list.clear()
         self.record = {}
+        self.refresh_price = 0
+        self.total_change_tile_count = 0
+        self.change_tile_count = 0
+        self.goods.clear()
+        self.next_operation.clear()
+        self.ting_list.clear()
 
         self.update_reason.clear()
         self.update_reason.append(".lq.Lobby.amuletActivityGiveup")

@@ -1,6 +1,6 @@
 import React from "react";
-import { ws } from "../lib/ws";
-import { useLogStore } from "../lib/logStore";
+import {ws} from "../lib/ws";
+import {useLogStore} from "../lib/logStore";
 import styles from "./DiagnosticsPage.module.css";
 
 export default function DiagnosticsPage() {
@@ -27,18 +27,18 @@ export default function DiagnosticsPage() {
         <div className="diag-wrap">
             <section className="card diag-top">
                 <div className="diag-status">
-                    <span className={`dot ${conn ? "ok" : "down"}`} />
+                    <span className={`dot ${conn ? "ok" : "down"}`}/>
                     <b>WebSocket</b>：{conn ? "已连接" : "未连接"}
                 </div>
                 <label className="tail">
-                    <input type="checkbox" checked={tail} onChange={(e) => setTail(e.target.checked)} />
+                    <input type="checkbox" checked={tail} onChange={(e) => setTail(e.target.checked)}/>
                     自动滚动
                 </label>
             </section>
 
             <section className="mj-panel card">
-                <h3 style={{marginTop:0}}>WS 封包（收/发）</h3>
-                <div id="ws-frames" className="log">
+                <h3 style={{marginTop: 0}}>WS 封包（收/发）</h3>
+                <div id="ws-frames" className="log ${styles.noAnchor}">
                     {frames.map((f, i) => (
                         <div key={i} className={`${styles.line} ${f.dir === "in" ? styles.info : styles.out}`}>
                             <span className={styles.ts}>[{f.ts}]</span>{" "}
@@ -51,8 +51,8 @@ export default function DiagnosticsPage() {
             </section>
 
             <section className="mj-panel card">
-                <h3 style={{marginTop:0}}>后端事件日志</h3>
-                <div id="diag-logpanel" className="log">
+                <h3 style={{marginTop: 0}}>后端事件日志</h3>
+                <div id="diag-logpanel" className="log ${styles.noAnchor}">
                     {logs.map((l, i) => {
                         const cls =
                             l.level === "ERROR" || l.level === "STDERR" ? styles.err :

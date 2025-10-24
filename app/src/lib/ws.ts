@@ -1,6 +1,7 @@
 import {useLogStore} from "./logStore";
 import {setRegistry, type RegistryPayload} from "./registryStore";
-import { setFuseConfig, type FuseConfig } from "./fuseStore";
+import {setFuseConfig, type FuseConfig} from "./fuseStore";
+import {AutoRunnerConfig, setAutoConfig} from "./autoRunnerStore";
 
 export type UpdateConfigPacket = { type: "update_config"; data: Record<string, Record<string, any>> };
 export type Packet =
@@ -174,7 +175,7 @@ class WS {
 
 export const ws = new WS("http://127.0.0.1:8787");
 ws.onPacket((pkt) => {
-    if (pkt.type     === "update_registry") {
+    if (pkt.type === "update_registry") {
         const data = pkt.data as RegistryPayload;
         if (data && Array.isArray(data.amulets) && Array.isArray(data.badges)) {
             setRegistry(data);
@@ -188,5 +189,12 @@ ws.onPacket((pkt) => {
         if (cfg && cfg.guard_skip_contains) {
             setFuseConfig(cfg);
         }
+    } else if (pkt.type === "update_autorun_config") {
+        const cfg = pkt.data as AutoRunnerConfig;
+        if (cfg) {
+            setAutoConfig(cfg);
+        }
+    } else if (pkt.type === "autorun_control_result") {
+        return;
     }
 });

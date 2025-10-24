@@ -47,10 +47,6 @@ def _tile_key(label: str) -> Tuple[int, int]:
 
 
 def sort_hand_labels(hand_labels: List[str]) -> List[str]:
-    """
-    按你给的规则对 13 张“可排序部分”排序（不含最后一张摸牌）。
-    注意：这个函数不处理“最后一张摸牌”逻辑。外层需要把最后一张保留在末尾。
-    """
     return sorted(hand_labels, key=_tile_key)
 
 

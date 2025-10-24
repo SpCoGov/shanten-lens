@@ -93,12 +93,6 @@ class WsAddon:
 
         try:
             view = self.codec.parse_frame(message.content, message.from_client)
-
-            try:
-                if (not message.from_client) and view.get("type") in ("Res", "Notify") and isinstance(view.get("id"), int):
-                    self.resolve_waiter_sync(int(view["id"]), view)
-            except Exception:
-                pass
         except Exception as e:
             logger.error(
                 f"parse error for ws message from {flow.client_conn.address} -> "
@@ -136,11 +130,16 @@ class WsAddon:
         except Exception as e:
             logger.error(f"logging full message failed: {e}")
 
-        # 执行 hook（出/入站）
         hook = self.on_outbound if message.from_client else self.on_inbound
         action, payload = self._apply(hook, view)
 
+        # 如果要 drop，先尝试唤醒 waiter 再返回，避免调用侧超时
         if action == "drop":
+            if (not message.from_client) and view.get("type") in ("Res", "Notify") and isinstance(view.get("id"), int):
+                try:
+                    self.resolve_waiter_sync(int(view["id"]), view)
+                except Exception:
+                    pass
             message.drop()
             logger.success(f"{'已发送' if message.from_client else '接收到'}(drop)：{view.get('method')}")
             return
@@ -149,6 +148,7 @@ class WsAddon:
             new_view = dict(view, data=payload)
             try:
                 message.content = self.codec.build_frame(new_view)
+                view = new_view
                 logger.success(f"{'已发送' if message.from_client else '接收到'}(modify)：{new_view.get('method')}")
             except Exception as e:
                 logger.error(f"修改后重建失败：{e}")
@@ -162,6 +162,11 @@ class WsAddon:
                     logger.success(f"已注入：{inj.get('method')} -> {'client' if to_client else 'server'}")
                 except Exception as e:
                     logger.error(f"注入失败：{e}")
+        try:
+            if (not message.from_client) and view.get("type") in ("Res", "Notify") and isinstance(view.get("id"), int):
+                self.resolve_waiter_sync(int(view["id"]), view)
+        except Exception:
+            pass
 
     def _pick_flow(self, peer_key: Optional[str]):
         if peer_key:

@@ -181,7 +181,6 @@ input, textarea, select, code, pre, .selectable {
     pointer-events: none;
 }
 
-/* 顶部下滑通知（SettingsPage 用） */
 .toast {
     position: fixed;
     top: -48px;

@@ -104,7 +104,6 @@ export default function SettingsPage() {
 
     return (
         <div className="settings-wrap">
-            {/* 顶部下滑通知（全局样式） */}
             <div className={`toast ${toastVisible ? "visible" : ""} ${toast?.kind || "info"}`}>{toast?.msg}</div>
 
             <div className="settings-header">
