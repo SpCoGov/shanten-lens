@@ -64,6 +64,16 @@ def _validate_table(data: Any, kind: REGISTRY_KINDS) -> Tuple[bool, str]:
     return True, "ok"
 
 
+def _get_version(obj: Dict[str, Any] | None) -> int:
+    if not isinstance(obj, dict):
+        return 0
+    v = obj.get("version", 0)
+    try:
+        return int(v)
+    except Exception:
+        return 0
+
+
 def _atomic_write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, dir=str(path.parent)) as tf:
@@ -95,17 +105,24 @@ def load_registry(kind: REGISTRY_KINDS,
     ok_builtin, _ = _validate_table(builtin, kind)
     if not ok_builtin:
         raise ValueError(f"内置资源 {filename} 校验失败，请检查 assets 文件。")
-
+    builtin_ver = _get_version(builtin)
     if external_dir:
         ext_path = external_dir / filename
         ext = _read_external(ext_path)
         if ext:
-            ok, _ = _validate_table(ext, kind)
-            if ok:
+            ok_ext, _ = _validate_table(ext, kind)
+            if ok_ext:
+                ext_ver = _get_version(ext)
+                if ext_ver < builtin_ver:
+                    _atomic_write_text(ext_path, json.dumps(builtin, ensure_ascii=False, indent=2))
+                    reloaded = _read_external(ext_path)
+                    return reloaded if isinstance(reloaded, dict) else builtin
                 return ext
-        if write_back_if_missing and (not ext_path.exists()):
-            _atomic_write_text(ext_path, json.dumps(builtin, ensure_ascii=False, indent=2))
-
+        else:
+            if write_back_if_missing and (not ext_path.exists()):
+                _atomic_write_text(ext_path, json.dumps(builtin, ensure_ascii=False, indent=2))
+                return builtin
+        return builtin
     return builtin
 
 

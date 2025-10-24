@@ -197,7 +197,6 @@
     border-radius: 6px !important;
 }
 
-/* 大牌高度限制（推荐打牌行） */
 .tilePill :global(img), .tilePill :global(canvas), .tilePill :global(svg), .tilePill :global(div) {
     max-height: 36px;
 }

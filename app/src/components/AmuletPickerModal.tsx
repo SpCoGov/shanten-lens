@@ -1,6 +1,6 @@
 import React from "react";
 import Modal from "./Modal";
-import { useRegistry } from "../lib/registryStore";
+import {useRegistry} from "../lib/registryStore";
 
 const RARITIES = ["ALL", "PURPLE", "ORANGE", "BLUE", "GREEN"] as const;
 type RarityKey = typeof RARITIES[number];
@@ -14,7 +14,7 @@ export default function AmuletPickerModal({
     onClose: () => void;
     onSelect: (amuletId: number) => void;
 }) {
-    const { amulets } = useRegistry();
+    const {amulets} = useRegistry();
     const [q, setQ] = React.useState("");
     const [rarity, setRarity] = React.useState<RarityKey>("ALL");
     const [sel, setSel] = React.useState<number | null>(null);
@@ -51,18 +51,17 @@ export default function AmuletPickerModal({
 
     return (
         <Modal open={open} onClose={onClose} title="选择护身符" actions={actions}>
-            {/* 顶部筛选区：去掉原来的确认按钮 */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <div style={{display: "flex", gap: 8, marginBottom: 12}}>
                 <input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     placeholder="搜索名称或ID…"
-                    style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd" }}
+                    style={{flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd"}}
                 />
                 <select
                     value={rarity}
                     onChange={(e) => setRarity(e.target.value as RarityKey)}
-                    style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd" }}
+                    style={{padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd"}}
                 >
                     {RARITIES.map((r) => (
                         <option key={r} value={r}>{r}</option>
@@ -95,13 +94,13 @@ export default function AmuletPickerModal({
                                 transition: "box-shadow 120ms ease, border-color 120ms ease",
                             }}
                         >
-                            <div style={{ fontSize: 12, color: "#888" }}>ID: {a.id}</div>
-                            <div style={{ fontWeight: 600, margin: "4px 0" }}>{a.name}</div>
-                            <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>{a.rarity}</div>
+                            <div style={{fontSize: 12, color: "#888"}}>ID: {a.id}</div>
+                            <div style={{fontWeight: 600, margin: "4px 0"}}>{a.name}</div>
+                            <div style={{fontSize: 12, color: "#555", marginBottom: 6}}>{a.rarity}</div>
                             <img
                                 src={icon}
                                 alt={a.name}
-                                style={{ width: 80, height: "auto", display: "block", opacity: 0.95 }}
+                                style={{width: 80, height: "auto", display: "block", opacity: 0.95}}
                                 draggable={false}
                             />
                         </button>

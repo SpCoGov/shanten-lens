@@ -6,7 +6,6 @@ from backend.mitm.addon import WsAddon
 from backend.model.game_state import GameState
 from ...core.interfaces import GameBot
 
-
 class PacketBot(GameBot):
     def __init__(
             self,
@@ -23,7 +22,6 @@ class PacketBot(GameBot):
         self.default_timeout = default_timeout
         self._get_state = state_getter
 
-        # 操作码（保留你的键）
         self.op_code = {
             "discard": 1,
             "tsumo": 8,
@@ -102,9 +100,9 @@ class PacketBot(GameBot):
                 addon.discard_waiter_sync(msg_id)
                 return False, "timeout", None
             resp = addon.pop_waiter_sync_resp(msg_id)
-            if resp.get("error", None) is not None:
-                logger.error(f"error occurred: {resp.get('error')}")
-                return False, f"error code: {resp.get('error', {}).get('code', 0)}", None
+            if resp.get('data', {}).get('error', None) is not None:
+                logger.error(f"error occurred: {resp.get('data', {}).get('error')}")
+                return False, f"error code: {resp.get('data', {}).get('error', {}).get('code', 0)}", None
             return True, "ok", resp
         except Exception as e:
             addon.discard_waiter_sync(msg_id)
@@ -120,141 +118,148 @@ class PacketBot(GameBot):
             delay_sec=delay_sec, timeout=timeout
         )
 
-    def giveup(self, delay_sec: float = 0.1) -> bool:
+    def giveup(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         ok, reason, resp = self._inject_and_wait(
             method=".lq.Lobby.amuletActivityGiveup",
             data={"activityId": self.activity_id},
             delay_sec=delay_sec
         )
-        return ok
+        return ok, reason, resp
 
-    def start_game(self, delay_sec: float = 0.1):
+    def start_game(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         ok, reason, resp = self._inject_and_wait(
             method=".lq.Lobby.amuletActivityStartGame",
             data={"activityId": self.activity_id},
             delay_sec=delay_sec
         )
-        return ok
+        return ok, reason, resp
 
-    def op_tsumo(self, delay_sec: float = 0.3) -> bool:
+    def op_tsumo(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         t = self.op_code.get("tsumo")
         if t is None:
             raise NotImplementedError("PacketBot.op_tsumo: no op_code 'tsumo'")
         if not self._ops_allow(t):
             logger.error("gamestate disallow tsumo")
-            return False
+            return False, "gamestate disallow discard", None
         ok, reason, resp = self._operate(pkt_type=t, tile_list=[], delay_sec=delay_sec)
         if self.verbose:
             logger.info(f"tsumo -> ok={ok}, reason={reason}, resp={resp}")
-        return ok
+        return ok, reason, resp
 
-    def op_skip_replace(self, delay_sec: float = 0.3) -> bool:
+    def op_skip_change(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         t = self.op_code.get("skip_replace")
         if t is None:
             raise NotImplementedError("PacketBot.op_skip_replace: no op_code 'skip_replace'")
         if not self._ops_allow(t):
             logger.error("gamestate disallow skip-replace")
-            return False
+            return False, "gamestate disallow discard", None
         ok, reason, resp = self._operate(pkt_type=t, tile_list=[], delay_sec=delay_sec)
         if self.verbose:
             logger.info(f"skip_replace -> ok={ok}, reason={reason}, resp={resp}")
-        return ok
+        return ok, reason, resp
 
-    def op_replace(self, tile_id: int, delay_sec: float = 0.3) -> bool:
+    def op_change(self, tile_ids: List[int], delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         t = self.op_code.get("replace")
         if t is None:
             raise NotImplementedError("PacketBot.op_replace: no op_code 'replace'")
         if not self._ops_allow(t):
             logger.error("gamestate disallow replace")
-            return False
-        ok, reason, resp = self._operate(pkt_type=t, tile_list=[tile_id], delay_sec=delay_sec)
+            return False, "gamestate disallow discard", None
+        ok, reason, resp = self._operate(pkt_type=t, tile_list=tile_ids, delay_sec=delay_sec)
         if self.verbose:
-            logger.info(f"replace tile={tile_id} -> ok={ok}, reason={reason}, resp={resp}")
-        return ok
+            logger.info(f"replace tile={tile_ids} -> ok={ok}, reason={reason}, resp={resp}")
+        return ok, reason, resp
 
     def discard_by_tile_id(
             self,
             tile_id: int,
             allow_tsumogiri: bool = True,
-            delay_sec: float = 0.3,
-    ) -> bool:
+            delay_sec: float = 3,
+    ) -> Tuple[bool, str, Optional[dict]]:
         t = self.op_code.get("discard", 1)
         if not self._ops_allow(t):
             logger.error("gamestate disallow discard")
-            return False
+            return False, "gamestate disallow discard", None
         ok, reason, resp = self._operate(pkt_type=t, tile_list=[tile_id], delay_sec=delay_sec)
         if self.verbose:
             logger.info(f"discard id={tile_id}({self._label(tile_id)}) -> ok={ok}, reason={reason}, resp={resp}")
-        return ok
+        return ok, reason, resp
 
-    def select_free_effect(self, selected_id: int, delay_sec: float = 0.3) -> bool:
+    def select_free_effect(self, selected_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         st = self._state()
         if not self._check_stage(1):
-            return False
+            return False, "in the illegal stage", None
         if any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
             ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySelectFreeEffect", data={"activityId": self.activity_id, "selectedId": selected_id}, delay_sec=delay_sec)
-            return ok
-        return False
+            return ok, reason, resp
+        return False, "unknown id", None
 
-    def select_reward_effect(self, selected_id: int, delay_sec: float = 0.3) -> bool:
+    def select_reward_effect(self, selected_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         st = self._state()
         if not self._check_stage(7):
-            return False
-        if any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
+            return False, "in the illegal stage", None
+        if int(selected_id) == 0 or any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
             ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySelectRewardPack", data={"activityId": self.activity_id, "id": selected_id}, delay_sec=delay_sec)
-            return ok
-        return False
+            return ok, reason, resp
+        return False, "unknown id", None
 
-    def select_effect(self, selected_id: int, delay_sec: float = 0.3) -> bool:
+    def select_effect(self, selected_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         st = self._state()
         if not self._check_stage(5):
-            return False
-        if any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
+            return False, "in the illegal stage", None
+        if int(selected_id) == 0 or any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
             ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySelectPack", data={"activityId": self.activity_id, "id": selected_id}, delay_sec=delay_sec)
-            return ok
-        return False
+            return ok, reason, resp
+        return False, "unknown id", None
 
-    def buy_pack(self, good_id: int, delay_sec: float = 0.3) -> bool:
+    def buy_pack(self, good_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         st = self._state()
         if not self._check_stage(4):
-            return False
-        if any(good.get("id") == good_id and good.get("sold") is False for good in st.goods):
-            ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivityBuy", data={"activityId": self.activity_id, "id": good_id}, delay_sec=delay_sec)
-            return ok
-        return False
+            return False, "in the illegal stage", None
+        good = next((g for g in st.goods if g.get("id") == good_id and g.get("sold") is False), None)
+        if good:
+            if good.get("price", 0) <= st.coin:
+                ok, reason, resp = self._inject_and_wait(
+                    method=".lq.Lobby.amuletActivityBuy",
+                    data={"activityId": self.activity_id, "id": good_id},
+                    delay_sec=delay_sec
+                )
+                return ok, reason, resp
+            return False, "coin not enough", None
+        return False, "unknown id", None
 
-    def refresh_shop(self, delay_sec: float = 0.3):
+    def refresh_shop(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         st = self._state()
         if not self._check_stage(4):
-            return False
+            return False, "in the illegal stage", None
         if st.coin >= st.refresh_price:
             ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivityRefreshShop", data={"activityId": self.activity_id}, delay_sec=delay_sec)
-            return ok
-        return False
+            return ok, reason, resp
+        return False, "coin not enough", None
 
-    def sell_effect(self, uid: int, delay_sec: float = 0.3):
+    def sell_effect(self, uid: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         st = self._state()
         if any(effect.get("uid") == uid for effect in st.effect_list):
             ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySellEffect", data={"activityId": self.activity_id, "id": uid}, delay_sec=delay_sec)
-            return ok
-        return False
+            return ok, reason, resp
+        return False, "unknown id", None
 
-    def end_shopping(self, delay_sec: float = 0.3):
+    def end_shopping(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         if not self._check_stage(4):
-            return False
+            return False, "in the illegal stage", None
         ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivityEndShopping", data={"activityId": self.activity_id}, delay_sec=delay_sec)
-        return ok
+        return ok, reason, resp
 
-    def next_level(self, delay_sec: float = 0.3):
+    def next_level(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         if not self._check_stage(6):
-            return False
+            return False, "in the illegal stage", None
         ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivityUpgrade", data={"activityId": self.activity_id}, delay_sec=delay_sec)
-        return ok
+        return ok, reason, resp
 
-    def fetch_amulet_activity_data(self, delay_sec: float = 0.1):
+    def fetch_amulet_activity_data(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         ok, reason, resp = self._inject_and_wait(
             method=".lq.Lobby.fetchAmuletActivityData",
             data={"activityId": self.activity_id},
             delay_sec=delay_sec
         )
-        return ok
+        return ok, reason, resp

@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "version": 1,
   "items": [
     { "id": 600010, "icon_id": 600010, "name": "濃霧の印", "rarity": "BROWN"},
     { "id": 600020, "icon_id": 600020, "name": "口封じの印", "rarity": "BROWN"},

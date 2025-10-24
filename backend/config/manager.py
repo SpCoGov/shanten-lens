@@ -42,7 +42,7 @@ class ConfigManager:
         return {
             name: t.to_values_dict()
             for name, t in self.tables.items()
-            if not (isinstance(name, str) and name == "fuse")
+            if not (isinstance(name, str) and name in ["fuse", "autorun"])
         }
 
     def to_table_payload(self, name: str) -> Dict[str, Any]:
