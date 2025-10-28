@@ -5,6 +5,7 @@ import contextlib
 import ctypes
 import json
 import os
+import platform
 import subprocess
 import sys
 from pathlib import Path
@@ -65,9 +66,44 @@ def default_data_root() -> Path:
     return Path(user_data_dir(appname="Shanten Lens", appauthor=None))
 
 
+def setup_logging():
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    log_file = LOG_DIR / "{time:YYYYMMDD_HHmmss}.log"
+
+    logger.remove()
+
+    logger.add(
+        sys.stdout,
+        level="INFO",
+        backtrace=True,
+        diagnose=False,
+        enqueue=True,
+    )
+
+    logger.add(
+        str(log_file),
+        level="DEBUG",
+        rotation="20 MB",
+        retention="14 days",
+        compression="zip",
+        encoding="utf-8",
+        backtrace=True,
+        diagnose=False,
+        enqueue=True,
+        format=(
+            "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | "
+            "{process.name}:{thread.name} | {name}:{function}:{line} - {message}"
+        ),
+    )
+
+
 DATA_ROOT: Path = default_data_root()
 CONF_DIR: Path = DATA_ROOT / "configs"
 DATA_DIR: Path = DATA_ROOT / "data"
+LOG_DIR: Path = DATA_ROOT / "logs"
+
+setup_logging()
 
 MANAGER = build_manager(CONF_DIR)
 AMULET_REG: AmuletRegistry | None = None
@@ -186,11 +222,11 @@ def api_testmove():
     return {"type": "testmove", "data": {"ok": True}}
 
 
-@api_app.get("/api/give_up")
-def api_give_up():
+@api_app.get("/api/buy")
+def api_buy(good_id: int = Query(...)):
     try:
-        ok, reason = PACKET_BOT.giveup()
-        return {"type": "give_up", "data": {"ok": ok, "reason": reason}}
+        ok, reason, resp = PACKET_BOT.buy_pack(good_id)
+        return {"type": "give_up", "data": {"ok": ok, "reason": reason, "resp": resp or {}}}
     except Exception as e:
         logger.error(f"reload give_up failed: {e}")
 
@@ -389,12 +425,52 @@ async def _watch_configs():
             logger.info("autorun config updated & broadcast")
 
 
+async def anti_afk_loop():
+    if platform.system().lower() != "windows":
+        logger.info("anti-AFK disabled: non-Windows platform")
+        return
+
+    logger.info("anti-AFK loop started")
+    await asyncio.sleep(1.0)
+
+    while True:
+        try:
+            enabled = bool(MANAGER.get("game.anti_afk", False))
+            interval = 30
+            edge_ratio = 0.015
+
+            if enabled:
+                ok1 = pipeline.click_left_center_once()
+                if not ok1:
+                    logger.debug("anti-AFK: first click (left-center) skipped/failed")
+
+                await asyncio.sleep(3)
+
+                ok2 = pipeline.click_left_edge_nudged_once(edge_ratio)
+                if not ok2:
+                    logger.debug("anti-AFK: second click (left-edge-nudged) skipped/failed")
+
+                remaining = max(0, interval - 3)
+                await asyncio.sleep(remaining)
+            else:
+                await asyncio.sleep(2.0)
+
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("anti-AFK loop error")
+            await asyncio.sleep(3.0)
+
+
 async def run_ws_server(host: str, port: int):
     watcher_cfg = asyncio.create_task(_watch_configs())
     watcher_reg = asyncio.create_task(_watch_data_tables())
 
     api_port = int(MANAGER.get("api_port", 8788))
     api_task = asyncio.create_task(run_http_server(host, api_port))
+
+    antiafk_task = asyncio.create_task(anti_afk_loop())
+
     async with serve(ws_handler, host, port, max_size=2 ** 20):
         logger.info(f"Websocket listening on ws://{host}:{port}/")
         try:
@@ -403,7 +479,9 @@ async def run_ws_server(host: str, port: int):
             watcher_cfg.cancel()
             watcher_reg.cancel()
             api_task.cancel()
+            antiafk_task.cancel()
             with contextlib.suppress(Exception):
                 await watcher_cfg
                 await watcher_reg
                 await api_task
+                await antiafk_task

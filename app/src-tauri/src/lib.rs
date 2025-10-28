@@ -88,16 +88,10 @@ fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Resul
 
   let exe = resolve_backend_path(&app).ok_or_else(|| "backend exe not found".to_string())?;
 
-  let data_root = app.path()
-    .app_data_dir().map_err(|e| e.to_string())?
-    .join("shanten");
-  let data_root_str = data_root.to_string_lossy().to_string();
-
   let mut cmd = Command::new(&exe);
   cmd.args([
       "--host", "127.0.0.1",
-      "--port", "8787",
-      "--data-root", &data_root_str
+      "--port", "8787"
     ])
     .stdin(Stdio::null())
     .stdout(Stdio::piped())

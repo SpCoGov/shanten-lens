@@ -411,6 +411,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             next_operation = round_info.get("nextOperation", {}).get("value", None)
             locked_tiles = round_info.get("lockedTile", {}).get("value", None)
             effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
+            game = value_changes.get("game", {})
+            boss_buff = game.get("bossBuff", {}).get("value", None)
             record = value_changes.get("record", None)
             GAME_STATE.update_record(record)
             if hands and pool:
@@ -423,9 +425,9 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
                     value_changes_19 = switch_stage_event.get("valueChanges", {})
                     stage = value_changes_19.get("stage", -1)
                     ended = value_changes_19.get("ended", False)
-                    GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, ting_list=ting_list, next_operation=next_operation, total_change_tile_count=total_change_tile_count, change_tile_count=change_tile_count, reason=".lq.Lobby.amuletActivityUpgrade:19")
+                    GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, ting_list=ting_list, next_operation=next_operation, total_change_tile_count=total_change_tile_count, change_tile_count=change_tile_count, boss_buff=boss_buff, reason=".lq.Lobby.amuletActivityUpgrade:19")
                 else:
-                    GAME_STATE.update_other_info(desktop_remain=desktop_remain, level=level, effect_list=effect_list, ting_list=ting_list, next_operation=next_operation, total_change_tile_count=total_change_tile_count, change_tile_count=change_tile_count, reason=".lq.Lobby.amuletActivityUpgrade:23")
+                    GAME_STATE.update_other_info(desktop_remain=desktop_remain, level=level, effect_list=effect_list, ting_list=ting_list, next_operation=next_operation, total_change_tile_count=total_change_tile_count, change_tile_count=change_tile_count, boss_buff=boss_buff, reason=".lq.Lobby.amuletActivityUpgrade:23")
                 if MANAGER.get("game.public_all"):
                     show_desktop_tiles = round_info.get("showDesktopTiles", {}).get("value", [])
                     show_desktop_tiles.clear()
@@ -438,6 +440,7 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
                         show_desktop_tiles.append({"id": tile, "pos": pos})
                         pos -= 1
                     modify = True
+                    logger.info(f"public all modified: {data}")
         matched = next((e for e in events if e.get("type") == 48), None)
         if matched:
             value_changes = matched.get("valueChanges", {})
@@ -501,8 +504,6 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             loop = asyncio.get_running_loop()
             loop.create_task(broadcast(json))
             suuannkou = plan_pure_pinzu_suu_ankou_v2(GAME_STATE.hand_tiles, GAME_STATE.wall_tiles, GAME_STATE.deck_map)
-            logger.info(f"suuannkou: {suuannkou}")
-            logger.info(f"GAME_STATE.deck_map: {GAME_STATE.deck_map}")
 
             def ids_to_tiles(id_list: List[int], deck_map: "OrderedDict[int, str]") -> List[str]:
                 """
@@ -621,6 +622,7 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             stage = game.get("stage", -1)
             ended = game.get("ended", False)
             coin = int(game.get("game", {}).get("coin", ""))
+            boss_buff = game.get("game", {}).get("bossBuff", None)
             level = game.get("level", None)
             shop = game.get("shop", {})
             free_candidate_effect_list = game.get("effect", {}).get("freeRewardCandidates", None)
@@ -635,11 +637,13 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             next_operation = round_info.get("nextOperation", None)
             GAME_STATE.update_record(record)
             if desktop_remain < 36:
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, push_gamestate=False)
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, boss_buff=boss_buff, push_gamestate=False)
                 GAME_STATE.refresh_wall_by_remaning()
             else:
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume)
-            #return "modify", dict({"error": {"code": 26104, "u32Params": [], "strParams": [], "jsonParam": ""}})
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, boss_buff=boss_buff, push_gamestate=False)
+            error_number_test = MANAGER.get("general.error_code_test")
+            if error_number_test != 0:
+                return "modify", dict({"error": {"code": error_number_test, "u32Params": [], "strParams": [], "jsonParam": ""}})
     # 只是用来更新一下状态
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityGiveup":
         GAME_STATE.on_giveup()
@@ -658,14 +662,15 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
         data = view.get("data", {})
         events = data.get("events", [])
         start_event = next((e for e in events if e.get("type") == 1), None)
-        value_changes = start_event.get("valueChanges", {})
-        stage = value_changes.get("stage", -1)
-        ended = value_changes.get("ended", False)
-        record = value_changes.get("record", None)
-        effect = value_changes.get("effect", None)
-        free_candidate_effect_list = effect.get("freeRewardCandidates", {}).get("value", [])
+        result = start_event.get("result", {}).get("newGameResult", {})
+        stage = result.get("stage", -1)
+        ended = result.get("ended", False)
+        record = result.get("record", None)
+        effect = result.get("effect", None)
+        free_candidate_effect_list = effect.get("freeRewardCandidates", [])
+        max_effect_volume = effect.get("maxEffectVolume", None)
         GAME_STATE.update_record(record)
-        GAME_STATE.update_other_info(stage=stage, ended=ended, candidate_effect_list=free_candidate_effect_list, reason=".lq.Lobby.amuletActivityStartGame:1")
+        GAME_STATE.update_other_info(stage=stage, ended=ended, candidate_effect_list=free_candidate_effect_list, max_effect_volume=max_effect_volume, reason=".lq.Lobby.amuletActivityStartGame:1")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityBuy":
         data = dict(view["data"])
         events = data.get("events", [])
@@ -746,8 +751,19 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
         select_reward_event = next((e for e in events if e.get("type") == 16), None)
         if select_reward_event:
             value_changes = select_reward_event.get("valueChanges", {})
-            effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
-            GAME_STATE.update_other_info(effect_list=effect_list, reason=".lq.Lobby.amuletActivitySelectRewardPack:16")
+            effect = value_changes.get("effect", {})
+            effect_list = effect.get("effectList", {}).get("value", None)
+            level_reward_candidates = effect.get("levelRewardCandidates", {}).get("value", None)
+            GAME_STATE.update_other_info(effect_list=effect_list, candidate_effect_list=level_reward_candidates, reason=".lq.Lobby.amuletActivitySelectRewardPack:16")
+        shop_event = next((e for e in events if e.get("type") == 12), None)
+        if shop_event:
+            value_changes = shop_event.get("valueChanges", {})
+            stage = value_changes.get("stage", -1)
+            shop = value_changes.get("shop", {})
+            goods = shop.get("goods", {}).get("value", None)
+            refresh_price = shop.get("refreshPrice", {}).get("value", None)
+            ended = shop_event.get("ended", False)
+            GAME_STATE.update_other_info(stage=stage, goods=goods, refresh_price=refresh_price, ended=ended, reason=".lq.Lobby.amuletActivitySelectRewardPack:12")
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityUpgradeShopBuff":
         data = view.get("data", {})
         events = data.get("events", [])

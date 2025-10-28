@@ -83,6 +83,7 @@
     { "id": 27, "icon_id": 31, "name": "賞金稼ぎ", "rarity": "BLUE" },
     { "id": 213, "icon_id": 175, "name": "塗装の匠", "rarity": "BLUE" },
     { "id": 36, "icon_id": 40, "name": "ノベルティ", "rarity": "BLUE" },
+    { "id": 120, "icon_id": 108, "name": "愛嬌", "rarity": "BLUE" },
 
     { "id": 229, "icon_id": 191,  "name": "スタンプ盗み", "rarity": "ORANGE" },
     { "id": 227, "icon_id": 189,  "name": "月光の加護", "rarity": "ORANGE" },

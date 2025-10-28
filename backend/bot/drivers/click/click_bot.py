@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional, Callable
+from typing import List, Dict, Optional, Callable, Tuple
 from backend.bot.core.interfaces import GameBot
 from .pipeline import BotPipeline, BotConfig
 from backend.app import GAME_STATE
@@ -29,10 +29,10 @@ class ClickBot(GameBot):
             self,
             tile_id: int,
             allow_tsumogiri: bool = True
-    ) -> bool:
+    ) -> Tuple[bool, str, Optional[dict]]:
         return self.pipeline.click_discard_by_tile_id(
             tile_id=tile_id,
             hand_ids_with_draw=GAME_STATE.hand_tiles,
             id2label=GAME_STATE.deck_map,
             allow_tsumogiri=allow_tsumogiri
-        )
+        ), "", None
