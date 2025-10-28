@@ -14,12 +14,14 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         .add("public_all", False, desc="公开全部", kind="bool")
         .add("auto_discard", False, desc="自动打牌", kind="bool")
         .add("auto_tsumo", False, desc="自动自摸", kind="bool")
+        .add("anti_afk", False, desc="防止AFK", kind="bool")
     )
     mgr.add_table(
         ConfigTable("general", file=conf_dir / "general.json")
         .add("language", "zh-CN", desc="界面语言", kind="string")
         .add("theme", "system", desc="主题", kind="string")
         .add("debug", False, desc="调试模式", kind="bool")
+        .add("error_code_test", 0, desc="错误测试", kind="number")
     )
     mgr.add_table(
         ConfigTable("backend", file=conf_dir / "backend.json")

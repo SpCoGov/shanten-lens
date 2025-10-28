@@ -38,6 +38,7 @@ class GameState:
     change_tile_count: int = field(default_factory=int)
     total_change_tile_count: int = field(default_factory=int)
     max_effect_volume: int = field(default_factory=int)
+    boss_buff: List[int] = field(default_factory=list)
 
     update_reason: List[str] = field(default_factory=list)
 
@@ -68,6 +69,7 @@ class GameState:
             "change_tile_count": self.change_tile_count,
             "total_change_tile_count": self.total_change_tile_count,
             "max_effect_volume": self.max_effect_volume,
+            "boss_buff": self.boss_buff,
 
             "update_reason": self.update_reason,
         }
@@ -166,6 +168,7 @@ class GameState:
     def update_other_info(self, desktop_remain: int = None, stage: int = None, ended: bool = None, coin: int = None, level: int = None,
                           effect_list: List[Dict] = None, candidate_effect_list: List[Dict] = None, ting_list: List[Dict] = None, next_operation: List[Dict] = None,
                           goods: List[Dict] = None, refresh_price: int = None, change_tile_count: int = None, total_change_tile_count: int = None, max_effect_volume: int = None,
+                          boss_buff: List[int] = None,
                           push_gamestate: bool = True, reason: str = ""):
         if desktop_remain is not None:
             self.desktop_remain = desktop_remain
@@ -195,6 +198,9 @@ class GameState:
             self.change_tile_count = change_tile_count
         if max_effect_volume is not None:
             self.max_effect_volume = max_effect_volume
+        if boss_buff is not None:
+            self.boss_buff = boss_buff
+        logger.debug(f"game state updated: {self}, reason: {self.update_reason}")
         self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()
@@ -222,10 +228,11 @@ class GameState:
         self.goods.clear()
         self.next_operation.clear()
         self.ting_list.clear()
+        self.boss_buff.clear()
 
         self.update_reason.clear()
         self.update_reason.append(".lq.Lobby.amuletActivityGiveup")
-
+        logger.debug(f"game state updated(give up): {self}, reason: {self.update_reason}")
         loop = asyncio.get_running_loop()
         loop.create_task(self.on_gamestage_change())
 

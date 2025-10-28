@@ -29,7 +29,6 @@ async def main():
     _app.PACKET_BOT = PacketBot(
         addon_getter=lambda: bridge.addon,
         activity_id=250811,
-        verbose=True,
         state_getter=lambda: GAME_STATE
     )
 

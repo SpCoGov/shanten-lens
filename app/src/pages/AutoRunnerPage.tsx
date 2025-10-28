@@ -193,6 +193,8 @@ export default function AutoRunnerPage() {
                     borderRadius: 12,
                     background: "#fff",
                     padding: 12,
+
+
                     marginBottom: 12,
                 }}
             >
@@ -225,11 +227,9 @@ export default function AutoRunnerPage() {
                         className="nav-btn"
                         onClick={start}
                         disabled={Boolean(disabledReason) || status.mode === "step"}
-                        title={
-                            status.mode === "step"
-                                ? "手动单步模式下无需启动，直接点“下一步”"
-                                : disabledReason || undefined
-                        }
+                        title={status.mode === "step"
+                            ? "手动单步模式下无需启动，直接点“下一步”"
+                            : disabledReason || undefined}
                     >
                         {working ? "运行中…" : "启动"}
                     </button>
@@ -257,6 +257,25 @@ export default function AutoRunnerPage() {
                     ) : (
                         <span className="badge ok">就绪</span>
                     ))}
+
+                    {(() => {
+                        const ready = status.preferred_flow_ready; // boolean | undefined
+                        const cls =
+                            ready === true ? "ok" :
+                                ready === false ? "down" : ""; // 未知不加 ok/down 颜色
+
+                        const text =
+                            ready === true ? "业务流：已选定" :
+                                ready === false ? "业务流：未选定" : "业务流：未知";
+
+                        const tip = status.preferred_flow_peer
+                            ? `peer: ${status.preferred_flow_peer}`
+                            : (ready === false ? "未绑定游戏业务流，请先触发一次 .lq.Lobby.fetchAmuletActivityData" : undefined);
+
+                        return (
+                            <span className={`badge ${cls}`} title={tip}>{text}</span>
+                        );
+                    })()}
                 </div>
 
                 {!working && (needConfirm || status.has_live_game) && (

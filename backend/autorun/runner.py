@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from backend.autorun.util.retry_1004 import call_with_1004_retry_async
 from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
 from backend.bot.drivers.packet.packet_bot import PacketBot
+from backend.mitm import bridge
+from backend.mitm.addon import WsAddon
 from backend.model.game_state import GameState
 
 try:
@@ -25,9 +27,9 @@ def _now_wall_ms() -> int:
 def _now_mono_ms() -> int:
     return int(time.monotonic() * 1000)
 
-# TODO: 开局前、和牌前调整卡维、盗印like的位置；如果目标护身符为非plus且有印章、如果卡包里遇到了印章不对应的该护身符、将其的价值视为0而不是99
+
 class AutoRunner:
-    PROBE_DEBUG = True
+    PROBE_DEBUG = False
     HEARTBEAT_INTERVAL = 1.0  # s
 
     def __init__(self, *, get_config, get_game_state) -> None:
@@ -69,6 +71,38 @@ class AutoRunner:
         self.cutoff_level: int = 0
 
         self.update_config(self._get_config())
+
+    def _preferred_flow_status(self) -> tuple[Optional[bool], Optional[str]]:
+        packet_bot: PacketBot = self._get_packet_bot()
+        if not packet_bot or not hasattr(packet_bot, "get_addon"):
+            return None, None
+
+        addon = packet_bot.get_addon()
+        if not addon:
+            return None, None
+
+        flow = getattr(addon, "preferred_flow", None)
+        peer_key = getattr(addon, "preferred_peer_key", None)
+
+        if flow is None:
+            return False, peer_key  # 可能為 None
+
+        if not peer_key:
+            try:
+                cip = flow.client_conn.address[0]
+                sip = flow.server_conn.address[0]
+                peer_key = f"{cip}|{sip}"
+            except Exception:
+                peer_key = None
+
+        try:
+            ws = getattr(flow, "websocket", None)
+            if ws is None:
+                return False, peer_key
+        except Exception:
+            return False, peer_key
+
+        return True, peer_key
 
     def _get_packet_bot(self):
         try:
@@ -146,12 +180,12 @@ class AutoRunner:
                 ok, reason, resp = False, f"probe_error: {e}", None
                 logger.exception("[autorun] manual probe exception")
 
-        self._last_probe_ts = _now_mono_ms()
         self._last_probe_ok = ok
         self._last_probe_reason = reason or ""
         self._last_probe_resp = resp
 
         await self._recompute_ready_flags_from_last_probe()
+        logger.info(f"ok: {ok}, reason: {reason}, resp: {resp}")
         if push:
             await self._broadcast_status(safe=True)
         return ok, reason, resp
@@ -241,12 +275,17 @@ class AutoRunner:
             if self.PROBE_DEBUG:
                 logger.info(f"[autorun] started (mode={self.mode})")
 
-    async def stop(self) -> None:
+    async def stop(self, *, final_step: Optional[str] = None) -> None:
         async with self._lock:
             if not self.running:
+                # 即使未运行，也允许更新最终标签（例如为了在 UI 上保留最后状态）
+                if final_step:
+                    self.current_step = final_step
+                    await self._broadcast_status(safe=True)
                 return
-            self.running = False
+
             self.elapsed_ms = self._calc_elapsed_ms()
+            self.running = False
             self._started_mono_ms = 0
 
             if self._loop_task and not self._loop_task.done():
@@ -257,10 +296,12 @@ class AutoRunner:
                 self._heartbeat_task.cancel()
             self._heartbeat_task = None
 
-            self.current_step = "stopped"
+            # 如果传入了最终标签，就保留它；否则使用默认的 "stopped"
+            self.current_step = final_step or "stopped"
+
             await self._broadcast_status(safe=True)
             if self.PROBE_DEBUG:
-                logger.info("[autorun] stopped")
+                logger.info(f"[autorun] stopped (final_step={self.current_step})")
 
     async def _heartbeat_loop(self) -> None:
         try:
@@ -280,7 +321,7 @@ class AutoRunner:
                 except Exception as e:
                     self.last_error = str(e)
                     logger.exception("[autorun] run_tick error")
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.1)
         except asyncio.CancelledError:
             pass
 
@@ -305,8 +346,8 @@ class AutoRunner:
                 ok, reason, resp = await call_with_1004_retry_async(
                     bot.start_game,
                     delay_sec=3,
-                    interval=0.4,
-                    timeout=30,
+                    interval=3,
+                    timeout=3000,
                     to_thread=True,
                 )
                 if ok:
@@ -324,8 +365,8 @@ class AutoRunner:
                     bot.select_free_effect,
                     selected_id=first_effect,
                     delay_sec=3,
-                    interval=0.4,
-                    timeout=30,
+                    interval=3,
+                    timeout=3000,
                     to_thread=True,
                 )
                 if ok:
@@ -336,11 +377,29 @@ class AutoRunner:
             if game_state.stage == 6:
                 self.current_step = "game.level_confirm"
                 await self._broadcast_status(safe=True)
+                # 这里是游戏开始前 —— 先尝试按 [卡维, 盗印like, 其他] 排序
+                try:
+                    uids = self._sorted_uids_by_mode(game_state.effect_list or [], mode="pre_start")
+                    if uids:
+                        self.current_step = "game.pre_start_sort"
+                        await self._broadcast_status(safe=True)
+                        ok_sort, reason_sort, _ = await call_with_1004_retry_async(
+                            bot.sort_effect,
+                            sorted_uid=uids,
+                            delay_sec=2.0,
+                            interval=0.3,
+                            timeout=10,
+                            to_thread=True,
+                        )
+                        if not ok_sort:
+                            logger.warning(f"pre-start sort_effect failed: {reason_sort}")
+                except Exception as _e:
+                    logger.warning(f"pre-start sort attempt error: {_e}")
                 ok, reason, resp = await call_with_1004_retry_async(
                     bot.next_level,
                     delay_sec=3,
-                    interval=0.4,
-                    timeout=30,
+                    interval=3,
+                    timeout=3000,
                     to_thread=True,
                 )
                 if ok:
@@ -355,8 +414,8 @@ class AutoRunner:
                     ok, reason, resp = await call_with_1004_retry_async(
                         bot.op_skip_change,
                         delay_sec=3,
-                        interval=0.4,
-                        timeout=30,
+                        interval=3,
+                        timeout=3000,
                         to_thread=True,
                     )
                     if ok:
@@ -364,17 +423,24 @@ class AutoRunner:
                     self.last_error = reason
                     await self.abort(f"fatal: {reason}")
                     return
-                # 把非饼全换了
-                filtered_ids = [tid for tid in game_state.hand_tiles
-                                if (face := game_state.deck_map.get(tid)) is not None
-                                and (face == "bd"
-                                     or face.endswith("p"))]
+                prefer_keep = [tid for tid in game_state.hand_tiles if (face := game_state.deck_map.get(tid)) is not None and (face == "bd" or face.endswith("p"))]
+                # 901是每次只能替换三张牌的debuff
+                if 901 in (game_state.boss_buff or []):
+                    keep_target = max(0, len(game_state.hand_tiles) - 3)
+                    if len(prefer_keep) >= keep_target:
+                        filtered_ids = prefer_keep[:keep_target]
+                    else:
+                        rest = [tid for tid in game_state.hand_tiles if tid not in prefer_keep]
+                        take_more = rest[: max(0, keep_target - len(prefer_keep))]
+                        filtered_ids = prefer_keep + take_more
+                else:
+                    filtered_ids = prefer_keep
                 ok, reason, resp = await call_with_1004_retry_async(
                     bot.op_change,
                     tile_ids=filtered_ids,
                     delay_sec=3,
-                    interval=0.4,
-                    timeout=30,
+                    interval=3,
+                    timeout=3000,
                     to_thread=True,
                 )
                 if ok:
@@ -383,7 +449,7 @@ class AutoRunner:
                 await self.abort(f"fatal: {reason}")
                 return
             if game_state.stage == 3:
-                self.current_step = f"game.discard"
+                self.current_step = f"game.discard({game_state.level})"
                 await self._broadcast_status(safe=True)
                 suuannkou = plan_pure_pinzu_suu_ankou_v2(game_state.hand_tiles, game_state.wall_tiles, game_state.deck_map)
                 if suuannkou["status"] == "impossible":
@@ -393,8 +459,8 @@ class AutoRunner:
                     ok, reason, resp = await call_with_1004_retry_async(
                         bot.giveup,
                         delay_sec=3,
-                        interval=0.4,
-                        timeout=30,
+                        interval=3,
+                        timeout=3000,
                         to_thread=True,
                     )
                     if ok:
@@ -403,13 +469,31 @@ class AutoRunner:
                     await self.abort(f"fatal: {reason}")
                     return
                 elif suuannkou["status"] == "win_now":
+                    # 这里是和牌前 —— 先尝试按 [盗印like, 卡维, 其他] 排序
+                    try:
+                        uids = self._sorted_uids_by_mode(game_state.effect_list or [], mode="pre_win")
+                        if uids:
+                            self.current_step = "game.pre_win_sort"
+                            await self._broadcast_status(safe=True)
+                            ok_sort, reason_sort, resp = await call_with_1004_retry_async(
+                                bot.sort_effect,
+                                sorted_uid=uids,
+                                delay_sec=2.0,
+                                interval=0.3,
+                                timeout=10,
+                                to_thread=True,
+                            )
+                            if not ok_sort:
+                                logger.warning(f"pre-win sort_effect failed: {reason_sort}, resp: {resp}")
+                    except Exception as _e:
+                        logger.warning(f"pre-win sort attempt error: {_e}")
                     self.current_step = "game.tsumo"
                     await self._broadcast_status(safe=True)
                     ok, reason, resp = await call_with_1004_retry_async(
                         bot.op_tsumo,
                         delay_sec=3,
-                        interval=0.4,
-                        timeout=30,
+                        interval=3,
+                        timeout=3000,
                         to_thread=True,
                     )
                     if ok:
@@ -423,8 +507,8 @@ class AutoRunner:
                         bot.discard_by_tile_id,
                         tile_id=discard,
                         delay_sec=3,
-                        interval=0.4,
-                        timeout=30,
+                        interval=3,
+                        timeout=3000,
                         to_thread=True,
                     )
                     if ok:
@@ -440,15 +524,15 @@ class AutoRunner:
                 if not candidates:
                     if game_state.refresh_price > game_state.coin:
                         # 如果当前已经到了截至关卡、则remake
-                        if self.cutoff_level >= game_state.level:
+                        if self.cutoff_level <= game_state.level:
                             self.current_step = "game.remake"
                             await self._broadcast_status(safe=True)
                             self.need_start_game = True
                             ok, reason, resp = await call_with_1004_retry_async(
                                 bot.giveup,
                                 delay_sec=3,
-                                interval=0.4,
-                                timeout=30,
+                                interval=3,
+                                timeout=3000,
                                 to_thread=True,
                             )
                             if ok:
@@ -461,8 +545,8 @@ class AutoRunner:
                         ok, reason, resp = await call_with_1004_retry_async(
                             bot.end_shopping,
                             delay_sec=3,
-                            interval=0.4,
-                            timeout=30,
+                            interval=3,
+                            timeout=3000,
                             to_thread=True,
                         )
                         if ok:
@@ -472,14 +556,49 @@ class AutoRunner:
                         return
                     self.current_step = "game.refresh_shop"
                     await self._broadcast_status(safe=True)
+                    logger.debug(f"refreshed shopping: cost {game_state.refresh_price}")
                     ok, reason, resp = await call_with_1004_retry_async(
                         bot.refresh_shop,
                         delay_sec=3,
-                        interval=0.4,
-                        timeout=30,
+                        interval=3,
+                        timeout=3000,
                         to_thread=True,
                     )
                     if ok:
+                        # 刷新成功后：卖掉“带 600110 印章 且 非目标所需”的任意一个护身符
+                        victim_uid: Optional[int] = None
+                        for it in (game_state.effect_list or []):
+                            bid = None
+                            b = it.get("badge")
+                            if isinstance(b, dict) and "id" in b:
+                                try:
+                                    bid = int(b["id"])
+                                except Exception:
+                                    bid = None
+                            if bid == 600110 and not _is_needed_for_any_target(it, self.targets):
+                                uid = it.get("uid")
+                                if uid is not None:
+                                    try:
+                                        victim_uid = int(uid)
+                                    except Exception:
+                                        victim_uid = None
+                                break  # 只挑一个
+
+                        if victim_uid is not None:
+                            self.current_step = "game.sell_happiness_after_refresh"
+                            await self._broadcast_status(safe=True)
+                            ok2, reason2, _ = await call_with_1004_retry_async(
+                                bot.sell_effect,
+                                uid=victim_uid,
+                                delay_sec=3,
+                                interval=3,
+                                timeout=30,
+                                to_thread=True,
+                            )
+                            if not ok2:
+                                self.last_error = reason2
+                                await self.abort(f"fatal: {reason2}")
+                                return
                         return
                     self.last_error = reason
                     await self.abort(f"fatal: {reason}")
@@ -493,13 +612,29 @@ class AutoRunner:
                 if cheapest["price"] > game_state.coin:
                     # 最便宜的都买不起、刷新商店、刷新商店也没钱就下一关
                     if game_state.refresh_price > game_state.coin:
+                        if self.cutoff_level <= game_state.level:
+                            self.current_step = "game.remake"
+                            await self._broadcast_status(safe=True)
+                            self.need_start_game = True
+                            ok, reason, resp = await call_with_1004_retry_async(
+                                bot.giveup,
+                                delay_sec=3,
+                                interval=3,
+                                timeout=3000,
+                                to_thread=True,
+                            )
+                            if ok:
+                                return
+                            self.last_error = reason
+                            await self.abort(f"fatal: {reason}")
+                            return
                         self.current_step = "game.end_shopping"
                         await self._broadcast_status(safe=True)
                         ok, reason, resp = await call_with_1004_retry_async(
                             bot.end_shopping,
                             delay_sec=3,
-                            interval=0.4,
-                            timeout=30,
+                            interval=3,
+                            timeout=3000,
                             to_thread=True,
                         )
                         if ok:
@@ -512,11 +647,45 @@ class AutoRunner:
                     ok, reason, resp = await call_with_1004_retry_async(
                         bot.refresh_shop,
                         delay_sec=3,
-                        interval=0.4,
-                        timeout=30,
+                        interval=3,
+                        timeout=3000,
                         to_thread=True,
                     )
                     if ok:
+                        # 刷新成功后：卖掉“带 600110 印章 且 非目标所需”的任意一个护身符
+                        victim_uid: Optional[int] = None
+                        for it in (game_state.effect_list or []):
+                            bid = None
+                            b = it.get("badge")
+                            if isinstance(b, dict) and "id" in b:
+                                try:
+                                    bid = int(b["id"])
+                                except Exception:
+                                    bid = None
+                            if bid == 600110 and not _is_needed_for_any_target(it, self.targets):
+                                uid = it.get("uid")
+                                if uid is not None:
+                                    try:
+                                        victim_uid = int(uid)
+                                    except Exception:
+                                        victim_uid = None
+                                break  # 只挑一个
+
+                        if victim_uid is not None:
+                            self.current_step = "game.sell_happiness_after_refresh"
+                            await self._broadcast_status(safe=True)
+                            ok2, reason2, _ = await call_with_1004_retry_async(
+                                bot.sell_effect,
+                                uid=victim_uid,
+                                delay_sec=3,
+                                interval=3,
+                                timeout=30,
+                                to_thread=True,
+                            )
+                            if not ok2:
+                                self.last_error = reason2
+                                await self.abort(f"fatal: {reason2}")
+                                return
                         return
                     self.last_error = reason
                     await self.abort(f"fatal: {reason}")
@@ -525,8 +694,8 @@ class AutoRunner:
                     bot.buy_pack,
                     good_id=cheapest["id"],
                     delay_sec=3,
-                    interval=0.4,
-                    timeout=30,
+                    interval=3,
+                    timeout=3000,
                     to_thread=True,
                 )
                 if ok:
@@ -535,16 +704,28 @@ class AutoRunner:
                 await self.abort(f"fatal: {reason}")
                 return
             if game_state.stage == 5 or game_state.stage == 7:
-                self.current_step = "game.select_effect"
+                logger.debug(f"goods: {game_state.goods}")
+                if game_state.stage == 5:
+                    self.current_step = "game.select_effect"
+                else:
+                    self.current_step = "game.select_reward_effect"
                 await self._broadcast_status(safe=True)
                 # value: 99-目标护身符、2-指引护身符（当前持有的指引护身符未满3个的情况下）、1-幸福护身符、0-普通
-                best_raw, best_bid, value = select_amulet_from_candidates(game_state.candidate_effect_list, game_state.effect_list, self.targets)
+                best_raw, best_bid, value, sell_uid = select_amulet_from_candidates(game_state.candidate_effect_list, game_state.effect_list, self.targets)
+                if sell_uid:
+                    # 先卖掉
+                    ok, reason, resp = await call_with_1004_retry_async(
+                        bot.sell_effect, uid=sell_uid, delay_sec=3, interval=3, timeout=30, to_thread=True
+                    )
+                    if not ok:
+                        self.last_error = reason
+                        await self.abort(f"fatal: {reason}")
+                        return
                 need_space = 1
                 if best_bid == 600160:
                     need_space = 2
                 used_space = total_volume(game_state.effect_list)
                 free_space = game_state.max_effect_volume - used_space
-                logger.debug(f"free space: {free_space}, needed space: {used_space}, used_space: {used_space}, max space: {game_state.max_effect_volume}")
                 # 如果空间充足、直接选择
                 if free_space >= need_space:
                     if game_state.stage == 5:
@@ -552,8 +733,8 @@ class AutoRunner:
                             bot.select_effect,
                             selected_id=best_raw,
                             delay_sec=3,
-                            interval=0.4,
-                            timeout=30,
+                            interval=3,
+                            timeout=3000,
                             to_thread=True,
                         )
                     else:
@@ -561,14 +742,16 @@ class AutoRunner:
                             bot.select_reward_effect,
                             selected_id=best_raw,
                             delay_sec=3,
-                            interval=0.4,
-                            timeout=30,
+                            interval=3,
+                            timeout=3000,
                             to_thread=True,
                         )
                     if ok:
-                        # 如果选择的护身符不是什么重要的护身符、直接卖
                         if value == 0:
-                            uid = find_uid_for_raw_or_plus(game_state.effect_list, best_raw)
+                            reg_id = _reg_id_of_raw(best_raw)
+                            if reg_id == 146:
+                                return
+                            uid = _pick_uid_to_sell_same_reg(game_state.effect_list, reg_id, self.targets)
                             if uid:
                                 self.current_step = "game.sell_useless_effect"
                                 await self._broadcast_status(safe=True)
@@ -576,8 +759,8 @@ class AutoRunner:
                                     bot.sell_effect,
                                     uid=uid,
                                     delay_sec=3,
-                                    interval=0.4,
-                                    timeout=30,
+                                    interval=3,
+                                    timeout=3000,
                                     to_thread=True,
                                 )
                                 if ok:
@@ -598,18 +781,20 @@ class AutoRunner:
                         need_space=need_space,
                         sell_candidates=sell_list,
                     )
-
+                    logger.debug(f"need_space: {need_space}, free_space: {free_space}, to_sell: {to_sell}, freed: {freed}, enough: {enough}')")
                     if enough:
                         for it in to_sell:
                             uid = it.get("uid")
                             if uid is None:
                                 continue
+                            self.current_step = "game.selling_to_make_space"
+                            await self._broadcast_status(safe=True)
                             ok, reason, resp = await call_with_1004_retry_async(
                                 bot.sell_effect,
                                 uid=uid,
                                 delay_sec=3,
                                 interval=0.6,
-                                timeout=30,
+                                timeout=3000,
                                 to_thread=True,
                             )
                             if ok:
@@ -618,14 +803,16 @@ class AutoRunner:
                             await self.abort(f"fatal: {reason}")
                             return
                     else:
+                        logger.debug(f"not enough space to buy 0: max: {game_state.max_effect_volume}, used: {used_space}, free: {free_space}")
                         self.current_step = "game.skip_buy_insufficient_space0"
+                        await self._broadcast_status(safe=True)
                         if game_state.stage == 5:
                             ok, reason, resp = await call_with_1004_retry_async(
                                 bot.select_effect,
                                 selected_id=0,
                                 delay_sec=3,
-                                interval=0.4,
-                                timeout=30,
+                                interval=3,
+                                timeout=3000,
                                 to_thread=True,
                             )
                         else:
@@ -633,8 +820,8 @@ class AutoRunner:
                                 bot.select_reward_effect,
                                 selected_id=0,
                                 delay_sec=3,
-                                interval=0.4,
-                                timeout=30,
+                                interval=3,
+                                timeout=3000,
                                 to_thread=True,
                             )
                         if ok:
@@ -643,14 +830,16 @@ class AutoRunner:
                         await self.abort(f"fatal: {reason}")
                     return
                 # 又不重要、空间还不够、直接不买、跳过
+                logger.debug(f"not enough space to buy 1: max: {game_state.max_effect_volume}, used: {used_space}, free: {free_space}")
                 self.current_step = "game.skip_buy_insufficient_space1"
+                await self._broadcast_status(safe=True)
                 if game_state.stage == 5:
                     ok, reason, resp = await call_with_1004_retry_async(
                         bot.select_effect,
                         selected_id=0,
                         delay_sec=3,
-                        interval=0.4,
-                        timeout=30,
+                        interval=3,
+                        timeout=3000,
                         to_thread=True,
                     )
                 else:
@@ -658,8 +847,8 @@ class AutoRunner:
                         bot.select_reward_effect,
                         selected_id=0,
                         delay_sec=3,
-                        interval=0.4,
-                        timeout=30,
+                        interval=3,
+                        timeout=3000,
                         to_thread=True,
                     )
                 if ok:
@@ -694,6 +883,8 @@ class AutoRunner:
         resp = self._last_probe_resp or {}
         has_live_game = (resp or {}).get("data", {}).get("game") is not None
         await self._recompute_ready_flags_from_last_probe()
+        pf_ready, pf_peer = self._preferred_flow_status()
+        logger.debug(f"pf_ready: {pf_ready}, pf_peer: {pf_peer}")
         return {
             "mode": self.mode,
             "running": self.running,
@@ -711,6 +902,9 @@ class AutoRunner:
             "probe_ok": self._last_probe_ok,
             "probe_reason": self._last_probe_reason,
             "probe_at": self._last_probe_ts,
+
+            "preferred_flow_ready": pf_ready,
+            "preferred_flow_peer": pf_peer,
         }
 
     async def _broadcast_status(self, safe: bool = False) -> None:
@@ -811,16 +1005,88 @@ class AutoRunner:
             logger.error("count_achieved_now failed: {}", e)
             return False
 
-        # 刷新历史最好
         if achieved > (self.best_achieved_count or 0):
             self.best_achieved_count = achieved
 
         if achieved >= (self.end_count or 1):
+            # 先设置并广播达成态
             self.current_step = "goal_met"
             await self._broadcast_status(safe=True)
-            await self.stop()
+            await self.stop(final_step="goal_met")
             return True
         return False
+
+    @staticmethod
+    def _base(raw: Any) -> int:
+        try:
+            return int(raw or 0) // 10
+        except Exception:
+            return 0
+
+    @staticmethod
+    def _first_src_base(row: Dict[str, Any]) -> Optional[int]:
+        if not isinstance(row, dict):
+            return None
+        store = row.get("store")
+        if not isinstance(store, list) or not store:
+            return None
+        try:
+            return int(store[0]) // 10
+        except Exception:
+            return None
+
+    @staticmethod
+    def _is_theft_like(row: Dict[str, Any]) -> bool:
+        # 盗印 229；黑客 232 / 不稳定 228 若来源是盗印，也算 theft-like
+        ID_UNSTABLE, ID_THEFT, ID_HACKER = 228, 229, 232
+        b = AutoRunner._base(row.get("id"))
+        if b == ID_THEFT:
+            return True
+        if b in (ID_HACKER, ID_UNSTABLE) and AutoRunner._first_src_base(row) == ID_THEFT:
+            return True
+        return False
+
+    @staticmethod
+    def _is_kavi(row: Dict[str, Any]) -> bool:
+        return AutoRunner._base(row.get("id")) == 230
+
+    def _sorted_uids_by_mode(self, effect_list: List[Dict[str, Any]], mode: str) -> Optional[List[int]]:
+        if not isinstance(effect_list, list):
+            return None
+
+        kavi, theftlike, others = [], [], []
+        for row in effect_list:
+            if self._is_kavi(row):
+                kavi.append(row)
+            elif self._is_theft_like(row):
+                theftlike.append(row)
+            else:
+                others.append(row)
+
+        if mode == "pre_start":
+            new_order = kavi + theftlike + others
+        elif mode == "pre_win":
+            new_order = theftlike + kavi + others
+        else:
+            return None
+
+        def _uids(arr: List[Dict[str, Any]]) -> List[int]:
+            out = []
+            for r in arr:
+                try:
+                    out.append(int(r.get("uid")))
+                except Exception:
+                    pass
+            return out
+
+        new_uids = _uids(new_order)
+        old_uids = _uids(effect_list)
+
+        if len(new_uids) != len(old_uids) or set(new_uids) != set(old_uids):
+            return None
+        if new_uids == old_uids:
+            return None
+        return new_uids
 
 
 def _reg_id_of_raw(raw_id: int) -> int:
@@ -879,13 +1145,110 @@ def _candidate_value(raw_id: int, badge_id: Optional[int]) -> int:
     return base
 
 
+def _required_nonplus_badges_for_reg(targets: List[Dict[str, Any]], reg_id: int) -> set[int]:
+    req: set[int] = set()
+    for t in targets or []:
+        if t.get("kind") != "amulet":
+            continue
+        try:
+            tid = int(t.get("id"))
+        except Exception:
+            continue
+        if tid != reg_id:
+            continue
+        if not bool(t.get("plus", False)):
+            tb = t.get("badge", None)
+            if tb not in (None, "",):
+                try:
+                    req.add(int(tb))
+                except Exception:
+                    pass
+    return req
+
+
+def _find_owned_uid_for_reg(effect_list: List[Dict[str, Any]], reg_id: int) -> Optional[int]:
+    for e in effect_list or []:
+        try:
+            raw = int(e.get("id", 0))
+            if raw // 10 == reg_id:
+                uid = e.get("uid")
+                return int(uid) if uid is not None else None
+        except Exception:
+            continue
+    return None
+
+
+def _owned_effect_value_for_selling(e: Dict[str, Any], targets: List[Dict[str, Any]]) -> int:
+    """
+    给“背包里的一件护身符”打一个售卖优先级用的价值分，分越高越不该被卖。
+    - 命中任何目标 => 极大分，绝不卖
+    - 指引(600070) => 很高分，尽量不卖
+    - 幸福(600110) => 较高分
+    - 特殊：reg==146 => 很高分（你的诉求）
+    - 其余：基础=稀有度*3，若带600050再x3
+    """
+    if _is_needed_for_any_target(e, targets):
+        return 10 ** 9  # 目标需要，绝不卖
+
+    reg_id, is_plus, bid = _extract_amulet_signature(e)
+
+    # 基础价值（和 _candidate_value 同口径）
+    base = 0
+    try:
+        amulet_reg = app_mod.AMULET_REG
+        if amulet_reg is not None:
+            item = amulet_reg.get(reg_id)
+            if item and getattr(item, "rarity", None) is not None:
+                rarity_val = int(getattr(item.rarity, "value", 0))
+                base = rarity_val * 3
+    except Exception:
+        base = 0
+
+    if bid == 600050:
+        base *= 3
+
+    # 提升重要护身符与关键印章
+    if bid == 600070:  # 指引
+        base += 10000
+    if bid == 600110:  # 幸福
+        base += 1000
+    if reg_id == 146:  # 车轮
+        base += 10000
+
+    return base
+
+
+def _pick_uid_to_sell_same_reg(effect_list: List[Dict[str, Any]], reg_id: int, targets: List[Dict[str, Any]]) -> Optional[int]:
+    cands: List[Dict[str, Any]] = []
+    for e in effect_list or []:
+        try:
+            rid = int(e.get("id", 0)) // 10
+            if rid == reg_id:
+                cands.append(e)
+        except Exception:
+            continue
+
+    if not cands:
+        return None
+
+    worst = min(
+        cands,
+        key=lambda x: (_owned_effect_value_for_selling(x, targets), int(x.get("uid") or 1_000_000_000))
+    )
+    uid = worst.get("uid")
+    try:
+        return int(uid) if uid is not None else None
+    except Exception:
+        return None
+
+
 def select_amulet_from_candidates(
         candidate_effect_list: List[Dict[str, Any]],
         effect_list: List[Dict[str, Any]],
         targets: List[Dict[str, Any]],
-) -> Tuple[Optional[int], Optional[int], Optional[int]]:
+) -> Tuple[Optional[int], Optional[int], Optional[int], Optional[int]]:
     if not candidate_effect_list:
-        return None, None, None
+        return None, None, None, None
 
     want_badges = set()
     want_amulet_regs = set()
@@ -902,31 +1265,52 @@ def select_amulet_from_candidates(
             except Exception:
                 pass
 
+    zero_raw_ids: set[int] = set()
+
     for c in candidate_effect_list:
         raw_id = int(c.get("id", 0))
         if raw_id <= 0:
             continue
         reg_id = _reg_id_of_raw(raw_id)
         bid = _candidate_badge_id(c)
-        if reg_id in want_amulet_regs or (bid is not None and bid in want_badges):
-            return raw_id, bid, 99
 
+        # 命中“目标印章”直接 99
+        if bid is not None and bid in want_badges:
+            return raw_id, bid, 99, None
+
+        # 命中“目标护身符 reg”
+        if reg_id in want_amulet_regs:
+            required_badges = _required_nonplus_badges_for_reg(targets, reg_id)
+            if required_badges:
+                # 非 plus 且目标指定 badge，候选必须匹配该 badge，否则这张候选记为 0 分
+                if bid in required_badges:
+                    return raw_id, bid, 99, None
+                else:
+                    zero_raw_ids.add(raw_id)
+            else:
+                # 无额外 badge 要求，直接 99
+                return raw_id, bid, 99, None
+
+    # 指引 600070 未满 3 个
     WANT_BADGE_STACK = 600070
-    owned_cnt_600070 = _owned_count_with_badge(effect_list, WANT_BADGE_STACK)
-    if owned_cnt_600070 < 3:
+    if _owned_count_with_badge(effect_list, WANT_BADGE_STACK) < 3:
         for c in candidate_effect_list:
             bid = _candidate_badge_id(c)
             if bid == WANT_BADGE_STACK:
-                return int(c["id"]), bid, 2
+                return int(c["id"]), bid, 2, None
 
+    # 幸福 600110
     for c in candidate_effect_list:
         bid = _candidate_badge_id(c)
         if bid == 600110:
-            return int(c["id"]), bid, 1
+            return int(c["id"]), bid, 1, None
 
+    # 按价值挑最好；同时，当某候选被标记为 zero_raw_ids 时，尝试给出 sell_uid
     best_raw: Optional[int] = None
     best_bid: Optional[int] = None
     best_val = -10 ** 9
+    best_sell_uid: Optional[int] = None
+
     for c in candidate_effect_list:
         try:
             raw_id = int(c.get("id", 0))
@@ -934,14 +1318,34 @@ def select_amulet_from_candidates(
             continue
         if raw_id <= 0:
             continue
+
         bid = _candidate_badge_id(c)
-        val = _candidate_value(raw_id, bid)
+        reg_id = _reg_id_of_raw(raw_id)
+
+        if raw_id in zero_raw_ids:
+            # 价值强制为 0；若背包已有同 reg 且该已拥有并非目标需要，建议先卖
+            val = 0
+            uid = _find_owned_uid_for_reg(effect_list, reg_id)
+            if uid is not None:
+                # 确认这件现有的不被目标需要
+                owned_item = next((e for e in effect_list if e.get("uid") == uid), None)
+                if owned_item is not None and not _is_needed_for_any_target(owned_item, targets):
+                    sell_uid = uid
+                else:
+                    sell_uid = None
+            else:
+                sell_uid = None
+        else:
+            val = _candidate_value(raw_id, bid)
+            sell_uid = None
+
         if val > best_val:
             best_val = val
             best_raw = raw_id
             best_bid = bid
+            best_sell_uid = sell_uid
 
-    return best_raw, best_bid, 0
+    return best_raw, best_bid, 0 if best_raw is not None and best_raw in zero_raw_ids else (0 if best_val <= 0 else 0), best_sell_uid
 
 
 def total_volume(effect_list: List[Dict[str, Any]]) -> int:

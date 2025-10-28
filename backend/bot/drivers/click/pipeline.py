@@ -39,22 +39,11 @@ def button_centers_by_order(
 
 
 class BotPipeline:
-    """
-    无模板图、语言无关的点击流水线：
-      - bind_window / ensure_bound / refresh_viewport
-      - selftest_move(...)：调试所有位置
-      - click_op(...)：点击操作按钮
-      - click_discard_by_index(...) / click_discard_by_tile_id(...)：出牌
-        （已改为“拖到客户区中心”手势）
-    """
-
     def __init__(self, cfg: BotConfig):
         self.cfg = cfg
         self.clicker = Clicker(cfg.ack_timeout_sec, cfg.ack_retry, cfg.ack_settle_ms, cfg.ack_check_ms)
         self._viewport: Optional[Tuple[int, int, int, int]] = None
         self._hwnd = None
-
-    # ---------- 绑定/基础 ----------
 
     def bind_window(self, keyword: Optional[str] = None) -> bool:
         kw = keyword or self.cfg.window_title_keyword
@@ -87,8 +76,6 @@ class BotPipeline:
             return False
         self._viewport = vp
         return True
-
-    # ---------- 截图/映射 ----------
 
     def _bbox_from_norm(self, norm_rect: Tuple[float, float, float, float]) -> Tuple[int, int, int, int]:
         if self._viewport:
@@ -126,7 +113,6 @@ class BotPipeline:
         oy = (self.cfg.screen_height - scale * 9) / 2.0
         return int(round(ox + x16 * scale)), int(round(oy + y9 * scale))
 
-    # ---------- 常用 bbox ----------
     def _button_bar_bbox(self) -> tuple[int, int, int, int]:
         if self.cfg.button_bar_norm:
             return self._bbox_from_norm(self.cfg.button_bar_norm)
@@ -144,7 +130,6 @@ class BotPipeline:
         y1 = y2 - 150
         return x1, y1, x2, y2
 
-    # ---------- 计算“客户区中心” ----------
     def _viewport_center(self) -> Tuple[int, int]:
         """
         返回“客户区中心”位置；为避免挡字/动画，可略微下移到 55% 高度。
@@ -363,6 +348,62 @@ class BotPipeline:
 
         return self.clicker.click_with_ack(do_click, ok_pred, self._blind_close_popups)
 
+    def _viewport_left_center(self) -> Tuple[int, int]:
+        if self._viewport:
+            left, top, w, h = self._viewport
+            cx = left + int(w * 0.25)
+            cy = top + int(h * 0.55)
+            return cx, cy
+        return self._map16x9(4.0, 5.0)
+
+    def click_left_center_once(self) -> bool:
+        if not self.ensure_bound():
+            if not self.bind_window(self.cfg.window_title_keyword):
+                return False
+        self.refresh_viewport()
+        cx, cy = self._viewport_left_center()
+        if self._hwnd:
+            try:
+                focus_window(self._hwnd, viewport=self._viewport)
+                time.sleep(0.02)
+            except Exception:
+                pass
+        try:
+            self.clicker.click_xy(cx, cy)
+            return True
+        except Exception as e:
+            logger.warning(f"anti-AFK click failed: {e}")
+            return False
+
+    def _viewport_left_edge_nudged(self, nudged_ratio: float = 0.03) -> Tuple[int, int]:
+        if self._viewport:
+            left, top, w, h = self._viewport
+            cx = left + int(w * max(0.0, min(nudged_ratio, 0.25)))
+            cy = top + int(h * 0.55)
+            return cx, cy
+        return self._map16x9(0.5, 5.0)
+
+    def click_left_edge_nudged_once(self, nudged_ratio: float = 0.03) -> bool:
+        if not self.ensure_bound():
+            if not self.bind_window(self.cfg.window_title_keyword):
+                logger.debug("anti-AFK: bind window failed (edge-nudged)")
+                return False
+        self.refresh_viewport()
+        cx, cy = self._viewport_left_edge_nudged(nudged_ratio)
+        if self._hwnd:
+            try:
+                focus_window(self._hwnd, viewport=self._viewport)
+                time.sleep(0.02)
+            except Exception:
+                pass
+        try:
+            self.clicker.click_xy(cx, cy)
+            logger.debug(f"anti-AFK clicked at LEFT-EDGE-NUDGED ({cx},{cy}) ratio={nudged_ratio}")
+            return True
+        except Exception as e:
+            logger.warning(f"anti-AFK edge-nudged click failed: {e}")
+            return False
+
     def click_discard_by_tile_id(
             self,
             tile_id: int,
@@ -431,7 +472,6 @@ class BotPipeline:
             self._drag_tile_to_center(cx, cy)
 
         def ok_pred():
-            # TODO: 接入GameState做真实确认
             return True
 
         return self.clicker.click_with_ack(do_click, ok_pred, self._blind_close_popups)

@@ -26,6 +26,8 @@ export type AutoRunnerStatus = {
     game_ready_reason?: string;
     game_ready_code?: "BUSINESS_REFUSED" | "GAME_NOT_READY" | "PROBE_TIMEOUT" | "" | "NOT_PROBED";
     probe_fail_count?: number;
+    preferred_flow_ready?: boolean;
+    preferred_flow_peer?: string;
 };
 
 const defaultConfig: AutoRunnerConfig = {

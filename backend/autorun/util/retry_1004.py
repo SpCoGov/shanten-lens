@@ -3,10 +3,13 @@ import asyncio
 from time import monotonic
 from typing import Any, Callable, Optional, Tuple
 
+import backend.app
+
 
 def _is_1004(reason: str | None) -> bool:
     r = (reason or "").lower()
-    return "error code: 1004" in r or "error code: 26104" in r
+    return "no-preferred-flow" in r or "timeout" in r
+    # or "error code: 26104" in r
 
 
 async def call_with_1004_retry_async(
@@ -39,7 +42,7 @@ async def call_with_1004_retry_async(
         if not _is_1004(reason):
             # 非 1004：无论 ok 与否，都结束重试
             return res
-
+        # backend.app.PACKET_BOT.heartbeat()
         # reason 是 1004 → 继续重试
         if timeout is not None and (monotonic() - start) >= timeout:
             return False, f"retry-timeout(1004) after {attempt} tries", None
@@ -67,7 +70,7 @@ def call_with_1004_retry(
 
         if not _is_1004(reason):
             return ok, reason, resp
-
+        # backend.app.PACKET_BOT.heartbeat()
         if timeout is not None and (monotonic() - start) >= timeout:
             return False, f"retry-timeout(1004) after {attempt} tries", None
 

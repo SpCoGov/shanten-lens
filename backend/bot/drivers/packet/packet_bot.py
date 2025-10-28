@@ -6,19 +6,18 @@ from backend.mitm.addon import WsAddon
 from backend.model.game_state import GameState
 from ...core.interfaces import GameBot
 
+
 class PacketBot(GameBot):
     def __init__(
             self,
             addon_getter: Callable[[], WsAddon],
             activity_id: int = 250811,
             op_code_map: Optional[Dict[str, int]] = None,
-            verbose: bool = True,
             default_timeout: float = 5.0,
             state_getter: Optional[Callable[[], Any]] = None,
     ):
-        self._get_addon = addon_getter
+        self.get_addon = addon_getter
         self.activity_id = activity_id
-        self.verbose = verbose
         self.default_timeout = default_timeout
         self._get_state = state_getter
 
@@ -42,10 +41,12 @@ class PacketBot(GameBot):
         return self._get_state() if self._get_state else None
 
     def _get_peer_key(self) -> Optional[str]:
-        addon: WsAddon = self._get_addon()
-        if not addon or not getattr(addon, "last_flow", None):
+        addon: WsAddon = self.get_addon()
+        if not addon:
             return None
-        f = addon.last_flow
+        f = getattr(addon, "preferred_flow", None)
+        if not f or not getattr(f, "websocket", None):
+            return None
         try:
             return f"{f.client_conn.address[0]}|{f.server_conn.address[0]}"
         except Exception:
@@ -78,20 +79,23 @@ class PacketBot(GameBot):
             self, *, method: str, data: dict,
             delay_sec: float, timeout: Optional[float] = None
     ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
-        addon = self._get_addon()
-        if not addon or not getattr(addon, "last_flow", None):
+        addon = self.get_addon()
+        if not addon:
             return False, "addon-or-flow-not-ready", None
+
+        peer_key = self._get_peer_key()
+        if not peer_key:
+            return False, "no-preferred-flow", None
 
         ok, reason, msg_id = addon.inject_now(
             method=method,
             data=data,
             t="Req",
-            peer_key=self._get_peer_key(),
+            peer_key=peer_key,
         )
         if not ok or msg_id < 0:
             return False, f"inject-failed:{reason}", None
 
-        # 注册同步等待器并阻塞等待
         ev = addon.register_waiter_sync(msg_id)
         to = float(delay_sec) if timeout is None else float(timeout)
         try:
@@ -118,6 +122,14 @@ class PacketBot(GameBot):
             delay_sec=delay_sec, timeout=timeout
         )
 
+    def heartbeat(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
+        ok, reason, resp = self._inject_and_wait(
+            method=".lq.Route.heartbeat",
+            data={"delay": 100, "platform": 5, "networkQuality": 100, "noOperationCounter": 0},
+            delay_sec=delay_sec
+        )
+        return ok, reason, resp
+
     def giveup(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         ok, reason, resp = self._inject_and_wait(
             method=".lq.Lobby.amuletActivityGiveup",
@@ -142,8 +154,6 @@ class PacketBot(GameBot):
             logger.error("gamestate disallow tsumo")
             return False, "gamestate disallow discard", None
         ok, reason, resp = self._operate(pkt_type=t, tile_list=[], delay_sec=delay_sec)
-        if self.verbose:
-            logger.info(f"tsumo -> ok={ok}, reason={reason}, resp={resp}")
         return ok, reason, resp
 
     def op_skip_change(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
@@ -154,8 +164,6 @@ class PacketBot(GameBot):
             logger.error("gamestate disallow skip-replace")
             return False, "gamestate disallow discard", None
         ok, reason, resp = self._operate(pkt_type=t, tile_list=[], delay_sec=delay_sec)
-        if self.verbose:
-            logger.info(f"skip_replace -> ok={ok}, reason={reason}, resp={resp}")
         return ok, reason, resp
 
     def op_change(self, tile_ids: List[int], delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
@@ -166,8 +174,6 @@ class PacketBot(GameBot):
             logger.error("gamestate disallow replace")
             return False, "gamestate disallow discard", None
         ok, reason, resp = self._operate(pkt_type=t, tile_list=tile_ids, delay_sec=delay_sec)
-        if self.verbose:
-            logger.info(f"replace tile={tile_ids} -> ok={ok}, reason={reason}, resp={resp}")
         return ok, reason, resp
 
     def discard_by_tile_id(
@@ -181,8 +187,6 @@ class PacketBot(GameBot):
             logger.error("gamestate disallow discard")
             return False, "gamestate disallow discard", None
         ok, reason, resp = self._operate(pkt_type=t, tile_list=[tile_id], delay_sec=delay_sec)
-        if self.verbose:
-            logger.info(f"discard id={tile_id}({self._label(tile_id)}) -> ok={ok}, reason={reason}, resp={resp}")
         return ok, reason, resp
 
     def select_free_effect(self, selected_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
@@ -243,6 +247,31 @@ class PacketBot(GameBot):
             ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySellEffect", data={"activityId": self.activity_id, "id": uid}, delay_sec=delay_sec)
             return ok, reason, resp
         return False, "unknown id", None
+
+    def sort_effect(self, sorted_uid: List[int], delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
+        st = self._state()
+        try:
+            cur_uids = [int(e.get("uid")) for e in (st.effect_list or []) if e.get("uid") is not None]
+        except Exception:
+            return False, "bad-effect-list", None
+        if not cur_uids:
+            return False, "no-effects", None
+        try:
+            in_uids = [int(x) for x in (sorted_uid or [])]
+        except Exception:
+            return False, "sorted_uid-not-integers", None
+        if len(in_uids) != len(set(in_uids)):
+            return False, "sorted_uid-has-duplicates", None
+        if set(in_uids) != set(cur_uids):
+            return False, "sorted_uid-mismatch-current-effects", None
+        if in_uids == cur_uids:
+            return True, "already sorted", None
+        ok, reason, resp = self._inject_and_wait(
+            method=".lq.Lobby.amuletActivitySortEffect",
+            data={"activityId": self.activity_id, "sortedUid": in_uids},
+            delay_sec=delay_sec
+        )
+        return ok, reason, resp
 
     def end_shopping(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         if not self._check_stage(4):
