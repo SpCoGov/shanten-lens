@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import smtplib
+import socket
+import ssl
 import time
 import traceback
 from typing import Any, Dict, List, Optional, Tuple
+from email.mime.text import MIMEText
 
 from backend.autorun.util.retry_1004 import call_with_1004_retry_async
 from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
 from backend.bot.drivers.packet.packet_bot import PacketBot
-from backend.mitm import bridge
-from backend.mitm.addon import WsAddon
 from backend.model.game_state import GameState
 
 try:
@@ -26,6 +28,9 @@ def _now_wall_ms() -> int:
 
 def _now_mono_ms() -> int:
     return int(time.monotonic() * 1000)
+
+
+SMTP_TIMEOUT_SEC = 12
 
 
 class AutoRunner:
@@ -69,8 +74,145 @@ class AutoRunner:
         self.end_count: int = 1
         self.targets: List[Dict[str, Any]] = []
         self.cutoff_level: int = 0
+        self.op_interval_ms: int = 1000
+        self.email_notify: dict = {}
 
         self.update_config(self._get_config())
+
+    def _targets_status_lines(self, effect_list: List[Dict[str, Any]], targets: List[Dict[str, Any]]) -> List[str]:
+        """逐个目标给出‘已拥有/未拥有’，并在目标为 amulet 时标注 plus / badge 需求。"""
+        lines: List[str] = []
+        # 先构建已拥有集合，便于快速判断
+        owned: List[Tuple[int, bool, Optional[int]]] = []
+        for e in effect_list or []:
+            owned.append(self._extract_amulet_signature(e))
+
+        def has_amulet(reg_id: int, need_plus: bool, need_badge: Optional[int]) -> bool:
+            for (r, p, b) in owned:
+                if r != reg_id:
+                    continue
+                if need_badge is not None and b != need_badge:
+                    continue
+                # 需要 plus 时必须 plus；不需要 plus 时要求非 plus
+                if need_plus and not p:
+                    continue
+                if (not need_plus) and p:
+                    continue
+                return True
+            return False
+
+        for i, t in enumerate(targets or []):
+            kind = t.get("kind")
+            if kind == "badge":
+                try:
+                    bid = int(t.get("id"))
+                except Exception:
+                    bid = -1
+                # 任意带该 badge 的护身符算满足
+                ok = any((b == bid) for (_r, _p, b) in owned)
+                lines.append(f"- 目标#{i + 1} 印章: {bid} —— {'已拥有✓' if ok else '未拥有×'}")
+            elif kind == "amulet":
+                try:
+                    reg = int(t.get("id"))
+                except Exception:
+                    reg = -1
+                need_plus = bool(t.get("plus", False))
+                tb = t.get("badge", None)
+                need_badge: Optional[int]
+                if tb not in (None, ""):
+                    try:
+                        need_badge = int(tb)
+                    except Exception:
+                        need_badge = None
+                else:
+                    need_badge = None
+                ok = has_amulet(reg, need_plus, need_badge)
+                plus_txt = "plus=是" if need_plus else "plus=否"
+                badge_txt = f", 需印章={need_badge}" if need_badge is not None else ""
+                lines.append(f"- 目标#{i + 1} 护身符: reg={reg}（{plus_txt}{badge_txt}） —— {'已拥有✓' if ok else '未拥有×'}")
+            else:
+                lines.append(f"- 目标#{i + 1} 未知类型 —— 跳过")
+        return lines
+
+    @staticmethod
+    def _fmt_ms(ms: int) -> str:
+        ms = max(0, int(ms or 0))
+        s = ms // 1000
+        hh = s // 3600
+        mm = (s % 3600) // 60
+        ss = s % 60
+        return f"{hh:02d}:{mm:02d}:{ss:02d}"
+
+    @staticmethod
+    def _amulet_sig_str(effect_item: Dict[str, Any]) -> str:
+        reg, is_plus, badge = AutoRunner._extract_amulet_signature(effect_item)
+        plus = "+" if is_plus else ""
+        btxt = f", badge={badge}" if badge is not None else ""
+        return f"reg={reg}{plus}{btxt}"
+
+    def _owned_amulets_lines(self, effect_list: List[Dict[str, Any]]) -> List[str]:
+        lines: List[str] = []
+        for e in effect_list or []:
+            lines.append(f"  • {self._amulet_sig_str(e)}")
+        return lines or ["  （无）"]
+
+    def _get_effect_list_snapshot(self) -> List[Dict[str, Any]]:
+        gs = self._get_game_state()
+        try:
+            d = gs.to_dict() if hasattr(gs, "to_dict") else (gs or {})
+        except Exception:
+            d = (gs or {})
+        return d.get("effect_list") or []
+
+    def _notify_email_success_sync(self) -> None:
+        cfg = self.email_notify or {}
+        if not cfg.get("enabled"):
+            return
+        elapsed = self._calc_elapsed_ms()
+        effect_list = self._get_effect_list_snapshot()
+        lines_targets = self._targets_status_lines(effect_list, self.targets)
+        lines_owned = self._owned_amulets_lines(effect_list)
+
+        subject = "【Shanten Lens】自动化完成 ✓（目标已达成）"
+        body = "\n".join([
+            "自动化已完成（达到结束条件）。",
+            f"- 运行时长：{self._fmt_ms(elapsed)}",
+            f"- 已运行局数：{self.runs}",
+            f"- 达成目标数：{self.best_achieved_count}/{self.end_count}",
+            "",
+            "目标达成情况：",
+            *lines_targets,
+            "",
+            "当前已拥有护身符：",
+            *lines_owned,
+        ])
+        ok, reason = self.send_email_notify(subject, body)
+        if app_mod and hasattr(app_mod, "broadcast_sync_ui_toast"):
+            # 需要的话，可以在后端也给前端弹个 toast
+            try:
+                app_mod.broadcast_sync_ui_toast("success", "目标已达成，邮件已发送" if ok else f"目标已达成，邮件发送失败：{reason}")
+            except Exception:
+                pass
+
+    def _notify_email_failure_sync(self, reason_text: str) -> None:
+        cfg = self.email_notify or {}
+        if not cfg.get("enabled"):
+            return
+        elapsed = self._calc_elapsed_ms()
+        subject = "【Shanten Lens】自动化中止 ✗"
+        body = "\n".join([
+            "自动化因错误中止。",
+            f"- 错误原因：{reason_text or (self.last_error or 'unknown')}",
+            f"- 最后步骤：{self.current_step or '-'}",
+            f"- 运行时长：{self._fmt_ms(elapsed)}",
+            f"- 已运行局数：{self.runs}",
+        ])
+        ok, reason = self.send_email_notify(subject, body)
+        if app_mod and hasattr(app_mod, "broadcast_sync_ui_toast"):
+            try:
+                app_mod.broadcast_sync_ui_toast("error", "运行中止，邮件已发送" if ok else f"运行中止，邮件发送失败：{reason}")
+            except Exception:
+                pass
 
     def _preferred_flow_status(self) -> tuple[Optional[bool], Optional[str]]:
         packet_bot: PacketBot = self._get_packet_bot()
@@ -119,6 +261,8 @@ class AutoRunner:
     def update_config(self, cfg: Dict[str, Any]) -> None:
         self.end_count = max(1, int((cfg or {}).get("end_count", 1) or 1))
         self.targets = list((cfg or {}).get("targets") or [])
+        self.op_interval_ms = max(1, int((cfg or {}).get("op_interval_ms", 1000)))
+        self.email_notify = (cfg or {}).get("email_notify")
         try:
             self.cutoff_level = int((cfg or {}).get("cutoff_level", 0) or 0)
         except Exception:
@@ -143,6 +287,69 @@ class AutoRunner:
         self._probe_fail_count = 0
         if self.PROBE_DEBUG:
             logger.info("[autorun] probe state cleared (NOT_PROBED)")
+
+    def send_email_notify(self, subject: str, body: str, *, to_override: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+        cfg = self.email_notify or {}
+        if not cfg.get("enabled"):
+            return False, "email-notify-disabled"
+
+        host = (cfg.get("host") or "").strip()
+        port = int(cfg.get("port") or 0)
+        use_ssl = bool(cfg.get("ssl")) or (port == 465)  # 兼容常见 465=SSL
+        from_addr = (cfg.get("from") or "").strip()
+        pwd = cfg.get("pass") or ""
+        to_addr = (to_override or cfg.get("to") or "").strip()
+
+        # 基本校验
+        if not host or not port:
+            return False, "smtp-host-or-port-missing"
+        if "@" not in (from_addr or ""):
+            return False, "from-address-invalid"
+        if "@" not in (to_addr or ""):
+            return False, "to-address-invalid"
+        if not pwd:
+            return False, "smtp-password-missing"
+
+        # 构造邮件
+        msg = MIMEText(body or "", "plain", "utf-8")
+        msg["Subject"] = subject or ""
+        msg["From"] = from_addr
+        msg["To"] = to_addr
+
+        # 发送
+        try:
+            socket.setdefaulttimeout(SMTP_TIMEOUT_SEC)
+            if use_ssl:
+                ctx = ssl.create_default_context()
+                with smtplib.SMTP_SSL(host, port, timeout=SMTP_TIMEOUT_SEC, context=ctx) as s:
+                    s.login(from_addr, pwd)
+                    s.sendmail(from_addr, [to_addr], msg.as_string())
+            else:
+                ctx = ssl.create_default_context()
+                with smtplib.SMTP(host, port, timeout=SMTP_TIMEOUT_SEC) as s:
+                    # 587 常见：先 EHLO 再 STARTTLS
+                    try:
+                        s.ehlo()
+                        s.starttls(context=ctx)
+                        s.ehlo()
+                    except smtplib.SMTPException:
+                        # 某些服务器不要求/不支持 STARTTLS，允许跳过
+                        pass
+                    s.login(from_addr, pwd)
+                    s.sendmail(from_addr, [to_addr], msg.as_string())
+            return True, None
+        except smtplib.SMTPAuthenticationError as e:
+            return False, f"smtp-auth-failed:{e.smtp_code or ''}"
+        except smtplib.SMTPConnectError as e:
+            return False, f"smtp-connect-failed:{e.smtp_code or ''}"
+        except smtplib.SMTPServerDisconnected:
+            return False, "smtp-disconnected"
+        except smtplib.SMTPRecipientsRefused:
+            return False, "smtp-recipient-refused"
+        except smtplib.SMTPException as e:
+            return False, f"smtp-error:{e.__class__.__name__}"
+        except Exception as e:
+            return False, f"error:{e.__class__.__name__}"
 
     def _classify_probe_reason(self, reason: str) -> str:
         r = (reason or "").lower().strip()
@@ -321,7 +528,7 @@ class AutoRunner:
                 except Exception as e:
                     self.last_error = str(e)
                     logger.exception("[autorun] run_tick error")
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(self.op_interval_ms / 1000)
         except asyncio.CancelledError:
             pass
 
@@ -769,6 +976,8 @@ class AutoRunner:
                                 await self.abort(f"fatal: {reason}")
                             return
                         return
+                    if reason == "error code: 2691":
+                        return
                     self.last_error = reason
                     await self.abort(f"fatal: {reason}")
                     return
@@ -865,6 +1074,12 @@ class AutoRunner:
     async def abort(self, reason: str = "fatal error", *, push: bool = True) -> None:
         async with self._lock:
             self.last_error = reason or "fatal error"
+
+            try:
+                self._notify_email_failure_sync(self.last_error)
+            except Exception:
+                logger.exception("send failure email failed")
+
             self.running = False
             self.elapsed_ms = self._calc_elapsed_ms()
             self._started_mono_ms = 0
@@ -1012,6 +1227,12 @@ class AutoRunner:
             # 先设置并广播达成态
             self.current_step = "goal_met"
             await self._broadcast_status(safe=True)
+
+            try:
+                self._notify_email_success_sync()
+            except Exception:
+                logger.exception("send success email failed")
+
             await self.stop(final_step="goal_met")
             return True
         return False

@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from "react";
 import {ws} from "../lib/ws";
 import styles from "./SettingsPage.module.css";
+import { pushToast } from "../lib/toast";
 
 type Tables = Record<string, Record<string, any>>;
 
@@ -11,29 +12,12 @@ function deepEqual(a: any, b: any) {
         return false;
     }
 }
-
-type ToastKind = "info" | "success" | "error";
-
 export default function SettingsPage() {
     const [serverTables, setServerTables] = useState<Tables | null>(null);
     const [draft, setDraft] = useState<Tables>({});
     const [dirty, setDirty] = useState(false);
     const [hasServerUpdateWhileDirty, setHasServerUpdateWhileDirty] = useState(false);
     const awaitingSyncRef = useRef(false);
-
-    // 顶部通知
-    const [toast, setToast] = useState<{ msg: string; kind: ToastKind; id: number } | null>(null);
-    const [toastVisible, setToastVisible] = useState(false);
-    const toastTimerRef = useRef<number | null>(null);
-    const pushToast = (msg: string, kind: ToastKind = "info", duration = 2200) => {
-        setToast({msg, kind, id: Date.now()});
-        setToastVisible(true);
-        if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = window.setTimeout(() => setToastVisible(false), duration);
-    };
-    useEffect(() => () => {
-        if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
-    }, []);
 
     useEffect(() => {
         ws.connect();
@@ -70,7 +54,6 @@ export default function SettingsPage() {
         setDraft(prev => ({...prev, [tname]: {...(prev[tname] ?? {}), [key]: val}}));
     };
 
-    // 保存（防抖）
     const SAVE_COOLDOWN_MS = 800;
     const lastSaveRef = useRef(0);
     const [saving, setSaving] = useState(false);
@@ -104,8 +87,6 @@ export default function SettingsPage() {
 
     return (
         <div className="settings-wrap">
-            <div className={`toast ${toastVisible ? "visible" : ""} ${toast?.kind || "info"}`}>{toast?.msg}</div>
-
             <div className="settings-header">
                 <h2 className="title">设置</h2>
                 <div className="toolbar">

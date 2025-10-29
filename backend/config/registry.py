@@ -51,6 +51,21 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         .add("end_count", 1, desc="达成的目标数量（护身符/印章混计）", kind="int")
         .add("targets", [], desc="结束判定的目标清单", kind="object")
         .add("cutoff_level", 0, desc="截止关卡（101..503；0=不限制）", kind="int")
+        .add("op_interval_ms", 1000, desc="操作间隔", kind="int")
+        .add(
+            "email_notify",
+            {
+                "enabled": False,
+                "host": "",
+                "port": 587,
+                "ssl": False,
+                "from": "",
+                "pass": "",
+                "to": "",
+            },
+            desc="邮件通知（完成/出错后，SMTP）",
+            kind="object",
+        )
     )
     mgr.load_all()
     return mgr

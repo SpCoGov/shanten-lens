@@ -370,7 +370,7 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         return await _result(True, "")
                     await AUTORUNNER.stop()
                     return await _result(True, "")
-                if action == "set_mode":
+                elif action == "set_mode":
                     mode = (data or {}).get("mode")
                     await AUTORUNNER.set_mode(mode)
                     return await _result(True, "")
@@ -381,6 +381,21 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         return await _result(True, "")
                     except Exception as e:
                         return await _result(False, str(e))
+                elif action == "notify_test_email":
+                    ok, reason = AUTORUNNER.send_email_notify(
+                        subject="Shanten Lens 测试通知",
+                        body="这是一封测试邮件：自动化完成/出错后会发送类似的邮件。",
+                    )
+                    if ok:
+                        await ws_send(ws, {
+                            "type": "ui_toast",
+                            "data": {"kind": "success", "msg": "测试邮件已发送", "duration": 1800}
+                        })
+                    else:
+                        await ws_send(ws, {
+                            "type": "ui_toast",
+                            "data": {"kind": "error", "msg": f"发送失败: {reason or ''}", "duration": 2600}
+                        })
 
     except Exception:
         pass

@@ -19,6 +19,11 @@ ignore_methods = [
     '.lq.Lobby.fetchServerTime',
     '.lq.Lobby.loginSuccess',
     '.lq.Lobby.loginBeat',
+    '.lq.Lobby.fetchAccountStatisticInfo',
+    '.lq.Lobby.fetchAccountInfo',
+    '.lq.Lobby.fetchCommentList',
+    '.lq.Lobby.fetchAccountChallengeRankInfo',
+    '.lq.Lobby.fetchAccountInfoExtra',
 ]
 
 
@@ -136,24 +141,23 @@ class WsAddon:
 
         try:
             if backend.app.MANAGER.get("general.debug"):
-                logger.debug(f"{'已发送' if message.from_client else '接收到'}：{view.get('method')} (id={view.get('id')})")
-                import json
-                pretty = json.dumps(view.get('data'), ensure_ascii=False)
-                cur_key = _peer_key_ws(flow)
-                pf = self.preferred_flow
-                pf_key = _peer_key_ws(pf) if pf else None
-                on_pref = (pf is not None and pf is flow)
-                logger.debug(
-                    "== FULL MESSAGE BEGIN ==\n"
-                    f"method: {view.get('method')}\n"
-                    f"from_client: {view.get('from_client')}\n"
-                    f"msg_id: {view.get('id')}\n"
-                    f"parsed:\n{pretty}\n"
-                    f"cur_f={id(flow)} cur_key={cur_key} pref_f={id(pf) if pf else None} pref_key={pf_key or 'None'} on_pref={on_pref}\n"
-                    "== FULL MESSAGE END =="
-                )
                 if view.get('method') not in ignore_methods:
-                    ...
+                    logger.debug(f"{'已发送' if message.from_client else '接收到'}：{view.get('method')} (id={view.get('id')})")
+                    import json
+                    pretty = json.dumps(view.get('data'), ensure_ascii=False)
+                    cur_key = _peer_key_ws(flow)
+                    pf = self.preferred_flow
+                    pf_key = _peer_key_ws(pf) if pf else None
+                    on_pref = (pf is not None and pf is flow)
+                    logger.debug(
+                        "== FULL MESSAGE BEGIN ==\n"
+                        f"method: {view.get('method')}\n"
+                        f"from_client: {view.get('from_client')}\n"
+                        f"msg_id: {view.get('id')}\n"
+                        f"parsed:\n{pretty}\n"
+                        f"cur_f={id(flow)} cur_key={cur_key} pref_f={id(pf) if pf else None} pref_key={pf_key or 'None'} on_pref={on_pref}\n"
+                        "== FULL MESSAGE END =="
+                    )
         except Exception as e:
             logger.error(f"logging full message failed: {e}")
 
@@ -238,9 +242,25 @@ class WsAddon:
           - force_id: 可选，强制使用某个 msg_id（不传则用 last_req_id+偏移）
         返回: (ok: bool, detail: str, msg_id: int|-1)
         """
-        flow = self._pick_flow(peer_key)
+
+        def _ctx(extra: str = "") -> str:
+            pf = self.preferred_flow
+            try:
+                cip = pf.client_conn.address[0] if pf else None
+                sip = pf.server_conn.address[0] if pf else None
+                pf_key = f"{cip}|{sip}" if (cip and sip) else None
+            except Exception:
+                pf_key = None
+            return ((f"[inject ctx] method={method!r} t={t!r} "
+                     f"force_id={force_id!r} pf_id={id(pf) if pf else None} "
+                     f"pf_key={pf_key or 'None'} {extra} "
+                     f"method={method!r} data={data!r}"
+                     ).strip())
+
+        flow = self.preferred_flow
         if not flow or not getattr(flow, "websocket", None):
-            return False, "no-active-websocket-flow", -1
+            logger.error(f"inject_now: no preferred websocket flow. {_ctx()}")
+            return False, "no-preferred-websocket-flow", -1
 
         inj = {"type": t, "method": method, "data": data}
         msg_id = -1
@@ -266,6 +286,8 @@ class WsAddon:
         try:
             inj_bytes = self.codec.build_frame(inj)
         except Exception as e:
+            logger.exception("build-frame-failed")
+            logger.exception(f"inject_now: build-frame-failed. {_ctx()}")
             return False, f"build-frame-failed: {e}", -1
 
         try:
@@ -276,6 +298,7 @@ class WsAddon:
 
         master = self.master
         if not master or not getattr(master, "event_loop", None):
+            logger.error(f"inject_now: no master loop. {_ctx()}")
             return False, "inject-failed:no-master-loop", -1
 
         loop = master.event_loop
@@ -293,6 +316,7 @@ class WsAddon:
             loop.call_soon_threadsafe(_do_inject)
             return True, "ok", msg_id
         except Exception as e:
+            logger.error(f"inject_now: call_soon_threadsafe failed: {e}. {_ctx()}")
             return False, f"inject-failed:{e}", -1
 
     _MAX_LOG_BODY = 64 * 1024  # 64 KB

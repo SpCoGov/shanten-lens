@@ -2,6 +2,7 @@ import {useLogStore} from "./logStore";
 import {setRegistry, type RegistryPayload} from "./registryStore";
 import {setFuseConfig, type FuseConfig} from "./fuseStore";
 import {AutoRunnerConfig, setAutoConfig} from "./autoRunnerStore";
+import { pushToast } from "./toast";
 
 export type UpdateConfigPacket = { type: "update_config"; data: Record<string, Record<string, any>> };
 export type Packet =
@@ -195,6 +196,18 @@ ws.onPacket((pkt) => {
             setAutoConfig(cfg);
         }
     } else if (pkt.type === "autorun_control_result") {
+        return;
+    }
+});
+
+ws.onPacket((pkt) => {
+    if (pkt.type === "ui_toast") {
+        const d = pkt.data || {};
+        console.log("[ui_toast] incoming =>", d);
+        const msg = String(d.msg ?? "");
+        const kind = (d.kind ?? "info") as "info" | "success" | "error";
+        const dur = Number.isFinite(Number(d.duration)) ? Number(d.duration) : 2200;
+        if (msg) pushToast(msg, kind, dur);
         return;
     }
 });

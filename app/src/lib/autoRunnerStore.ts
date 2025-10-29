@@ -9,6 +9,18 @@ export type AutoRunnerConfig = {
     targets: TargetItem[];
     cutoff_level?: number;
     __tick__?: number; // 轻量刷新
+    op_interval_ms?: number;
+    email_notify?: EmailNotifyConfig;
+};
+
+export type EmailNotifyConfig = {
+    enabled: boolean;
+    host: string;   // SMTP 服务器
+    port: number;   // 端口
+    ssl: boolean;   // SSL/TLS
+    from: string;   // 发件邮箱（同时作为认证用户名）
+    pass: string;   // 密码/授权码
+    to: string;     // 收件邮箱
 };
 
 export type AutoRunnerStatus = {
@@ -33,7 +45,17 @@ export type AutoRunnerStatus = {
 const defaultConfig: AutoRunnerConfig = {
     end_count: 1,
     targets: [],
-    cutoff_level: 103,
+    cutoff_level: 102,
+    op_interval_ms: 1000,
+    email_notify: {
+        enabled: false,
+        host: "",
+        port: 587,
+        ssl: false,
+        from: "",
+        pass: "",
+        to: "",
+    },
 };
 
 const defaultStatus: AutoRunnerStatus = {
