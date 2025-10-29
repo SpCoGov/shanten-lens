@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from idlelib.configdialog import changes
-
-from loguru import logger
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import List, Dict
@@ -200,7 +197,6 @@ class GameState:
             self.max_effect_volume = max_effect_volume
         if boss_buff is not None:
             self.boss_buff = boss_buff
-        logger.debug(f"game state updated: {self}, reason: {self.update_reason}")
         self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()
@@ -232,7 +228,6 @@ class GameState:
 
         self.update_reason.clear()
         self.update_reason.append(".lq.Lobby.amuletActivityGiveup")
-        logger.debug(f"game state updated(give up): {self}, reason: {self.update_reason}")
         loop = asyncio.get_running_loop()
         loop.create_task(self.on_gamestage_change())
 

@@ -58,6 +58,9 @@ input, textarea, select, code, pre, .selectable {
 }
 
 .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
     display: grid;
     grid-template-columns: 1fr auto auto;
     align-items: center;
@@ -183,34 +186,25 @@ input, textarea, select, code, pre, .selectable {
 
 .toast {
     position: fixed;
-    top: -48px;
+    top: 12px;
     left: 50%;
     transform: translateX(-50%);
-    padding: 8px 14px;
-    border-radius: 999px;
-    font-size: 13px;
-    border: 1px solid #e5e7eb;
+    z-index: 2000;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border, #e5e7eb);
     background: #fff;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, .08);
-    transition: top .24s ease, opacity .2s ease;
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
     opacity: 0;
-    z-index: 50;
+    transition: opacity .15s ease;
     pointer-events: none;
+    color: #111;
+    font-size: 14px;
 }
-
-.toast.visible {
-    top: 16px;
-    opacity: 1;
-}
-
-.toast.info {
-    border-color: #cbd5e1;
-}
-
-.toast.success {
-    border-color: #86efac;
-    background: #f0fdf4;
-}
+.toast.visible { opacity: 1; }
+.toast.info    { border-color:#ddd; }
+.toast.success { border-color:#16a34a; }
+.toast.error   { border-color:#dc2626; }
 
 /* 提示块 */
 .notice {

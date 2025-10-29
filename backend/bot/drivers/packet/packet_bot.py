@@ -106,6 +106,7 @@ class PacketBot(GameBot):
             resp = addon.pop_waiter_sync_resp(msg_id)
             if resp.get('data', {}).get('error', None) is not None:
                 logger.error(f"error occurred: {resp.get('data', {}).get('error')}")
+                logger.debug(f"game state while error occurred: {self._state().to_dict()}, method: {method}, data: {data}")
                 return False, f"error code: {resp.get('data', {}).get('error', {}).get('code', 0)}", None
             return True, "ok", resp
         except Exception as e:
@@ -267,8 +268,8 @@ class PacketBot(GameBot):
         if in_uids == cur_uids:
             return True, "already sorted", None
         ok, reason, resp = self._inject_and_wait(
-            method=".lq.Lobby.amuletActivitySortEffect",
-            data={"activityId": self.activity_id, "sortedUid": in_uids},
+            method=".lq.Lobby.amuletActivityEffectSort",
+            data={"activityId": self.activity_id, "sortedId": in_uids},
             delay_sec=delay_sec
         )
         return ok, reason, resp

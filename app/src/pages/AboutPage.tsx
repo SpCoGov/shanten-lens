@@ -6,10 +6,12 @@ export default function AboutPage() {
         <div className={styles.wrap}>
             <h1>向听镜 <span className={styles.sub}>Shanten Lens</span></h1>
 
-            <section>
-                <h2>作者</h2>
-                <p>海绵couna</p>
-            </section>
+            <div className={styles.meta}>
+                <span className={styles.author}>海绵couna</span>
+                <span className={styles.sep} aria-hidden>·</span>
+                <span className={styles.version}>v0.4.12</span>
+                <span className={styles.build}>(build&nbsp;1)</span>
+            </div>
 
             <section>
                 <h2>版权与许可</h2>

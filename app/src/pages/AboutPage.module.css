@@ -73,3 +73,45 @@ summary {
     color: #6b7280;
     font-size: 12px;
 }
+
+.meta {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 6px 0 18px;
+    color: currentColor;
+    opacity: 0.85;
+    font-size: 0.95rem;
+}
+
+.author {
+    font-weight: 450;
+    letter-spacing: .1px;
+    color: color-mix(in oklab, currentColor 80%, transparent);
+}
+
+.sep {
+    opacity: .6;
+    transform: translateY(-1px);
+}
+
+.version {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.92rem;
+    opacity: .9;
+}
+
+.build {
+    font-size: 0.88rem;
+    opacity: .6;
+}
+
+@media (prefers-color-scheme: dark) {
+    .meta {
+        opacity: 0.9;
+    }
+
+    .author {
+        color: color-mix(in oklab, white 70%, transparent);
+    }
+}

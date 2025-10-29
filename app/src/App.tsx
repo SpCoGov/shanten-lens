@@ -13,6 +13,7 @@ import ReplacementPanel from "./components/ReplacementPanel";
 import AdvisorPanel, {type ChiitoiData} from "./components/AdvisorPanel";
 import AmuletBar from "./components/AmuletBar";
 import {type EffectItem} from "./lib/gamestate";
+import { installWsToastBridge, useGlobalToast } from "./lib/toast";
 import "./App.css";
 
 import {
@@ -30,6 +31,7 @@ const SIDEBAR_WIDTH = 320;
 const MAIN_GAP = 12;
 
 export default function App() {
+    const { toast, visible: toastVisible } = useGlobalToast();
     const [route, setRoute] = React.useState<Route>("home");
     const [connected, setConnected] = React.useState(false);
 
@@ -52,6 +54,7 @@ export default function App() {
     React.useEffect(() => {
         ws.connect();
         setConnected(ws.connected);
+        installWsToastBridge(ws);
         const offOpen = ws.onOpen(() => setConnected(true));
         const offClose = ws.onClose(() => setConnected(false));
 
@@ -130,6 +133,9 @@ export default function App() {
 
     return (
         <div className="app">
+            <div className={`toast ${toastVisible ? "visible" : ""} ${toast?.kind || "info"}`}>
+                {toast?.msg}
+            </div>
 
             <header className="app-header">
                 <div className="brand">向听镜</div>
@@ -183,6 +189,7 @@ export default function App() {
                     padding: `${OUTER_PADDING}px`,
                     boxSizing: "border-box",
                     height: "calc(100vh - var(--header-height, 56px))",
+                    overflowY: "auto",
                 }}
             >
                 {route === "home" && (

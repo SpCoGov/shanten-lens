@@ -8,7 +8,7 @@ import backend.app
 
 def _is_1004(reason: str | None) -> bool:
     r = (reason or "").lower()
-    return "no-preferred-flow" in r or "timeout" in r
+    return "no-preferred-flow" in r or "timeout" in r or "no-preferred-websocket-flow" in r
     # or "error code: 26104" in r
 
 
