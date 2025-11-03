@@ -11,6 +11,8 @@ export interface GameStateData {
     locked_tiles: number[];
     switch_used_tiles: number[];
     effect_list?: EffectItem[];
+    goods?: GoodsItem[];
+    candidate_effect_list?: CandidateEffectRef[];
 }
 
 export interface BadgeAffix {
@@ -27,6 +29,18 @@ export interface EffectItem {
     store: string[];
     tags: string[];
     badge?: BadgeAffix;
+}
+
+export interface GoodsItem {
+    id: number;
+    goodsId: number;
+    price: number;
+    sold: boolean;
+}
+
+export interface CandidateEffectRef {
+    id: number;
+    badgeId: number;
 }
 
 export interface WsEnvelope<T = any> {

@@ -1,5 +1,6 @@
 import ctypes
 from ctypes import wintypes
+from typing import Optional, Tuple
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
@@ -8,6 +9,8 @@ HWND = wintypes.HWND
 LPARAM = wintypes.LPARAM
 BOOL = wintypes.BOOL
 LONG = wintypes.LONG
+UINT = wintypes.UINT
+DWORD = wintypes.DWORD
 
 
 class POINT(ctypes.Structure):
@@ -19,69 +22,89 @@ class RECT(ctypes.Structure):
 
 
 EnumWindows = user32.EnumWindows
+EnumWindows.argtypes = [ctypes.WINFUNCTYPE(BOOL, HWND, LPARAM), LPARAM]
+EnumWindows.restype = BOOL
 EnumWindowsProc = ctypes.WINFUNCTYPE(BOOL, HWND, LPARAM)
+
 GetWindowTextW = user32.GetWindowTextW
+GetWindowTextW.argtypes = [HWND, wintypes.LPWSTR, ctypes.c_int]
+GetWindowTextW.restype = ctypes.c_int
+
 GetWindowTextLengthW = user32.GetWindowTextLengthW
+GetWindowTextLengthW.argtypes = [HWND]
+GetWindowTextLengthW.restype = ctypes.c_int
+
 IsWindowVisible = user32.IsWindowVisible
+IsWindowVisible.argtypes = [HWND]
+IsWindowVisible.restype = BOOL
+
 GetClientRect = user32.GetClientRect
+GetClientRect.argtypes = [HWND, ctypes.POINTER(RECT)]
+GetClientRect.restype = BOOL
+
 ClientToScreen = user32.ClientToScreen
+ClientToScreen.argtypes = [HWND, ctypes.POINTER(POINT)]
+ClientToScreen.restype = BOOL
 
 GetForegroundWindow = user32.GetForegroundWindow
-SetForegroundWindow = user32.SetForegroundWindow
-SetActiveWindow = user32.SetActiveWindow
+GetForegroundWindow.argtypes = []
+GetForegroundWindow.restype = HWND
+
 ShowWindow = user32.ShowWindow
-SetWindowPos = user32.SetWindowPos
-AttachThreadInput = user32.AttachThreadInput
-GetWindowThreadProcessId = user32.GetWindowThreadProcessId
-GetCurrentThreadId = kernel32.GetCurrentThreadId
-BringWindowToTop = user32.BringWindowToTop
-keybd_event = user32.keybd_event
+ShowWindow.argtypes = [HWND, ctypes.c_int]
+ShowWindow.restype = BOOL
+
+SetForegroundWindow = user32.SetForegroundWindow
+SetForegroundWindow.argtypes = [HWND]
+SetForegroundWindow.restype = BOOL
+
+AllowSetForegroundWindow = user32.AllowSetForegroundWindow
+AllowSetForegroundWindow.argtypes = [DWORD]
+AllowSetForegroundWindow.restype = BOOL
 
 SW_RESTORE = 9
-SW_SHOW = 5
-HWND_TOPMOST = -1
-HWND_NOTOPMOST = -2
-SWP_NOSIZE = 0x0001
-SWP_NOMOVE = 0x0002
-SWP_SHOWWINDOW = 0x0040
-VK_MENU = 0x12  # Alt
+ASFW_ANY = 0xFFFFFFFF
 
 
 def _get_title(hwnd: int) -> str:
-    length = GetWindowTextLengthW(hwnd)
+    length = GetWindowTextLengthW(HWND(hwnd))
     if length <= 0:
         return ""
     buf = ctypes.create_unicode_buffer(length + 1)
-    GetWindowTextW(hwnd, buf, length + 1)
+    GetWindowTextW(HWND(hwnd), buf, length + 1)
     return buf.value
 
 
-def find_window_by_keyword(keyword: str):
+def find_window_by_keyword(keyword: str) -> Tuple[Optional[int], str]:
     result = {"hwnd": None, "title": ""}
     kw = (keyword or "").lower()
 
+    @EnumWindowsProc
     def _enum_proc(hwnd, _lparam):
-        if not IsWindowVisible(hwnd):
+        try:
+            if not IsWindowVisible(hwnd):
+                return True
+            title = _get_title(hwnd)
+            if not title:
+                return True
+            if kw in title.lower():
+                result["hwnd"] = int(hwnd)
+                result["title"] = title
+                return False  # stop
             return True
-        title = _get_title(hwnd)
-        if not title:
+        except Exception:
             return True
-        if kw in title.lower():
-            result["hwnd"] = hwnd
-            result["title"] = title
-            return False  # stop enum
-        return True
 
-    EnumWindows(EnumWindowsProc(_enum_proc), 0)
+    EnumWindows(_enum_proc, 0)
     return result["hwnd"], result["title"]
 
 
-def get_client_rect_screen(hwnd: int):
+def get_client_rect_screen(hwnd: int) -> Optional[Tuple[int, int, int, int]]:
     rect = RECT()
-    if not GetClientRect(hwnd, ctypes.byref(rect)):
+    if not GetClientRect(HWND(hwnd), ctypes.byref(rect)):
         return None
     pt = POINT(0, 0)
-    if not ClientToScreen(hwnd, ctypes.byref(pt)):
+    if not ClientToScreen(HWND(hwnd), ctypes.byref(pt)):
         return None
     left = pt.x
     top = pt.y
@@ -90,55 +113,51 @@ def get_client_rect_screen(hwnd: int):
     return left, top, width, height
 
 
-def is_foreground(hwnd) -> bool:
-    return GetForegroundWindow() == hwnd
+def is_foreground(hwnd: int) -> bool:
+    return int(GetForegroundWindow() or 0) == int(hwnd)
 
 
-def _alt_nudge():
-    keybd_event(VK_MENU, 0, 0, 0)
-    keybd_event(VK_MENU, 0, 2, 0)
+_last_focus = {"ts": 0.0, "hwnd": 0}
 
 
-def ensure_focus(hwnd: int, viewport=None, click_fallback: bool = False) -> bool:
-    ShowWindow(hwnd, SW_RESTORE)
-    ShowWindow(hwnd, SW_SHOW)
-    _alt_nudge()
-
-    cur_tid = GetCurrentThreadId()
-    tgt_tid = GetWindowThreadProcessId(hwnd, None)
-    attached = AttachThreadInput(cur_tid, tgt_tid, True)
-    try:
-        BringWindowToTop(hwnd)
-        SetForegroundWindow(hwnd)
-        SetActiveWindow(hwnd)
-    finally:
-        if attached:
-            AttachThreadInput(cur_tid, tgt_tid, False)
-
-    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
-    SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+def ensure_focus(hwnd: int, *, min_interval_sec: float = 1.2, restore_before=True) -> bool:
+    import time as _t
+    if not hwnd:
+        return False
 
     if is_foreground(hwnd):
         return True
 
-    if click_fallback and viewport:
+    now = _t.time()
+    if _last_focus["hwnd"] == hwnd and (now - _last_focus["ts"] < min_interval_sec):
+        return False
+
+    if restore_before:
         try:
-            import pyautogui, time as _t
-            left, top, w, h = viewport
-            pyautogui.moveTo(left + 10, top + 10, duration=0)
-            pyautogui.mouseDown()
-            pyautogui.mouseUp()
-            _t.sleep(0.02)
+            ShowWindow(HWND(hwnd), SW_RESTORE)
         except Exception:
             pass
-        _alt_nudge()
-        BringWindowToTop(hwnd)
-        SetForegroundWindow(hwnd)
-        SetActiveWindow(hwnd)
 
-    return is_foreground(hwnd)
+    try:
+        AllowSetForegroundWindow(ASFW_ANY)
+    except Exception:
+        pass
+
+    ok = bool(SetForegroundWindow(HWND(hwnd)))
+
+    if ok and is_foreground(hwnd):
+        _last_focus["hwnd"] = hwnd
+        _last_focus["ts"] = _t.time()
+        return True
+
+    _t.sleep(0.03)
+    if is_foreground(hwnd):
+        _last_focus["hwnd"] = hwnd
+        _last_focus["ts"] = _t.time()
+        return True
+
+    return False
 
 
 def focus_window(hwnd: int, viewport=None) -> bool:
-    """便捷包装：带兜底点击"""
-    return ensure_focus(hwnd, viewport=viewport, click_fallback=True)
+    return ensure_focus(hwnd)

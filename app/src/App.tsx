@@ -6,23 +6,18 @@ import AutoRunnerPage from "./pages/AutoRunnerPage";
 import FusePage from "./pages/FusePage";
 import AboutPage from "./pages/AboutPage";
 import {ws} from "./lib/ws";
-import {useLogStore, type LogLevel} from "./lib/logStore";
+import {type LogLevel, useLogStore} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
 import WallStats from "./components/WallStats";
 import ReplacementPanel from "./components/ReplacementPanel";
-import AdvisorPanel, {type ChiitoiData} from "./components/AdvisorPanel";
+import AdvisorPanel, {type PlanData} from "./components/AdvisorPanel";
 import AmuletBar from "./components/AmuletBar";
-import {type EffectItem} from "./lib/gamestate";
-import { installWsToastBridge, useGlobalToast } from "./lib/toast";
+import {buildCells, CandidateEffectRef, type Cell, type EffectItem, type GameStateData, type GoodsItem, toDeckMap, type WsEnvelope} from "./lib/gamestate";
+import {installWsToastBridge, useGlobalToast} from "./lib/toast";
+import {AutoRunnerStatus, setAutoStatus} from "./lib/autoRunnerStore";
+import GoodsBar from "./components/GoodsBar";
+import CandidateBar from "./components/CandidateBar";
 import "./App.css";
-
-import {
-    type GameStateData,
-    type WsEnvelope,
-    toDeckMap,
-    buildCells,
-    type Cell,
-} from "./lib/gamestate";
 
 type Route = "home" | "fuse" | "autorun" | "settings" | "diagnostics" | "about";
 
@@ -31,7 +26,7 @@ const SIDEBAR_WIDTH = 320;
 const MAIN_GAP = 12;
 
 export default function App() {
-    const { toast, visible: toastVisible } = useGlobalToast();
+    const {toast, visible: toastVisible} = useGlobalToast();
     const [route, setRoute] = React.useState<Route>("home");
     const [connected, setConnected] = React.useState(false);
 
@@ -47,9 +42,15 @@ export default function App() {
     const [replacementTiles, setReplacementTiles] = React.useState<string[]>([]);
     const [switchUsedCount, setSwitchUsedCount] = React.useState<number>(0);
 
-    const [speedData, setSpeedData] = React.useState<ChiitoiData | null>(null);
-    const [countData, setCountData] = React.useState<ChiitoiData | null>(null);
+    const [deckMap, setDeckMap] = React.useState<Map<number, string>>(new Map());
+
+    const [planSuuAnkou, setPlanSuuAnkou] = React.useState<PlanData | null>(null);
+    const [planChiitoi, setPlanChiitoi] = React.useState<PlanData | null>(null);
+
     const [amulets, setAmulets] = React.useState<EffectItem[]>([]);
+
+    const [goods, setGoods] = React.useState<GoodsItem[]>([]);
+    const [candidates, setCandidates] = React.useState<CandidateEffectRef[]>([]);
 
     React.useEffect(() => {
         ws.connect();
@@ -62,7 +63,7 @@ export default function App() {
             if (pkt.type === "update_gamestate") {
                 const d = pkt.data as GameStateData;
                 const deck = toDeckMap(d.deck_map);
-
+                setDeckMap(deck);
                 const list = buildCells(deck, d.locked_tiles ?? [], d.wall_tiles ?? [], 36);
                 setCells(list);
                 setStage(d.stage ?? 0);
@@ -85,14 +86,21 @@ export default function App() {
                     : [];
                 setWallStatsTiles(wallList);
 
-                setSpeedData(null);
-                setCountData(null);
+                setPlanSuuAnkou(null);
+                setPlanChiitoi(null);
 
                 setAmulets(Array.isArray(d.effect_list) ? d.effect_list : []);
-            } else if (pkt.type === "chiitoi_recommendation" && pkt.data) {
-                const data = pkt.data as ChiitoiData;
-                if (data.policy === "speed") setSpeedData(data);
-                if (data.policy === "count") setCountData(data);
+                setGoods(d.goods ?? []);
+                setCandidates(d.candidate_effect_list ?? []);
+            } else if (pkt.type === "discard_recommendation" && pkt.data) {
+                const arr = Array.isArray(pkt.data) ? pkt.data as Array<{ yaku: string; data: PlanData }> : [];
+                for (const item of arr) {
+                    if (!item || !item.yaku) continue;
+                    if (item.yaku === "chiitoi") setPlanChiitoi(item.data ?? null);
+                    else if (item.yaku === "suuannkou") setPlanSuuAnkou(item.data ?? null);
+                }
+            } else if (pkt.type === "autorun_status" && pkt.data) {
+                setAutoStatus(pkt.data as AutoRunnerStatus);
             }
         });
 
@@ -102,7 +110,7 @@ export default function App() {
             const sub = async (event: string, level: LogLevel = "INFO") => {
                 const un = await listen<string>(event, (e) => {
                     const payload =
-                        typeof e.payload === "string" ? e.payload : JSON.stringify(e.payload);
+                        e.payload;
                     addLog(level, `${event}: ${payload}`);
                 });
                 unsubs.push(un);
@@ -198,13 +206,19 @@ export default function App() {
                         style={{
                             display: "flex",
                             alignItems: "stretch",
-                            gap: 12,
+                            gap: MAIN_GAP,
                             height: "100%",
                         }}
                     >
-                        <div style={{width: 320, flex: "0 0 auto"}}>
-                            <AdvisorPanel speed={speedData} count={countData}/>
-                        </div>
+                        {(stage === 2 || stage === 3) ? (
+                            <div style={{width: SIDEBAR_WIDTH, flex: "0 0 auto"}}>
+                                <AdvisorPanel
+                                    suuAnkou={planSuuAnkou}
+                                    chiitoi={planChiitoi}
+                                    resolveFace={(id) => deckMap.get(id) ?? null}
+                                />
+                            </div>
+                        ) : null}
 
                         <div style={{flex: 1, minWidth: 0, position: "relative"}}>
                             <div
@@ -220,7 +234,39 @@ export default function App() {
                                 <AmuletBar items={amulets} scale={0.55}/>
                             </div>
 
-                            <TileGrid cells={cells}/>
+                            {(stage === 4 || stage === 5) ? (
+                                <div
+                                    style={{
+                                        border: "1px solid var(--border, #ddd)",
+                                        borderRadius: 12,
+                                        background: "#fff",
+                                        padding: 8,
+                                        marginBottom: 12,
+                                    }}
+                                >
+                                    <div style={{fontWeight: 600, marginBottom: 6}}>商品</div>
+                                    <GoodsBar items={goods} scale={0.85}/>
+                                </div>
+                            ) : null}
+
+                            {[1, 5, 7].includes(stage) && (
+                                <div
+                                    style={{
+                                        border: "1px solid var(--border, #ddd)",
+                                        borderRadius: 12,
+                                        background: "#fff",
+                                        padding: 8,
+                                        marginBottom: 12,
+                                    }}
+                                >
+                                    <div style={{fontWeight: 600, marginBottom: 6}}>候选护身符</div>
+                                    <CandidateBar candidates={candidates} scale={0.55}/>
+                                </div>
+                            )}
+
+                            {(stage === 2 || stage === 3) ? (
+                                <TileGrid cells={cells}/>
+                            ) : null}
 
                             {stage === 2 && replacementTiles.length > 0 && (
                                 <ReplacementPanel
@@ -242,7 +288,7 @@ export default function App() {
                                     padding: "8px 12px",
                                     display: "flex",
                                     alignItems: "center",
-                                    gap: 12,
+                                    gap: MAIN_GAP,
                                     zIndex: 60,
                                 }}
                             >
@@ -260,7 +306,11 @@ export default function App() {
                             </div>
                         </div>
 
-                        <div style={{flex: "0 0 auto", width: "auto", marginRight: 0,}}><WallStats wallTiles={wallStatsTiles}/></div>
+                        {(stage === 2 || stage === 3) ? (
+                            <div style={{flex: "0 0 auto", width: "auto", marginRight: 0}}>
+                                <WallStats wallTiles={wallStatsTiles}/>
+                            </div>
+                        ) : null}
                     </div>
                 )}
 

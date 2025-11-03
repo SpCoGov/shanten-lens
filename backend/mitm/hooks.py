@@ -2,16 +2,17 @@ import asyncio
 import ctypes
 import platform
 from collections import OrderedDict
-from typing import Tuple, Any, Dict, List, Set, Iterable, Optional
+from typing import Tuple, Any, Dict, List, Set, Iterable, Optional, Union
 
 from loguru import logger
 from mitmproxy import ctx
 
+import backend.app
 import backend.mitm.addon as _addon
 from backend.app import AMULET_REG, BADGE_REG, pipeline
 from backend.app import MANAGER, GAME_STATE, broadcast
 from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
-from backend.bot.logic.chiitoi_recommender import chiitoi_recommendation_json
+from backend.autorun.util.chiitoi_recommender import chiitoi_recommendation_json
 
 ID_KAVI = 230
 BADGE_LIFE = 600100
@@ -225,6 +226,8 @@ def _must_pick_guard(selected_raw_id: int) -> tuple[bool, bool, str]:
 
 
 def on_outbound(view: Dict) -> Tuple[str, Any]:
+    if backend.app.AUTORUNNER.running:
+        return "pass", None
     try:
         if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivitySelectPack":
             data = view.get("data") or {}
@@ -245,25 +248,20 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
 
         if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityUpgrade":
             cfg = MANAGER.to_table_payload("fuse") or {}
+            ef = _effects()
             if bool(cfg.get("enable_prestart_kavi_guard", True)):
-                ef = _effects()
                 has_kavi = any(_base(e.get("id")) == ID_KAVI and _bid(e) == BADGE_CONDUCTION for e in ef)
-                if not has_kavi: return "pass", None
-
-                min_cnt = int(cfg.get("conduction_min_count", 3))
-                cnt = sum(1 for e in ef if _bid(e) == BADGE_CONDUCTION)
-                if cnt < min_cnt: return "pass", None
-
-                nb = _neighbors_of_kavi()
-                if nb["kavi_index"] < 0: return "pass", None
-                left, right = nb["left"], nb["right"]
-                if (left is not None and _bid(left) == 0) or (right is not None and _bid(right) == 0):
-                    return "pass", None
-
-                msg = _build_kavi_msg(_plus(nb["kavi_raw_id"]), min_cnt, cnt, left, right)
-                return ("pass", None) if _confirm("熔断确认：确认开局？", msg) else ("drop", None)
+                if has_kavi:
+                    min_cnt = int(cfg.get("conduction_min_count", 3))
+                    cnt = sum(1 for e in ef if _bid(e) == BADGE_CONDUCTION)
+                    if cnt >= min_cnt:
+                        nb = _neighbors_of_kavi()
+                        if nb["kavi_index"] >= 0:
+                            left, right = nb["left"], nb["right"]
+                            if not ((left is not None and _bid(left) == 0) or (right is not None and _bid(right) == 0)):
+                                msg = _build_kavi_msg(_plus(nb["kavi_raw_id"]), min_cnt, cnt, left, right)
+                                return ("pass", None) if _confirm("熔断确认：确认开局？", msg) else ("drop", None)
             if bool(cfg.get("enable_kavi_plus_buffer_guard", True)):
-                ef = _effects()
                 # 找到卡维 Plus
                 try:
                     k_idx = next((i for i, e in enumerate(ef) if _base(e.get("id")) == ID_KAVI and _plus(e.get("id"))), -1)
@@ -417,6 +415,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             GAME_STATE.update_record(record)
             if hands and pool:
                 GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, push_gamestate=False)
+                new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, GAME_STATE.effect_list)
+                GAME_STATE.update_wall(new_wall)
                 desktop_remain = round_info.get("desktopRemain", {}).get("value", 0)
                 level = value_changes.get("game", {}).get("level", {}).get("value", 0)
                 # 进入换牌阶段
@@ -439,8 +439,18 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
                     for tile in GAME_STATE.locked_tiles:
                         show_desktop_tiles.append({"id": tile, "pos": pos})
                         pos -= 1
+                    if has_amulet_221(GAME_STATE.effect_list):
+                        event_3 = next((e for e in events if e.get("type") == 3), None)
+                        if event_3:
+                            show_desktop_tiles_list = [
+                                event_3.get("valueChanges", {}).get("round", {}).get("showDesktopTiles", {}).get("value", []),
+                                next(iter(event_3.get("effectedHooks", []))).get("result", {}).get("modifyChangeDesktop", {}).get("showDesktopTiles", [])
+                            ]
+                            for tile_list in show_desktop_tiles_list:
+                                tile_list.clear()
+                                for tile in show_desktop_tiles:
+                                    tile_list.append(tile)
                     modify = True
-                    logger.info(f"public all modified: {data}")
         matched = next((e for e in events if e.get("type") == 48), None)
         if matched:
             value_changes = matched.get("valueChanges", {})
@@ -497,14 +507,6 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
 
             GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, effect_list=effect_list, ting_list=ting_list, next_operation=next_operation, reason=".lq.Lobby.amuletActivityOperate:6")
 
-            json = chiitoi_recommendation_json(deck_map=GAME_STATE.deck_map,
-                                               hand_ids=GAME_STATE.hand_tiles,
-                                               wall_ids=GAME_STATE.wall_tiles,
-                                               policy="speed")
-            loop = asyncio.get_running_loop()
-            loop.create_task(broadcast(json))
-            suuannkou = plan_pure_pinzu_suu_ankou_v2(GAME_STATE.hand_tiles, GAME_STATE.wall_tiles, GAME_STATE.deck_map)
-
             def ids_to_tiles(id_list: List[int], deck_map: "OrderedDict[int, str]") -> List[str]:
                 """
                 把 [id] 按顺序转换成 [tile]（不做任何规范化，0p 仍是 '0p'）
@@ -514,51 +516,52 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
                 except KeyError as e:
                     raise ValueError(f"deck_map 缺少 id={e.args[0]} 的映射") from None
 
-            if suuannkou["status"] == "plan":
-                logger.info(f"discards: {ids_to_tiles(suuannkou['discards'], GAME_STATE.deck_map)})")
+            chiitoi = chiitoi_recommendation_json(GAME_STATE.deck_map, GAME_STATE.hand_tiles, GAME_STATE.wall_tiles)
+            suuannkou = plan_pure_pinzu_suu_ankou_v2(GAME_STATE.hand_tiles, GAME_STATE.wall_tiles, GAME_STATE.deck_map)
 
-            json = chiitoi_recommendation_json(deck_map=GAME_STATE.deck_map,
-                                               hand_ids=GAME_STATE.hand_tiles,
-                                               wall_ids=GAME_STATE.wall_tiles,
-                                               policy="count")
             loop = asyncio.get_running_loop()
-            loop.create_task(broadcast(json))
+            loop.create_task(broadcast(chiitoi))
 
-            if not json.get("data", {}).get("win_now", False):
-                if MANAGER.get("game.auto_discard"):
-                    discard_id = int(json["data"]["discard_id"])
-                    loop = asyncio.get_running_loop()
+            def _current_discard(plan: dict) -> int | None:
+                if not isinstance(plan, dict):
+                    return None
+                if plan.get("status") != "plan":
+                    return None
+                d = plan.get("discards") or []
+                return int(d[0]) if d else None
 
-                    def _do():
-                        pipeline.click_discard_by_tile_id(
-                            tile_id=discard_id,
-                            hand_ids_with_draw=GAME_STATE.hand_tiles,
-                            id2label=GAME_STATE.deck_map,
-                            allow_tsumogiri=True
-                        )
+            def _wrap_entry(yaku_key: str, plan: dict) -> dict:
+                entry = {
+                    "status": plan.get("status"),
+                    "draws_needed": plan.get("draws_needed"),
+                    "target14": plan.get("target14") or [],
+                    "discards": plan.get("discards") or [],
+                }
+                # 可选字段（仅存在时写入）
+                if "pair_hint" in plan: entry["pair_hint"] = plan["pair_hint"]
+                if "mode" in plan: entry["mode"] = plan["mode"]
+                if "reason" in plan: entry["reason"] = plan["reason"]
+                # 附带当前一步要打的牌（方便前端直接取）
+                cur = _current_discard(plan)
+                if cur is not None:
+                    entry["discard"] = cur
+                return {"yaku": yaku_key, "data": entry}
 
-                    loop.call_later(1, _do)
-                    # peer_key = None
-                    # addon_now = _addon.WS_ADDON_INSTANCE
-                    # if addon_now and addon_now._last_flow:
-                    #     f = addon_now._last_flow
-                    #     peer_key = f"{f.client_conn.address[0]}|{f.server_conn.address[0]}"
-                    #
-                    # def _do_inject():
-                    #     addon = _addon.WS_ADDON_INSTANCE
-                    #     if not addon:
-                    #         logger.warning("WS_ADDON_INSTANCE not ready; skip inject")
-                    #         return
-                    #     ok, reason = addon.inject_now(
-                    #         method=".lq.Lobby.amuletActivityOperate",
-                    #         data={"activityId": 250811, "type": 1, "tileList": [discard_id]},
-                    #         t="Req",
-                    #         peer_key=peer_key,
-                    #     )
-                    #     logger.info(f"success: {ok}, reason: {reason}")
-                    #
-                    # ctx.master.event_loop.call_later(0.3, _do_inject)
-            else:
+            payload = {
+                "type": "discard_recommendation",
+                "data": [
+                    _wrap_entry("chiitoi", chiitoi),
+                    _wrap_entry("suuannkou", suuannkou),
+                ],
+            }
+
+            # 广播一次即可
+            loop = asyncio.get_running_loop()
+            loop.create_task(broadcast(payload))
+
+            win_entries = [e for e in payload["data"] if e["data"].get("status") == "win_now"]
+
+            if win_entries:
                 if MANAGER.get("game.auto_tsumo"):
                     peer_key = None
                     addon_now = _addon.WS_ADDON_INSTANCE
@@ -571,7 +574,7 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
                         if not addon:
                             logger.warning("WS_ADDON_INSTANCE not ready; skip inject")
                             return
-                        ok, reason = addon.inject_now(
+                        ok, reason, _ = addon.inject_now(
                             method=".lq.Lobby.amuletActivityOperate",
                             data={"activityId": 250811, "type": 8, "tileList": []},
                             t="Req",
@@ -580,6 +583,29 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
                         logger.info(f"success: {ok}, reason: {reason}")
 
                     ctx.master.event_loop.call_later(0.3, _do_inject)
+
+            else:
+                if MANAGER.get("game.auto_discard"):
+                    plan_candidates = [
+                        e for e in payload["data"]
+                        if e["data"].get("status") == "plan" and isinstance(e["data"].get("discards"), list) and e["data"]["discards"]
+                    ]
+                    if plan_candidates:
+                        plan_candidates.sort(
+                            key=lambda e: (e["data"].get("draws_needed") if e["data"].get("draws_needed") is not None else 10 ** 9)
+                        )
+                        best = plan_candidates[0]
+                        discard_id = int(best["data"]["discards"][0])
+
+                        def _do():
+                            pipeline.click_discard_by_tile_id(
+                                tile_id=discard_id,
+                                hand_ids_with_draw=GAME_STATE.hand_tiles,
+                                id2label=GAME_STATE.deck_map,
+                                allow_tsumogiri=True
+                            )
+
+                        loop.call_later(1, _do)
         coin_event = next((e for e in events if e.get("type") == 11), None)
         if coin_event:
             value_changes = coin_event.get("valueChanges", {})
@@ -638,9 +664,13 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             GAME_STATE.update_record(record)
             if desktop_remain < 36:
                 GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, boss_buff=boss_buff, push_gamestate=False)
+                new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, effect_list)
+                GAME_STATE.update_wall(new_wall)
                 GAME_STATE.refresh_wall_by_remaning()
             else:
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, boss_buff=boss_buff, push_gamestate=False)
+                new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, effect_list)
+                GAME_STATE.update_wall(new_wall)
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, boss_buff=boss_buff, push_gamestate=True)
             error_number_test = MANAGER.get("general.error_code_test")
             if error_number_test != 0:
                 return "modify", dict({"error": {"code": error_number_test, "u32Params": [], "strParams": [], "jsonParam": ""}})
@@ -776,3 +806,42 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             GAME_STATE.update_record(record)
             GAME_STATE.update_other_info(coin=coin, reason=".lq.Lobby.amuletActivityUpgradeShopBuff:21")
     return "pass", None
+
+
+def has_amulet_221(effects: List[Dict[str, Any]]) -> bool:
+    for e in effects or []:
+        try:
+            eid = int(e.get("id", -1))
+        except Exception:
+            continue
+        if eid // 10 == 221:
+            return True
+    return False
+
+
+def reorder_wall_tiles_by_amulet221(
+        deck_map: Union[Dict[int, str], List[Dict[str, Any]]],
+        wall_tiles: List[int],
+        effect_list: List[Dict[str, Any]],
+) -> List[int]:
+    if not has_amulet_221(effect_list):
+        return list(wall_tiles)
+    if isinstance(deck_map, dict):
+        id2tile: Dict[int, str] = deck_map
+    else:
+        id2tile = {int(x["id"]): str(x["tile"]) for x in deck_map}
+
+    suit_order_digits = ["1", "2", "3", "4", "0", "5", "6", "7", "8", "9"]
+    order = []
+    for s in ("m", "p", "s"):
+        order += [d + s for d in suit_order_digits]
+    order += [str(d) + "z" for d in range(1, 8)]
+
+    rank = {t: i for i, t in enumerate(order)}
+    original_index = {tid: i for i, tid in enumerate(wall_tiles)}
+
+    def sort_key(tid: int):
+        tile = id2tile.get(tid, "")
+        return rank.get(tile, len(order)), original_index[tid]
+
+    return sorted(wall_tiles, key=sort_key)

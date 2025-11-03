@@ -6,8 +6,8 @@ import socket
 import ssl
 import time
 import traceback
-from typing import Any, Dict, List, Optional, Tuple
 from email.mime.text import MIMEText
+from typing import Any, Dict, List, Optional, Tuple
 
 from backend.autorun.util.retry_1004 import call_with_1004_retry_async
 from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
@@ -392,7 +392,6 @@ class AutoRunner:
         self._last_probe_resp = resp
 
         await self._recompute_ready_flags_from_last_probe()
-        logger.info(f"ok: {ok}, reason: {reason}, resp: {resp}")
         if push:
             await self._broadcast_status(safe=True)
         return ok, reason, resp
@@ -459,11 +458,13 @@ class AutoRunner:
 
             self.update_config(self._get_config())
             self.running = True
+            self.elapsed_ms = 0
             self.started_at = _now_wall_ms()
             self._started_mono_ms = _now_mono_ms()
             self.current_step = "init"
             self.last_error = None
             self.runs = 0
+            self.best_achieved_count = 0
 
             self.need_start_game = True
 
@@ -726,7 +727,6 @@ class AutoRunner:
             if game_state.stage == 4:
                 self.current_step = "game.buy_pack"
                 await self._broadcast_status(safe=True)
-                logger.debug(game_state.goods)
                 candidates = [g for g in game_state.goods if not g.get("sold", False)]
                 if not candidates:
                     if game_state.refresh_price > game_state.coin:
@@ -763,7 +763,6 @@ class AutoRunner:
                         return
                     self.current_step = "game.refresh_shop"
                     await self._broadcast_status(safe=True)
-                    logger.debug(f"refreshed shopping: cost {game_state.refresh_price}")
                     ok, reason, resp = await call_with_1004_retry_async(
                         bot.refresh_shop,
                         delay_sec=3,
@@ -907,11 +906,13 @@ class AutoRunner:
                 )
                 if ok:
                     return
+                if reason == "error code: 2691":
+                    bot.fetch_amulet_activity_data()
+                    return
                 self.last_error = reason
                 await self.abort(f"fatal: {reason}")
                 return
             if game_state.stage == 5 or game_state.stage == 7:
-                logger.debug(f"goods: {game_state.goods}")
                 if game_state.stage == 5:
                     self.current_step = "game.select_effect"
                 else:
@@ -972,11 +973,15 @@ class AutoRunner:
                                 )
                                 if ok:
                                     return
+                                if reason == "error code: 2699":
+                                    bot.fetch_amulet_activity_data()
+                                    return
                                 self.last_error = reason
                                 await self.abort(f"fatal: {reason}")
                             return
                         return
                     if reason == "error code: 2691":
+                        bot.fetch_amulet_activity_data()
                         return
                     self.last_error = reason
                     await self.abort(f"fatal: {reason}")
@@ -990,7 +995,6 @@ class AutoRunner:
                         need_space=need_space,
                         sell_candidates=sell_list,
                     )
-                    logger.debug(f"need_space: {need_space}, free_space: {free_space}, to_sell: {to_sell}, freed: {freed}, enough: {enough}')")
                     if enough:
                         for it in to_sell:
                             uid = it.get("uid")
@@ -1012,7 +1016,6 @@ class AutoRunner:
                             await self.abort(f"fatal: {reason}")
                             return
                     else:
-                        logger.debug(f"not enough space to buy 0: max: {game_state.max_effect_volume}, used: {used_space}, free: {free_space}")
                         self.current_step = "game.skip_buy_insufficient_space0"
                         await self._broadcast_status(safe=True)
                         if game_state.stage == 5:
@@ -1099,7 +1102,6 @@ class AutoRunner:
         has_live_game = (resp or {}).get("data", {}).get("game") is not None
         await self._recompute_ready_flags_from_last_probe()
         pf_ready, pf_peer = self._preferred_flow_status()
-        logger.debug(f"pf_ready: {pf_ready}, pf_peer: {pf_peer}")
         return {
             "mode": self.mode,
             "running": self.running,
@@ -1211,7 +1213,14 @@ class AutoRunner:
         for item in eff_list:
             for idx in self.match_targets_for_amulet(item, self.targets):
                 hit.add(idx)
-        return len(hit)
+        total_value = 0
+        for idx in hit:
+            try:
+                t = self.targets[idx]
+            except Exception:
+                continue
+            total_value += _target_value(t)
+        return total_value
 
     async def _check_and_finish_if_done(self) -> bool:
         try:
@@ -1310,6 +1319,14 @@ class AutoRunner:
         return new_uids
 
 
+def _target_value(t: Dict[str, Any]) -> int:
+    try:
+        v = int(t.get("value", 1))
+        return max(0, v)
+    except Exception:
+        return 1
+
+
 def _reg_id_of_raw(raw_id: int) -> int:
     return int(raw_id) // 10
 
@@ -1400,20 +1417,12 @@ def _find_owned_uid_for_reg(effect_list: List[Dict[str, Any]], reg_id: int) -> O
 
 
 def _owned_effect_value_for_selling(e: Dict[str, Any], targets: List[Dict[str, Any]]) -> int:
-    """
-    给“背包里的一件护身符”打一个售卖优先级用的价值分，分越高越不该被卖。
-    - 命中任何目标 => 极大分，绝不卖
-    - 指引(600070) => 很高分，尽量不卖
-    - 幸福(600110) => 较高分
-    - 特殊：reg==146 => 很高分（你的诉求）
-    - 其余：基础=稀有度*3，若带600050再x3
-    """
     if _is_needed_for_any_target(e, targets):
         return 10 ** 9  # 目标需要，绝不卖
 
     reg_id, is_plus, bid = _extract_amulet_signature(e)
 
-    # 基础价值（和 _candidate_value 同口径）
+    # 基础价值
     base = 0
     try:
         amulet_reg = app_mod.AMULET_REG

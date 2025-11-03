@@ -50,13 +50,6 @@
     border-radius: 999px;
 }
 
-.cardBody {
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
 .cardBodyMuted {
     padding: 12px;
     color: #6b7280;
@@ -87,130 +80,107 @@
     margin-left: 6px;
 }
 
-.grid2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-.metric {
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 10px;
-}
-
-.metricLabel {
-    font-size: 12px;
-    color: #6b7280;
-}
-
-.metricValue {
-    font-size: 18px;
-    font-weight: 600;
-}
-
-.ukeBox {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.tableWrap {
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    overflow: hidden;
-    max-height: 180px;
-}
-
-.tableHead {
-    display: grid;
-    grid-template-columns: 1fr 60px 60px;
-    gap: 8px;
-    padding: 6px 10px;
-    background: #f8fafc;
-    font-size: 12px;
-    color: #6b7280;
-}
-
-.tableBody {
-    max-height: 150px;
-    overflow: auto;
-}
-
-.tableRow {
-    display: grid;
-    grid-template-columns: 1fr 60px 60px;
-    gap: 8px;
-    padding: 6px 10px;
-    border-top: 1px solid #f1f5f9;
-    font-size: 13px;
-    align-items: center;
-}
-
-.center {
-    text-align: center;
-}
-
-.right {
-    text-align: right;
-}
-
-.legend {
-    display: flex;
-    gap: 8px;
-    font-size: 12px;
-    color: #6b7280;
-    padding: 0 4px;
-}
-
-.info {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border-radius: 999px;
-    background: #e5e7eb;
-    color: #111827;
-    font-weight: 700;
-}
-
-/* 牌容器：去掉背景/阴影/边框；圆角单独控制 */
 .tileReset :global(*) {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
 }
 
-/* 恢复圆角：大牌 */
 .tileRound :global(img), .tileRound :global(canvas), .tileRound :global(svg), .tileRound :global(div) {
     border-radius: 8px !important;
-}
-
-/* 小牌尺寸 + 圆角 */
-.tileSmall :global(img), .tileSmall :global(canvas), .tileSmall :global(svg), .tileSmall :global(div) {
-    max-width: 22px;
-    max-height: 28px;
-}
-
-.tileRoundSm :global(img), .tileRoundSm :global(canvas), .tileRoundSm :global(svg), .tileRoundSm :global(div) {
-    border-radius: 6px !important;
 }
 
 .tilePill :global(img), .tilePill :global(canvas), .tilePill :global(svg), .tilePill :global(div) {
     max-height: 36px;
 }
 
-/* 可立刻和的提示块 */
-.winNow {
-    margin: 12px;
-    border: 1px solid #bbf7d0;
-    background: #ecfdf5;
-    color: #065f46;
-    border-radius: 10px;
-    padding: 10px;
+.band {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
 }
 
-.winNowTitle {
-    font-weight: 600;
+.bandLeft, .bandRight {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bandLabel, .bandActionLabel {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.bandValue {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: .3px;
+    color: #0f172a;
+    line-height: 1.05;
+}
+
+.vbar {
+    width: 1px;
+    height: 36px;
+    background: #e6e8ee;
+    justify-self: center;
+    border-radius: 1px;
+}
+
+.actionChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid #e6e8ee;
+    border-radius: 999px;
+    padding: 6px 10px 6px 6px;
+    background: #fff;
+}
+
+.actionChip:hover {
+    background: #fafbfc;
+}
+
+.chipText {
+    font-size: 12px;
+    color: #475569;
+}
+
+.chipDisabled {
+    opacity: .6;
+}
+
+.okBand {
+    display: block;
+    margin: 12px;
+    padding: 10px 12px;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    background: #ecfdf5;
+}
+
+.bandOkText {
+    color: #065f46;
+    font-weight: 700;
+    text-align: center;
+}
+
+.bandSingle {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+}
+
+.band {
+    align-items: start;
+}
+
+.bandLabel,
+.bandActionLabel {
+    margin: 0 0 2px 0;
+    line-height: 1.2;
 }

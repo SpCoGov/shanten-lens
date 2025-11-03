@@ -9,7 +9,7 @@ export default function AboutPage() {
             <div className={styles.meta}>
                 <span className={styles.author}>海绵couna</span>
                 <span className={styles.sep} aria-hidden>·</span>
-                <span className={styles.version}>v0.4.12</span>
+                <span className={styles.version}>v0.4.15</span>
                 <span className={styles.build}>(build&nbsp;1)</span>
             </div>
 

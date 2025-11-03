@@ -122,6 +122,9 @@ class GameState:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
+    def update_wall(self, wall_tiles: List[int]):
+        self.wall_tiles = wall_tiles.copy()
+
     def refresh_wall_by_remaning(self, push_gamestate: bool = True, reason: str = ""):
         temp = self.deck_map.copy()
         hand_tiles = self.hand_tiles.copy()
