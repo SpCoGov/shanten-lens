@@ -9,7 +9,7 @@ def plan_pure_pinzu_suu_ankou(
         deck_map: "OrderedDict[int, str]",
 ) -> Optional[Dict]:
     """
-    规划：只追求【纯饼四暗刻】，bd 仅可当作任意饼子；0p 视为 5p（但打 5p 时优先打 5p 而不是 0p）。
+    规划：只追求【纯饼四暗刻】，bd 仅可当作任意饼子；0p 视为 5p，打 5p 时优先打 5p 而不是 0p。
     若无法在未来摸牌内达成，返回 None。
     返回的 discards 是【要打出去的牌 id 列表】（从当前这一步开始，直到自摸前一手）。
     """
@@ -143,7 +143,7 @@ def plan_pure_pinzu_suu_ankou(
 
     def discard_score(tile_id: int, future_rest_ids: List[int]) -> Tuple[int, int, int, int]:
         f = face_of(tile_id)
-        # 1) 非饼 & 非 bd：最优先丢
+        # 非饼 & 非 bd：最优先丢
         if f != "bd" and not is_pinzu(f):
             return (0, 0, 0, tile_id)
 
@@ -173,7 +173,6 @@ def plan_pure_pinzu_suu_ankou(
         candidates = [x for x in set(cur_ids) if still_feasible_after_discard(x, future_rest)]
         if not candidates:
             # 理论上不会发生：因为整体是可行的
-            # 兜底：任意丢一张自然不影响到达（优先非饼/非bd）
             candidates = list(set(cur_ids))
 
         best = min(candidates, key=lambda t: discard_score(t, future_rest))
@@ -198,7 +197,7 @@ def plan_pure_pinzu_suu_ankou(
         discards.append(best)
         cur_ids.remove(best)
 
-    # 生成解释性的 target14（仅牌面，用于展示）
+    # 生成解释性的 target14
     target_face = []
     for d in range(1, 10):
         r = f"{d}p"
@@ -216,7 +215,7 @@ def plan_pure_pinzu_suu_ankou_v2(hand_tiles, future_draw_ids, deck_map):
     if base is None:
         return {
             "status": "impossible",  # 无论怎么摸都做不成“纯饼四暗刻”
-            "reason": "not-enough-pinzu-or-bd"  # 可选择写更具体的原因
+            "reason": "not-enough-pinzu-or-bd"
         }
     # base = {"draws_needed": k_found, "target14": [...], "discards": [...]}
     k = base["draws_needed"]

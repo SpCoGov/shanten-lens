@@ -359,54 +359,54 @@ class WsAddon:
                 pass
         return text
 
-    def request(self, flow: http.HTTPFlow):
-        # 记录最近的 flow，便于后续注入时拾取
-        peer_key = f"{flow.client_conn.address[0]}|{flow.request.host}"
-        self._flows[peer_key] = flow
-        self.last_flow = flow
-
-        if not backend.app.MANAGER.get("general.debug"):
-            return
-
-        try:
-            req = flow.request
-            headers = self._maybe_redact_headers(req.headers)
-            body_text = self._pretty_body(req.raw_content or b"", req.headers.get("content-type"))
-
-            logger.debug(
-                "== HTTP REQUEST BEGIN ==\n"
-                f"{self._short_addr(flow)}\n"
-                f"{req.method} {req.url}\n"
-                f"HTTP/{req.http_version}\n"
-                f"Headers: {json.dumps(headers, ensure_ascii=False)}\n"
-                f"Body({len(req.raw_content or b'')} bytes, shown up to {self._MAX_LOG_BODY}):\n"
-                f"{body_text}\n"
-                "== HTTP REQUEST END =="
-            )
-        except Exception as e:
-            logger.error(f"http request log failed: {e}")
-
-    # 打印 HTTP 响应
-    def response(self, flow: http.HTTPFlow):
-        if not backend.app.MANAGER.get("general.debug"):
-            return
-        try:
-            resp = flow.response
-            headers = self._maybe_redact_headers(resp.headers)
-            body_text = self._pretty_body(resp.raw_content or b"", resp.headers.get("content-type"))
-
-            logger.debug(
-                "== HTTP RESPONSE BEGIN ==\n"
-                f"{self._short_addr(flow)}\n"
-                f"HTTP/{resp.http_version} {resp.status_code} {resp.reason}\n"
-                f"From: {flow.request.method} {flow.request.url}\n"
-                f"Headers: {json.dumps(headers, ensure_ascii=False)}\n"
-                f"Body({len(resp.raw_content or b'')} bytes, shown up to {self._MAX_LOG_BODY}):\n"
-                f"{body_text}\n"
-                "== HTTP RESPONSE END =="
-            )
-        except Exception as e:
-            logger.error(f"http response log failed: {e}")
+    # def request(self, flow: http.HTTPFlow):
+    #     # 记录最近的 flow，便于后续注入时拾取
+    #     peer_key = f"{flow.client_conn.address[0]}|{flow.request.host}"
+    #     self._flows[peer_key] = flow
+    #     self.last_flow = flow
+    #
+    #     if not backend.app.MANAGER.get("general.debug"):
+    #         return
+    #
+    #     try:
+    #         req = flow.request
+    #         headers = self._maybe_redact_headers(req.headers)
+    #         body_text = self._pretty_body(req.raw_content or b"", req.headers.get("content-type"))
+    #
+    #         logger.debug(
+    #             "== HTTP REQUEST BEGIN ==\n"
+    #             f"{self._short_addr(flow)}\n"
+    #             f"{req.method} {req.url}\n"
+    #             f"HTTP/{req.http_version}\n"
+    #             f"Headers: {json.dumps(headers, ensure_ascii=False)}\n"
+    #             f"Body({len(req.raw_content or b'')} bytes, shown up to {self._MAX_LOG_BODY}):\n"
+    #             f"{body_text}\n"
+    #             "== HTTP REQUEST END =="
+    #         )
+    #     except Exception as e:
+    #         logger.error(f"http request log failed: {e}")
+    #
+    # # 打印 HTTP 响应
+    # def response(self, flow: http.HTTPFlow):
+    #     if not backend.app.MANAGER.get("general.debug"):
+    #         return
+    #     try:
+    #         resp = flow.response
+    #         headers = self._maybe_redact_headers(resp.headers)
+    #         body_text = self._pretty_body(resp.raw_content or b"", resp.headers.get("content-type"))
+    #
+    #         logger.debug(
+    #             "== HTTP RESPONSE BEGIN ==\n"
+    #             f"{self._short_addr(flow)}\n"
+    #             f"HTTP/{resp.http_version} {resp.status_code} {resp.reason}\n"
+    #             f"From: {flow.request.method} {flow.request.url}\n"
+    #             f"Headers: {json.dumps(headers, ensure_ascii=False)}\n"
+    #             f"Body({len(resp.raw_content or b'')} bytes, shown up to {self._MAX_LOG_BODY}):\n"
+    #             f"{body_text}\n"
+    #             "== HTTP RESPONSE END =="
+    #         )
+    #     except Exception as e:
+    #         logger.error(f"http response log failed: {e}")
 
 
 WS_ADDON_INSTANCE: Optional[WsAddon] = None

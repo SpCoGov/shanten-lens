@@ -2,114 +2,117 @@ import React from "react";
 import styles from "./AdvisorPanel.module.css";
 import Tile from "./Tile";
 
-export type ChiitoiData = {
-    policy: "speed" | "count";
-    applicable: boolean;
-    could_win_now: boolean;
-    sacrifice_for_count: boolean;
-    win_now: boolean;
-    discard_id: number | null;
-    discard_tile: string | null;
-    discard_tile_raw: string | null;
-    draws_needed: number | null;
-    uke_ire_total: number | null;
-    uke_detail: Record<string, number> | null;
+export type PlanData = {
+    status: "win_now" | "plan" | "impossible";
+    draws_needed?: number;
+    target14?: string[];
+    discards?: number[];
+    mode?: string;
+    reason?: string;
 };
 
 export default function AdvisorPanel({
-                                         speed,
-                                         count,
+                                         suuAnkou,
+                                         chiitoi,
+                                         resolveFace,
                                      }: {
-    speed: ChiitoiData | null;
-    count: ChiitoiData | null;
+    suuAnkou: PlanData | null;
+    chiitoi: PlanData | null;
+    resolveFace?: (id: number) => string | null;
 }) {
     return (
         <aside className={styles.wrap}>
-            <StrategyCard data={speed} variant="speed"/>
-            <StrategyCard data={count} variant="count"/>
-            <Legend/>
+            <StrategyCard title="四暗刻" data={suuAnkou} resolveFace={resolveFace} />
+            <StrategyCard title="七対子" data={chiitoi} resolveFace={resolveFace} />
         </aside>
     );
 }
 
 function StrategyCard({
+                          title,
                           data,
-                          variant,
+                          resolveFace,
+                          badge
                       }: {
-    data: ChiitoiData | null;
-    variant: "speed" | "count";
+    title: string;
+    data: PlanData | null;
+    resolveFace?: (id: number) => string | null;
+    badge?: string;
+    onlyShowImpossibleWhenMelded?: boolean;
 }) {
-    const header = variant === "speed" ? "速度优先" : "次数优先";
-    const badge = variant === "speed" ? "最快" : "受入最多";
-
     if (!data) {
         return (
             <section className={styles.card}>
                 <div className={styles.cardHead}>
-                    <h3>{header}</h3>
-                    <span className={styles.badgeMuted}>{badge}</span>
+                    <h3>{title}</h3>
+                    {badge && badge.trim() && <span className={styles.badgeMuted}>{badge}</span>}
                 </div>
                 <div className={styles.cardBodyMuted}>等待后端结果…</div>
             </section>
         );
     }
 
-    const canWinNow = data.applicable && data.win_now;
-    const showDiscard = data.applicable && !data.win_now && data.discard_id != null;
-    const showUke = variant === "count";
+    const isWinNow = data.status === "win_now";
+    const isPlan = data.status === "plan";
+    const isImpossible = data.status === "impossible";
+
+    const reasonLower = (data.reason || "").toLowerCase();
+    const isMenzenOnlyWord = isImpossible && reasonLower === "hand-must-be-14";
+
+    const firstDiscardId =
+        isPlan && data.discards && data.discards.length > 0 ? data.discards[0] : null;
+    const firstDiscardFace = firstDiscardId != null && resolveFace ? resolveFace(firstDiscardId) : null;
 
     return (
         <section className={styles.card}>
             <div className={styles.cardHead}>
-                <h3>{header}</h3>
-                <span className={variant === "speed" ? styles.badgeBlue : styles.badgeGreen}>{badge}</span>
+                <h3>{title}</h3>
+                {badge && badge.trim() && <span className={styles.badgeBlue}>{badge}</span>}
             </div>
 
-            {!data.applicable ? (
-                <div className={styles.cardBodyMuted}>当前不适用七对（需要门清）</div>
-            ) : canWinNow ? (
-                <div className={styles.winNow}>
-                    <div className={styles.winNowTitle}>当前可立刻和（七对）</div>
+            {isWinNow ? (
+                <div className={styles.okBand}>
+                    <div className={styles.bandOkText}>当前可立刻和</div>
+                </div>
+            ) : isImpossible ? (
+                <div className={styles.bandSingle}>
+                    <div className={styles.bandLabel}>还需摸</div>
+                    <div className={styles.bandValue}>{isMenzenOnlyWord ? "門前のみ" : "无解"}</div>
                 </div>
             ) : (
-                <div className={styles.cardBody}>
-                    {showDiscard ? (
-                        <div className={styles.rowBetween}>
-                            <div>
-                                <div className={styles.label}>
-                                    {variant === "count" && data.could_win_now
-                                        ? "可选：扩大受入（放弃即胡）"
-                                        : "推荐打牌"}
-                                </div>
-                                <div className={styles.tileRow}>
-                                    <TilePill face={data.discard_tile} raw={data.discard_tile_raw}/>
-                                    <span className={styles.idHint}>id: {data.discard_id}</span>
-                                </div>
-                            </div>
+                // 可规划：左右两列 + 分隔符 + 推荐打牌
+                <div className={styles.band}>
+                    <div className={styles.bandLeft}>
+                        <div className={styles.bandLabel}>还需摸</div>
+                        <div className={styles.bandValue}>
+                            {formatDrawsNeeded(
+                                typeof data.draws_needed === "number" ? data.draws_needed : null
+                            )}
                         </div>
-                    ) : null}
-
-                    <div className={styles.grid2}>
-                        <Metric label="还需摸" value={formatDrawsNeeded(data.draws_needed)}/>
-                        <Metric
-                            label="受入张数"
-                            value={showUke && data.uke_ire_total != null ? String(data.uke_ire_total) : "-"}
-                        />
                     </div>
 
-                    {showUke && data.uke_detail && Object.keys(data.uke_detail).length > 0 ? (
-                        <div className={styles.ukeBox}>
-                            <div className={styles.label}>受入明细</div>
-                            <UkeDetail detail={data.uke_detail}/>
-                        </div>
-                    ) : null}
+                    <div className={styles.vbar} />
+
+                    <div className={styles.bandRight}>
+                        <div className={styles.bandActionLabel}>推荐打牌</div>
+                        {firstDiscardId != null ? (
+                            <div className={styles.actionChip}>
+                <span className={`${styles.tilePill} ${styles.tileReset} ${styles.tileRound}`}>
+                  <Tile tile={firstDiscardFace || "-"} />
+                </span>
+                                <span className={styles.chipText}>id: {firstDiscardId}</span>
+                            </div>
+                        ) : (
+                            <div className={`${styles.actionChip} ${styles.chipDisabled}`}>—</div>
+                        )}
+                    </div>
                 </div>
             )}
         </section>
     );
 }
 
-function Metric({label, value}: { label: string; value: string }) {
+function Metric({ label, value }: { label: string; value: string }) {
     return (
         <div className={styles.metric}>
             <div className={styles.metricLabel}>{label}</div>
@@ -118,62 +121,16 @@ function Metric({label, value}: { label: string; value: string }) {
     );
 }
 
-function UkeDetail({detail}: { detail: Record<string, number> }) {
-    const entries = Object.entries(detail).sort((a, b) => b[1] - a[1]);
-    const total = entries.reduce((s, [, n]) => s + n, 0);
-    return (
-        <div className={styles.tableWrap}>
-            <div className={styles.tableHead}>
-                <div>牌面</div>
-                <div className={styles.center}>张数</div>
-                <div className={styles.right}>占比</div>
-            </div>
-            <div className={styles.tableBody}>
-                {entries.map(([face, cnt], i) => (
-                    <div key={face + i} className={styles.tableRow}>
-                        <div className={styles.tileRow}>
-                            <TileSmall face={face}/>
-                            {face}
-                        </div>
-                        <div className={styles.center}>{cnt}</div>
-                        <div className={styles.right}>{total ? Math.round((cnt / total) * 100) + "%" : "-"}</div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-function Legend() {
-    return (
-        <div className={styles.legend}>
-            <span className={styles.info}>i</span>
-            <div>
-                <div>“受入张数”仅在次数优先显示。</div>
-            </div>
-        </div>
-    );
-}
-
-function TilePill({face}: { face: string | null; raw: string | null }) {
+function TilePill({ face }: { face: string | null }) {
     if (!face) return <span>-</span>;
     return (
         <span className={`${styles.tilePill} ${styles.tileReset} ${styles.tileRound}`}>
-      <Tile tile={face}/>
-    </span>
-    );
-}
-
-function TileSmall({face}: { face: string }) {
-    return (
-        <span className={`${styles.tileSmall} ${styles.tileReset} ${styles.tileRoundSm}`}>
-      <Tile tile={face}/>
+      <Tile tile={face} />
     </span>
     );
 }
 
 function formatDrawsNeeded(n: number | null) {
     if (n === null || n === undefined) return "无解";
-    if (n === 0) return "0";
     return String(n);
 }

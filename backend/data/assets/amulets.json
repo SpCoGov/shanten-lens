@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "version": 1,
+  "version": 2,
   "items": [
     { "id": 33, "icon_id": 37, "name": "秘技：先手必勝", "rarity": "GREEN" },
     { "id": 104, "icon_id": 92, "name": "伐採場", "rarity": "GREEN" },
@@ -36,6 +36,7 @@
     { "id": 202, "icon_id": 164, "name": "鏡写し", "rarity": "GREEN" },
     { "id": 57, "icon_id": 66, "name": "恭喜發財", "rarity": "GREEN" },
     { "id": 105, "icon_id": 93, "name": "損して得取れ", "rarity": "GREEN" },
+    { "id": 101, "icon_id": 89, "name": "おもちゃ箱", "rarity": "GREEN" },
 
     { "id": 3, "icon_id": 4, "name": "点鉄成金", "rarity": "BLUE" },
     { "id": 146, "icon_id": 134, "name": "駆けるタイヤ", "rarity": "BLUE" },
@@ -84,6 +85,13 @@
     { "id": 213, "icon_id": 175, "name": "塗装の匠", "rarity": "BLUE" },
     { "id": 36, "icon_id": 40, "name": "ノベルティ", "rarity": "BLUE" },
     { "id": 120, "icon_id": 108, "name": "愛嬌", "rarity": "BLUE" },
+    { "id": 123, "icon_id": 111, "name": "一姫キラー", "rarity": "BLUE" },
+    { "id": 128, "icon_id": 116, "name": "太陽盗みの大泥棒", "rarity": "BLUE" },
+    { "id": 25, "icon_id": 28, "name": "風の加護", "rarity": "BLUE" },
+    { "id": 147, "icon_id": 135, "name": "光る深海魚", "rarity": "BLUE" },
+    { "id": 28, "icon_id": 32, "name": "資源リサイクル", "rarity": "BLUE" },
+    { "id": 138, "icon_id": 126, "name": "怠慢バイト", "rarity": "BLUE" },
+    { "id": 139, "icon_id": 127, "name": "二重学位", "rarity": "BLUE" },
 
     { "id": 229, "icon_id": 191,  "name": "スタンプ盗み", "rarity": "ORANGE" },
     { "id": 227, "icon_id": 189,  "name": "月光の加護", "rarity": "ORANGE" },

@@ -1,7 +1,7 @@
 import {useSyncExternalStore} from "react";
 
-export type TargetBadge = { kind: "badge"; id: number };
-export type TargetAmulet = { kind: "amulet"; id: number; plus?: boolean; badge?: number | null };
+export type TargetBadge = { kind: "badge"; id: number; value?: number };
+export type TargetAmulet = { kind: "amulet"; id: number; plus?: boolean; badge?: number | null; value?: number };
 export type TargetItem = TargetBadge | TargetAmulet;
 
 export type AutoRunnerConfig = {
@@ -84,16 +84,45 @@ let state: State = {
     status: defaultStatus,
 };
 
+function normalizeTargets(arr: TargetItem[] | undefined | null): TargetItem[] {
+    if (!Array.isArray(arr)) return [];
+    return arr.map((t) => {
+        const v = Number.isFinite(Number((t as any).value)) ? Math.max(1, Math.floor(Number((t as any).value))) : 1;
+        if (t.kind === "amulet") {
+            const a = t as TargetAmulet;
+            return {kind: "amulet", id: a.id, plus: !!a.plus, badge: a.badge ?? null, value: v};
+        } else {
+            const b = t as TargetBadge;
+            return {kind: "badge", id: b.id, value: v};
+        }
+    });
+}
+
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((fn) => fn());
 
 export function setAutoConfig(cfg: AutoRunnerConfig) {
-    state = {...state, config: cfg ?? defaultConfig};
+    state = {
+        ...state,
+        config: {
+            ...defaultConfig,
+            ...(cfg ?? defaultConfig),
+            targets: normalizeTargets(cfg?.targets),
+        },
+    };
     emit();
 }
 
 export function patchAutoConfig(patch: Partial<AutoRunnerConfig>) {
-    state = {...state, config: {...state.config, ...patch}};
+    const nextTargets = patch.targets ? normalizeTargets(patch.targets) : state.config.targets;
+    state = {
+        ...state,
+        config: {
+            ...state.config,
+            ...patch,
+            targets: nextTargets,
+        },
+    };
     emit();
 }
 
@@ -102,14 +131,20 @@ export function setAutoStatus(newStatus: AutoRunnerStatus) {
     emit();
 }
 
-export function addTargetAmulet(item: { id: number; plus?: boolean; badge?: number | null }) {
-    const next: TargetItem = {kind: "amulet", id: item.id, plus: !!item.plus, badge: item.badge ?? null};
+export function addTargetAmulet(item: { id: number; plus?: boolean; badge?: number | null; value?: number }) {
+    const next: TargetItem = {
+        kind: "amulet",
+        id: item.id,
+        plus: !!item.plus,
+        badge: item.badge ?? null,
+        value: Number.isFinite(Number(item.value)) ? Math.max(1, Math.floor(Number(item.value))) : 1,
+    };
     state = {...state, config: {...state.config, targets: [...state.config.targets, next]}};
     emit();
 }
 
-export function addTargetBadge(badgeId: number) {
-    const next: TargetItem = {kind: "badge", id: badgeId};
+export function addTargetBadge(badgeId: number, value: number = 1) {
+    const next: TargetItem = {kind: "badge", id: badgeId, value: Math.max(1, Math.floor(Number(value)))};
     state = {...state, config: {...state.config, targets: [...state.config.targets, next]}};
     emit();
 }
@@ -123,9 +158,20 @@ export function removeTargetAt(index: number) {
 
 export function replaceTargetAt(index: number, item: TargetItem) {
     const arr = state.config.targets.slice();
-    if (index >= 0 && index < arr.length) arr[index] = item;
+    if (index >= 0 && index < arr.length) arr[index] = {...item, value: Math.max(1, Math.floor(Number((item as any).value ?? 1)))};
     state = {...state, config: {...state.config, targets: arr}};
     emit();
+}
+
+export function setTargetValue(index: number, value: number) {
+    const v = Math.max(1, Math.floor(Number(value || 1)));
+    const arr = state.config.targets.slice();
+    if (index >= 0 && index < arr.length) {
+        const t = arr[index];
+        arr[index] = {...t, value: v};
+        state = {...state, config: {...state.config, targets: arr}};
+        emit();
+    }
 }
 
 export function parseLevelText(s: string): number | null {
