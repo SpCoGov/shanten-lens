@@ -1,4 +1,5 @@
 import React from "react";
+import "../styles/theme.css";
 import Modal from "./Modal";
 import { useRegistry } from "../lib/registryStore";
 
@@ -55,15 +56,34 @@ export default function BadgePickerModal({
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     placeholder="搜索名称或ID…"
-                    style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd" }}
+                    style={{
+                        flex: 1,
+                        padding: "8px 10px",
+                        borderRadius: 8,
+                        border: "1px solid var(--border)",
+                        background: "var(--input-bg)",
+                        outline: "none",
+                    }}
+                    onFocus={(e) => (e.currentTarget.style.boxShadow = "var(--input-focus-ring)")}
+                    onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
                 />
                 <select
                     value={rar}
                     onChange={(e) => setRar(e.target.value as Rar)}
-                    style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd" }}
+                    style={{
+                        padding: "8px 10px",
+                        borderRadius: 8,
+                        border: "1px solid var(--border)",
+                        background: "var(--input-bg)",
+                        outline: "none",
+                    }}
+                    onFocus={(e) => (e.currentTarget.style.boxShadow = "var(--input-focus-ring)")}
+                    onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
                 >
                     {RARS.map((r) => (
-                        <option key={r} value={r}>{r}</option>
+                        <option key={r} value={r}>
+                            {r}
+                        </option>
                     ))}
                 </select>
             </div>
@@ -84,18 +104,21 @@ export default function BadgePickerModal({
                             onClick={() => setSel(b.id)}
                             style={{
                                 textAlign: "left",
-                                border: "1px solid " + (chosen ? "#1677ff" : "#ddd"),
-                                boxShadow: chosen ? "0 0 0 2px rgba(22,119,255,.35)" : "none",
+                                border: `1px solid ${chosen ? "color-mix(in srgb, var(--color-ring) 65%, transparent)" : "var(--border)"}`,
+                                boxShadow: chosen ? "0 0 0 2px color-mix(in srgb, var(--color-ring) 35%, transparent)" : "none",
                                 borderRadius: 12,
                                 padding: 10,
-                                background: "#fff",
+                                background: "var(--panel)",
                                 cursor: "pointer",
                                 transition: "box-shadow 120ms ease, border-color 120ms ease",
                             }}
+                            title={`${b.name} (#${b.id})`}
                         >
-                            <div style={{ fontSize: 12, color: "#888" }}>ID: {b.id}</div>
-                            <div style={{ fontWeight: 600, margin: "4px 0" }}>{b.name}</div>
-                            <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>{b.rarity}</div>
+                            <div style={{ fontSize: 12, color: "var(--muted)" }}>ID: {b.id}</div>
+                            <div style={{ fontWeight: 600, margin: "4px 0", color: "var(--text)" }}>{b.name}</div>
+                            <div style={{ fontSize: 12, color: "color-mix(in srgb, var(--text) 60%, transparent)", marginBottom: 6 }}>
+                                {b.rarity}
+                            </div>
                             <img
                                 src={icon}
                                 alt={b.name}

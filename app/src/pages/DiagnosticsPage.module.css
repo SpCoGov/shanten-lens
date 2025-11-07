@@ -2,7 +2,7 @@
 }
 
 .ts {
-    color: #9ca3af;
+    color: var(--color-hint);
 }
 
 .lv {

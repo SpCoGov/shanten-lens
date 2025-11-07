@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import "../styles/theme.css";
 import Tile from "./Tile";
 import styles from "./WallStats.module.css";
 
@@ -15,7 +16,7 @@ function normalize(raw: string): string {
     if (/^[mps][0-9]$/.test(s)) return s;                // m0..m9 / p0..p9 / s0..s9
     if (/^[0-9][mps]$/.test(s)) return `${s[1]}${s[0]}`;  // 1m..9m / 0p..9p
     if (/^z[1-7]$/.test(s)) return s;                     // z1..z7
-    if (/^[1-7]z$/.test(s)) return `z${s[0]}`;            // 1z..7z -> z1..z7（修复点）
+    if (/^[1-7]z$/.test(s)) return `z${s[0]}`;            // 1z..7z -> z1..z7
     return s; // 其他编码原样
 }
 
@@ -31,7 +32,6 @@ function keyToReadable(key: string): string {
         const honors = ["东","南","西","北","白","发","中"];
         return honors[(v - 1 + 7) % 7] ?? key;
     }
-    // 兜底：如果 key 形如 "Nz"（例如 "4z"），也能正确显示
     if (/^[1-7]z$/.test(key)) {
         const honors = ["东","南","西","北","白","发","中"];
         const n = Number(key[0]);

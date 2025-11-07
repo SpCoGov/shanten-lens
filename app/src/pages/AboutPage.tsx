@@ -1,4 +1,5 @@
 import React from "react";
+import "../styles/theme.css";
 import styles from "./AboutPage.module.css";
 
 export default function AboutPage() {
@@ -9,7 +10,7 @@ export default function AboutPage() {
             <div className={styles.meta}>
                 <span className={styles.author}>海绵couna</span>
                 <span className={styles.sep} aria-hidden>·</span>
-                <span className={styles.version}>v0.4.15</span>
+                <span className={styles.version}>v1.0.0</span>
                 <span className={styles.build}>(build&nbsp;1)</span>
             </div>
 

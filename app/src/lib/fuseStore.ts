@@ -49,12 +49,12 @@ export function toggleSelect(kind: "amulet" | "badge", id: number) {
     } else {
         b.has(id) ? b.delete(id) : b.add(id);
     }
-    state = {...state, selected: {amulets: a, badges: b}}; // 新引用
+    state = {...state, selected: {amulets: a, badges: b}};
     emit();
 }
 
 export function clearSelection() {
-    state = {...state, selected: {amulets: new Set(), badges: new Set()}}; // 新引用
+    state = {...state, selected: {amulets: new Set(), badges: new Set()}};
     emit();
 }
 

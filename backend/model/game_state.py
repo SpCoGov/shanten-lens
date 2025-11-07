@@ -52,7 +52,7 @@ class GameState:
             "wall_tiles": self.wall_tiles,
             "switch_used_tiles": self.switch_used_tiles,
             "ended": self.ended,
-            "desktop_remain": self.desktop_remain,
+            "desktop_remain": self.desktop_remain,  
             "locked_tiles": self.locked_tiles,
             "coin": self.coin,
             "level": self.level,

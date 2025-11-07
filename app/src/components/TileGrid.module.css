@@ -1,10 +1,10 @@
 .tile-card {
-    background: #0b1020;
-    border: 1px solid rgba(255,255,255,.08);
+    background: var(--tilecard-bg);
+    border: 1px solid var(--tilecard-border);
     border-radius: 16px;
     padding: 16px;
-    color: #e5e7eb;
-    box-shadow: 0 6px 20px rgba(0,0,0,.35);
+    color: var(--tilecard-fg);
+    box-shadow: var(--tilecard-shadow);
 }
 
 .tile-card__header {
@@ -24,4 +24,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.tile-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    font-size: 14px;
 }

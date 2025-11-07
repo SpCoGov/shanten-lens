@@ -1,15 +1,13 @@
 .wrap {
-    color: #222;
+    color: var(--text);
 }
 
 section {
-    border: 1px solid #e5e7eb;
-    background: #fff;
-}
-
-.license {
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
 }
 
 h1 {
@@ -22,7 +20,7 @@ h1 {
 
 .sub {
     font-size: 14px;
-    color: #6b7280;
+    color: var(--muted);
     font-weight: 500;
 }
 
@@ -31,16 +29,8 @@ h2 {
     margin: 16px 0 8px;
 }
 
-section {
-    background: #fff;
-    border: 1px solid var(--border, #e5e7eb);
-    border-radius: 12px;
-    padding: 12px 14px;
-    margin-bottom: 12px;
-}
-
 a {
-    color: #2563eb;
+    color: var(--link);
     text-decoration: none;
 }
 
@@ -55,8 +45,8 @@ summary {
 
 .license {
     white-space: pre-wrap;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px;
     margin-top: 8px;
@@ -70,7 +60,7 @@ summary {
 }
 
 .muted {
-    color: #6b7280;
+    color: var(--muted);
     font-size: 12px;
 }
 
@@ -80,7 +70,7 @@ summary {
     gap: 8px;
     margin: 6px 0 18px;
     color: currentColor;
-    opacity: 0.85;
+    opacity: 0.88;
     font-size: 0.95rem;
 }
 
@@ -108,7 +98,7 @@ summary {
 
 @media (prefers-color-scheme: dark) {
     .meta {
-        opacity: 0.9;
+        opacity: 0.92;
     }
 
     .author {

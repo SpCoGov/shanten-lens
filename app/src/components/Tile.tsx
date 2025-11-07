@@ -1,5 +1,6 @@
 import React from "react";
-import { TILE_ATLAS_DEFAULT, TileCode } from "./useCroppedAtlasDefault";
+import "../styles/theme.css";
+import {TILE_ATLAS_DEFAULT, TileCode} from "./useCroppedAtlasDefault";
 
 const ATLAS_SRC = "/assets/mjp_default.png";
 const LAIZI_SRC = "/assets/mjp_laizi.png";
@@ -8,10 +9,10 @@ const LAIZI_SRC = "/assets/mjp_laizi.png";
 function normalize(code: string): TileCode {
     const s = code.trim();
     const ok = [
-        "0m","1m","2m","3m","4m","5m","6m","7m","8m","9m",
-        "0p","1p","2p","3p","4p","5p","6p","7p","8p","9p",
-        "0s","1s","2s","3s","4s","5s","6s","7s","8s","9s",
-        "1z","2z","3z","4z","5z","6z","7z",
+        "0m", "1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m",
+        "0p", "1p", "2p", "3p", "4p", "5p", "6p", "7p", "8p", "9p",
+        "0s", "1s", "2s", "3s", "4s", "5s", "6s", "7s", "8s", "9s",
+        "1z", "2z", "3z", "4z", "5z", "6z", "7z",
     ] as const;
     return (ok as readonly string[]).includes(s) ? (s as TileCode) : "5m";
 }
@@ -19,7 +20,7 @@ function normalize(code: string): TileCode {
 /** 把原始字符串标准化到项目编码体系（含把中文字牌映射为 z1..z7） */
 function normalizeLoose(raw: string): string {
     const s = raw?.trim() ?? "";
-    const honor: Record<string, string> = { 东: "z1", 南: "z2", 西: "z3", 北: "z4", 白: "z5", 发: "z6", 中: "z7" };
+    const honor: Record<string, string> = {东: "z1", 南: "z2", 西: "z3", 北: "z4", 白: "z5", 发: "z6", 中: "z7"};
     if (honor[s]) return honor[s];
     if (/^[mps][0-9]$/.test(s)) return s;               // m0..m9 / p0..p9 / s0..s9
     if (/^[0-9][mps]$/.test(s)) return `${s[1]}${s[0]}`; // 1m..9m / 0p..9p
@@ -27,10 +28,10 @@ function normalizeLoose(raw: string): string {
     return s;
 }
 
-function parseSuitVal(n: string): { suit: string|null; val: number|null } {
-    if (/^[mps][0-9]$/.test(n)) return { suit: n[0], val: Number(n[1]) };
-    if (/^z[1-7]$/.test(n)) return { suit: "z", val: Number(n[1]) };
-    return { suit: null, val: null };
+function parseSuitVal(n: string): { suit: string | null; val: number | null } {
+    if (/^[mps][0-9]$/.test(n)) return {suit: n[0], val: Number(n[1])};
+    if (/^z[1-7]$/.test(n)) return {suit: "z", val: Number(n[1])};
+    return {suit: null, val: null};
 }
 
 /** 等价判定：同花色 && (同值 || 0↔5)；字牌需完全一致 */
@@ -89,7 +90,6 @@ export default function Tile({
     const norm = isLaizi ? "5m" : normalize(raw);  // 癞子不参与 atlas 映射时的等价判断
     const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
-    // === 等价组高亮：hoveredTile 命中当前牌或其等价（赤五↔五）即高亮 ===
     const active = hoveredTile ? isEquivalent(hoveredTile, raw) : false;
 
     React.useEffect(() => {
@@ -119,11 +119,11 @@ export default function Tile({
                 width,
                 height,
                 borderRadius: 8,
-                background: "#fff",
-                boxShadow: "0 1px 3px rgba(0,0,0,.15)",
+                background: "var(--tile-bg)",
+                boxShadow: "var(--tile-shadow)",
                 display: "grid",
                 placeItems: "center",
-                outline: active ? "2px solid #22d3ee" : "none",
+                outline: active ? "var(--tile-outline)" : "none",
                 transform: active ? "scale(1.06)" : "none",
                 transition: "transform .08s ease, outline .08s ease",
                 overflow: "hidden",
@@ -138,10 +138,10 @@ export default function Tile({
                     src={LAIZI_SRC}
                     alt="bd"
                     draggable={false}
-                    style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+                    style={{width: "100%", height: "100%", objectFit: "contain", display: "block"}}
                 />
             ) : (
-                <canvas ref={canvasRef} />
+                <canvas ref={canvasRef}/>
             )}
 
             {dim && (
@@ -149,7 +149,7 @@ export default function Tile({
                     style={{
                         position: "absolute",
                         inset: 0,
-                        background: "rgba(0,0,0,.35)",
+                        background: "var(--tile-dim-scrim)",
                     }}
                 />
             )}

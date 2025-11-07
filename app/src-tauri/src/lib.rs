@@ -177,42 +177,6 @@ fn kill_all_backends_silently() {
 }
 
 pub fn run() {
-#[cfg(windows)]
-  {
-    use std::env;
-    const KEY: &str = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
-
-    fn append_wv2_args(s: &str) {
-      let cur = env::var(KEY).unwrap_or_default();
-      let newv = if cur.trim().is_empty() {
-        s.to_string()
-      } else {
-        format!("{cur} {s}")
-      };
-      env::set_var(KEY, newv);
-    }
-
-    // 1) 永久：关闭遮挡优化 + 后台节流
-    append_wv2_args("--disable-features=CalculateNativeWinOcclusion,msWebView2EnableOcclusion");
-    append_wv2_args("--disable-backgrounding-occluded-windows --disable-renderer-backgrounding");
-
-    // 2) 渲染模式（默认 warp；可通过环境变量覆盖）
-    //    SL_WV2_RENDER_MODE=warp|disable-gpu|gl
-    let mode = env::var("SL_WV2_RENDER_MODE").unwrap_or_else(|_| "warp".into());
-    match mode.as_str() {
-      "disable-gpu" => append_wv2_args("--disable-gpu"),
-      "gl" => append_wv2_args("--use-angle=gl"),
-      _ => append_wv2_args("--use-angle=warp"), // 默认
-    }
-
-    // 3) 可选：强制软件合成（有些设备这个也能稳）
-    if env::var("SL_WV2_SOFTCOMPOSE").map(|v| v == "1").unwrap_or(false) {
-      append_wv2_args("--enable-features=msWebView2ForceSoftwareComposite");
-    }
-
-    // 调试输出，确认参数确实生效
-    println!("WEBVIEW2 args = {}", env::var(KEY).unwrap_or_default());
-  }
   tauri::Builder::default()
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_opener::init())

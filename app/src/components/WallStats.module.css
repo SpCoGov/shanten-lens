@@ -11,7 +11,7 @@
 
 .header { margin-bottom: 8px; }
 .title { font-weight: 600; }
-.sub { font-size: 12px; color: #6b7280; margin-top: 2px; }
+.sub { font-size: 12px; color: var(--color-muted); margin-top: 2px; }
 
 .list {
     display: flex;
@@ -29,18 +29,18 @@
     border: 1px solid rgba(0,0,0,0.06);
     border-radius: 10px;
     padding: 8px;
-    background: #fafafa;
+    background: var(--list-item-bg);
 }
 
 .item:hover {
-    background: #f5f5f5;
+    background: var(--list-item-hover);
 }
 
 .tileBox { width: 44px; height: 60px; flex: 0 0 auto; }
 
 .meta { flex: 1 1 auto; min-width: 0; }
 .name { font-size: 14px; font-weight: 600; }
-.subtext { font-size: 11px; color: #6b7280; }
+.subtext { font-size: 11px; color: var(--color-muted); }
 
 .count { font-weight: 700; }
-.empty { color: #6b7280; font-size: 13px; padding: 10px 6px; }
+.empty { color: var(--color-muted); font-size: 13px; padding: 10px 6px; }

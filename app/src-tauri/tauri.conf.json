@@ -31,9 +31,33 @@
         "minHeight": 640,
         "resizable": true,
         "visible": false,
-        "devtools": false
+        "devtools": false,
+        "decorations": false
       }
-    ]
+    ],
+    "security": {
+      "devCsp": "default-src 'self' http://localhost:* http://127.0.0.1:* tauri: asset: blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:8787 ws://127.0.0.1:8787 http://localhost:* ws://localhost:* tauri: ipc:;",
+      "csp": "default-src 'self' tauri: asset: blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:8787 ws://127.0.0.1:8787 tauri: ipc:;",
+      "capabilities": [
+        {
+          "identifier": "window-controls",
+          "windows": [
+            "main",
+            "splash"
+          ],
+          "permissions": [
+            "core:default",
+            "core:event:default",
+            "core:webview:default",
+            "core:window:default",
+            "core:window:allow-start-dragging",
+            "core:window:allow-minimize",
+            "core:window:allow-toggle-maximize",
+            "core:window:allow-close"
+          ]
+        }
+      ]
+    }
   },
   "bundle": {
     "active": true,

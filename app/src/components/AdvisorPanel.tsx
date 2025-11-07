@@ -1,4 +1,5 @@
 import React from "react";
+import "../styles/theme.css";
 import styles from "./AdvisorPanel.module.css";
 import Tile from "./Tile";
 
@@ -80,7 +81,6 @@ function StrategyCard({
                     <div className={styles.bandValue}>{isMenzenOnlyWord ? "門前のみ" : "无解"}</div>
                 </div>
             ) : (
-                // 可规划：左右两列 + 分隔符 + 推荐打牌
                 <div className={styles.band}>
                     <div className={styles.bandLeft}>
                         <div className={styles.bandLabel}>还需摸</div>

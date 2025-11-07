@@ -1,4 +1,5 @@
 import React from "react";
+import "../styles/theme.css";
 import {ws} from "../lib/ws";
 import {useLogStore} from "../lib/logStore";
 import styles from "./DiagnosticsPage.module.css";
