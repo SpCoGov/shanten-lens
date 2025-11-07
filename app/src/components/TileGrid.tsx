@@ -1,4 +1,5 @@
 import React, {useLayoutEffect, useMemo, useRef, useState} from "react";
+import "../styles/theme.css";
 import Tile from "./Tile";
 import "./TileGrid.module.css";
 import type {Cell} from "../lib/gamestate";
@@ -95,7 +96,7 @@ export default function TileGrid({cells}: { cells: Cell[] }) {
                                 inset: 0,
                                 display: "grid",
                                 placeItems: "center",
-                                color: "#6b7280",
+                                color: "var(--muted)",
                                 fontSize: 14,
                             }}
                         >

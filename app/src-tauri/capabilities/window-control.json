@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0/capability.json",
+  "identifier": "window-control",
+  "description": "Allow window controls & drag region",
+  "platforms": ["windows", "linux", "macOS"],
+  "permissions": [
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging"
+  ]
+}

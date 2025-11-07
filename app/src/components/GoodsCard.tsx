@@ -1,4 +1,5 @@
 import React from "react";
+import "../styles/theme.css";
 import { type GoodsItem } from "../lib/gamestate";
 
 const GOODS_IMG: Record<number, string> = {
@@ -9,7 +10,7 @@ const GOODS_IMG: Record<number, string> = {
 
 export default function GoodsCard({
                                       item,
-                                      scale = 0.9, // 默认稍大一些，原图 150x220
+                                      scale = 0.9,
                                   }: {
     item: GoodsItem;
     scale?: number;
@@ -31,9 +32,9 @@ export default function GoodsCard({
                 flex: "0 0 auto",
                 borderRadius: Math.max(8, Math.round(10 * scale)),
                 overflow: "hidden",
-                border: "1px solid var(--border, #ddd)",
-                background: "#fff",
-                boxShadow: "0 4px 12px rgba(0,0,0,.06)",
+                border: "1px solid var(--border)",
+                background: "var(--panel)",
+                boxShadow: "var(--panel-shadow)",
             }}
             title={`ID=${item.id} goodsId=${item.goodsId} 价格=${item.price}`}
         >
@@ -58,17 +59,18 @@ export default function GoodsCard({
                     bottom: 8,
                     padding: "4px 8px",
                     borderRadius: 999,
-                    background: "rgba(255,255,255,.9)",
-                    border: "1px solid var(--border, #ddd)",
+                    background: "var(--glass-bg)",
+                    border: "1px solid var(--border)",
                     fontSize: Math.max(12, Math.round(13 * scale)),
                     fontWeight: 700,
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 6,
-                    boxShadow: "0 2px 8px rgba(0,0,0,.08)",
+                    boxShadow: "var(--shadow-sm)",
+                    backdropFilter: "saturate(120%) blur(2px)",
                 }}
             >
-                <span style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,.12))" }}>⭐</span>
+                <span style={{ filter: "drop-shadow(var(--shadow-text))" }}>⭐</span>
                 <span>{item.price}</span>
             </div>
 
@@ -77,7 +79,7 @@ export default function GoodsCard({
                     style={{
                         position: "absolute",
                         inset: 0,
-                        background: "rgba(46, 204, 113, 0.32)", // 绿色半透明
+                        background: "var(--sold-scrim)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -88,12 +90,12 @@ export default function GoodsCard({
                         style={{
                             padding: "6px 12px",
                             borderRadius: 8,
-                            background: "rgba(46, 204, 113, .9)",
-                            color: "#fff",
+                            background: "var(--sold-pill-bg)",
+                            color: "var(--on-strong)",
                             fontWeight: 800,
                             letterSpacing: "0.1em",
-                            border: "1px solid rgba(0,0,0,.08)",
-                            boxShadow: "0 2px 10px rgba(0,0,0,.15)",
+                            border: "1px solid var(--sold-pill-border)",
+                            boxShadow: "var(--shadow-md)",
                             fontSize: Math.max(12, Math.round(14 * scale)),
                         }}
                     >

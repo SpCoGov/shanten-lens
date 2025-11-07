@@ -7,9 +7,9 @@
 }
 
 .card {
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 12px;
-    background: #fff;
+    background: var(--panel);
 }
 
 .cardHead {
@@ -17,7 +17,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 12px;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--color-cutline);
 }
 
 .cardHead h3 {
@@ -27,24 +27,24 @@
 }
 
 .badgeBlue {
-    background: #2563eb;
-    color: #fff;
+    background: var(--accent-blue);
+    color: var(--panel);
     font-size: 12px;
     padding: 2px 8px;
     border-radius: 999px;
 }
 
 .badgeGreen {
-    background: #059669;
-    color: #fff;
+    background: var(--accent-green);
+    color: var(--panel);
     font-size: 12px;
     padding: 2px 8px;
     border-radius: 999px;
 }
 
 .badgeMuted {
-    background: #e5e7eb;
-    color: #111827;
+    background: var(--border);
+    color: var(--text);
     font-size: 12px;
     padding: 2px 8px;
     border-radius: 999px;
@@ -52,7 +52,7 @@
 
 .cardBodyMuted {
     padding: 12px;
-    color: #6b7280;
+    color: var(--muted);
     font-size: 13px;
 }
 
@@ -64,7 +64,7 @@
 
 .label {
     font-size: 12px;
-    color: #6b7280;
+    color: var(--muted);
     margin-bottom: 4px;
 }
 
@@ -76,7 +76,7 @@
 
 .idHint {
     font-size: 12px;
-    color: #9ca3af;
+    color: var(--color-hint);
     margin-left: 6px;
 }
 
@@ -86,11 +86,17 @@
     box-shadow: none !important;
 }
 
-.tileRound :global(img), .tileRound :global(canvas), .tileRound :global(svg), .tileRound :global(div) {
+.tileRound :global(img),
+.tileRound :global(canvas),
+.tileRound :global(svg),
+.tileRound :global(div) {
     border-radius: 8px !important;
 }
 
-.tilePill :global(img), .tilePill :global(canvas), .tilePill :global(svg), .tilePill :global(div) {
+.tilePill :global(img),
+.tilePill :global(canvas),
+.tilePill :global(svg),
+.tilePill :global(div) {
     max-height: 36px;
 }
 
@@ -111,21 +117,21 @@
 
 .bandLabel, .bandActionLabel {
     font-size: 12px;
-    color: #6b7280;
+    color: var(--muted);
 }
 
 .bandValue {
     font-size: 26px;
     font-weight: 800;
     letter-spacing: .3px;
-    color: #0f172a;
+    color: var(--text);
     line-height: 1.05;
 }
 
 .vbar {
     width: 1px;
     height: 36px;
-    background: #e6e8ee;
+    background: var(--color-divider);
     justify-self: center;
     border-radius: 1px;
 }
@@ -134,19 +140,19 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    border: 1px solid #e6e8ee;
+    border: 1px solid var(--color-divider);
     border-radius: 999px;
     padding: 6px 10px 6px 6px;
-    background: #fff;
+    background: var(--panel);
 }
 
 .actionChip:hover {
-    background: #fafbfc;
+    background: var(--btn-hover-bg);
 }
 
 .chipText {
     font-size: 12px;
-    color: #475569;
+    color: color-mix(in oklab, var(--text) 70%, transparent);
 }
 
 .chipDisabled {
@@ -157,13 +163,13 @@
     display: block;
     margin: 12px;
     padding: 10px 12px;
-    border: 1px solid #bbf7d0;
+    border: 1px solid var(--badge-ok-border);
     border-radius: 10px;
-    background: #ecfdf5;
+    background: var(--badge-ok-bg);
 }
 
 .bandOkText {
-    color: #065f46;
+    color: var(--badge-ok-fg);
     font-weight: 700;
     text-align: center;
 }

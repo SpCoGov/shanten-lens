@@ -1,10 +1,11 @@
 import React from "react";
+import "../styles/theme.css";
 import { type EffectItem } from "../lib/gamestate";
 import AmuletCard from "./AmuletCard";
 
 export default function AmuletBar({
                                       items,
-                                      scale = 0.55,     // 默认再小一点
+                                      scale = 0.55,
                                       max = 8,
                                   }: {
     items: EffectItem[];
@@ -17,10 +18,10 @@ export default function AmuletBar({
         return (
             <div
                 style={{
-                    border: "1px dashed var(--border, #ddd)",
+                    border: "1px dashed var(--border)",
                     borderRadius: 10,
                     padding: 6,
-                    color: "var(--muted-fg, #888)",
+                    color: "var(--muted-fg)",
                     fontSize: 12,
                 }}
             >
@@ -33,9 +34,9 @@ export default function AmuletBar({
         <div
             style={{
                 display: "flex",
-                flexWrap: "nowrap",    // 关键：不换行
+                flexWrap: "nowrap",
                 gap: 8,
-                overflowX: "auto",     // 超出则横向滚动
+                overflowX: "auto",
                 overflowY: "hidden",
                 padding: "6px 4px",
             }}

@@ -1,4 +1,5 @@
 import React from "react";
+import "../styles/theme.css";
 import Modal from "./Modal";
 import AmuletPickerModal from "./AmuletPickerModal";
 import BadgePickerModal from "./BadgePickerModal";
@@ -24,7 +25,9 @@ export default function AmuletEditorModal({
 
     const [amuletId, setAmuletId] = React.useState<number | null>(initial?.id ?? null);
     const [plus, setPlus] = React.useState<boolean>(Boolean(initial?.plus));
-    const [badgeId, setBadgeId] = React.useState<number | null>(typeof initial?.badge === "number" ? initial!.badge : null);
+    const [badgeId, setBadgeId] = React.useState<number | null>(
+        typeof initial?.badge === "number" ? initial!.badge : null
+    );
 
     const [pickA, setPickA] = React.useState(false);
     const [pickB, setPickB] = React.useState(false);
@@ -65,12 +68,19 @@ export default function AmuletEditorModal({
             } as any)
             : null;
 
+    const focusRing = (el: HTMLElement | null, on: boolean) => {
+        if (!el) return;
+        el.style.boxShadow = on ? "var(--input-focus-ring)" : "none";
+        el.style.borderColor = on ? "var(--input-hover-border)" : "var(--border)";
+    };
+
     return (
         <>
             <Modal open={open} onClose={onClose} title={title} actions={actions} width={760}>
                 <div style={{display: "grid", gap: 12, marginBottom: 12}}>
+                    {/* 护身符 ID */}
                     <div style={{display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap"}}>
-                        <label style={{width: 84, color: "#555"}}>护身符ID</label>
+                        <label style={{width: 84, color: "var(--muted)"}}>护身符ID</label>
                         <input
                             type="number"
                             value={amuletId ?? ""}
@@ -79,16 +89,27 @@ export default function AmuletEditorModal({
                                 setAmuletId(v === "" ? null : Number(v));
                             }}
                             placeholder="输入护身符ID…"
-                            style={{width: 160, padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd"}}
+                            style={{
+                                width: 160,
+                                padding: "8px 10px",
+                                borderRadius: 8,
+                                border: "1px solid var(--border)",
+                                background: "var(--input-bg)",
+                                outline: "none",
+                            }}
+                            onFocus={(e) => focusRing(e.currentTarget, true)}
+                            onBlur={(e) => focusRing(e.currentTarget, false)}
                         />
                         <button className="nav-btn" onClick={() => setPickA(true)}>
                             从列表选择
                         </button>
-                        <span style={{color: "#888", fontSize: 12}}>{amuletId != null ? (reg ? ` ${reg.name}` : " 未知ID") : " 未选择"}</span>
+                        <span style={{color: "var(--muted)", fontSize: 12}}>
+              {amuletId != null ? (reg ? ` ${reg.name}` : " 未知ID") : " 未选择"}
+            </span>
                     </div>
 
                     <div style={{display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap"}}>
-                        <label style={{width: 84, color: "#555"}}>Plus</label>
+                        <label style={{width: 84, color: "var(--muted)"}}>Plus</label>
                         <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
                             <input type="checkbox" checked={plus} onChange={(e) => setPlus(e.target.checked)}/>
                             <span>Plus</span>
@@ -96,7 +117,7 @@ export default function AmuletEditorModal({
                     </div>
 
                     <div style={{display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap"}}>
-                        <label style={{width: 84, color: "#555"}}>印章</label>
+                        <label style={{width: 84, color: "var(--muted)"}}>印章</label>
                         <input
                             type="number"
                             value={badgeId ?? ""}
@@ -105,7 +126,16 @@ export default function AmuletEditorModal({
                                 setBadgeId(v === "" ? null : Number(v));
                             }}
                             placeholder="输入印章ID…"
-                            style={{width: 160, padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd"}}
+                            style={{
+                                width: 160,
+                                padding: "8px 10px",
+                                borderRadius: 8,
+                                border: "1px solid var(--border)",
+                                background: "var(--input-bg)",
+                                outline: "none",
+                            }}
+                            onFocus={(e) => focusRing(e.currentTarget, true)}
+                            onBlur={(e) => focusRing(e.currentTarget, false)}
                         />
                         <button className="nav-btn" onClick={() => setPickB(true)}>
                             从列表选择
@@ -113,15 +143,17 @@ export default function AmuletEditorModal({
                         <button className="nav-btn" onClick={() => setBadgeId(null)} disabled={badgeId == null}>
                             清除
                         </button>
-                        <span style={{color: "#888", fontSize: 12}}>{badgeId != null ? badgeById.get(badgeId)?.name ?? "未知印章" : "未选择"}</span>
+                        <span style={{color: "var(--muted)", fontSize: 12}}>
+              {badgeId != null ? badgeById.get(badgeId)?.name ?? "未知印章" : "未选择"}
+            </span>
                     </div>
                 </div>
 
                 <div
                     style={{
-                        border: "1px solid var(--border, #ddd)",
+                        border: "1px solid var(--border)",
                         borderRadius: 12,
-                        background: "#fff",
+                        background: "var(--panel)",
                         padding: 12,
                     }}
                 >
@@ -129,7 +161,7 @@ export default function AmuletEditorModal({
                     {effectItem ? (
                         <div style={{display: "flex", alignItems: "center", gap: 12}}>
                             <AmuletCard item={effectItem} scale={0.75}/>
-                            <div style={{color: "#555", lineHeight: 1.6}}>
+                            <div style={{color: "var(--text)", lineHeight: 1.6}}>
                                 <div>原始ID（raw）：{rawId}</div>
                                 <div>显示ID（reg）：{amuletId}</div>
                                 <div>Plus：{plus ? "是" : "否"}</div>
@@ -137,7 +169,7 @@ export default function AmuletEditorModal({
                             </div>
                         </div>
                     ) : (
-                        <div style={{color: "#999"}}>请选择护身符以预览。</div>
+                        <div style={{color: "var(--muted)"}}>请选择护身符以预览。</div>
                     )}
                 </div>
             </Modal>

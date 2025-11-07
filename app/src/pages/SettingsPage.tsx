@@ -1,3 +1,4 @@
+import "../styles/theme.css";
 import React, {useEffect, useRef, useState} from "react";
 import {ws} from "../lib/ws";
 import styles from "./SettingsPage.module.css";

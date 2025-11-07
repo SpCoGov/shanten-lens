@@ -1,14 +1,15 @@
 :root {
-    --border: #e5e7eb;
-    --muted: #6b7280;
-    --bg: #fafafa;
-    --ring: #3b82f6;
-    --text: #0f172a;
+    --border: var(--color-border);
+    --muted: var(--color-muted);
+    --bg: var(--color-bg);
+    --ring: var(--color-ring);
+    --text: var(--color-text);
+
+    --radius: 12px;
+    --header-height: 44px;
+    --statusbar-height: 36px;
 
     --panel-radius: 12px;
-    --panel-bg: #fff;
-    --panel-border: 1px solid var(--border, rgba(0, 0, 0, .08));
-    --panel-shadow: 0 2px 12px rgba(0, 0, 0, .06);
     --panel-padding: 12px;
 
     --content-max: 1280px;
@@ -16,15 +17,7 @@
     --label-w: 260px;
 }
 
-.mj-panel {
-    border-radius: var(--panel-radius);
-    background: var(--panel-bg);
-    border: var(--panel-border);
-    box-shadow: var(--panel-shadow);
-    padding: var(--panel-padding);
-    box-sizing: border-box;
-}
-
+/* ===== 通用/基础 ===== */
 * {
     box-sizing: border-box;
 }
@@ -51,10 +44,51 @@ input, textarea, select, code, pre, .selectable {
     user-select: text;
 }
 
+.mj-panel {
+    border-radius: var(--panel-radius);
+    background: var(--panel-bg);
+    border: var(--panel-border);
+    box-shadow: var(--panel-shadow);
+    padding: var(--panel-padding);
+    box-sizing: border-box;
+}
+
 .app {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    padding-top: var(--header-height);
+}
+
+.topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-height);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--panel-shadow);
+    z-index: 1000;
+}
+
+.topbar .drag {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding-left: 6px;
+}
+
+.topbar .title {
+    font-weight: 700;
+    line-height: 1.2;
+    user-select: none;
+    margin: 0;
 }
 
 .app-header {
@@ -67,11 +101,57 @@ input, textarea, select, code, pre, .selectable {
     gap: 12px;
     padding: 10px 14px;
     border-bottom: 1px solid var(--border);
-    background: #fff;
+    background: var(--panel-bg);
 }
 
-.brand {
-    font-weight: 700;
+.win {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.win-btn {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel-bg);
+    color: var(--text);
+    cursor: pointer;
+    line-height: 1;
+}
+
+.win-btn:hover {
+    background: var(--hover-bg);
+}
+
+.win-btn.close:hover {
+    background: var(--danger-weak-bg);
+    border-color: var(--danger-weak-border);
+}
+
+.shell {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 12px;
+    padding: 12px;
+    height: calc(100vh - var(--header-height) - var(--statusbar-height));
+    box-sizing: border-box;
+}
+
+.sidebar {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--panel-bg);
+    box-shadow: var(--panel-shadow);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
 }
 
 .nav {
@@ -82,14 +162,77 @@ input, textarea, select, code, pre, .selectable {
 .nav-btn {
     padding: 6px 10px;
     border: 1px solid var(--border);
-    background: #fff;
+    background: var(--panel-bg);
     border-radius: 8px;
     cursor: pointer;
     transition: background .15s ease, border-color .15s ease;
 }
 
 .nav-btn.active, .nav-btn:hover {
-    background: #f3f4f6;
+    background: var(--hover-bg);
+}
+
+.nav-icon {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: var(--panel-bg);
+    color: var(--text);
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+
+.nav-icon:hover {
+    background: var(--hover-bg);
+    border-color: var(--border);
+}
+
+.nav-icon.active {
+    background: var(--badge-ok-bg);
+    border-color: var(--badge-ok-border);
+}
+
+.main-pane {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--panel-bg);
+    box-shadow: var(--panel-shadow);
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+}
+
+.app-main {
+    width: 100%;
+    margin: 0;
+    padding: clamp(12px, 2vw, 16px);
+    max-width: var(--content-max);
+}
+
+.card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+
+.panel {
+    border: var(--panel-border);
+    border-radius: var(--panel-radius);
+    background: var(--panel-bg);
+    box-shadow: var(--panel-shadow);
+    padding: 8px;
+    margin-bottom: 12px;
+}
+
+.panel-title {
+    font-weight: 600;
+    margin-bottom: 6px;
 }
 
 .status {
@@ -97,31 +240,6 @@ input, textarea, select, code, pre, .selectable {
     align-items: center;
     gap: 8px;
     color: var(--muted);
-}
-
-.app-main {
-    width: 100%;
-    margin: 0 auto;
-    padding: clamp(12px, 2vw, 16px);
-    max-width: var(--content-max);
-}
-
-.card {
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 16px;
-}
-
-.hero {
-    display: grid;
-    gap: 8px;
-}
-
-.hero-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
 }
 
 .badge {
@@ -132,15 +250,15 @@ input, textarea, select, code, pre, .selectable {
 }
 
 .badge.ok {
-    color: #166534;
-    border-color: #86efac;
-    background: #f0fdf4;
+    color: var(--badge-ok-fg);
+    border-color: var(--badge-ok-border);
+    background: var(--badge-ok-bg);
 }
 
 .badge.down {
-    color: #7f1d1d;
-    border-color: #fecaca;
-    background: #fef2f2;
+    color: var(--badge-down-fg);
+    border-color: var(--badge-down-border);
+    background: var(--badge-down-bg);
 }
 
 .dot {
@@ -151,24 +269,64 @@ input, textarea, select, code, pre, .selectable {
 }
 
 .dot.ok {
-    background: #16a34a;
+    background: var(--state-ok);
 }
 
 .dot.down {
-    background: #ef4444;
+    background: var(--state-down);
+}
+
+.statusbar {
+    height: var(--statusbar-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    border-top: 1px solid var(--border);
+    background: var(--panel-bg);
+}
+
+.sb-left, .sb-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.sb-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sb-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    display: inline-block;
+    background: var(--state-muted);
+}
+
+.sb-dot.ok {
+    background: var(--state-ok);
+}
+
+.sb-dot.warn {
+    background: var(--state-warn);
 }
 
 .btn {
     padding: 8px 14px;
-    border: 1px solid #d1d5db;
-    background: #f9fafb;
+    border: 1px solid var(--btn-border);
+    background: var(--btn-bg);
     border-radius: 10px;
     cursor: pointer;
     transition: background .15s ease, border-color .15s ease, transform .02s ease;
 }
 
 .btn:hover {
-    background: #f3f4f6;
+    background: var(--btn-hover-bg);
 }
 
 .btn:active {
@@ -176,7 +334,7 @@ input, textarea, select, code, pre, .selectable {
 }
 
 .btn.ghost {
-    background: #fff;
+    background: var(--panel-bg);
 }
 
 .btn.loading {
@@ -192,61 +350,68 @@ input, textarea, select, code, pre, .selectable {
     z-index: 2000;
     padding: 8px 12px;
     border-radius: 10px;
-    border: 1px solid var(--border, #e5e7eb);
-    background: #fff;
-    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    border: 1px solid var(--border);
+    background: var(--panel-bg);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .08);
     opacity: 0;
     transition: opacity .15s ease;
     pointer-events: none;
-    color: #111;
+    color: var(--color-text);
     font-size: 14px;
 }
-.toast.visible { opacity: 1; }
-.toast.info    { border-color:#ddd; }
-.toast.success { border-color:#16a34a; }
-.toast.error   { border-color:#dc2626; }
 
-/* 提示块 */
+.toast.visible {
+    opacity: 1;
+}
+
+.toast.info {
+    border-color: var(--toast-info-border);
+}
+
+.toast.success {
+    border-color: var(--toast-success-border);
+}
+
+.toast.error {
+    border-color: var(--toast-error-border);
+}
+
 .notice {
     margin-top: 8px;
     padding: 8px 10px;
-    border: 1px solid #fde68a;
-    background: #fffbeb;
-    color: #92400e;
+    border: 1px solid var(--notice-border);
+    background: var(--notice-bg);
+    color: var(--notice-fg);
     border-radius: 8px;
 }
 
 .hint {
-    color: #6b7280;
+    color: var(--color-muted);
     font-size: 12px;
 }
 
-.form-input,
-select,
-textarea {
+.form-input, select, textarea {
     width: 100%;
     max-width: var(--field-max);
     padding: 9px 12px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--input-border);
     border-radius: 10px;
-    background: #fff;
+    background: var(--panel-bg);
     color: var(--text);
     transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
     outline: none;
     line-height: 1.3;
 }
 
-.form-input:focus,
-select:focus,
-textarea:focus {
+.form-input:focus, select:focus, textarea:focus {
     border-color: var(--ring);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, .15);
-    background: #fff;
+    background: var(--panel-bg);
 }
 
 .form-input[disabled], select[disabled], textarea[disabled] {
-    background: #f3f4f6;
-    color: #9ca3af;
+    background: var(--input-disabled-bg);
+    color: var(--color-hint);
     cursor: not-allowed;
 }
 
@@ -303,7 +468,7 @@ textarea:focus {
 }
 
 .row > label {
-    color: #111827;
+    color: var(--color-text);
 }
 
 .row > *:not(label) > .form-input,
@@ -359,15 +524,16 @@ textarea:focus {
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px;
-    background: #0b1220;
-    color: #e5e7eb;
+    background: var(--log-bg);
+    color: var(--log-fg);
     font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .empty {
-    color: #9ca3af;
+    color: var(--color-hint);
 }
-.fullwidth-row{
+
+.fullwidth-row {
     max-width: none !important;
     width: 100% !important;
     margin: 0 !important;
@@ -379,16 +545,181 @@ textarea:focus {
     right: 50%;
     margin-left: -50vw;
     margin-right: -50vw;
-    width: 100vw;              /* 视口宽度 */
-    padding-left: 16px;        /* 固定左右边距 */
+    width: 100vw;
+    padding-left: 16px;
     padding-right: 16px;
     box-sizing: border-box;
 }
 
-/* 以防父级把 app-main 设成 flex 居中，强制回到块级并占满 */
 .app-main {
     display: block !important;
     max-width: none !important;
     width: 100% !important;
     margin: 0 !important;
+}
+
+.gamebar {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 24px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--panel-radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .08);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 60;
+}
+
+.gb-title {
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: .06em;
+    color: var(--muted);
+    text-transform: uppercase;
+}
+
+.nav-btn,
+.btn,
+.win-btn {
+    color: var(--text);
+}
+
+.nav-btn:focus-visible,
+.btn:focus-visible,
+.win-btn:focus-visible,
+.nav-icon:focus-visible,
+.sidebar button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
+.nav-icon.active {
+    background: var(--badge-ok-bg);
+    border-color: var(--badge-ok-border);
+    box-shadow: inset 0 0 0 1px var(--badge-ok-border);
+}
+
+.toast {
+    border-color: var(--border);
+}
+
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 8px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-alt);
+}
+
+:root {
+    color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+}
+
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 100%;
+    max-width: var(--field-max);
+    padding: 9px 12px;
+    padding-right: 28px;
+    border: 1px solid var(--input-border) !important;
+    border-radius: 10px;
+    background-color: var(--input-bg) !important;
+    color: var(--text) !important;
+    transition: background-color .15s, border-color .15s, box-shadow .15s;
+    outline: none;
+
+    /* 自绘箭头 */
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 14px) 48%, calc(100% - 9px) 48%;
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+}
+
+select:hover {
+    background-color: var(--input-hover-bg) !important;
+    border-color: var(--input-hover-border) !important;
+}
+
+select:focus {
+    background-color: var(--input-active-bg) !important;
+    border-color: var(--ring) !important;
+    box-shadow: var(--input-focus-ring) !important;
+}
+
+/* 支持 :has 的浏览器：空值/已值 两态 */
+select:has(option:checked[value=""]):not(:focus) {
+    background-color: var(--input-bg) !important;
+    color: var(--color-hint) !important;
+}
+
+select:has(option:checked:not([value=""])):not(:focus) {
+    background-color: var(--input-active-bg) !important;
+    border-color: var(--input-hover-border) !important;
+}
+
+/* 不支持 :has 的浏览器（靠 JS 类名） */
+select.is-empty:not(:focus) {
+    background-color: var(--input-bg) !important;
+    color: var(--color-hint) !important;
+}
+
+select.has-value:not(:focus) {
+    background-color: var(--input-active-bg) !important;
+    border-color: var(--input-hover-border) !important;
+}
+
+/* 展开态选项（系统绘制） */
+select option {
+    background-color: var(--panel-bg);
+    color: var(--text);
+}
+
+select option:checked {
+    background: var(--input-selected-bg) linear-gradient(0 0);
+    color: var(--input-selected-fg);
+}
+
+/* 聚焦时的当前项更强对比 */
+select:focus option:checked {
+    background: var(--ring) linear-gradient(0 0);
+    color: #fff;
+}
+
+/* 深色轻微内阴影，避免和面板糊一起 */
+:root[data-theme="dark"] select {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .02);
+}
+
+/* 让我们可控的列表项也有一致高亮 */
+.option.is-selected, .listitem.is-selected, [aria-selected="true"] {
+    background-color: var(--input-selected-bg) !important;
+    color: var(--input-selected-fg) !important;
+}
+
+/* 复选/单选颜色 */
+input[type="checkbox"], input[type="radio"] {
+    accent-color: var(--ring);
+}
+
+/* 校验失败高亮 */
+input:invalid, textarea:invalid, select:invalid {
+    border-color: var(--toast-error-border);
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, .18);
 }

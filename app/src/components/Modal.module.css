@@ -1,7 +1,7 @@
 .overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, .4);
+    background: var(--overlay-scrim);
     z-index: 999;
     display: flex;
     align-items: center;
@@ -12,22 +12,22 @@
 .card {
     max-width: 95vw;
     max-height: 90vh;
-    overflow: hidden; /* 由外层负责圆角裁切 */
-    background: #fff;
+    overflow: hidden;
+    background: var(--panel);
     border-radius: 12px;
-    border: 1px solid var(--border, #ddd);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, .25);
+    border: 1px solid var(--border);
+    box-shadow: var(--elev-shadow);
 }
 
 .header {
     padding: 12px 16px;
-    border-bottom: 1px solid var(--border, #eee);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
     position: sticky;
     top: 0;
-    background: #fff;
+    background: var(--panel-bg);
     z-index: 1;
     border-top-left-radius: 12px;
     border-top-right-radius: 12px;
@@ -65,7 +65,7 @@
 }
 
 .body::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, .22);
+    background-color: var(--scrollbar-thumb);
     border-radius: 8px;
     border: 2px solid transparent;
     background-clip: content-box;
@@ -73,5 +73,5 @@
 
 .body {
     scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, .35) transparent;
+    scrollbar-color: var(--scrollbar-thumb-alt) transparent;
 }

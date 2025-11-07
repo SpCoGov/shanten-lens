@@ -1,8 +1,9 @@
 {
   "devDependencies": {
+    "@tauri-apps/cli": "^2.9.2",
     "concurrently": "^9.2.1"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.8.0"
+    "@tauri-apps/api": "^2.9.0"
   }
 }

@@ -1,8 +1,9 @@
 import React from "react";
+import "../styles/theme.css";
 import Tile from "./Tile";
 
 const emitHover = (tile: string | null) =>
-    window.dispatchEvent(new CustomEvent("shanten:hover-tile", { detail: tile }));
+    window.dispatchEvent(new CustomEvent("shanten:hover-tile", {detail: tile}));
 
 export default function ReplacementPanel({
                                              replacementTiles,
@@ -39,7 +40,7 @@ export default function ReplacementPanel({
             rafRef.current = null;
             return;
         }
-        el.scrollLeft = current + diff * 0.22; // 缓动系数：越大越快
+        el.scrollLeft = current + diff * 0.22;
         rafRef.current = requestAnimationFrame(animate);
     }, []);
 
@@ -65,10 +66,10 @@ export default function ReplacementPanel({
     const lastIdx = Math.max(-1, usedCount - 1);
 
     return (
-        <section className="mj-panel" style={{ marginTop: 12, overflowY: "hidden" }}>
-            <div style={{ marginBottom: 8, display: "flex", alignItems: "baseline", gap: 8 }}>
-                <div style={{ fontWeight: 600 }}>替换序列</div>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>
+        <section className="mj-panel" style={{marginTop: 12, overflowY: "hidden"}}>
+            <div style={{marginBottom: 8, display: "flex", alignItems: "baseline", gap: 8}}>
+                <div style={{fontWeight: 600}}>替换序列</div>
+                <div style={{fontSize: 12, color: "var(--muted)"}}>
                     可替换 {replacementTiles.length} 张 · 已替换 {usedCount} 张
                 </div>
             </div>
@@ -93,12 +94,12 @@ export default function ReplacementPanel({
                 {replacementTiles.map((t, idx) => {
                     const used = idx <= lastIdx;
                     return (
-                        <div key={`${t}-${idx}`} style={{ display: "grid", justifyItems: "center" }}>
+                        <div key={`${t}-${idx}`} style={{display: "grid", justifyItems: "center"}}>
                             <div
                                 style={{
                                     position: "relative",
                                     borderRadius: 8,
-                                    outline: used ? "2px solid rgba(16,185,129,.85)" : "none",
+                                    outline: used ? "2px solid color-mix(in srgb, var(--state-ok) 85%, transparent)" : "none",
                                     outlineOffset: used ? 2 : 0,
                                     marginBottom: 10,
                                 }}
@@ -125,11 +126,11 @@ export default function ReplacementPanel({
                                             transform: "translate(-50%, -50%)",
                                             fontSize: 13,
                                             fontWeight: 700,
-                                            color: "#fff",
-                                            background: "rgba(16,185,129,0.88)",
+                                            color: "var(--on-strong)",
+                                            background: "color-mix(in srgb, var(--state-ok) 88%, transparent)",
                                             padding: "4px 10px",
                                             borderRadius: 8,
-                                            boxShadow: "0 0 6px rgba(0,0,0,0.25)",
+                                            boxShadow: "var(--elev-shadow)",
                                             pointerEvents: "none",
                                         }}
                                     >
@@ -138,19 +139,27 @@ export default function ReplacementPanel({
                                 )}
                             </div>
 
-                            <div style={{ height: 18, display: "grid", placeItems: "center" }}>
+                            <div style={{height: 18, display: "grid", placeItems: "center"}}>
                                 {idx === lastIdx && usedCount > 0 && (
-                                    <div style={{ display: "grid", justifyItems: "center", gap: 2 }}>
+                                    <div style={{display: "grid", justifyItems: "center", gap: 2}}>
                                         <div
                                             style={{
                                                 width: 0,
                                                 height: 0,
                                                 borderLeft: "6px solid transparent",
                                                 borderRight: "6px solid transparent",
-                                                borderTop: "8px solid rgba(59,130,246,.9)",
+                                                borderTop:
+                                                    "8px solid color-mix(in srgb, var(--color-ring) 90%, transparent)",
                                             }}
                                         />
-                                        <div style={{ fontSize: 11, color: "rgba(59,130,246,.9)" }}>当前</div>
+                                        <div
+                                            style={{
+                                                fontSize: 11,
+                                                color: "color-mix(in srgb, var(--color-ring) 90%, transparent)",
+                                            }}
+                                        >
+                                            当前
+                                        </div>
                                     </div>
                                 )}
                             </div>

@@ -1,4 +1,5 @@
 import React from "react";
+import "../styles/theme.css";
 import AmuletCard from "./AmuletCard";
 import { type CandidateEffectRef, type EffectItem } from "../lib/gamestate";
 
@@ -30,10 +31,10 @@ export default function CandidateBar({
         return (
             <div
                 style={{
-                    border: "1px dashed var(--border, #ddd)",
+                    border: "1px dashed var(--border)",
                     borderRadius: 10,
                     padding: 6,
-                    color: "var(--muted-fg, #888)",
+                    color: "var(--muted-fg)",
                     fontSize: 12,
                 }}
             >

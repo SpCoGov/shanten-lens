@@ -1,6 +1,17 @@
 import React from "react";
+import "../styles/theme.css";
 import {ws} from "../lib/ws";
-import {addTargetAmulet, addTargetBadge, formatLevelNum, parseLevelText, patchAutoConfig, removeTargetAt, type TargetItem, useAutoRunner, setTargetValue,} from "../lib/autoRunnerStore";
+import {
+    addTargetAmulet,
+    addTargetBadge,
+    formatLevelNum,
+    parseLevelText,
+    patchAutoConfig,
+    removeTargetAt,
+    type TargetItem,
+    useAutoRunner,
+    setTargetValue,
+} from "../lib/autoRunnerStore";
 import {useRegistry} from "../lib/registryStore";
 import AmuletEditorModal, {type EditedAmulet} from "../components/AmuletEditorModal";
 import BadgePickerModal from "../components/BadgePickerModal";
@@ -15,6 +26,82 @@ function formatDuration(ms: number): string {
     const pad = (n: number) => n.toString().padStart(2, "0");
     return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
 }
+
+const S = {
+    page: {padding: 16} as const,
+
+    section: {
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        background: "var(--panel)",
+        padding: 12,
+        marginBottom: 12,
+    } as const,
+
+    h2: {margin: "8px 0 12px", color: "var(--text)"} as const,
+
+    labelText: {color: "var(--text)", whiteSpace: "nowrap"} as const,
+    subText: {color: "var(--muted)", fontSize: 12} as const,
+    subText13: {color: "var(--muted)", fontSize: 13} as const,
+
+    input: {
+        width: 120,
+        padding: "6px 8px",
+        borderRadius: 8,
+        border: "1px solid var(--border)",
+        background: "var(--panel)",
+        color: "var(--text)",
+    } as const,
+
+    inputWide: {
+        width: "100%",
+        maxWidth: 280,
+        padding: "6px 8px",
+        borderRadius: 8,
+        border: "1px solid var(--border)",
+        background: "var(--panel)",
+        color: "var(--text)",
+    } as const,
+
+    select: {
+        padding: "6px 8px",
+        borderRadius: 8,
+        border: "1px solid var(--border)",
+        background: "var(--panel)",
+        color: "var(--text)",
+    } as const,
+
+    targetCard: {
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        background: "var(--panel)",
+        padding: 10,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+    } as const,
+
+    targetCardBadge: {
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        background: "var(--panel)",
+        padding: 10,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+    } as const,
+
+    valueBox: {
+        width: 90,
+        padding: "6px 8px",
+        borderRadius: 8,
+        border: "1px solid var(--border)",
+        background: "var(--panel)",
+        color: "var(--text)",
+    } as const,
+
+    gridGap10: {display: "grid", gap: 10} as const,
+};
 
 export default function AutoRunnerPage() {
     const {config, status} = useAutoRunner();
@@ -41,9 +128,7 @@ export default function AutoRunnerPage() {
     }, [config.cutoff_level]);
 
     React.useEffect(() => {
-        if (refreshing) {
-            setRefreshing(false);
-        }
+        if (refreshing) setRefreshing(false);
     }, [status, refreshing]);
 
     const onSave = React.useCallback(() => {
@@ -68,7 +153,7 @@ export default function AutoRunnerPage() {
 
         const valueBox = (
             <label style={{display: "inline-flex", alignItems: "center", gap: 6}}>
-                <span style={{color: "#555", whiteSpace: "nowrap"}}>目标价值</span>
+                <span style={S.labelText}>目标价值</span>
                 <input
                     type="number"
                     min={1}
@@ -78,7 +163,7 @@ export default function AutoRunnerPage() {
                         const v = Math.max(1, Math.floor(Number(e.target.value || 1)));
                         setTargetValue(idx, v);
                     }}
-                    style={{width: 90, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd"}}
+                    style={S.valueBox}
                     title="达到该目标时，计作达成的目标数量（默认为 1）"
                 />
             </label>
@@ -91,18 +176,7 @@ export default function AutoRunnerPage() {
             const amuName = amu?.name ?? `ID ${t.id}`;
 
             return (
-                <div
-                    key={idx}
-                    style={{
-                        border: "1px solid #ddd",
-                        borderRadius: 12,
-                        background: "#fff",
-                        padding: 10,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                    }}
-                >
+                <div key={idx} style={S.targetCard}>
                     <AmuletCard item={effectItem} scale={0.7}/>
                     <div style={{lineHeight: 1.6}}>
                         <div>
@@ -113,9 +187,7 @@ export default function AutoRunnerPage() {
                             <b>印章</b>：
                             {t.badge != null ? (badgeById.get(t.badge)?.name ?? t.badge) : "任意/无均可"}
                         </div>
-                        <div style={{color: "#888", fontSize: 12}}>
-                            判定：若设置了印章则需“拥有该印章的护身符”；未设置则该护身符无或任意印章均满足。
-                        </div>
+                        <div style={S.subText}>判定：若设置了印章则需“拥有该印章的护身符”；未设置则该护身符无或任意印章均满足。</div>
                     </div>
                     <div style={{flex: 1}}/>
                     {valueBox}
@@ -128,24 +200,13 @@ export default function AutoRunnerPage() {
             const badge = badgeById.get(t.id) || null;
             const icon = `/assets/badge/badge_${t.id}.png`;
             return (
-                <div
-                    key={idx}
-                    style={{
-                        border: "1px solid #ddd",
-                        borderRadius: 12,
-                        background: "#fff",
-                        padding: 10,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                    }}
-                >
+                <div key={idx} style={S.targetCardBadge}>
                     <img src={icon} alt={badge?.name ?? String(t.id)} style={{width: 64, height: 64}} draggable={false}/>
                     <div style={{lineHeight: 1.6}}>
                         <div>
                             <b>印章</b>：{badge ? `${badge.name}` : `ID ${t.id}`}
                         </div>
-                        <div style={{color: "#888", fontSize: 12}}>判定：拥有该印章即可计数。</div>
+                        <div style={S.subText}>判定：拥有该印章即可计数。</div>
                     </div>
                     <div style={{flex: 1}}/>
                     {valueBox}
@@ -173,55 +234,33 @@ export default function AutoRunnerPage() {
     const opInterval = Number.isFinite(Number(config.op_interval_ms)) ? Number(config.op_interval_ms) : 1000;
 
     return (
-        <div style={{padding: 16}}>
-            <h2 style={{margin: "8px 0 12px"}}>自动化</h2>
+        <div style={S.page}>
+            <h2 style={S.h2}>自动化</h2>
 
-            <section
-                style={{
-                    border: "1px solid var(--border,#ddd)",
-                    borderRadius: 12,
-                    background: "#fff",
-                    padding: 12,
-                    marginBottom: 12,
-                }}
-            >
-                <div style={{fontWeight: 600, marginBottom: 6}}>运行信息</div>
+            <section style={S.section}>
+                <div style={{fontWeight: 600, marginBottom: 6, color: "var(--text)"}}>运行信息</div>
                 <div style={{display: "flex", gap: 12, flexWrap: "wrap"}}>
                     <span className="badge">已运行时长：{elapsedDisplay}</span>
                     <span className="badge">已运行局数：{status.runs ?? 0}</span>
                     <span className="badge">历史最高目标数：{status.best_achieved_count ?? 0}</span>
-                    <span className="badge" title="run_tick 的调度间隔（毫秒）">
-                        操作间隔：{opInterval}ms
-                    </span>
+                    <span className="badge" title="run_tick 的调度间隔（毫秒）">操作间隔：{opInterval}ms</span>
                 </div>
-                <div style={{marginTop: 8, color: "#666", fontSize: 13}}>
+                <div style={{marginTop: 8, ...S.subText13, lineHeight: 1.45}}>
                     <div>当前步骤：{status.current_step ?? "-"}</div>
                     <div>最近错误：{status.last_error ?? "-"}</div>
                     <div>启动时间：{status.started_at ? new Date(status.started_at).toLocaleString() : "-"}</div>
                 </div>
             </section>
 
-            <section
-                style={{
-                    border: "1px solid var(--border,#ddd)",
-                    borderRadius: 12,
-                    background: "#fff",
-                    padding: 12,
-                    marginBottom: 12,
-                }}
-            >
-                <div style={{fontWeight: 600, marginBottom: 6}}>运行控制</div>
+            <section style={S.section}>
+                <div style={{fontWeight: 600, marginBottom: 6, color: "var(--text)"}}>运行控制</div>
 
                 <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap"}}>
                     <button
                         className="nav-btn"
                         onClick={start}
                         disabled={Boolean(disabledReason) || status.mode === "step"}
-                        title={
-                            status.mode === "step"
-                                ? "手动单步模式下无需启动，直接点“下一步”"
-                                : disabledReason || undefined
-                        }
+                        title={status.mode === "step" ? "手动单步模式下无需启动，直接点“下一步”" : disabledReason || undefined}
                     >
                         {working ? "运行中…" : "启动"}
                     </button>
@@ -243,7 +282,7 @@ export default function AutoRunnerPage() {
                     </button>
 
                     <label style={{display: "inline-flex", alignItems: "center", gap: 8, marginLeft: 6}}>
-                        <span style={{color: "#555", whiteSpace: "nowrap"}}>操作间隔</span>
+                        <span style={S.labelText}>操作间隔</span>
                         <input
                             type="number"
                             min={0}
@@ -255,9 +294,9 @@ export default function AutoRunnerPage() {
                                 patchAutoConfig({op_interval_ms: clamped});
                             }}
                             title="run_tick 的调度间隔（毫秒）。建议 1000（1秒）；过低可能被暂时封禁IP。"
-                            style={{width: 120, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd"}}
+                            style={S.input}
                         />
-                        <span style={{color: "#888", fontSize: 12, whiteSpace: "nowrap"}}>ms</span>
+                        <span style={S.subText}>ms</span>
                     </label>
 
                     <span className={`badge ${working ? "ok" : "down"}`}>{working ? "运行中" : "已停止"}</span>
@@ -268,39 +307,35 @@ export default function AutoRunnerPage() {
                         const text = ready === true ? "业务流：已选定" : ready === false ? "业务流：未选定" : "业务流：未知";
                         const tip = status.preferred_flow_peer
                             ? `peer: ${status.preferred_flow_peer}`
-                            : (ready === false ? "未绑定游戏业务流" : undefined);
+                            : ready === false
+                                ? "未绑定游戏业务流"
+                                : undefined;
                         return (
-                            <span className={`badge ${cls}`} title={tip}>{text}</span>
+                            <span className={`badge ${cls}`} title={tip}>
+                {text}
+              </span>
                         );
                     })()}
                 </div>
 
-                <p style={{marginTop: 8, color: "#666", fontSize: 13, lineHeight: 1.5}}>
+                <p style={{marginTop: 8, ...S.subText13, lineHeight: 1.5}}>
                     达成下方的“结束条件”即停止；若到达“截止关卡”仍未达成，则自动重开。
                 </p>
             </section>
 
-            <section
-                style={{
-                    border: "1px solid var(--border,#ddd)",
-                    borderRadius: 12,
-                    background: "#fff",
-                    padding: 12,
-                    marginBottom: 12,
-                }}
-            >
-                <div style={{fontWeight: 600, marginBottom: 6}}>结束条件</div>
+            <section style={S.section}>
+                <div style={{fontWeight: 600, marginBottom: 6, color: "var(--text)"}}>结束条件</div>
 
                 <div style={{display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12}}>
-                    <span style={{color: "#555"}}>目标数量</span>
+                    <span style={S.labelText}>目标数量</span>
                     <input
                         type="number"
                         min={1}
                         value={Number(config.end_count ?? 1)}
                         onChange={(e) => patchAutoConfig({end_count: Math.max(1, Number(e.target.value || 1))})}
-                        style={{width: 100, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd"}}
+                        style={{...S.input, width: 100}}
                     />
-                    <span style={{color: "#888", fontSize: 12}}>（集齐该数量的目标即结束）</span>
+                    <span style={S.subText}>（集齐该数量的目标即结束）</span>
                 </div>
 
                 <div style={{display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap"}}>
@@ -312,27 +347,19 @@ export default function AutoRunnerPage() {
                     </button>
                 </div>
 
-                <div style={{display: "grid", gap: 10}}>
+                <div style={S.gridGap10}>
                     {config.targets.length === 0 ? (
-                        <div style={{color: "#888"}}>尚未添加目标。</div>
+                        <div style={{color: "var(--muted)"}}>尚未添加目标。</div>
                     ) : (
                         config.targets.map((t, i) => renderTarget(t, i))
                     )}
                 </div>
             </section>
 
-            <section
-                style={{
-                    border: "1px solid var(--border,#ddd)",
-                    borderRadius: 12,
-                    background: "#fff",
-                    padding: 12,
-                    marginBottom: 12,
-                }}
-            >
-                <div style={{fontWeight: 600, marginBottom: 6}}>截止关卡</div>
+            <section style={S.section}>
+                <div style={{fontWeight: 600, marginBottom: 6, color: "var(--text)"}}>截止关卡</div>
                 <div style={{display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap"}}>
-                    <span style={{color: "#555"}}>关卡</span>
+                    <span style={S.labelText}>关卡</span>
                     <input
                         value={levelText}
                         placeholder="例如 1-1"
@@ -342,29 +369,21 @@ export default function AutoRunnerPage() {
                             const n = parseLevelText(s);
                             patchAutoConfig({cutoff_level: n ?? 0});
                         }}
-                        style={{width: 130, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd"}}
+                        style={{...S.input, width: 130}}
                     />
                 </div>
-                <p style={{marginTop: 8, color: "#888", fontSize: 12}}>若到该关卡仍未达成“目标数量”，则本局结束并自动重开。</p>
+                <p style={S.subText}>若到该关卡仍未达成“目标数量”，则本局结束并自动重开。</p>
             </section>
 
-            <section
-                style={{
-                    border: "1px solid var(--border,#ddd)",
-                    borderRadius: 12,
-                    background: "#fff",
-                    padding: 12,
-                    marginBottom: 12,
-                }}
-            >
-                <div style={{fontWeight: 600, marginBottom: 6}}>执行模式</div>
+            <section style={S.section}>
+                <div style={{fontWeight: 600, marginBottom: 6, color: "var(--text)"}}>执行模式</div>
                 <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap"}}>
                     <label style={{display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap"}}>
-                        <span>模式</span>
+                        <span style={S.labelText}>模式</span>
                         <select
                             value={status.mode ?? "continuous"}
                             onChange={(e) => ws.send({type: "autorun_control", data: {action: "set_mode", mode: e.target.value}})}
-                            style={{padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd"}}
+                            style={S.select}
                         >
                             <option value="continuous">持续运行</option>
                             <option value="step">手动单步</option>
@@ -380,22 +399,13 @@ export default function AutoRunnerPage() {
                         下一步
                     </button>
                 </div>
-                <p style={{marginTop: 8, color: "#888", fontSize: 12}}>
-                    · 持续运行：后台自动循环执行。<br/>
-                    · 手动单步：不自动运行，点击“下一步”仅执行一次调度。
+                <p style={{marginTop: 8, ...S.subText, lineHeight: 1.5}}>
+                    · 持续运行：后台自动循环执行。<br/>· 手动单步：不自动运行，点击“下一步”仅执行一次调度。
                 </p>
             </section>
 
-            <section
-                style={{
-                    border: "1px solid var(--border,#ddd)",
-                    borderRadius: 12,
-                    background: "#fff",
-                    padding: 12,
-                    marginBottom: 12,
-                }}
-            >
-                <div style={{fontWeight: 600, marginBottom: 6}}>邮件通知</div>
+            <section style={S.section}>
+                <div style={{fontWeight: 600, marginBottom: 6, color: "var(--text)"}}>邮件通知</div>
 
                 {(() => {
                     const email = (config.email_notify ?? {
@@ -408,102 +418,99 @@ export default function AutoRunnerPage() {
                         to: "",
                     });
 
-                    const patchEmail = (kv: Partial<typeof email>) =>
-                        patchAutoConfig({email_notify: {...email, ...kv}});
+                    const patchEmail = (kv: Partial<typeof email>) => patchAutoConfig({email_notify: {...email, ...kv}});
 
-                    const box = {width: "100%", maxWidth: 280, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd"} as const;
                     const field = {display: "grid", gap: 6, justifyItems: "start"} as const;
-                    const rowGrid = (cols: string) => ({
-                        display: "grid",
-                        gridTemplateColumns: cols,
-                        columnGap: 12,
-                        rowGap: 10,
-                        alignItems: "start",
-                    } as const);
+                    const rowGrid = (cols: string) =>
+                        ({
+                            display: "grid",
+                            gridTemplateColumns: cols,
+                            columnGap: 12,
+                            rowGap: 10,
+                            alignItems: "start",
+                        } as const);
 
                     return (
-                        <div style={{display: "grid", gap: 10}}>
+                        <div style={S.gridGap10}>
                             <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
                                 <input
                                     type="checkbox"
                                     checked={!!email.enabled}
                                     onChange={(e) => patchEmail({enabled: e.target.checked})}
                                 />
-                                <span>启用邮件通知（SMTP）</span>
+                                <span style={S.labelText}>启用邮件通知（SMTP）</span>
                             </label>
 
                             <div style={rowGrid("minmax(220px, 320px) 140px 140px")}>
                                 <label style={field}>
-                                    <span style={{color: "#555"}}>SMTP 服务器</span>
+                                    <span style={S.labelText}>SMTP 服务器</span>
                                     <input
                                         placeholder="smtp.example.com"
                                         value={email.host ?? ""}
                                         onChange={(e) => patchEmail({host: e.target.value.trim()})}
-                                        style={box}
+                                        style={S.inputWide}
                                     />
                                 </label>
 
                                 <label style={field}>
-                                    <span style={{color: "#555"}}>端口</span>
+                                    <span style={S.labelText}>端口</span>
                                     <input
                                         type="number"
                                         min={1}
                                         max={65535}
                                         value={Number(email.port ?? 587)}
-                                        onChange={(e) =>
-                                            patchEmail({port: Math.max(1, Math.min(65535, Number(e.target.value || 587)))})
-                                        }
-                                        style={{...box, maxWidth: 160}}
+                                        onChange={(e) => patchEmail({port: Math.max(1, Math.min(65535, Number(e.target.value || 587)))})}
+                                        style={{...S.inputWide, maxWidth: 160}}
                                     />
                                 </label>
 
                                 <label style={field}>
-                                    <span style={{color: "#555"}}>SSL/TLS</span>
+                                    <span style={S.labelText}>SSL/TLS</span>
                                     <div style={{display: "flex", alignItems: "center", gap: 8, height: 36}}>
                                         <input
                                             type="checkbox"
                                             checked={!!email.ssl}
                                             onChange={(e) => patchEmail({ssl: e.target.checked})}
-                                            style={{transform: "translateY(1px)"}} // 微调视觉居中
+                                            style={{transform: "translateY(1px)"}}
                                         />
-                                        <span style={{fontSize: 12, color: "#666"}}>{email.ssl ? "开启" : "关闭"}</span>
+                                        <span style={S.subText}>{email.ssl ? "开启" : "关闭"}</span>
                                     </div>
                                 </label>
                             </div>
 
                             <div style={rowGrid("minmax(220px, 320px) minmax(220px, 320px)")}>
                                 <label style={field}>
-                                    <span style={{color: "#555"}}>发件邮箱</span>
+                                    <span style={S.labelText}>发件邮箱</span>
                                     <input
                                         type="email"
                                         placeholder="sender@example.com"
                                         value={email.from ?? ""}
                                         onChange={(e) => patchEmail({from: e.target.value.trim()})}
-                                        style={box}
+                                        style={S.inputWide}
                                     />
                                 </label>
 
                                 <label style={field}>
-                                    <span style={{color: "#555"}}>密码/授权码</span>
+                                    <span style={S.labelText}>密码/授权码</span>
                                     <input
                                         type="password"
                                         placeholder="密码"
                                         value={email.pass ?? ""}
                                         onChange={(e) => patchEmail({pass: e.target.value})}
-                                        style={box}
+                                        style={S.inputWide}
                                     />
                                 </label>
                             </div>
 
                             <div style={rowGrid("minmax(220px, 320px)")}>
                                 <label style={field}>
-                                    <span style={{color: "#555"}}>收件邮箱</span>
+                                    <span style={S.labelText}>收件邮箱</span>
                                     <input
                                         type="email"
                                         placeholder="you@example.com"
                                         value={email.to ?? ""}
                                         onChange={(e) => patchEmail({to: e.target.value.trim()})}
-                                        style={box}
+                                        style={S.inputWide}
                                     />
                                 </label>
                             </div>
@@ -517,14 +524,19 @@ export default function AutoRunnerPage() {
                                         !(email.host && email.port) ||
                                         !(email.from || "").includes("@") ||
                                         !(email.to || "").includes("@") ||
-                                        !(email.pass)
+                                        !email.pass
                                     }
                                     title={
-                                        !email.enabled ? "请先启用邮件通知"
-                                            : !(email.host && email.port) ? "请填写服务器与端口"
-                                                : !(email.from || "").includes("@") ? "请填写发件邮箱"
-                                                    : !(email.pass) ? "请填写密码"
-                                                        : !(email.to || "").includes("@") ? "请填写收件邮箱"
+                                        !email.enabled
+                                            ? "请先启用邮件通知"
+                                            : !(email.host && email.port)
+                                                ? "请填写服务器与端口"
+                                                : !(email.from || "").includes("@")
+                                                    ? "请填写发件邮箱"
+                                                    : !email.pass
+                                                        ? "请填写密码"
+                                                        : !(email.to || "").includes("@")
+                                                            ? "请填写收件邮箱"
                                                             : undefined
                                     }
                                 >

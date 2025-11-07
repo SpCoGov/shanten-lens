@@ -1,4 +1,5 @@
 import React from "react";
+import "../styles/theme.css";
 import styles from "./Modal.module.css";
 
 export default function Modal({
@@ -14,7 +15,7 @@ export default function Modal({
     title?: string;
     children: React.ReactNode;
     width?: number;
-    actions?: React.ReactNode; // 新增
+    actions?: React.ReactNode;
 }) {
     if (!open) return null;
     return (

@@ -1,4 +1,5 @@
 import React from "react";
+import "../styles/theme.css";
 import {type EffectItem} from "../lib/gamestate";
 import {getRegistry} from "../lib/registryStore";
 
@@ -28,9 +29,7 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
     if (amu && amu.rarity && RAR_BG_INDEX[amu.rarity]) bgIndex = RAR_BG_INDEX[amu.rarity];
 
     const isWide = item.volume === 2;
-    const bgPath = isWide
-        ? `/assets/amulet/fu_widen_bg${bgIndex}.jpg`
-        : `/assets/amulet/fu_bg${bgIndex}.jpg`;
+    const bgPath = isWide ? `/assets/amulet/fu_widen_bg${bgIndex}.jpg` : `/assets/amulet/fu_bg${bgIndex}.jpg`;
     const iconPath = amu ? `/assets/amulet/fu_${pad4(amu.icon_id)}.png` : null;
     const badgePath = item.badge ? `/assets/badge/badge_${item.badge.id}.png` : null;
 
@@ -59,9 +58,7 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
                 flex: "0 0 auto",
             }}
             title={
-                unknown
-                    ? `未知护身符 ID=${regId} (raw=${rawId})`
-                    : `${amu!.name}${plus ? "（Plus）" : ""}`
+                unknown ? `未知护身符 ID=${regId} (raw=${rawId})` : `${amu!.name}${plus ? "（Plus）" : ""}`
             }
         >
             {unknown ? (
@@ -69,9 +66,10 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
                     style={{
                         position: "absolute",
                         inset: 0,
-                        background: "#ff4d4f",
+                        background: "color-mix(in srgb, var(--state-down) 75%, transparent)",
                         borderRadius: RADIUS,
-                        border: "2px solid #b71c1c",
+                        border: "2px solid color-mix(in srgb, var(--state-down) 55%, transparent)",
+                        boxShadow: "var(--shadow-md)",
                     }}
                 />
             ) : (
@@ -85,7 +83,8 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
                         height: "100%",
                         objectFit: "cover",
                         borderRadius: RADIUS,
-                        border: "1px solid var(--border, #ddd)",
+                        border: "1px solid var(--border)",
+                        boxShadow: "var(--shadow-sm)",
                     }}
                     draggable={false}
                 />
@@ -118,7 +117,7 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
                         bottom: Math.round(6 * scale),
                         width: PLUS,
                         height: PLUS,
-                        filter: "drop-shadow(0 1px 2px rgba(0,0,0,.35))",
+                        filter: "drop-shadow(var(--shadow-text))",
                     }}
                     draggable={false}
                 />
@@ -127,14 +126,14 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
             {badgePath && (
                 <img
                     src={badgePath}
-                    alt="Badge"
+                    alt={bad?.name ?? "Badge"}
                     style={{
                         position: "absolute",
                         right: Math.round(4 * scale),
                         top: Math.round(4 * scale),
                         width: BADGE,
                         height: BADGE,
-                        filter: "drop-shadow(0 1px 2px rgba(0,0,0,.35))",
+                        filter: "drop-shadow(var(--shadow-text))",
                     }}
                     draggable={false}
                 />
@@ -148,10 +147,10 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        color: "#fff",
+                        color: "var(--on-strong)",
                         fontWeight: 700,
                         fontSize: Math.max(12, Math.round(14 * scale)),
-                        textShadow: "0 1px 2px rgba(0,0,0,.35)",
+                        textShadow: "var(--shadow-text)",
                     }}
                 >
                     {`未知ID ${regId}`}
