@@ -3,6 +3,7 @@ import React, {useEffect, useRef, useState} from "react";
 import {ws} from "../lib/ws";
 import styles from "./SettingsPage.module.css";
 import { pushToast } from "../lib/toast";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 type Tables = Record<string, Record<string, any>>;
 
@@ -91,6 +92,10 @@ export default function SettingsPage() {
             <div className="settings-header">
                 <h2 className="title">设置</h2>
                 <div className="toolbar">
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginRight: 8 }}>
+                        <span>语言</span>
+                        <LanguageSwitcher />
+                    </div>
                     <button className="btn" onClick={manualSync}>手动同步</button>
                     <button className="btn" onClick={openConfigDir}>打开配置目录</button>
                 </div>
