@@ -1,27 +1,32 @@
 import React from "react";
 import "../styles/theme.css";
 import styles from "./AboutPage.module.css";
+import {useTranslation, Trans} from "react-i18next";
 
 export default function AboutPage() {
+    const {t} = useTranslation();
     return (
         <div className={styles.wrap}>
-            <h1>向听镜 <span className={styles.sub}>Shanten Lens</span></h1>
+            <h1>{t("app.title")} <span className={styles.sub}>{t("app.subtitle")}</span></h1>
 
             <div className={styles.meta}>
-                <span className={styles.author}>海绵couna</span>
+                <span className={styles.author}>{t("app.author")}</span>
                 <span className={styles.sep} aria-hidden>·</span>
                 <span className={styles.version}>v1.0.0</span>
                 <span className={styles.build}>(build&nbsp;1)</span>
             </div>
 
             <section>
-                <h2>版权与许可</h2>
+                <h2>{t("about.section_license_title")}</h2>
                 <p>
-                    © {new Date().getFullYear()} 向听镜（Shanten Lens）。本项目采用
-                    <strong> Apache License 2.0</strong>。
+                    <Trans
+                        i18nKey="about.license_copyright_html"
+                        values={{ year: new Date().getFullYear() }}
+                        components={{ strong: <strong /> }}
+                    />
                 </p>
                 <details>
-                    <summary>查看许可摘要</summary>
+                    <summary>{t("about.license_toggle_summary")}</summary>
                     <pre className={styles.license}>
 {`Licensed under the Apache License, Version 2.0 (the "License").
 You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -31,28 +36,31 @@ Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
             </section>
 
             <section>
-                <h2>素材来源</h2>
-                <p>部分资源来源于「雀魂」。仅用于非商业用途与学习研究。</p>
+                <h2>{t("about.section_assets_title")}</h2>
+                <p>{t("about.section_assets_body")}</p>
             </section>
 
             <section>
-                <h2>使用提醒</h2>
+                <h2>{t("about.section_usage_title")}</h2>
                 <p>
-                    为减小影响范围，请<strong>不要在公开场合传播或宣传</strong>本软件及其运行画面
-                    （例如：直播、公开群聊、公开社媒等）。该提醒仅为使用建议，不构成对 Apache 许可的附加法律限制。
+                    <Trans
+                        i18nKey="about.section_usage_body_html"
+                        values={{ year: new Date().getFullYear() }}
+                        components={{ strong: <strong /> }}
+                    />
                 </p>
             </section>
 
             <footer className={styles.footer}>
                 <details>
-                    <summary>仓库地址</summary>
+                    <summary>{t("about.section_repo_title")}</summary>
                     <p className={styles.muted}>
                         <a
                             href="https://github.com/SpCoGov/shanten-lens"
                             target="_blank"
                             rel="noreferrer"
                         >
-                            Github
+                            {t("about.repo_link_text")}
                         </a>
                     </p>
                 </details>

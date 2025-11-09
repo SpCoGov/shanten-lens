@@ -17,7 +17,6 @@
     --label-w: 260px;
 }
 
-/* ===== 通用/基础 ===== */
 * {
     box-sizing: border-box;
 }
@@ -629,6 +628,10 @@ input, textarea, select, code, pre, .selectable {
     color-scheme: dark;
 }
 
+:root[data-theme="dark-green"] {
+    color-scheme: dark;
+}
+
 select {
     appearance: none;
     -webkit-appearance: none;
@@ -644,7 +647,6 @@ select {
     transition: background-color .15s, border-color .15s, box-shadow .15s;
     outline: none;
 
-    /* 自绘箭头 */
     background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
     linear-gradient(135deg, var(--muted) 50%, transparent 50%);
     background-position: calc(100% - 14px) 48%, calc(100% - 9px) 48%;
@@ -663,7 +665,6 @@ select:focus {
     box-shadow: var(--input-focus-ring) !important;
 }
 
-/* 支持 :has 的浏览器：空值/已值 两态 */
 select:has(option:checked[value=""]):not(:focus) {
     background-color: var(--input-bg) !important;
     color: var(--color-hint) !important;
@@ -674,7 +675,6 @@ select:has(option:checked:not([value=""])):not(:focus) {
     border-color: var(--input-hover-border) !important;
 }
 
-/* 不支持 :has 的浏览器（靠 JS 类名） */
 select.is-empty:not(:focus) {
     background-color: var(--input-bg) !important;
     color: var(--color-hint) !important;
@@ -685,7 +685,6 @@ select.has-value:not(:focus) {
     border-color: var(--input-hover-border) !important;
 }
 
-/* 展开态选项（系统绘制） */
 select option {
     background-color: var(--panel-bg);
     color: var(--text);
@@ -696,30 +695,30 @@ select option:checked {
     color: var(--input-selected-fg);
 }
 
-/* 聚焦时的当前项更强对比 */
 select:focus option:checked {
     background: var(--ring) linear-gradient(0 0);
     color: #fff;
 }
 
-/* 深色轻微内阴影，避免和面板糊一起 */
 :root[data-theme="dark"] select {
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .02);
 }
 
-/* 让我们可控的列表项也有一致高亮 */
 .option.is-selected, .listitem.is-selected, [aria-selected="true"] {
     background-color: var(--input-selected-bg) !important;
     color: var(--input-selected-fg) !important;
 }
 
-/* 复选/单选颜色 */
 input[type="checkbox"], input[type="radio"] {
     accent-color: var(--ring);
 }
 
-/* 校验失败高亮 */
 input:invalid, textarea:invalid, select:invalid {
     border-color: var(--toast-error-border);
     box-shadow: 0 0 0 3px rgba(248, 113, 113, .18);
 }
+
+.toolbar { align-items: center; }
+.badge { white-space: nowrap; }
+.row.tight { gap: 6px; }
+.hint-inline { display: inline-flex; align-items: center; }

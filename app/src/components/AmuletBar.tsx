@@ -1,7 +1,9 @@
 import React from "react";
 import "../styles/theme.css";
-import { type EffectItem } from "../lib/gamestate";
+import {type EffectItem} from "../lib/gamestate";
 import AmuletCard from "./AmuletCard";
+import "../lib/i18n"
+import {useTranslation} from "react-i18next";
 
 export default function AmuletBar({
                                       items,
@@ -13,7 +15,7 @@ export default function AmuletBar({
     max?: number;
 }) {
     const list = Array.isArray(items) ? items.slice(0, max) : [];
-
+    const {t} = useTranslation();
     if (list.length === 0) {
         return (
             <div
@@ -25,7 +27,7 @@ export default function AmuletBar({
                     fontSize: 12,
                 }}
             >
-                暂无护身符
+                {t("noAmulet")}
             </div>
         );
     }
@@ -42,7 +44,7 @@ export default function AmuletBar({
             }}
         >
             {list.map((it) => (
-                <AmuletCard key={`${it.uid}-${it.id}`} item={it} scale={scale} />
+                <AmuletCard key={`${it.uid}-${it.id}`} item={it} scale={scale}/>
             ))}
         </div>
     );

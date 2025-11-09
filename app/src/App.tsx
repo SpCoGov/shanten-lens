@@ -30,6 +30,8 @@ import GoodsBar from "./components/GoodsBar";
 import CandidateBar from "./components/CandidateBar";
 import "./fonts/material-symbols.css";
 import {getCurrentWindow} from "@tauri-apps/api/window";
+import "./lib/i18n";
+import {useTranslation} from "react-i18next";
 
 type Route = "home" | "fuse" | "autorun" | "settings" | "diagnostics" | "about";
 
@@ -40,6 +42,7 @@ const MAIN_GAP = 12;
 const appWindow = getCurrentWindow();
 
 function Topbar() {
+    const {t} = useTranslation();
     const onMin = async () => {
         try {
             await appWindow.minimize();
@@ -65,17 +68,17 @@ function Topbar() {
     return (
         <header className="topbar">
             <div className="drag" data-tauri-drag-region>
-                <span className="title">向听镜</span>
+                <span className="title">{t("app.title")}</span>
             </div>
 
             <div className="win" data-tauri-drag-region="false">
-                <button className="win-btn" data-tauri-drag-region="false" title="最小化" onClick={onMin}>
+                <button className="win-btn" data-tauri-drag-region="false" title={t("window.minimize")} onClick={onMin}>
                     <span className="ms">remove</span>
                 </button>
-                <button className="win-btn" data-tauri-drag-region="false" title="最大化/还原" onClick={onTgl}>
+                <button className="win-btn" data-tauri-drag-region="false" title={t("window.maximize")} onClick={onTgl}>
                     <span className="ms">rectangle</span>
                 </button>
-                <button className="win-btn close" data-tauri-drag-region="false" title="关闭" onClick={onClose}>
+                <button className="win-btn close" data-tauri-drag-region="false" title={t("window.close")} onClick={onClose}>
                     <span className="ms">close</span>
                 </button>
             </div>
@@ -84,6 +87,7 @@ function Topbar() {
 }
 
 export default function App() {
+    const {t, i18n} = useTranslation();
     const {toast, visible: toastVisible} = useGlobalToast();
     const [route, setRoute] = React.useState<Route>("home");
     const [connected, setConnected] = React.useState(false);
@@ -109,23 +113,35 @@ export default function App() {
     const [goods, setGoods] = React.useState<GoodsItem[]>([]);
     const [candidates, setCandidates] = React.useState<CandidateEffectRef[]>([]);
 
-    type ThemeMode = "light" | "dark";
+    type ThemeMode = "auto" | "dark" | "dark-green";
+    const THEME_ORDER: ThemeMode[] = ["auto", "dark", "dark-green"];
     const THEME_KEY = "sl-theme";
 
     function applyTheme(t: ThemeMode) {
         const root = document.documentElement;
-        if (t === "dark") {
-            root.setAttribute("data-theme", "dark");
-        } else {
-            root.removeAttribute("data-theme");
+
+        root.removeAttribute("data-theme");
+
+        if (t === "auto") {
+            const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+            if (prefersDark) {
+                root.setAttribute("data-theme", "dark");
+            }
+            return;
+        }
+
+        if (t === "dark" || t === "dark-green") {
+            root.setAttribute("data-theme", t);
         }
     }
 
     const [theme, setTheme] = React.useState<ThemeMode>(() => {
         const saved = localStorage.getItem(THEME_KEY) as ThemeMode | null;
-        if (saved === "light" || saved === "dark") return saved;
-        const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-        return prefersDark ? "dark" : "light";
+        if (saved === "auto" || saved === "dark" || saved === "dark-green") {
+            return saved;
+        }
+        if (saved === "dark") return "dark";
+        return "auto";
     });
 
     React.useEffect(() => {
@@ -133,7 +149,29 @@ export default function App() {
         localStorage.setItem(THEME_KEY, theme);
     }, [theme]);
 
-    const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+    const themeIcon = (() => {
+        switch (theme) {
+            case "auto":
+                return "light_mode";
+            case "dark":
+                return "dark_mode";
+            case "dark-green":
+                return "forest";
+            default:
+                return "light_mode";
+        }
+    })();
+
+    const themeLabel = (() => {
+        return t("app.theme." + theme);
+    })();
+
+    const nextTheme = React.useCallback((t: ThemeMode): ThemeMode => {
+        const i = THEME_ORDER.indexOf(t);
+        return THEME_ORDER[(i + 1) % THEME_ORDER.length];
+    }, []);
+
+    const toggleTheme = () => setTheme((prev) => nextTheme(prev));
 
     React.useEffect(() => {
         const update = (sel: HTMLSelectElement) => {
@@ -178,7 +216,6 @@ export default function App() {
         };
     }, []);
 
-    /* ===== WS & 事件桥接 ===== */
     React.useEffect(() => {
         ws.connect();
         setConnected(ws.connected);
@@ -266,30 +303,30 @@ export default function App() {
 
             <div className="shell">
                 <aside className="sidebar">
-                    <button className={`nav-icon ${route === "home" ? "active" : ""}`} title="主页" onClick={() => setRoute("home")}>
+                    <button className={`nav-icon ${route === "home" ? "active" : ""}`} title={t("nav.home")} onClick={() => setRoute("home")}>
                         <span className="ms">home</span>
                     </button>
-                    <button className={`nav-icon ${route === "fuse" ? "active" : ""}`} title="熔断" onClick={() => setRoute("fuse")}>
+                    <button className={`nav-icon ${route === "fuse" ? "active" : ""}`} title={t("nav.fuse")} onClick={() => setRoute("fuse")}>
                         <span className="ms">gpp_maybe</span>
                     </button>
-                    <button className={`nav-icon ${route === "autorun" ? "active" : ""}`} title="自动化" onClick={() => setRoute("autorun")}>
+                    <button className={`nav-icon ${route === "autorun" ? "active" : ""}`} title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
                         <span className="ms">autoplay</span>
                     </button>
-                    <button className={`nav-icon ${route === "settings" ? "active" : ""}`} title="设置" onClick={() => setRoute("settings")}>
+                    <button className={`nav-icon ${route === "settings" ? "active" : ""}`} title={t("nav.settings")} onClick={() => setRoute("settings")}>
                         <span className="ms">settings</span>
                     </button>
-                    <button className={`nav-icon ${route === "diagnostics" ? "active" : ""}`} title="日志" onClick={() => setRoute("diagnostics")}>
+                    <button className={`nav-icon ${route === "diagnostics" ? "active" : ""}`} title={t("nav.diagnostics")} onClick={() => setRoute("diagnostics")}>
                         <span className="ms">article</span>
                     </button>
-                    <button className={`nav-icon ${route === "about" ? "active" : ""}`} title="关于" onClick={() => setRoute("about")}>
+                    <button className={`nav-icon ${route === "about" ? "active" : ""}`} title={t("nav.about")} onClick={() => setRoute("about")}>
                         <span className="ms">help</span>
                     </button>
                     <button
                         className="nav-icon"
-                        title={`切换主题（当前：${theme === "dark" ? "深色" : "浅色"}）`}
+                        title={t("app.theme.toggle", {name: themeLabel})}
                         onClick={toggleTheme}
                     >
-                        <span className="ms">{theme === "dark" ? "dark_mode" : "light_mode"}</span>
+                        <span className="ms">{themeIcon}</span>
                     </button>
                 </aside>
 
@@ -312,20 +349,20 @@ export default function App() {
 
                                 <div style={{flex: 1, minWidth: 0, position: "relative"}}>
                                     <div className="panel">
-                                        <div className="panel-title">护身符</div>
+                                        <div className="panel-title">{t("amulet")}</div>
                                         <AmuletBar items={amulets} scale={0.55}/>
                                     </div>
 
                                     {(stage === 4 || stage === 5) && (
                                         <div className="panel">
-                                            <div className="panel-title">商品</div>
+                                            <div className="panel-title">{t("goods")}</div>
                                             <GoodsBar items={goods} scale={0.85}/>
                                         </div>
                                     )}
 
                                     {[1, 5, 7].includes(stage) && (
                                         <div className="panel">
-                                            <div className="panel-title">候选护身符</div>
+                                            <div className="panel-title">{t("candidate_amulet")}</div>
                                             <CandidateBar candidates={candidates} scale={0.55}/>
                                         </div>
                                     )}
@@ -358,20 +395,20 @@ export default function App() {
                 <div className="sb-left">
           <span className="sb-item">
             <i className={`sb-dot ${connected ? "ok" : "warn"}`}/>
-              {connected ? "后端：已连接" : "后端：未连接"}
+              {connected ? t("status.backendConnected") : t("status.backendDisconnected")}
           </span>
                 </div>
 
                 <div className="sb-right">
                     {hasGame ? (
                         <>
-                            <span className="badge">剩余：{remain}</span>
-                            <span className="badge">阶段：{stage}</span>
-                            <span className="badge">⭐ {coin}</span>
-                            <span className={`badge ${ended ? "down" : "ok"}`}>{ended ? "已结束" : "进行中"}</span>
+                            <span className="badge">{t("status.remaining", {count: remain})}</span>
+                            <span className="badge">{t("status.stage", {stage: stage})}</span>
+                            <span className="badge">{t("status.coin", {coin: coin})}</span>
+                            <span className={`badge ${ended ? "down" : "ok"}`}>{ended ? t("status.ended") : t("status.running")}</span>
                         </>
                     ) : (
-                        <span className="badge down">未找到游戏</span>
+                        <span className="badge down">{t("status.noGame")}</span>
                     )}
                 </div>
             </footer>

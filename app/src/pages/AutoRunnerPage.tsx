@@ -16,6 +16,7 @@ import {useRegistry} from "../lib/registryStore";
 import AmuletEditorModal, {type EditedAmulet} from "../components/AmuletEditorModal";
 import BadgePickerModal from "../components/BadgePickerModal";
 import AmuletCard from "../components/AmuletCard";
+import {Trans, useTranslation} from "react-i18next";
 
 function formatDuration(ms: number): string {
     if (!ms || ms < 0) ms = 0;
@@ -27,83 +28,8 @@ function formatDuration(ms: number): string {
     return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
 }
 
-const S = {
-    page: {padding: 16} as const,
-
-    section: {
-        border: "1px solid var(--border)",
-        borderRadius: 12,
-        background: "var(--panel)",
-        padding: 12,
-        marginBottom: 12,
-    } as const,
-
-    h2: {margin: "8px 0 12px", color: "var(--text)"} as const,
-
-    labelText: {color: "var(--text)", whiteSpace: "nowrap"} as const,
-    subText: {color: "var(--muted)", fontSize: 12} as const,
-    subText13: {color: "var(--muted)", fontSize: 13} as const,
-
-    input: {
-        width: 120,
-        padding: "6px 8px",
-        borderRadius: 8,
-        border: "1px solid var(--border)",
-        background: "var(--panel)",
-        color: "var(--text)",
-    } as const,
-
-    inputWide: {
-        width: "100%",
-        maxWidth: 280,
-        padding: "6px 8px",
-        borderRadius: 8,
-        border: "1px solid var(--border)",
-        background: "var(--panel)",
-        color: "var(--text)",
-    } as const,
-
-    select: {
-        padding: "6px 8px",
-        borderRadius: 8,
-        border: "1px solid var(--border)",
-        background: "var(--panel)",
-        color: "var(--text)",
-    } as const,
-
-    targetCard: {
-        border: "1px solid var(--border)",
-        borderRadius: 12,
-        background: "var(--panel)",
-        padding: 10,
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-    } as const,
-
-    targetCardBadge: {
-        border: "1px solid var(--border)",
-        borderRadius: 12,
-        background: "var(--panel)",
-        padding: 10,
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-    } as const,
-
-    valueBox: {
-        width: 90,
-        padding: "6px 8px",
-        borderRadius: 8,
-        border: "1px solid var(--border)",
-        background: "var(--panel)",
-        color: "var(--text)",
-    } as const,
-
-    gridGap10: {display: "grid", gap: 10} as const,
-};
-
 export default function AutoRunnerPage() {
+    const {t} = useTranslation();
     const {config, status} = useAutoRunner();
     const {badgeById, amuletById} = useRegistry();
 
@@ -148,13 +74,13 @@ export default function AutoRunnerPage() {
         ws.send({type: "autorun_control", data: {action: "stop"}});
     }, []);
 
-    const renderTarget = (t: TargetItem, idx: number) => {
-        const value = Math.max(1, Math.floor(Number((t as any).value ?? 1)));
-
+    const renderTarget = (target: TargetItem, idx: number) => {
+        const value = Math.max(1, Math.floor(Number((target as any).value ?? 1)));
         const valueBox = (
             <label style={{display: "inline-flex", alignItems: "center", gap: 6}}>
-                <span style={S.labelText}>目标价值</span>
+                <span>{t("autorun.target_value_label")}</span>
                 <input
+                    className="form-input"
                     type="number"
                     min={1}
                     step={1}
@@ -163,55 +89,54 @@ export default function AutoRunnerPage() {
                         const v = Math.max(1, Math.floor(Number(e.target.value || 1)));
                         setTargetValue(idx, v);
                     }}
-                    style={S.valueBox}
-                    title="达到该目标时，计作达成的目标数量（默认为 1）"
+                    style={{width: 90}}
+                    title={t("autorun.target_value_title")}
                 />
             </label>
         );
 
-        if (t.kind === "amulet") {
-            const rawId = t.id * 10 + (t.plus ? 1 : 0);
-            const effectItem = {id: rawId, volume: 1, badge: t.badge != null ? {id: t.badge} : undefined} as any;
-            const amu = amuletById.get(t.id) || null;
-            const amuName = amu?.name ?? `ID ${t.id}`;
+        if (target.kind === "amulet") {
+            const rawId = target.id * 10 + (target.plus ? 1 : 0);
+            const effectItem = {id: rawId, volume: 1, badge: target.badge != null ? {id: target.badge} : undefined} as any;
+            const amu = amuletById.get(target.id) || null;
+            const amuName = amu?.name ?? `ID ${target.id}`;
 
             return (
-                <div key={idx} style={S.targetCard}>
+                <div key={idx} className="panel" style={{padding: 10, display: "flex", alignItems: "center", gap: 10}}>
                     <AmuletCard item={effectItem} scale={0.7}/>
                     <div style={{lineHeight: 1.6}}>
                         <div>
-                            <b>护身符</b>：{amuName}
-                            {t.plus ? "+" : ""}
+                            <b>{t("autorun.target_amulet_label")}</b>：{amuName}
+                            {target.plus ? "+" : ""}
                         </div>
                         <div>
-                            <b>印章</b>：
-                            {t.badge != null ? (badgeById.get(t.badge)?.name ?? t.badge) : "任意/无均可"}
+                            <b>{t("autorun.target_badge_label")}</b>：{target.badge != null ? (badgeById.get(target.badge)?.name ?? target.badge) : t("autorun.target_any_badge")}
                         </div>
-                        <div style={S.subText}>判定：若设置了印章则需“拥有该印章的护身符”；未设置则该护身符无或任意印章均满足。</div>
+                        <div className="hint">{t("autorun.target_judge_amulet")}</div>
                     </div>
                     <div style={{flex: 1}}/>
                     {valueBox}
                     <button className="nav-btn" onClick={() => removeTargetAt(idx)}>
-                        删除
+                        {t("autorun.btn_delete_target")}
                     </button>
                 </div>
             );
         } else {
-            const badge = badgeById.get(t.id) || null;
-            const icon = `/assets/badge/badge_${t.id}.png`;
+            const badge = badgeById.get(target.id) || null;
+            const icon = `/assets/badge/badge_${target.id}.png`;
             return (
-                <div key={idx} style={S.targetCardBadge}>
-                    <img src={icon} alt={badge?.name ?? String(t.id)} style={{width: 64, height: 64}} draggable={false}/>
+                <div key={idx} className="panel" style={{padding: 10, display: "flex", alignItems: "center", gap: 12}}>
+                    <img src={icon} alt={badge?.name ?? String(target.id)} style={{width: 64, height: 64}} draggable={false}/>
                     <div style={{lineHeight: 1.6}}>
                         <div>
-                            <b>印章</b>：{badge ? `${badge.name}` : `ID ${t.id}`}
+                            <b>印章</b>：{badge ? `${badge.name}` : `ID ${target.id}`}
                         </div>
-                        <div style={S.subText}>判定：拥有该印章即可计数。</div>
+                        <div className="hint">{t("autorun.target_judge_badge")}</div>
                     </div>
                     <div style={{flex: 1}}/>
                     {valueBox}
                     <button className="nav-btn" onClick={() => removeTargetAt(idx)}>
-                        删除
+                        {t("autorun.btn_delete_target")}
                     </button>
                 </div>
             );
@@ -221,52 +146,52 @@ export default function AutoRunnerPage() {
     const elapsedDisplay = formatDuration(status.elapsed_ms ?? 0);
 
     const disabledReason = React.useMemo(() => {
-        if (working) return "已在运行";
+        if (working) return t("autorun.disabled_reason_running");
         if (status.game_ready === false) {
-            if (status.game_ready_code === "GAME_NOT_READY") return "游戏未启动/流程未就绪";
-            if (status.game_ready_code === "PROBE_TIMEOUT") return "连接超时（请检查游戏/代理）";
-            return status.game_ready_reason || "未就绪";
+            if (status.game_ready_code === "GAME_NOT_READY") return t("autorun.disabled_reason_game_not_ready");
+            if (status.game_ready_code === "PROBE_TIMEOUT") return t("autorun.disabled_reason_probe_timeout");
+            return t(status.game_ready_reason ?? "") || t("autorun.disabled_reason_not_ready");
         }
-        if (status.game_ready === undefined || status.game_ready_code === "NOT_PROBED") return "未探测";
+        if (status.game_ready === undefined || status.game_ready_code === "NOT_PROBED") return t("autorun.disabled_reason_not_probed");
         return "";
     }, [working, status.game_ready, status.game_ready_code, status.game_ready_reason]);
 
     const opInterval = Number.isFinite(Number(config.op_interval_ms)) ? Number(config.op_interval_ms) : 1000;
 
     return (
-        <div style={S.page}>
-            <h2 style={S.h2}>自动化</h2>
+        <div className="settings-wrap" style={{padding: 16}}>
+            <h2 className="title">{t("autorun.title")}</h2>
 
-            <section style={S.section}>
-                <div style={{fontWeight: 600, marginBottom: 6, color: "var(--text)"}}>运行信息</div>
+            <section className="panel">
+                <div className="panel-title">{t("autorun.section_runtime_title")}</div>
                 <div style={{display: "flex", gap: 12, flexWrap: "wrap"}}>
-                    <span className="badge">已运行时长：{elapsedDisplay}</span>
-                    <span className="badge">已运行局数：{status.runs ?? 0}</span>
-                    <span className="badge">历史最高目标数：{status.best_achieved_count ?? 0}</span>
-                    <span className="badge" title="run_tick 的调度间隔（毫秒）">操作间隔：{opInterval}ms</span>
+                    <span className="badge">{t("autorun.badge_elapsed", {time: elapsedDisplay})}</span>
+                    <span className="badge">{t("autorun.badge_runs", {count: status.runs ?? 0})}</span>
+                    <span className="badge">{t("autorun.badge_best", {count: status.best_achieved_count ?? 0})}</span>
+                    <span className="badge">{t("autorun.badge_interval", {ms: opInterval})}</span>
                 </div>
-                <div style={{marginTop: 8, ...S.subText13, lineHeight: 1.45}}>
-                    <div>当前步骤：{status.current_step ?? "-"}</div>
-                    <div>最近错误：{status.last_error ?? "-"}</div>
-                    <div>启动时间：{status.started_at ? new Date(status.started_at).toLocaleString() : "-"}</div>
+                <div className="hint" style={{marginTop: 8, lineHeight: 1.45}}>
+                    <div>{t("autorun.hint_current_step", {text: status.current_step ?? "-"})}</div>
+                    <div>{t("autorun.hint_last_error", {text: status.last_error ?? "-"})}</div>
+                    <div>{t("autorun.hint_started_at", {time: status.started_at ? new Date(status.started_at).toLocaleString() : "-"})}</div>
                 </div>
             </section>
 
-            <section style={S.section}>
-                <div style={{fontWeight: 600, marginBottom: 6, color: "var(--text)"}}>运行控制</div>
+            <section className="panel">
+                <div className="panel-title">{t("autorun.section_control_title")}</div>
 
-                <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap"}}>
+                <div className="toolbar" style={{gap: 8, flexWrap: "wrap" as const}}>
                     <button
                         className="nav-btn"
                         onClick={start}
                         disabled={Boolean(disabledReason) || status.mode === "step"}
-                        title={status.mode === "step" ? "手动单步模式下无需启动，直接点“下一步”" : disabledReason || undefined}
+                        title={status.mode === "step" ? t("autorun.tip_no_need_start_in_step") : disabledReason || undefined}
                     >
-                        {working ? "运行中…" : "启动"}
+                        {working ? t("autorun.btn_start_working") : t("autorun.btn_start")}
                     </button>
 
                     <button className="nav-btn" onClick={stop} disabled={!working}>
-                        停止
+                        {t("autorun.btn_stop")}
                     </button>
 
                     <button
@@ -276,14 +201,15 @@ export default function AutoRunnerPage() {
                             ws.send({type: "autorun_control", data: {action: "probe"}});
                         }}
                         disabled={refreshing}
-                        title="立即手动探测游戏是否就绪"
+                        title={t("autorun.tip_probe_now")}
                     >
-                        {refreshing ? "刷新中…" : "刷新状态"}
+                        {refreshing ? t("autorun.btn_refresh_loading") : t("autorun.btn_refresh")}
                     </button>
 
                     <label style={{display: "inline-flex", alignItems: "center", gap: 8, marginLeft: 6}}>
-                        <span style={S.labelText}>操作间隔</span>
+                        <span>{t("autorun.label_op_interval")}</span>
                         <input
+                            className="form-input"
                             type="number"
                             min={0}
                             max={5000}
@@ -293,100 +219,108 @@ export default function AutoRunnerPage() {
                                 const clamped = Math.max(0, Math.min(5000, Math.round(raw)));
                                 patchAutoConfig({op_interval_ms: clamped});
                             }}
-                            title="run_tick 的调度间隔（毫秒）。建议 1000（1秒）；过低可能被暂时封禁IP。"
-                            style={S.input}
+                            title={t("autorun.tip_op_interval")}
+                            style={{width: 120}}
                         />
-                        <span style={S.subText}>ms</span>
+                        <span className="hint">{t("autorun.suffix_ms")}</span>
                     </label>
 
-                    <span className={`badge ${working ? "ok" : "down"}`}>{working ? "运行中" : "已停止"}</span>
+                    <span className={`badge ${working ? "ok" : "down"}`}>{working ? t("autorun.status_running") : t("autorun.status_stopped")}</span>
 
                     {(() => {
                         const ready = status.preferred_flow_ready;
                         const cls = ready === true ? "ok" : ready === false ? "down" : "";
-                        const text = ready === true ? "业务流：已选定" : ready === false ? "业务流：未选定" : "业务流：未知";
+                        const text = ready === true ? t("autorun.flow_ready") : ready === false ? t("autorun.flow_not_ready") : t("autorun.flow_unknown");
                         const tip = status.preferred_flow_peer
-                            ? `peer: ${status.preferred_flow_peer}`
+                            ? t("autorun.flow_tip_peer", {peer: status.preferred_flow_peer})
                             : ready === false
-                                ? "未绑定游戏业务流"
+                                ? t("autorun.flow_tip_unbound")
                                 : undefined;
                         return (
-                            <span className={`badge ${cls}`} title={tip}>
-                {text}
-              </span>
+                            <span className={`badge ${cls}`} title={tip}>{text}</span>
                         );
                     })()}
                 </div>
 
-                <p style={{marginTop: 8, ...S.subText13, lineHeight: 1.5}}>
-                    达成下方的“结束条件”即停止；若到达“截止关卡”仍未达成，则自动重开。
+                <p className="hint" style={{marginTop: 8, lineHeight: 1.5}}>
+                    {t("autorun.control_note")}
                 </p>
             </section>
 
-            <section style={S.section}>
-                <div style={{fontWeight: 600, marginBottom: 6, color: "var(--text)"}}>结束条件</div>
+            <section className="panel">
+                <div className="panel-title">{t("autorun.section_goal_title")}</div>
 
-                <div style={{display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12}}>
-                    <span style={S.labelText}>目标数量</span>
-                    <input
-                        type="number"
-                        min={1}
-                        value={Number(config.end_count ?? 1)}
-                        onChange={(e) => patchAutoConfig({end_count: Math.max(1, Number(e.target.value || 1))})}
-                        style={{...S.input, width: 100}}
-                    />
-                    <span style={S.subText}>（集齐该数量的目标即结束）</span>
+                <div className="rows" style={{marginBottom: 8}}>
+                    <div className="row" style={{gridTemplateColumns: "auto auto 1fr", alignItems: "center"}}>
+                        <label>{t("autorun.label_end_count")}</label>
+                        <input
+                            className="form-input"
+                            type="number"
+                            min={1}
+                            value={Number(config.end_count ?? 1)}
+                            onChange={(e) => patchAutoConfig({end_count: Math.max(1, Number(e.target.value || 1))})}
+                            style={{width: 100}}
+                        />
+                        <span className="hint">{t("autorun.hint_end_count")}</span>
+                    </div>
                 </div>
 
-                <div style={{display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap"}}>
+                <div className="toolbar" style={{gap: 8, flexWrap: "wrap" as const, marginBottom: 10}}>
                     <button className="nav-btn" onClick={() => setOpenAmuletEditor(true)}>
-                        添加护身符目标
+                        {t("autorun.btn_add_amulet")}
                     </button>
                     <button className="nav-btn" onClick={() => setOpenBadgePicker(true)}>
-                        添加印章目标
+                        {t("autorun.btn_add_badge")}
                     </button>
                 </div>
 
-                <div style={S.gridGap10}>
+                <div style={{display: "grid", gap: 10}}>
                     {config.targets.length === 0 ? (
-                        <div style={{color: "var(--muted)"}}>尚未添加目标。</div>
+                        <div className="hint">{t("autorun.empty_targets")}</div>
                     ) : (
                         config.targets.map((t, i) => renderTarget(t, i))
                     )}
                 </div>
             </section>
 
-            <section style={S.section}>
-                <div style={{fontWeight: 600, marginBottom: 6, color: "var(--text)"}}>截止关卡</div>
-                <div style={{display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap"}}>
-                    <span style={S.labelText}>关卡</span>
-                    <input
-                        value={levelText}
-                        placeholder="例如 1-1"
-                        onChange={(e) => {
-                            const s = e.target.value;
-                            setLevelText(s);
-                            const n = parseLevelText(s);
-                            patchAutoConfig({cutoff_level: n ?? 0});
-                        }}
-                        style={{...S.input, width: 130}}
-                    />
+            <section className="panel">
+                <div className="panel-title">{t("autorun.section_cutoff_title")}</div>
+                <div className="rows">
+                    <div
+                        className="row flush"
+                        style={{gridTemplateColumns: "max-content max-content", alignItems: "center"}}
+                    >
+                        <label>{t("autorun.label_level")}</label>
+                        <input
+                            className="form-input"
+                            value={levelText}
+                            placeholder={t("autorun.placeholder_level")}
+                            onChange={(e) => {
+                                const s = e.target.value;
+                                setLevelText(s);
+                                const n = parseLevelText(s);
+                                patchAutoConfig({cutoff_level: n ?? 0});
+                            }}
+                            style={{width: 130}}
+                        />
+                    </div>
                 </div>
-                <p style={S.subText}>若到该关卡仍未达成“目标数量”，则本局结束并自动重开。</p>
+                <p className="hint">{t("autorun.hint_cutoff")}</p>
             </section>
 
-            <section style={S.section}>
-                <div style={{fontWeight: 600, marginBottom: 6, color: "var(--text)"}}>执行模式</div>
-                <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap"}}>
+            <section className="panel">
+                <div className="panel-title">{t("autorun.section_mode_title")}</div>
+                <div className="toolbar" style={{gap: 8, flexWrap: "wrap" as const}}>
                     <label style={{display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap"}}>
-                        <span style={S.labelText}>模式</span>
+                        <span>{t("autorun.label_mode")}</span>
                         <select
+                            className="form-input"
                             value={status.mode ?? "continuous"}
                             onChange={(e) => ws.send({type: "autorun_control", data: {action: "set_mode", mode: e.target.value}})}
-                            style={S.select}
+                            style={{width: 160}}
                         >
-                            <option value="continuous">持续运行</option>
-                            <option value="step">手动单步</option>
+                            <option value="continuous">{t("autorun.mode_continuous")}</option>
+                            <option value="step">{t("autorun.mode_step")}</option>
                         </select>
                     </label>
 
@@ -394,18 +328,21 @@ export default function AutoRunnerPage() {
                         className="nav-btn"
                         onClick={() => ws.send({type: "autorun_control", data: {action: "step"}})}
                         disabled={status.mode !== "step"}
-                        title={status.mode !== "step" ? "切换到“手动单步”模式后可用" : undefined}
+                        title={status.mode !== "step" ? t("autorun.tip_step_only") : undefined}
                     >
-                        下一步
+                        {t("autorun.btn_next_step")}
                     </button>
                 </div>
-                <p style={{marginTop: 8, ...S.subText, lineHeight: 1.5}}>
-                    · 持续运行：后台自动循环执行。<br/>· 手动单步：不自动运行，点击“下一步”仅执行一次调度。
+                <p className="hint" style={{marginTop: 8, lineHeight: 1.5}}>
+                    <Trans
+                        i18nKey="autorun.hint_modes"
+                        components={{ strong: <br /> }}
+                    />
                 </p>
             </section>
 
-            <section style={S.section}>
-                <div style={{fontWeight: 600, marginBottom: 6, color: "var(--text)"}}>邮件通知</div>
+            <section className="panel">
+                <div className="panel-title">{t("autorun.section_email_title")}</div>
 
                 {(() => {
                     const email = (config.email_notify ?? {
@@ -420,102 +357,93 @@ export default function AutoRunnerPage() {
 
                     const patchEmail = (kv: Partial<typeof email>) => patchAutoConfig({email_notify: {...email, ...kv}});
 
-                    const field = {display: "grid", gap: 6, justifyItems: "start"} as const;
-                    const rowGrid = (cols: string) =>
-                        ({
-                            display: "grid",
-                            gridTemplateColumns: cols,
-                            columnGap: 12,
-                            rowGap: 10,
-                            alignItems: "start",
-                        } as const);
+                    const rowCols = (cols: string) =>
+                        ({display: "grid", gridTemplateColumns: cols, columnGap: 12, rowGap: 10, alignItems: "start"} as const);
 
                     return (
-                        <div style={S.gridGap10}>
+                        <div style={{display: "grid", gap: 10}}>
                             <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
                                 <input
+                                    className="form-checkbox"
                                     type="checkbox"
                                     checked={!!email.enabled}
                                     onChange={(e) => patchEmail({enabled: e.target.checked})}
                                 />
-                                <span style={S.labelText}>启用邮件通知（SMTP）</span>
+                                <span>{t("autorun.toggle_email")}</span>
                             </label>
 
-                            <div style={rowGrid("minmax(220px, 320px) 140px 140px")}>
-                                <label style={field}>
-                                    <span style={S.labelText}>SMTP 服务器</span>
+                            <div style={rowCols("minmax(220px, 320px) 160px 160px")}>
+                                <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                                    <span>{t("autorun.label_smtp_host")}</span>
                                     <input
+                                        className="form-input"
                                         placeholder="smtp.example.com"
                                         value={email.host ?? ""}
                                         onChange={(e) => patchEmail({host: e.target.value.trim()})}
-                                        style={S.inputWide}
                                     />
                                 </label>
 
-                                <label style={field}>
-                                    <span style={S.labelText}>端口</span>
+                                <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                                    <span>{t("autorun.label_smtp_port")}</span>
                                     <input
+                                        className="form-input"
                                         type="number"
                                         min={1}
                                         max={65535}
                                         value={Number(email.port ?? 587)}
                                         onChange={(e) => patchEmail({port: Math.max(1, Math.min(65535, Number(e.target.value || 587)))})}
-                                        style={{...S.inputWide, maxWidth: 160}}
                                     />
                                 </label>
 
-                                <label style={field}>
-                                    <span style={S.labelText}>SSL/TLS</span>
-                                    <div style={{display: "flex", alignItems: "center", gap: 8, height: 36}}>
-                                        <input
-                                            type="checkbox"
-                                            checked={!!email.ssl}
-                                            onChange={(e) => patchEmail({ssl: e.target.checked})}
-                                            style={{transform: "translateY(1px)"}}
-                                        />
-                                        <span style={S.subText}>{email.ssl ? "开启" : "关闭"}</span>
-                                    </div>
+                                <label className="row" style={{gridTemplateColumns: "auto auto"}}>
+                                    <span>{t("autorun.label_smtp_ssl")}</span>
+                                    <input
+                                        className="form-checkbox"
+                                        type="checkbox"
+                                        checked={!!email.ssl}
+                                        onChange={(e) => patchEmail({ssl: e.target.checked})}
+                                    />
                                 </label>
                             </div>
 
-                            <div style={rowGrid("minmax(220px, 320px) minmax(220px, 320px)")}>
-                                <label style={field}>
-                                    <span style={S.labelText}>发件邮箱</span>
+                            <div style={rowCols("minmax(220px, 320px) minmax(220px, 320px)")}>
+                                <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                                    <span>{t("autorun.label_email_from")}</span>
                                     <input
+                                        className="form-input"
                                         type="email"
                                         placeholder="sender@example.com"
                                         value={email.from ?? ""}
                                         onChange={(e) => patchEmail({from: e.target.value.trim()})}
-                                        style={S.inputWide}
                                     />
                                 </label>
 
-                                <label style={field}>
-                                    <span style={S.labelText}>密码/授权码</span>
+                                <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                                    <span>{t("autorun.label_email_pass")}</span>
                                     <input
+                                        className="form-input"
                                         type="password"
-                                        placeholder="密码"
+                                        placeholder={t("autorun.label_email_pass_placeholder")}
                                         value={email.pass ?? ""}
                                         onChange={(e) => patchEmail({pass: e.target.value})}
-                                        style={S.inputWide}
                                     />
                                 </label>
                             </div>
 
-                            <div style={rowGrid("minmax(220px, 320px)")}>
-                                <label style={field}>
-                                    <span style={S.labelText}>收件邮箱</span>
+                            <div style={rowCols("minmax(220px, 320px)")}>
+                                <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                                    <span>{t("autorun.label_email_to")}</span>
                                     <input
+                                        className="form-input"
                                         type="email"
                                         placeholder="you@example.com"
                                         value={email.to ?? ""}
                                         onChange={(e) => patchEmail({to: e.target.value.trim()})}
-                                        style={S.inputWide}
                                     />
                                 </label>
                             </div>
 
-                            <div style={{display: "flex", gap: 8, alignItems: "center", marginTop: 6, flexWrap: "wrap"}}>
+                            <div className="toolbar" style={{gap: 8, marginTop: 6, flexWrap: "wrap" as const}}>
                                 <button
                                     className="nav-btn"
                                     onClick={() => ws.send({type: "autorun_control", data: {action: "notify_test_email"}})}
@@ -528,19 +456,19 @@ export default function AutoRunnerPage() {
                                     }
                                     title={
                                         !email.enabled
-                                            ? "请先启用邮件通知"
+                                            ? t("autorun.tip_need_enable_email")
                                             : !(email.host && email.port)
-                                                ? "请填写服务器与端口"
+                                                ? t("autorun.tip_need_host_port")
                                                 : !(email.from || "").includes("@")
-                                                    ? "请填写发件邮箱"
+                                                    ? t("autorun.tip_need_sender")
                                                     : !email.pass
-                                                        ? "请填写密码"
+                                                        ? t("autorun.tip_need_pass")
                                                         : !(email.to || "").includes("@")
-                                                            ? "请填写收件邮箱"
+                                                            ? t("autorun.tip_need_receiver")
                                                             : undefined
                                     }
                                 >
-                                    发送测试邮件
+                                    {t("autorun.btn_send_test")}
                                 </button>
                             </div>
                         </div>
@@ -549,7 +477,7 @@ export default function AutoRunnerPage() {
             </section>
 
             <button className="nav-btn" onClick={onSave} disabled={saving}>
-                {saving ? "保存中…" : "保存配置"}
+                {saving ? t("autorun.btn_saving") : t("autorun.btn_save")}
             </button>
 
             <AmuletEditorModal

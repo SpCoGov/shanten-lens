@@ -73,7 +73,7 @@
     --input-active-bg: #eef2f8;
 
     --input-hover-border: #94a3b8;
-    --input-focus-ring: 0 0 0 3px rgba(59,130,246,.20);
+    --input-focus-ring: 0 0 0 3px rgba(59, 130, 246, .20);
     --input-selected-bg: #e2e8f0;
     --input-selected-fg: #0f172a;
 
@@ -84,9 +84,9 @@
     --link: var(--link-fg, var(--accent-blue));
 
     --tile-bg: #ffffff;
-    --tile-shadow: 0 1px 3px rgba(0,0,0,.15);
+    --tile-shadow: 0 1px 3px rgba(0, 0, 0, .15);
     --tile-outline: 2px solid color-mix(in srgb, var(--color-ring) 70%, transparent);
-    --tile-dim-scrim: rgba(0,0,0,.35);
+    --tile-dim-scrim: rgba(0, 0, 0, .35);
 
     --on-strong: #ffffff;
 
@@ -169,7 +169,7 @@
     --input-hover-bg: #121a2a;
     --input-active-bg: #0d1320;
     --input-hover-border: #3b4a63;
-    --input-focus-ring: 0 0 0 3px rgba(96,165,250,.25);
+    --input-focus-ring: 0 0 0 3px rgba(96, 165, 250, .25);
 
     --input-selected-bg: #1f2a3a;
     --input-selected-fg: #e6eaf2;
@@ -181,9 +181,9 @@
     --link: var(--link-fg, var(--accent-blue));
 
     --tile-bg: #f2f5f8;
-    --tile-shadow: 0 1px 3px rgba(0,0,0,.6);
+    --tile-shadow: 0 1px 3px rgba(0, 0, 0, .6);
     --tile-outline: 2px solid color-mix(in srgb, var(--color-ring) 80%, transparent);
-    --tile-dim-scrim: rgba(0,0,0,.45);
+    --tile-dim-scrim: rgba(0, 0, 0, .45);
 
     --on-strong: #ffffff;
 
@@ -192,6 +192,105 @@
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, .35);
     --shadow-md: 0 2px 10px rgba(0, 0, 0, .45);
     --shadow-text: 0 1px 1px rgba(0, 0, 0, .5);
+
+    --sold-scrim: color-mix(in srgb, var(--state-ok) 38%, transparent);
+    --sold-pill-bg: color-mix(in srgb, var(--state-ok) 88%, transparent);
+    --sold-pill-border: color-mix(in srgb, var(--state-ok) 55%, transparent);
+}
+
+:root[data-theme="dark-green"] {
+    --color-bg: #0a1210;
+    --color-text: #e6efe9;
+    --color-muted: #98aea6;
+    --color-hint: #859d94;
+
+    --color-border: #20362e;
+    --color-cutline: #12201b;
+    --color-divider: #17332a;
+
+    --color-ring: #34d399;
+    --accent-blue: #34d399;
+    --accent-green: #34d399;
+    --link-fg: #5eead4;
+
+    --panel-bg: #0f1916;
+    --panel-border: 1px solid var(--color-border);
+    --panel-shadow: 0 2px 12px rgba(8, 60, 46, .45);
+
+    --list-item-bg: #0e1815;
+    --list-item-hover: #10201b;
+
+    --badge-ok-fg: #a6f0d6;
+    --badge-ok-bg: #0d201a;
+    --badge-ok-border: #1f5c47;
+    --badge-down-fg: #fecaca;
+    --badge-down-bg: #2a1414;
+    --badge-down-border: #4f1e1e;
+
+    --tilecard-bg: #0b1020;
+    --tilecard-fg: #d5dae4;
+    --tilecard-border: rgba(255, 255, 255, .08);
+    --tilecard-shadow: 0 6px 20px rgba(0, 0, 0, .6);
+
+    --overlay-scrim: rgba(4, 18, 14, .58);
+    --elev-bg: #0e1714;
+    --elev-shadow: 0 12px 40px rgba(8, 60, 46, .60);
+
+    --scrollbar-thumb: rgba(52, 211, 153, .30);
+    --scrollbar-thumb-alt: rgba(52, 211, 153, .45);
+
+    --log-bg: #0a1412;
+    --log-fg: #cfd6e3;
+
+    --hover-bg: #13241e;
+    --input-border: #2a4a40;
+    --input-disabled-bg: #12221c;
+
+    --input-bg: #0d1916;
+    --input-hover-bg: #0f1f1a;
+    --input-active-bg: #0c1714;
+    --input-hover-border: #2a4a40;
+    --input-focus-ring: 0 0 0 3px rgba(52, 211, 153, .28);
+    --input-selected-bg: #0f241f;
+    --input-selected-fg: var(--color-text);
+
+    --toast-info-border: #2c3f39;
+    --toast-success-border: #2fb872;
+    --toast-error-border: #f87171;
+
+    --notice-border: #7e6b1c;
+    --notice-bg: #241f0a;
+    --notice-fg: #e6c987;
+
+    --danger-weak-bg: #2a1414;
+    --danger-weak-border: #4f1e1e;
+
+    --state-ok: #34d399;
+    --state-warn: #f59e0b;
+    --state-down: #ef4444;
+    --state-muted: #7a8a81;
+
+    --btn-bg: var(--list-item-bg);
+    --btn-hover-bg: var(--list-item-hover);
+    --btn-border: var(--input-border);
+
+    --text: var(--color-text);
+    --muted: var(--color-muted);
+    --border: var(--color-border);
+    --panel: var(--panel-bg);
+    --link: var(--link-fg, var(--accent-blue));
+
+    --tile-bg: #0f1815;
+    --tile-shadow: 0 1px 3px rgba(0, 0, 0, .60);
+    --tile-outline: 2px solid color-mix(in srgb, var(--color-ring) 80%, transparent);
+    --tile-dim-scrim: rgba(0, 0, 0, .45);
+
+    --on-strong: #ffffff;
+
+    --glass-bg: color-mix(in srgb, var(--panel) 80%, transparent);
+    --shadow-sm: 0 2px 8px rgba(8, 60, 46, .35);
+    --shadow-md: 0 2px 10px rgba(8, 60, 46, .45);
+    --shadow-text: 0 1px 1px rgba(0, 0, 0, .50);
 
     --sold-scrim: color-mix(in srgb, var(--state-ok) 38%, transparent);
     --sold-pill-bg: color-mix(in srgb, var(--state-ok) 88%, transparent);
