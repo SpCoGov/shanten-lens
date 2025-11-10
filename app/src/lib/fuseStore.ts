@@ -24,7 +24,7 @@ type State = {
 };
 
 let state: State = {
-    config: defaultConfig,
+    config: {...defaultConfig, guard_skip_contains: {amulets: [], badges: []}},
     selected: {amulets: new Set(), badges: new Set()},
 };
 
@@ -32,12 +32,35 @@ const subs = new Set<() => void>();
 const emit = () => subs.forEach((fn) => fn());
 
 export function setFuseConfig(cfg: FuseConfig) {
-    state = {...state, config: cfg ?? defaultConfig};
+    const safe = cfg ?? defaultConfig;
+    state = {
+        ...state,
+        config: {
+            ...defaultConfig,
+            ...safe,
+            guard_skip_contains: {
+                amulets: safe.guard_skip_contains?.amulets ?? [],
+                badges: safe.guard_skip_contains?.badges ?? [],
+            },
+        },
+    };
     emit();
 }
 
 export function patchFuseConfig(patch: Partial<FuseConfig>) {
-    state = {...state, config: {...state.config, ...patch} as FuseConfig};
+    const next: FuseConfig = {
+        ...state.config,
+        ...patch,
+        guard_skip_contains: {
+            amulets:
+                patch.guard_skip_contains?.amulets ??
+                state.config.guard_skip_contains.amulets,
+            badges:
+                patch.guard_skip_contains?.badges ??
+                state.config.guard_skip_contains.badges,
+        },
+    };
+    state = {...state, config: next};
     emit();
 }
 
@@ -66,7 +89,11 @@ export function removeSelected() {
         (id) => !state.selected.badges.has(id)
     );
     state = {
-        config: {guard_skip_contains: {amulets: a, badges: b}},
+        ...state,
+        config: {
+            ...state.config,
+            guard_skip_contains: {amulets: a, badges: b},
+        },
         selected: {amulets: new Set(), badges: new Set()},
     };
     emit();
@@ -79,7 +106,10 @@ export function addAmulet(id: number) {
             ...state,
             config: {
                 ...state.config,
-                guard_skip_contains: {...state.config.guard_skip_contains, amulets: [...arr, id]},
+                guard_skip_contains: {
+                    ...state.config.guard_skip_contains,
+                    amulets: [...arr, id],
+                },
             },
         };
         emit();
@@ -93,7 +123,10 @@ export function addBadge(id: number) {
             ...state,
             config: {
                 ...state.config,
-                guard_skip_contains: {...state.config.guard_skip_contains, badges: [...arr, id]},
+                guard_skip_contains: {
+                    ...state.config.guard_skip_contains,
+                    badges: [...arr, id],
+                },
             },
         };
         emit();
