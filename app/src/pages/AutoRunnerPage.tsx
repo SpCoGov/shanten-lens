@@ -336,7 +336,6 @@ export default function AutoRunnerPage() {
                 <p className="hint" style={{marginTop: 8, lineHeight: 1.5}}>
                     <Trans
                         i18nKey="autorun.hint_modes"
-                        components={{ strong: <br /> }}
                     />
                 </p>
             </section>

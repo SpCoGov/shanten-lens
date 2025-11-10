@@ -134,6 +134,215 @@
     "disabled_reason_not_ready": "未準備",
     "disabled_reason_not_probed": "未検査"
   },
+  "diagnostics": {
+    "ws_status_label": "WebSocket",
+    "ws_connected": "接続済み",
+    "ws_disconnected": "未接続",
+    "auto_scroll": "自動スクロール",
+    "section_frames_title": "WS フレーム（受信／送信）",
+    "empty_frames": "（フレームはありません）",
+    "section_logs_title": "バックエンドイベントログ",
+    "empty_logs": "（ログはありません）"
+  },
+  "fuse": {
+    "title": "ヒューズ",
+    "section_shop_guard_title": "購入ガード",
+    "section_shop_guard_desc": "監視リストを整備すると、購入時に次の2ルールを適用します：<br/>1）監視項目が出たら<strong>「スキップ」禁止</strong>（下の「スキップ禁止」を有効にする）；<br/>2）監視項目があるのに<strong>そのいずれも選ばない</strong>場合はブロック（下の「監視項目の強制選択」を有効にする）。",
+    "btn_add_amulet": "お守りを追加",
+    "btn_add_badge": "スタンプを追加",
+    "btn_delete_selected": "選択を削除",
+    "btn_clear_selection": "選択を解除",
+    "toggle_skip_guard": "スキップ禁止（監視項目がある場合は「スキップ」を禁止）",
+    "toggle_force_pick": "監視項目の強制選択（監視項目があるのに未選択ならブロック）",
+    "section_conduction_title": "伝導チェーン・ガード",
+    "section_conduction_desc": "伝導お守りが閾値に達し、かつエンチャンターカーヴィの配置が規則に反している場合、対局開始をブロックします（お守りへの「伝導」付与忘れによる断鎖を防ぐため）。",
+    "toggle_conduction": "伝導チェーン・ガードを有効化",
+    "label_conduction_threshold": "伝導お守り閾値",
+    "hint_conduction_threshold": "（伝導お守り数が閾値以上 かつ エンチャンターカーヴィ位置が安全でない場合、開始をブロック）",
+    "section_badge_guard_title": "スタンプ・ガード",
+    "section_badge_guard_desc": "エンチャンターカーヴィが「伝導」または「拡張」を持ち、スタンプ盗みの左側に置かれている場合、和了をブロックします。",
+    "toggle_badge_guard": "スタンプ・ガードを有効化",
+    "section_kavi_plus_title": "エンチャンターカーヴィ+緩衝ガード",
+    "section_kavi_plus_desc": "「エンチャンターカーヴィ+」と「拡張」が共存する場合、その間に<strong>非・拡張</strong>のお守りが少なくとも1つ挟まれていなければ開始をブロックします。",
+    "toggle_kavi_plus": "エンチャンターカーヴィ+緩衝ガードを有効化",
+    "section_exit_life_title": "店退出ガード",
+    "section_exit_life_desc": "現在のお守りに「生命」スタンプが<strong>無い</strong>場合、店からの退出をブロックします。",
+    "toggle_exit_life": "店退出ガードを有効化",
+    "btn_save": "ヒューズ設定を保存",
+    "btn_saving": "保存中…",
+    "bar": {
+      "empty": "何もありません。下のボタンから守り札／スタンプを追加してください…",
+      "kind": {
+        "amulet": "お守り",
+        "badge": "スタンプ"
+      },
+      "unknown_amulet": "お守り#{{id}}",
+      "unknown_badge": "スタンプ#{{id}}",
+      "title_select": "{{kind}} {{name}}（ID:{{id}}）— クリックで選択",
+      "title_unselect": "{{kind}} {{name}}（ID:{{id}}）— クリックで選択解除"
+    }
+  },
+  "settings": {
+    "table": {
+      "game": "ゲーム",
+      "general": "一般",
+      "backend": "バックエンド"
+    },
+    "config": {
+      "game": {
+        "modify_announcement": "お知らせを変更",
+        "modify_announcement_desc": "向聴レンズの起動成功を知らせるお知らせを追加",
+        "public_all": "牌山を公開",
+        "public_all_desc": "ゲーム内のすべての牌を公開にする",
+        "auto_discard": "自動打牌",
+        "auto_discard_desc": "七対子の提案に従って自動で打牌（クリックの擬似操作）",
+        "auto_tsumo": "自動ツモ",
+        "auto_tsumo_desc": "ツモ可能なとき自動でツモ（パケット送信）",
+        "anti_afk": "AFK防止",
+        "anti_afk_desc": "離席扱いによる強制切断を防ぐ"
+      },
+      "general": {
+        "debug": "デバッグモード",
+        "debug_desc": "すべてのログを取得できるデバッグ用モード",
+        "error_code_test": "エラーコードテスト",
+        "error_code_test_desc": "エラーコードに対応するメッセージのテスト用"
+      },
+      "backend": {
+        "host": "バックエンドアドレス",
+        "host_desc": "バックエンドアドレス",
+        "port": "バックエンドポート",
+        "port_desc": "バックエンドポート",
+        "mitm_port": "MITM ポート",
+        "port_port": "MITM サーバーポート",
+        "api_port": "API ポート",
+        "api_port_desc": "API ポート"
+      }
+    },
+    "title": "設定",
+    "loading": "設定を読み込み中…",
+    "language_label": "言語",
+    "btn_manual_sync": "手動同期",
+    "btn_open_config_dir": "設定ディレクトリを開く",
+    "notice_server_update_dirty": "サーバから新しい設定が届いていますが、未保存の変更があります。保存するか変更を破棄してから同期してください。",
+    "btn_save": "保存",
+    "btn_saving": "保存中…",
+    "btn_discard": "変更を破棄",
+    "toast_save_submitted": "保存を送信しました",
+    "toast_save_done": "保存が完了しました",
+    "toast_discard": "未保存の変更を破棄しました",
+    "toast_open_config_ok": "設定ディレクトリを開く要求を送信しました",
+    "toast_open_config_fail": "開けませんでした：{{error}}"
+  },
+  "advisor": {
+    "title_suu_ankou": "四暗刻",
+    "title_chiitoi": "七対子",
+    "awaiting_backend": "バックエンド結果を待機中…",
+    "win_now": "今すぐ和了可能",
+    "need_draws_label": "必要ツモ数",
+    "impossible": "不可能",
+    "menzen_only": "門前のみ",
+    "recommend_discard": "打牌の推奨",
+    "id_label": "ID: {{id}}"
+  },
+  "amulet_card": {
+    "title_unknown": "未知のお守り ID={{regId}}（raw={{rawId}}）",
+    "title_known": "{{name}}{{suffix}}",
+    "plus_suffix": "（プラス）",
+    "plus_alt": "プラス",
+    "badge_alt": "スタンプ：{{name}}",
+    "unknown_label": "未知ID {{regId}}"
+  },
+  "amulet_picker": {
+    "title": "お守りを選択",
+    "search_ph": "名称またはIDで検索…",
+    "search_aria": "お守りを検索",
+    "rarity_label": "レア度フィルター",
+    "rarity": {
+      "ALL": "すべて",
+      "PURPLE": "紫",
+      "ORANGE": "橙",
+      "BLUE": "青",
+      "GREEN": "緑"
+    },
+    "action_confirm": "確定",
+    "action_confirm_hint": "お守りを選択してから確定してください",
+    "field_id": "ID: {{id}}",
+    "card_title": "{{name}}（#{{id}}）"
+  },
+  "badge_picker": {
+    "title": "スタンプを選択",
+    "search_ph": "名称またはIDで検索…",
+    "search_aria": "スタンプを検索",
+    "rarity_label": "レア度フィルター",
+    "rarity": {
+      "ALL": "すべて",
+      "RED": "赤",
+      "BLUE": "青",
+      "BROWN": "茶"
+    },
+    "action_confirm": "確定",
+    "action_confirm_hint": "スタンプを選択してから確定してください",
+    "field_id": "ID: {{id}}",
+    "card_title": "{{name}}（#{{id}}）"
+  },
+  "goods_bar": {
+    "empty": "商品はありません",
+    "aria_list": "商品リスト"
+  },
+  "good_card": {
+    "tooltip": "ID={{id}} goodsId={{goodsId}} 価格={{price}}",
+    "image_alt": "商品画像（goodsId={{goodsId}}）",
+    "price_aria": "価格 {{price}}",
+    "sold": "売却済"
+  },
+  "modal": {
+    "close": "閉じる"
+  },
+  "replacement_panel": {
+    "title": "置換シーケンス",
+    "summary": "置換可能：{{total}} 枚 ・ 置換済：{{used}} 枚",
+    "tile_title": "{{tile}}",
+    "tile_title_used": "{{tile}}（置換済）",
+    "badge_used": "置換済",
+    "pointer_current": "現在"
+  },
+  "wall_stats": {
+    "title": "山の統計",
+    "empty": "現在、引ける牌はありません",
+    "still_drawable": "残り枚数"
+  },
+  "tile": {
+    "suits": {
+      "m": "万",
+      "p": "筒",
+      "s": "索"
+    },
+    "honors": [
+      "東",
+      "南",
+      "西",
+      "北",
+      "白",
+      "発",
+      "中"
+    ],
+    "numbers": [
+      "零",
+      "一",
+      "二",
+      "三",
+      "四",
+      "五",
+      "六",
+      "七",
+      "八",
+      "九"
+    ],
+    "format": {
+      "number_suit": "{{num}}{{suit}}",
+      "red_five": "赤五{{suit}}"
+    }
+  },
   "amulet": "お守り",
   "candidate_amulet": "候補のお守り",
   "goods": "商品",

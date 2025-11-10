@@ -3,8 +3,10 @@ import "../styles/theme.css";
 import {ws} from "../lib/ws";
 import {useLogStore} from "../lib/logStore";
 import styles from "./DiagnosticsPage.module.css";
+import {useTranslation} from "react-i18next";
 
 export default function DiagnosticsPage() {
+    const {t} = useTranslation();
     const logs = useLogStore((s) => s.logs);
     const frames = useLogStore((s) => s.frames);
     const [tail, setTail] = React.useState(true);
@@ -29,16 +31,16 @@ export default function DiagnosticsPage() {
             <section className="card diag-top">
                 <div className="diag-status">
                     <span className={`dot ${conn ? "ok" : "down"}`}/>
-                    <b>WebSocket</b>：{conn ? "已连接" : "未连接"}
+                    <b>{t("diagnostics.ws_status_label")}</b>：{conn ? t("diagnostics.ws_connected") : t("diagnostics.ws_disconnected")}
                 </div>
                 <label className="tail">
                     <input type="checkbox" checked={tail} onChange={(e) => setTail(e.target.checked)}/>
-                    自动滚动
+                    {t("diagnostics.auto_scroll")}
                 </label>
             </section>
 
             <section className="mj-panel card">
-                <h3 style={{marginTop: 0}}>WS 封包（收/发）</h3>
+                <h3 style={{marginTop: 0}}>{t("diagnostics.section_frames_title")}</h3>
                 <div id="ws-frames" className="log ${styles.noAnchor}">
                     {frames.map((f, i) => (
                         <div key={i} className={`${styles.line} ${f.dir === "in" ? styles.info : styles.out}`}>
@@ -47,12 +49,12 @@ export default function DiagnosticsPage() {
                             <span className="selectable">{f.raw}</span>
                         </div>
                     ))}
-                    {frames.length === 0 && <div className="empty">（暂无封包）</div>}
+                    {frames.length === 0 && <div className="empty">{t("diagnostics.empty_frames")}</div>}
                 </div>
             </section>
 
             <section className="mj-panel card">
-                <h3 style={{marginTop: 0}}>后端事件日志</h3>
+                <h3 style={{marginTop: 0}}>{t("diagnostics.section_logs_title")}</h3>
                 <div id="diag-logpanel" className="log ${styles.noAnchor}">
                     {logs.map((l, i) => {
                         const cls =
@@ -67,7 +69,7 @@ export default function DiagnosticsPage() {
                             </div>
                         );
                     })}
-                    {logs.length === 0 && <div className="empty">（暂无日志）</div>}
+                    {logs.length === 0 && <div className="empty">{t("diagnostics.empty_logs")}</div>}
                 </div>
             </section>
         </div>

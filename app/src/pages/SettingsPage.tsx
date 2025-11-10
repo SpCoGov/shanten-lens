@@ -2,8 +2,9 @@ import "../styles/theme.css";
 import React, {useEffect, useRef, useState} from "react";
 import {ws} from "../lib/ws";
 import styles from "./SettingsPage.module.css";
-import { pushToast } from "../lib/toast";
+import {pushToast} from "../lib/toast";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import {t} from "i18next";
 
 type Tables = Record<string, Record<string, any>>;
 
@@ -14,6 +15,7 @@ function deepEqual(a: any, b: any) {
         return false;
     }
 }
+
 export default function SettingsPage() {
     const [serverTables, setServerTables] = useState<Tables | null>(null);
     const [draft, setDraft] = useState<Tables>({});
@@ -31,23 +33,23 @@ export default function SettingsPage() {
                     awaitingSyncRef.current = false;
                     setDirty(false);
                     setHasServerUpdateWhileDirty(false);
-                    pushToast("保存完成", "success", 1800);
+                    pushToast(t("settings.toast_save_done"), "success", 1800);
                 } else if (!dirty) {
                     setDraft(incoming);
                 } else {
                     setHasServerUpdateWhileDirty(true);
                 }
             } else if (pkt.type === "open_result") {
-                if (pkt.data?.ok) pushToast("已请求打开配置目录", "info", 1500);
-                else pushToast(`打开失败：${pkt.data?.error || ""}`, "error");
+                if (pkt.data?.ok) pushToast(t("settings.toast_open_config_ok"), "info", 1500);
+                else pushToast(t("settings.toast_open_config_fail", {error: pkt.data?.error || ""}), "error");
             }
         });
-        const t = setTimeout(() => {
+        const timeout = setTimeout(() => {
             ws.send({type: "request_update", data: {}} as any);
         }, 200);
         return () => {
             off();
-            clearTimeout(t);
+            clearTimeout(timeout);
         };
     }, []);
 
@@ -66,8 +68,14 @@ export default function SettingsPage() {
         setSaving(true);
         awaitingSyncRef.current = true;
         ws.send({type: "edit_config", data: draft} as any);
-        pushToast("已提交保存", "info", 1200);
+        pushToast(t("settings.toast_save_submitted"), "info", 1200);
         setTimeout(() => setSaving(false), 600);
+    };
+
+    const trKey = (table: string, key: string) => {
+        const nameKey = `settings.config.${table}.${key}`;
+        const descKey = `settings.config.${table}.${key}_desc`;
+        return { nameKey, descKey };
     };
 
     const discard = () => {
@@ -75,13 +83,13 @@ export default function SettingsPage() {
         setDirty(false);
         setHasServerUpdateWhileDirty(false);
         awaitingSyncRef.current = false;
-        pushToast("已放弃未保存更改", "info", 1200);
+        pushToast(t("settings.toast_discard"), "info", 1200);
     };
     const manualSync = () => ws.send({type: "request_update", data: {}} as any);
     const openConfigDir = () => ws.send({type: "open_config_dir", data: {}} as any);
 
     if (!serverTables && !Object.keys(draft).length) {
-        return <div className="settings-wrap">加载配置...</div>;
+        return <div className="settings-wrap">{t("settings.loading")}</div>;
     }
 
     const tablesToRender = Object.keys(draft).length ? draft : (serverTables ?? {});
@@ -90,30 +98,36 @@ export default function SettingsPage() {
     return (
         <div className="settings-wrap">
             <div className="settings-header">
-                <h2 className="title">设置</h2>
+                <h2 className="title">{t("settings.title")}</h2>
                 <div className="toolbar">
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginRight: 8 }}>
-                        <span>语言</span>
+                    <div className={styles.langWrap}>
+                        <span>{t("settings.language_label")}</span>
                         <LanguageSwitcher />
                     </div>
-                    <button className="btn" onClick={manualSync}>手动同步</button>
-                    <button className="btn" onClick={openConfigDir}>打开配置目录</button>
+                    <button className="btn" onClick={manualSync}>{t("settings.btn_manual_sync")}</button>
+                    <button className="btn" onClick={openConfigDir}>{t("settings.btn_open_config_dir")}</button>
                 </div>
             </div>
 
             {dirty && hasServerUpdateWhileDirty && (
                 <div className="notice">
-                    服务器有新配置推送，但你有未保存修改。你可以<span className="selectable">保存</span>或<span className="selectable">放弃更改</span>再同步。
+                    {t("settings.notice_server_update_dirty")}
                 </div>
             )}
 
             <div className={`mj-panel card ${styles.bigCard}`}>
                 {sections.map(([tname, kv], idx) => (
                     <div key={tname} className={styles.section}>
-                        <h3 className={styles.sectionTitle}>{tname}</h3>
+                        <h3
+                            className={styles.sectionTitle}
+                        >
+                            {t(`settings.table.${tname}`, { defaultValue: `settings.table.${tname}` })}
+                        </h3>
                         <div className="rows">
                             {Object.entries(kv).map(([key, val]) => {
                                 const id = `${tname}.${key}`;
+                                const { nameKey, descKey } = trKey(tname, key);
+
                                 const input =
                                     typeof val === "boolean" ? (
                                         <input
@@ -122,6 +136,7 @@ export default function SettingsPage() {
                                             className="form-checkbox"
                                             checked={!!val}
                                             onChange={(e) => onChange(tname, key, e.target.checked)}
+                                            title={descKey}
                                         />
                                     ) : typeof val === "number" ? (
                                         <input
@@ -130,6 +145,7 @@ export default function SettingsPage() {
                                             className="form-input"
                                             value={val}
                                             onChange={(e) => onChange(tname, key, Number(e.target.value))}
+                                            title={descKey}
                                         />
                                     ) : (
                                         <input
@@ -137,11 +153,13 @@ export default function SettingsPage() {
                                             className="form-input"
                                             value={val ?? ""}
                                             onChange={(e) => onChange(tname, key, e.target.value)}
+                                            title={descKey}
                                         />
                                     );
+
                                 return (
                                     <div className="row" key={key}>
-                                        <label htmlFor={id}>{key}</label>
+                                        <label htmlFor={id} title={t(descKey)}>{t(nameKey)}</label>
                                         {input}
                                     </div>
                                 );
@@ -152,11 +170,11 @@ export default function SettingsPage() {
                 ))}
             </div>
 
-                <div className="actions">
+            <div className="actions">
                 <button className={`btn ${saving ? "loading" : ""}`} onClick={save} disabled={!ws.connected || saving}>
-                    {saving ? "保存中…" : "保存"}
+                    {saving ? t("settings.btn_saving") : t("settings.btn_save")}
                 </button>
-                <button className="btn ghost" onClick={discard} disabled={!dirty}>放弃更改</button>
+                <button className="btn ghost" onClick={discard} disabled={!dirty}>{t("settings.btn_discard")}</button>
             </div>
         </div>
     );

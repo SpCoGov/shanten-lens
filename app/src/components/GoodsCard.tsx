@@ -1,6 +1,7 @@
 import React from "react";
 import "../styles/theme.css";
-import { type GoodsItem } from "../lib/gamestate";
+import {type GoodsItem} from "../lib/gamestate";
+import {t} from "i18next";
 
 const GOODS_IMG: Record<number, string> = {
     101: "/assets/fx_qingyun_kabao_4.png",
@@ -21,7 +22,11 @@ export default function GoodsCard({
     const H = Math.round(H0 * scale);
 
     const img = GOODS_IMG[item.goodsId] ?? GOODS_IMG[101];
-
+    const title = t("good_card.tooltip", {
+        id: item.id,
+        goodsId: item.goodsId,
+        price: item.price,
+    });
     return (
         <div
             style={{
@@ -36,7 +41,7 @@ export default function GoodsCard({
                 background: "var(--panel)",
                 boxShadow: "var(--panel-shadow)",
             }}
-            title={`ID=${item.id} goodsId=${item.goodsId} 价格=${item.price}`}
+            title={title}
         >
             <img
                 src={img}
@@ -70,7 +75,7 @@ export default function GoodsCard({
                     backdropFilter: "saturate(120%) blur(2px)",
                 }}
             >
-                <span style={{ filter: "drop-shadow(var(--shadow-text))" }}>⭐</span>
+                <span style={{filter: "drop-shadow(var(--shadow-text))"}}>⭐</span>
                 <span>{item.price}</span>
             </div>
 
@@ -99,7 +104,7 @@ export default function GoodsCard({
                             fontSize: Math.max(12, Math.round(14 * scale)),
                         }}
                     >
-                        売却済
+                        {t("good_card.sold")}
                     </div>
                 </div>
             )}

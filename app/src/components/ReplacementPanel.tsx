@@ -1,6 +1,7 @@
 import React from "react";
 import "../styles/theme.css";
 import Tile from "./Tile";
+import {t} from "i18next";
 
 const emitHover = (tile: string | null) =>
     window.dispatchEvent(new CustomEvent("shanten:hover-tile", {detail: tile}));
@@ -68,9 +69,12 @@ export default function ReplacementPanel({
     return (
         <section className="mj-panel" style={{marginTop: 12, overflowY: "hidden"}}>
             <div style={{marginBottom: 8, display: "flex", alignItems: "baseline", gap: 8}}>
-                <div style={{fontWeight: 600}}>替换序列</div>
+                <div style={{fontWeight: 600}}>{t("replacement_panel.title")}</div>
                 <div style={{fontSize: 12, color: "var(--muted)"}}>
-                    可替换 {replacementTiles.length} 张 · 已替换 {usedCount} 张
+                    {t("replacement_panel.summary", {
+                        total: replacementTiles.length,
+                        used: usedCount,
+                    })}
                 </div>
             </div>
 
@@ -91,10 +95,10 @@ export default function ReplacementPanel({
                     overscrollBehaviorX: "contain",
                 }}
             >
-                {replacementTiles.map((t, idx) => {
+                {replacementTiles.map((tFace, idx) => {
                     const used = idx <= lastIdx;
                     return (
-                        <div key={`${t}-${idx}`} style={{display: "grid", justifyItems: "center"}}>
+                        <div key={`${tFace}-${idx}`} style={{display: "grid", justifyItems: "center"}}>
                             <div
                                 style={{
                                     position: "relative",
@@ -103,13 +107,17 @@ export default function ReplacementPanel({
                                     outlineOffset: used ? 2 : 0,
                                     marginBottom: 10,
                                 }}
-                                onMouseEnter={() => emitHover(t)}
+                                onMouseEnter={() => emitHover(tFace)}
                                 onMouseLeave={() => emitHover(null)}
-                                onClick={() => emitHover(t)}
-                                title={`${t}${used ? "（已替）" : ""}`}
+                                onClick={() => emitHover(tFace)}
+                                title={
+                                    used
+                                        ? t("replacement_panel.tile_title_used", { tile: tFace })
+                                        : t("replacement_panel.tile_title", { tile: tFace })
+                                }
                             >
                                 <Tile
-                                    tile={t}
+                                    tile={tFace}
                                     dim={false}
                                     hoveredTile={hovered}
                                     setHoveredTile={(x) => emitHover(x)}
@@ -134,7 +142,7 @@ export default function ReplacementPanel({
                                             pointerEvents: "none",
                                         }}
                                     >
-                                        已替
+                                        {t("replacement_panel.badge_used")}
                                     </div>
                                 )}
                             </div>
@@ -158,7 +166,7 @@ export default function ReplacementPanel({
                                                 color: "color-mix(in srgb, var(--color-ring) 90%, transparent)",
                                             }}
                                         >
-                                            当前
+                                            {t("replacement_panel.pointer_current")}
                                         </div>
                                     </div>
                                 )}

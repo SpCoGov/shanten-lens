@@ -2,6 +2,7 @@ import React, { useCallback, useMemo } from "react";
 import "../styles/theme.css";
 import { useFuse, toggleSelect } from "../lib/fuseStore";
 import { getRegistry } from "../lib/registryStore";
+import { useTranslation } from "react-i18next";
 
 type ItemKind = "amulet" | "badge";
 
@@ -15,6 +16,7 @@ type Item = {
 };
 
 export default function FuseBar() {
+    const { t } = useTranslation();
     const { config, selected } = useFuse();
     const reg = getRegistry();
 
@@ -22,23 +24,25 @@ export default function FuseBar() {
         const aList = (config.guard_skip_contains.amulets ?? []).map((id: number) => ({
             kind: "amulet" as const,
             id,
-            name: reg.amuletById.get(id)?.name ?? `护符#${id}`,
-            icon: `assets/amulet/fu_${String(reg.amuletById.get(id)?.icon_id ?? 0).toString().padStart(4, "0")}.png`,
+            name: reg.amuletById.get(id)?.name ?? t("fuse.bar.unknown_amulet", { id }),
+            icon: `assets/amulet/fu_${String(reg.amuletById.get(id)?.icon_id ?? 0)
+                .toString()
+                .padStart(4, "0")}.png`,
             chosen: selected.amulets.has(id),
-            label: "护符",
+            label: t("fuse.bar.kind.amulet"),
         }));
 
         const bList = (config.guard_skip_contains.badges ?? []).map((id: number) => ({
             kind: "badge" as const,
             id,
-            name: reg.badgeById.get(id)?.name ?? `印章#${id}`,
+            name: reg.badgeById.get(id)?.name ?? t("fuse.bar.unknown_badge", { id }),
             icon: `assets/badge/badge_${id}.png`,
             chosen: selected.badges.has(id),
-            label: "印章",
+            label: t("fuse.bar.kind.badge"),
         }));
 
         return [...aList, ...bList];
-    }, [config.guard_skip_contains, reg, selected.amulets, selected.badges]);
+    }, [config.guard_skip_contains, reg, selected.amulets, selected.badges, t]);
 
     const onToggle = useCallback((kind: ItemKind, id: number) => {
         toggleSelect(kind, id);
@@ -55,7 +59,7 @@ export default function FuseBar() {
                     color: "var(--muted)",
                 }}
             >
-                空空如也，点击下方按钮添加护身符/印章…
+                {t("fuse.bar.empty")}
             </div>
         );
     }
@@ -72,11 +76,7 @@ export default function FuseBar() {
             }}
         >
             {items.map((it) => (
-                <Pill
-                    key={`${it.kind}-${it.id}`}
-                    item={it}
-                    onToggle={onToggle}
-                />
+                <Pill key={`${it.kind}-${it.id}`} item={it} onToggle={onToggle} />
             ))}
         </div>
     );
@@ -89,6 +89,7 @@ function Pill({
     item: Item;
     onToggle: (kind: ItemKind, id: number) => void;
 }) {
+    const { t } = useTranslation();
     const { kind, id, name, label, chosen, icon } = item;
 
     const handleKeyDown = useCallback(
@@ -102,11 +103,14 @@ function Pill({
     );
 
     const handleImgError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-        const el = e.currentTarget;
-        el.style.display = "none";
+        e.currentTarget.style.display = "none";
     }, []);
 
-    const title = `${label} ${name}（ID:${id}）— 点击${chosen ? "取消选择" : "选择"}`;
+    const title = t(chosen ? "fuse.bar.title_unselect" : "fuse.bar.title_select", {
+        kind: label,
+        name,
+        id,
+    });
 
     return (
         <button

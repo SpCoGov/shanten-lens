@@ -2,55 +2,63 @@ import React, { useMemo } from "react";
 import "../styles/theme.css";
 import Tile from "./Tile";
 import styles from "./WallStats.module.css";
+import i18next, {t} from "i18next";
 
 export interface WallStatsProps {
     wallTiles: string[];
     className?: string;
 }
 
-/** 归一化：'1m/m1' -> 'm1'；'东' -> 'z1'；'0p' -> 'p0'；'4z' -> 'z4' */
 function normalize(raw: string): string {
     const s = raw.trim();
     const honorCN: Record<string, string> = { 东: "z1", 南: "z2", 西: "z3", 北: "z4", 白: "z5", 发: "z6", 中: "z7" };
+    const honorJP: Record<string, string> = { 東: "z1", 南: "z2", 西: "z3", 北: "z4", 白: "z5", 発: "z6", 中: "z7", 發: "z6" };
     if (honorCN[s]) return honorCN[s];
-    if (/^[mps][0-9]$/.test(s)) return s;                // m0..m9 / p0..p9 / s0..s9
-    if (/^[0-9][mps]$/.test(s)) return `${s[1]}${s[0]}`;  // 1m..9m / 0p..9p
-    if (/^z[1-7]$/.test(s)) return s;                     // z1..z7
-    if (/^[1-7]z$/.test(s)) return `z${s[0]}`;            // 1z..7z -> z1..z7
-    return s; // 其他编码原样
+    if (honorJP[s]) return honorJP[s];
+    if (/^[mps][0-9]$/.test(s)) return s;
+    if (/^[0-9][mps]$/.test(s)) return `${s[1]}${s[0]}`;
+    if (/^z[1-7]$/.test(s)) return s;
+    if (/^[1-7]z$/.test(s)) return `z${s[0]}`;
+    return s;
 }
 
-/** 显示名：0→赤五X；1..9→汉字X；字牌→东南西北白发中（兜底兼容 'Nz'） */
-function keyToReadable(key: string): string {
-    const suit = key[0];
-    const valStr = key.slice(1);
+export function keyToReadable(key: string, i18n = i18next): string {
+    const t = i18n.t.bind(i18n);
+    const k = normalize(key);
+    const suitKey = k[0];
+    const valStr = k.slice(1);
     const v = Number(valStr);
-    const suitMap: Record<string, string> = { m: "万", p: "筒", s: "索" };
-    const cn = ["零","一","二","三","四","五","六","七","八","九"];
 
-    if (suit === "z") {
-        const honors = ["东","南","西","北","白","发","中"];
-        return honors[(v - 1 + 7) % 7] ?? key;
+    const suitName = t(`tile.suits.${suitKey}`, { defaultValue: "" }) as string;
+    const honors = t("tile.honors", { returnObjects: true }) as string[];
+    const numbers = t("tile.numbers", { returnObjects: true }) as string[];
+
+    if (suitKey === "z") {
+        const idx = Math.min(Math.max(v - 1, 0), 6);
+        return honors[idx] ?? k;
     }
     if (/^[1-7]z$/.test(key)) {
-        const honors = ["东","南","西","北","白","发","中"];
-        const n = Number(key[0]);
-        return honors[n - 1] ?? key;
+        const idx = Number(key[0]) - 1;
+        return honors[idx] ?? key;
     }
 
-    if (suitMap[suit]) {
-        if (v === 0) return `赤五${suitMap[suit]}`;
-        if (v >= 1 && v <= 9) return `${cn[v]}${suitMap[suit]}`;
+    if (suitName) {
+        if (v === 0) {
+            return t("tile.format.red_five", { suit: suitName }) as string;
+        }
+        if (v >= 1 && v <= 9) {
+            const numWord = numbers[v] ?? String(v);
+            return t("tile.format.number_suit", { num: numWord, suit: suitName }) as string;
+        }
     }
+
     return key;
 }
 
-/** 同花色排序值：0（赤五）紧随 5 之后，以 5.1 处理 */
 function valueSortNumber(v: number): number {
     return v === 0 ? 5.1 : v;
 }
 
-/** 排序：m→p→s→z；同花色数值升序，赤五紧跟五 */
 function sortKey(a: string, b: string): number {
     const order: Record<string, number> = { m: 0, p: 1, s: 2, z: 3 };
     const na = normalize(a);
@@ -67,7 +75,6 @@ function sortKey(a: string, b: string): number {
     return na.localeCompare(nb);
 }
 
-/** 等价组：普通五 ↔ 赤五；其他牌仅自身 */
 function eqGroup(tile: string): string[] {
     const t = normalize(tile);
     if (/^[mps][0-9]$/.test(t)) {
@@ -79,7 +86,6 @@ function eqGroup(tile: string): string[] {
     return [t];
 }
 
-/** 发出两个事件：单值兼容 + 等价组（数组） */
 function emitHover(tile: string | null) {
     window.dispatchEvent(new CustomEvent("shanten:hover-tile", { detail: tile }));
     const group = tile ? eqGroup(tile) : [];
@@ -109,12 +115,12 @@ export default function WallStats({ wallTiles, className }: WallStatsProps) {
         <aside className={[styles.wrap, className].filter(Boolean).join(" ")}>
             <div className={`mj-panel ${styles.panel}`}>
                 <div className={styles.header}>
-                    <div className={styles.title}>牌山统计</div>
+                    <div className={styles.title}>{t("wall_stats.title")}</div>
                 </div>
 
                 <div className={styles.list}>
                     {list.length === 0 ? (
-                        <div className={styles.empty}>当前无可摸牌</div>
+                        <div className={styles.empty}>{t("wall_stats.empty")}</div>
                     ) : (
                         list.map(({ key, sample, readable, count }) => (
                             <div
@@ -128,7 +134,7 @@ export default function WallStats({ wallTiles, className }: WallStatsProps) {
                                     <Tile
                                         tile={sample}
                                         dim={false}
-                                        hoveredTile={null}               // 侧栏不吃外部高亮
+                                        hoveredTile={null}
                                         setHoveredTile={(t) => emitHover(t || null)}
                                         width={44}
                                         height={60}
@@ -136,7 +142,7 @@ export default function WallStats({ wallTiles, className }: WallStatsProps) {
                                 </div>
                                 <div className={styles.meta}>
                                     <div className={styles.name}>{readable}</div>
-                                    <div className={styles.subtext}>还能摸到</div>
+                                    <div className={styles.subtext}>{t("wall_stats.still_drawable")}</div>
                                 </div>
                                 <div className={styles.count}>×{count}</div>
                             </div>

@@ -2,6 +2,7 @@ import React from "react";
 import "../styles/theme.css";
 import { type GoodsItem } from "../lib/gamestate";
 import GoodsCard from "./GoodsCard";
+import {t} from "i18next";
 
 export default function GoodsBar({
                                      items,
@@ -25,7 +26,7 @@ export default function GoodsBar({
                     fontSize: 12,
                 }}
             >
-                暂无商品
+                {t("goods_bar.empty")}
             </div>
         );
     }
