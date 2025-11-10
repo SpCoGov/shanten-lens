@@ -134,6 +134,213 @@
     "disabled_reason_not_ready": "未就绪",
     "disabled_reason_not_probed": "未探测"
   },
+  "diagnostics": {
+    "ws_status_label": "WebSocket",
+    "ws_connected": "已连接",
+    "ws_disconnected": "未连接",
+    "auto_scroll": "自动滚动",
+    "section_frames_title": "WS 封包（收/发）",
+    "empty_frames": "（暂无封包）",
+    "section_logs_title": "后端事件日志",
+    "empty_logs": "（暂无日志）"
+  },
+  "fuse": {
+    "title": "熔断",
+    "section_shop_guard_title": "购物守护",
+    "section_shop_guard_desc": "维护监控列表后，在购物时应用两条规则：<br/>1）出现监控项时<strong>禁止“跳过”</strong>（启用下方“禁止跳过”）；<br/>2）出现监控项但你<strong>没有选择监控项之一</strong>则阻止（启用下方“强制选择监控项”）。",
+    "btn_add_amulet": "添加护身符",
+    "btn_add_badge": "添加印章",
+    "btn_delete_selected": "删除选中",
+    "btn_clear_selection": "取消选择",
+    "toggle_skip_guard": "禁止跳过（出现监控项时阻止“跳过”）",
+    "toggle_force_pick": "强制选择监控项（出现监控项但未选其一时阻止）",
+    "section_conduction_title": "传导链守护",
+    "section_conduction_desc": "若传导卡数量达到阈值，且卡维未按规则摆放，将阻止开始对局，以避免忘记给护身符上「传导」而导致断链。",
+    "toggle_conduction": "启用传导链守护",
+    "label_conduction_threshold": "传导卡阈值",
+    "hint_conduction_threshold": "（当传导卡数量 ≥ 阈值且卡维位置不安全时，阻止开局）",
+    "section_badge_guard_title": "印章守护",
+    "section_badge_guard_desc": "若卡维携带「传导」或「膨胀」印章且置于盗印左侧，将阻止和牌。",
+    "toggle_badge_guard": "启用印章守护",
+    "section_kavi_plus_title": "卡维+缓冲守护",
+    "section_kavi_plus_desc": "当存在「卡维+」与「膨胀」时，若二者之间没有至少隔一个<strong>非膨胀</strong>护身符作为缓冲，阻止开局。",
+    "toggle_kavi_plus": "启用卡维+缓冲守护",
+    "section_exit_life_title": "退出商店守护",
+    "section_exit_life_desc": "若当前护身符中<strong>没有</strong>携带「生命」印章，阻止退出商店。",
+    "toggle_exit_life": "启用退出商店守护",
+    "btn_save": "保存熔断配置",
+    "btn_saving": "保存中…",
+    "bar": {
+      "empty": "空空如也，点击下方按钮添加护身符/印章…",
+      "kind": {
+        "amulet": "护身符",
+        "badge": "印章"
+      },
+      "unknown_amulet": "护身符#{{id}}",
+      "unknown_badge": "印章#{{id}}",
+      "title_select": "{{kind}} {{name}}（ID:{{id}}）— 点击选择",
+      "title_unselect": "{{kind}} {{name}}（ID:{{id}}）— 点击取消选择"
+    }
+  },
+  "settings": {
+    "table": {
+      "game": "游戏",
+      "general": "常规",
+      "backend": "后端"
+    },
+    "config": {
+      "game": {
+        "modify_announcement": "修改公告",
+        "modify_announcement_desc": "添加一条公告以提示向听镜启动成功",
+        "public_all": "公开牌山",
+        "public_all_desc": "让游戏中所有牌成为公开牌",
+        "auto_discard": "自动打牌",
+        "auto_discard_desc": "按照自动和七对子的提示自动打牌（模拟点击）",
+        "auto_tsumo": "自动自摸",
+        "auto_tsumo_desc": "在可以自摸的时候自动自摸（发送封包）",
+        "anti_afk": "防止挂机",
+        "anti_afk_desc": "防止被判定为挂机而强制断开链接"
+      },
+      "general": {
+        "debug": "调试模式",
+        "debug_desc": "调试模式可获得完整的日志",
+        "error_code_test": "错误代码测试",
+        "error_code_test_desc": "用于测试错误代码对应的提示"
+      },
+      "backend": {
+        "host": "后端地址",
+        "host_desc": "后端地址",
+        "port": "后端端口",
+        "port_desc": "后端端口",
+        "mitm_port": "MITM端口",
+        "port_port": "MITM服务器端口",
+        "api_port": "接口端口",
+        "api_port_desc": "接口端口"
+      }
+    },
+    "title": "设置",
+    "loading": "加载配置...",
+    "language_label": "语言",
+    "btn_manual_sync": "手动同步",
+    "btn_open_config_dir": "打开配置目录",
+    "notice_server_update_dirty": "服务器有新配置推送，但你有未保存修改。你可以保存或放弃更改再同步。",
+    "btn_save": "保存",
+    "btn_saving": "保存中…",
+    "btn_discard": "放弃更改",
+    "toast_save_submitted": "已提交保存",
+    "toast_save_done": "保存完成",
+    "toast_discard": "已放弃未保存更改",
+    "toast_open_config_ok": "已请求打开配置目录",
+    "toast_open_config_fail": "打开失败：{{error}}"
+  },
+  "advisor": {
+    "title_suu_ankou": "四暗刻",
+    "title_chiitoi": "七对子",
+    "awaiting_backend": "等待后端结果…",
+    "win_now": "当前可立刻和",
+    "need_draws_label": "还需摸",
+    "impossible": "无解",
+    "menzen_only": "门前清限定",
+    "recommend_discard": "推荐打牌",
+    "id_label": "ID: {{id}}"
+  },
+  "amulet_card": {
+    "title_unknown": "未知护身符 ID={{regId}} (raw={{rawId}})",
+    "title_known": "{{name}}{{suffix}}",
+    "plus_suffix": "（Plus）",
+    "plus_alt": "Plus",
+    "badge_alt": "印章：{{name}}",
+    "unknown_label": "未知ID {{regId}}"
+  },
+  "amulet_picker": {
+    "title": "选择护身符",
+    "search_ph": "搜索名称或ID…",
+    "search_aria": "搜索护身符",
+    "rarity_label": "稀有度筛选",
+    "rarity": {
+      "ALL": "全部",
+      "PURPLE": "紫",
+      "ORANGE": "橙",
+      "BLUE": "蓝",
+      "GREEN": "绿"
+    },
+    "action_confirm": "确认",
+    "action_confirm_hint": "请选择一个护身符后再确认",
+    "field_id": "ID: {{id}}",
+    "card_title": "{{name}}（#{{id}}）"
+  },
+  "badge_picker": {
+    "title": "选择印章",
+    "search_ph": "搜索名称或ID…",
+    "search_aria": "搜索印章",
+    "rarity_label": "稀有度筛选",
+    "rarity": {
+      "ALL": "全部",
+      "RED": "红",
+      "BLUE": "蓝",
+      "BROWN": "棕"
+    },
+    "action_confirm": "确认",
+    "action_confirm_hint": "请选择一个印章后再确认",
+    "field_id": "ID: {{id}}",
+    "card_title": "{{name}}（#{{id}}）"
+  },
+  "goods_bar": {
+    "empty": "暂无商品"
+  },
+  "good_card": {
+    "tooltip": "ID={{id}} goodsId={{goodsId}} 价格={{price}}",
+    "image_alt": "商品图片（goodsId={{goodsId}}）",
+    "sold": "已售罄"
+  },
+  "modal": {
+    "close": "关闭"
+  },
+  "replacement_panel": {
+    "title": "替换序列",
+    "summary": "可替换 {{total}} 张 · 已替换 {{used}} 张",
+    "tile_title": "{{tile}}",
+    "tile_title_used": "{{tile}}（已替）",
+    "badge_used": "已替",
+    "pointer_current": "当前"
+  },
+  "wall_stats": {
+    "title": "牌山统计",
+    "empty": "当前无可摸牌",
+    "still_drawable": "还能摸到"
+  },
+  "tile": {
+    "suits": {
+      "m": "万",
+      "p": "筒",
+      "s": "索"
+    },
+    "honors": [
+      "东",
+      "南",
+      "西",
+      "北",
+      "白",
+      "发",
+      "中"
+    ],
+    "numbers": [
+      "零",
+      "一",
+      "二",
+      "三",
+      "四",
+      "五",
+      "六",
+      "七",
+      "八",
+      "九"
+    ],
+    "format": {
+      "number_suit": "{{num}}{{suit}}",
+      "red_five": "赤五{{suit}}"
+    }
+  },
   "amulet": "护身符",
   "candidate_amulet": "候补护身符",
   "goods": "商品",

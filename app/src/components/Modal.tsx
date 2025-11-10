@@ -1,6 +1,7 @@
 import React from "react";
 import "../styles/theme.css";
 import styles from "./Modal.module.css";
+import {t} from "i18next";
 
 export default function Modal({
                                   open,
@@ -29,7 +30,7 @@ export default function Modal({
                     <div className={styles.headerTitle}>{title}</div>
                     <div className={styles.headerActions}>
                         {actions}
-                        <button className="nav-btn" onClick={onClose}>关闭</button>
+                        <button className="nav-btn" onClick={onClose}>{t("modal.close")}</button>
                     </div>
                 </div>
 

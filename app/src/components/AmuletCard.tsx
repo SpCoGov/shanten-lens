@@ -2,6 +2,7 @@ import React from "react";
 import "../styles/theme.css";
 import {type EffectItem} from "../lib/gamestate";
 import {getRegistry} from "../lib/registryStore";
+import {t} from "i18next";
 
 const RAR_BG_INDEX: Record<string, number> = {
     PURPLE: 1,
@@ -47,6 +48,12 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
     const PLUS = Math.round(PLUS0 * scale);
     const BADGE = Math.round(BADGE0 * scale);
     const RADIUS = Math.max(8, Math.round(12 * scale));
+    const titleText = unknown
+        ? t("amulet_card.title_unknown", { regId, rawId })
+        : t("amulet_card.title_known", {
+            name: amu!.name,
+            suffix: plus ? t("amulet_card.plus_suffix") : ""
+        });
 
     return (
         <div
@@ -57,9 +64,7 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
                 userSelect: "none",
                 flex: "0 0 auto",
             }}
-            title={
-                unknown ? `未知护身符 ID=${regId} (raw=${rawId})` : `${amu!.name}${plus ? "（Plus）" : ""}`
-            }
+            title={titleText}
         >
             {unknown ? (
                 <div
@@ -153,7 +158,7 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
                         textShadow: "var(--shadow-text)",
                     }}
                 >
-                    {`未知ID ${regId}`}
+                    {t("amulet_card.unknown_label", {regId: regId})}
                 </div>
             )}
         </div>

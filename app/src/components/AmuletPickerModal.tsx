@@ -1,7 +1,8 @@
 import React from "react";
 import "../styles/theme.css";
 import Modal from "./Modal";
-import { useRegistry } from "../lib/registryStore";
+import {useRegistry} from "../lib/registryStore";
+import {useTranslation} from "react-i18next";
 
 const RARITIES = ["ALL", "PURPLE", "ORANGE", "BLUE", "GREEN"] as const;
 type RarityKey = typeof RARITIES[number];
@@ -15,7 +16,8 @@ export default function AmuletPickerModal({
     onClose: () => void;
     onSelect: (amuletId: number) => void;
 }) {
-    const { amulets } = useRegistry();
+    const {t} = useTranslation();
+    const {amulets} = useRegistry();
     const [q, setQ] = React.useState("");
     const [rarity, setRarity] = React.useState<RarityKey>("ALL");
     const [sel, setSel] = React.useState<number | null>(null);
@@ -43,18 +45,20 @@ export default function AmuletPickerModal({
                 onClose();
             }}
             disabled={sel == null}
+            title={sel == null ? t("amulet_picker.action_confirm_hint") : undefined}
         >
-            确认
+            {t("amulet_picker.action_confirm")}
         </button>
     );
 
     return (
-        <Modal open={open} onClose={onClose} title="选择护身符" actions={actions}>
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <Modal open={open} onClose={onClose} title={t("amulet_picker.title")} actions={actions}>
+            <div style={{display: "flex", gap: 8, marginBottom: 12}}>
                 <input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    placeholder="搜索名称或ID…"
+                    placeholder={t("amulet_picker.search_ph")}
+                    aria-label={t("amulet_picker.search_aria")}
                     style={{
                         flex: 1,
                         padding: "8px 10px",
@@ -69,6 +73,7 @@ export default function AmuletPickerModal({
                 <select
                     value={rarity}
                     onChange={(e) => setRarity(e.target.value as RarityKey)}
+                    aria-label={t("amulet_picker.rarity_label")}
                     style={{
                         padding: "8px 10px",
                         borderRadius: 8,
@@ -76,12 +81,12 @@ export default function AmuletPickerModal({
                         background: "var(--input-bg)",
                         outline: "none",
                     }}
-                    onFocus={(e) => (e.currentTarget.style.boxShadow = "var(--input-focus-ring)")}
+                    onFocus={(e) => (e.currentTarget.style.boxShadow = "var(--input-focus_ring)")}
                     onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
                 >
                     {RARITIES.map((r) => (
                         <option key={r} value={r}>
-                            {r}
+                            {t(`amulet_picker.rarity.${r}`)}
                         </option>
                     ))}
                 </select>
@@ -101,7 +106,7 @@ export default function AmuletPickerModal({
                         <button
                             key={a.id}
                             onClick={() => setSel(a.id)}
-                            title={`${a.name} (#${a.id})`}
+                            title={t("amulet_picker.card_title", {name: a.name, id: a.id})}
                             style={{
                                 textAlign: "left",
                                 border: `1px solid ${
@@ -125,8 +130,10 @@ export default function AmuletPickerModal({
                                 if (!chosen) e.currentTarget.style.borderColor = "var(--border)";
                             }}
                         >
-                            <div style={{ fontSize: 12, color: "var(--muted)" }}>ID: {a.id}</div>
-                            <div style={{ fontWeight: 600, margin: "4px 0", color: "var(--text)" }}>{a.name}</div>
+                            <div style={{fontSize: 12, color: "var(--muted)"}}>
+                                {t("amulet_picker.field_id", {id: a.id})}
+                            </div>
+                            <div style={{fontWeight: 600, margin: "4px 0", color: "var(--text)"}}>{a.name}</div>
                             <div
                                 style={{
                                     fontSize: 12,
@@ -134,12 +141,12 @@ export default function AmuletPickerModal({
                                     marginBottom: 6,
                                 }}
                             >
-                                {a.rarity}
+                                {t(`amulet_picker.rarity.${a.rarity as RarityKey}`)}
                             </div>
                             <img
                                 src={icon}
                                 alt={a.name}
-                                style={{ width: 80, height: "auto", display: "block", opacity: 0.95 }}
+                                style={{width: 80, height: "auto", display: "block", opacity: 0.95}}
                                 draggable={false}
                             />
                         </button>

@@ -18,8 +18,6 @@ def build_manager(conf_dir: Path) -> ConfigManager:
     )
     mgr.add_table(
         ConfigTable("general", file=conf_dir / "general.json")
-        .add("language", "zh-CN", desc="界面语言", kind="string")
-        .add("theme", "system", desc="主题", kind="string")
         .add("debug", False, desc="调试模式", kind="bool")
         .add("error_code_test", 0, desc="错误测试", kind="number")
     )

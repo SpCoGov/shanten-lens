@@ -20,3 +20,11 @@
     opacity: .7;
     border-radius: 999px;
 }
+
+.langWrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 8px;
+    white-space: nowrap;
+}

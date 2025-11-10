@@ -22,7 +22,6 @@ export default function AboutPage() {
                     <Trans
                         i18nKey="about.license_copyright_html"
                         values={{ year: new Date().getFullYear() }}
-                        components={{ strong: <strong /> }}
                     />
                 </p>
                 <details>
@@ -46,7 +45,6 @@ Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
                     <Trans
                         i18nKey="about.section_usage_body_html"
                         values={{ year: new Date().getFullYear() }}
-                        components={{ strong: <strong /> }}
                     />
                 </p>
             </section>

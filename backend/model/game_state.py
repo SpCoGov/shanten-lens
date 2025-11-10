@@ -128,7 +128,7 @@ class GameState:
     def refresh_wall_by_remaning(self, push_gamestate: bool = True, reason: str = ""):
         temp = self.deck_map.copy()
         hand_tiles = self.hand_tiles.copy()
-        for hand_tile_id in hand_tiles:
+        for hand_tile_id in hand_tiles: 
             temp.pop(hand_tile_id)
         ids = list(temp.keys())
         # 跳过 dora 和 已经摸牌的数量

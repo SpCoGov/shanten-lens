@@ -2,6 +2,7 @@ import React from "react";
 import "../styles/theme.css";
 import styles from "./AdvisorPanel.module.css";
 import Tile from "./Tile";
+import {t} from "i18next";
 
 export type PlanData = {
     status: "win_now" | "plan" | "impossible";
@@ -23,8 +24,8 @@ export default function AdvisorPanel({
 }) {
     return (
         <aside className={styles.wrap}>
-            <StrategyCard title="四暗刻" data={suuAnkou} resolveFace={resolveFace} />
-            <StrategyCard title="七対子" data={chiitoi} resolveFace={resolveFace} />
+            <StrategyCard title={t("advisor.title_suu_ankou")} data={suuAnkou} resolveFace={resolveFace}/>
+            <StrategyCard title={t("advisor.title_chiitoi")} data={chiitoi} resolveFace={resolveFace}/>
         </aside>
     );
 }
@@ -48,7 +49,7 @@ function StrategyCard({
                     <h3>{title}</h3>
                     {badge && badge.trim() && <span className={styles.badgeMuted}>{badge}</span>}
                 </div>
-                <div className={styles.cardBodyMuted}>等待后端结果…</div>
+                <div className={styles.cardBodyMuted}>{t("advisor.awaiting_backend")}</div>
             </section>
         );
     }
@@ -73,17 +74,17 @@ function StrategyCard({
 
             {isWinNow ? (
                 <div className={styles.okBand}>
-                    <div className={styles.bandOkText}>当前可立刻和</div>
+                    <div className={styles.bandOkText}>{t("advisor.win_now")}</div>
                 </div>
             ) : isImpossible ? (
                 <div className={styles.bandSingle}>
-                    <div className={styles.bandLabel}>还需摸</div>
-                    <div className={styles.bandValue}>{isMenzenOnlyWord ? "門前のみ" : "无解"}</div>
+                    <div className={styles.bandLabel}>{t("advisor.need_draws_label")}</div>
+                    <div className={styles.bandValue}>{isMenzenOnlyWord ? t("advisor.menzen_only") : t("advisor.impossible")}</div>
                 </div>
             ) : (
                 <div className={styles.band}>
                     <div className={styles.bandLeft}>
-                        <div className={styles.bandLabel}>还需摸</div>
+                        <div className={styles.bandLabel}>{t("advisor.need_draws_label")}</div>
                         <div className={styles.bandValue}>
                             {formatDrawsNeeded(
                                 typeof data.draws_needed === "number" ? data.draws_needed : null
@@ -91,16 +92,16 @@ function StrategyCard({
                         </div>
                     </div>
 
-                    <div className={styles.vbar} />
+                    <div className={styles.vbar}/>
 
                     <div className={styles.bandRight}>
-                        <div className={styles.bandActionLabel}>推荐打牌</div>
+                        <div className={styles.bandActionLabel}>{t("advisor.recommend_discard")}</div>
                         {firstDiscardId != null ? (
                             <div className={styles.actionChip}>
                 <span className={`${styles.tilePill} ${styles.tileReset} ${styles.tileRound}`}>
-                  <Tile tile={firstDiscardFace || "-"} />
+                  <Tile tile={firstDiscardFace || "-"}/>
                 </span>
-                                <span className={styles.chipText}>id: {firstDiscardId}</span>
+                                <span className={styles.chipText}>{t("advisor.id_label", {id: firstDiscardId})}</span>
                             </div>
                         ) : (
                             <div className={`${styles.actionChip} ${styles.chipDisabled}`}>—</div>
@@ -112,7 +113,7 @@ function StrategyCard({
     );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({label, value}: { label: string; value: string }) {
     return (
         <div className={styles.metric}>
             <div className={styles.metricLabel}>{label}</div>
@@ -121,16 +122,16 @@ function Metric({ label, value }: { label: string; value: string }) {
     );
 }
 
-function TilePill({ face }: { face: string | null }) {
+function TilePill({face}: { face: string | null }) {
     if (!face) return <span>-</span>;
     return (
         <span className={`${styles.tilePill} ${styles.tileReset} ${styles.tileRound}`}>
-      <Tile tile={face} />
+      <Tile tile={face}/>
     </span>
     );
 }
 
 function formatDrawsNeeded(n: number | null) {
-    if (n === null || n === undefined) return "无解";
+    if (n === null || n === undefined) return t("advisor.impossible");
     return String(n);
 }

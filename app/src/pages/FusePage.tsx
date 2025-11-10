@@ -5,6 +5,8 @@ import {ws} from "../lib/ws";
 import AmuletPickerModal from "../components/AmuletPickerModal";
 import BadgePickerModal from "../components/BadgePickerModal";
 import FuseBar from "../components/FuseBar";
+import {t} from "i18next";
+import {Trans} from "react-i18next";
 
 export default function FusePage() {
     const {config, selected} = useFuse();
@@ -33,40 +35,38 @@ export default function FusePage() {
 
     return (
         <div className="settings-wrap" style={{padding: 16}}>
-            <h2 className="title">熔断</h2>
+            <h2 className="title">{t("fuse.title")}</h2>
 
             <section className="panel">
-                <div className="panel-title">购物守护</div>
+                <div className="panel-title">{t("fuse.section_shop_guard_title")}</div>
                 <p className="hint" style={{marginTop: 0, lineHeight: 1.5}}>
-                    维护监控列表后，在购物时应用两条规则：
-                    <br/>
-                    1）出现监控项时<strong>禁止“跳过”</strong>（启用下方“禁止跳过”）；
-                    <br/>
-                    2）出现监控项但你<strong>没有选择监控项之一</strong>则阻止（启用下方“强制选择监控项”）。
+                    <Trans
+                        i18nKey="fuse.section_shop_guard_desc"
+                    />
                 </p>
 
                 <FuseBar/>
 
                 <div className="toolbar" style={{marginTop: 10, flexWrap: "wrap" as const}}>
                     <button className="nav-btn" onClick={() => setOpenA(true)}>
-                        添加护身符
+                        {t("fuse.btn_add_amulet")}
                     </button>
                     <button className="nav-btn" onClick={() => setOpenB(true)}>
-                        添加印章
+                        {t("fuse.btn_add_badge")}
                     </button>
                     <button
                         className="nav-btn"
                         onClick={onRemove}
                         disabled={selected.amulets.size === 0 && selected.badges.size === 0}
                     >
-                        删除选中
+                        {t("fuse.btn_delete_selected")}
                     </button>
                     <button
                         className="nav-btn"
                         onClick={clearSelection}
                         disabled={selected.amulets.size === 0 && selected.badges.size === 0}
                     >
-                        取消选择
+                        {t("fuse.btn_clear_selection")}
                     </button>
                 </div>
 
@@ -78,7 +78,7 @@ export default function FusePage() {
                             checked={Boolean(config.enable_skip_guard)}
                             onChange={(e) => patchFuseConfig({enable_skip_guard: e.target.checked})}
                         />
-                        <span>禁止跳过（出现监控项时阻止“跳过”）</span>
+                        <span>{t("fuse.toggle_skip_guard")}</span>
                     </label>
 
                     <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
@@ -88,15 +88,17 @@ export default function FusePage() {
                             checked={Boolean(config.enable_shop_force_pick)}
                             onChange={(e) => patchFuseConfig({enable_shop_force_pick: e.target.checked})}
                         />
-                        <span>强制选择监控项（出现监控项但未选其一时阻止）</span>
+                        <span>{t("fuse.toggle_force_pick")}</span>
                     </label>
                 </div>
             </section>
 
             <section className="panel">
-                <div className="panel-title">传导链守护</div>
+                <div className="panel-title">{t("fuse.section_conduction_title")}</div>
                 <p className="hint" style={{marginTop: 0, lineHeight: 1.5}}>
-                    若传导卡数量达到阈值，且卡维未按规则摆放，将阻止开始对局，以避免忘记给护身符上「传导」而导致断链。
+                    <Trans
+                        i18nKey="fuse.section_conduction_desc"
+                    />
                 </p>
 
                 <label className="row" style={{gridTemplateColumns: "auto 1fr", marginBottom: 10}}>
@@ -106,12 +108,18 @@ export default function FusePage() {
                         checked={Boolean(config.enable_prestart_kavi_guard)}
                         onChange={(e) => patchFuseConfig({enable_prestart_kavi_guard: e.target.checked})}
                     />
-                    <span>启用传导链守护</span>
+                    <span>
+                        <Trans
+                        i18nKey="fuse.toggle_conduction"
+                        />
+                    </span>
                 </label>
 
                 <div className="row" style={{gridTemplateColumns: "auto auto 1fr", alignItems: "center"}}>
                       <span className="hint" style={{color: "var(--color-text)"}}>
-                        传导卡阈值
+                        <Trans
+                            i18nKey="fuse.label_conduction_threshold"
+                        />
                       </span>
                     <input
                         className="form-input"
@@ -121,14 +129,22 @@ export default function FusePage() {
                         onChange={(e) => patchFuseConfig({conduction_min_count: Number(e.target.value || 0)})}
                         style={{width: 100}}
                     />
-                    <span className="hint">（当传导卡数量 ≥ 阈值且卡维位置不安全时，阻止开局）</span>
+                    <span className="hint">
+                        <Trans
+                            i18nKey="fuse.hint_conduction_threshold"
+                        />
+                    </span>
                 </div>
             </section>
 
             <section className="panel">
-                <div className="panel-title">印章守护</div>
+                <div className="panel-title"><Trans
+                    i18nKey="fuse.section_badge_guard_title"
+                /></div>
                 <p className="hint" style={{marginTop: 0, lineHeight: 1.5}}>
-                    若卡维携带「传导」或「膨胀」印章且置于盗印左侧，将阻止和牌。
+                    <Trans
+                        i18nKey="fuse.section_badge_guard_desc"
+                    />
                 </p>
 
                 <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
@@ -138,14 +154,20 @@ export default function FusePage() {
                         checked={Boolean(config.enable_anti_steal_eat)}
                         onChange={(e) => patchFuseConfig({enable_anti_steal_eat: e.target.checked})}
                     />
-                    <span>启用印章守护</span>
+                    <span><Trans
+                        i18nKey="fuse.toggle_badge_guard"
+                    /></span>
                 </label>
             </section>
 
             <section className="panel">
-                <div className="panel-title">卡维+缓冲守护</div>
+                <div className="panel-title"><Trans
+                    i18nKey="fuse.section_kavi_plus_title"
+                /></div>
                 <p className="hint" style={{marginTop: 0, lineHeight: 1.5}}>
-                    当存在「卡维+」与「膨胀」时，若二者之间没有至少隔一个<b>非膨胀</b>护身符作为缓冲，阻止开局。
+                    <Trans
+                        i18nKey="fuse.section_kavi_plus_desc"
+                    />
                 </p>
 
                 <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
@@ -155,14 +177,20 @@ export default function FusePage() {
                         checked={Boolean(config.enable_kavi_plus_buffer_guard)}
                         onChange={(e) => patchFuseConfig({enable_kavi_plus_buffer_guard: e.target.checked})}
                     />
-                    <span>启用卡维+缓冲守护</span>
+                    <span><Trans
+                        i18nKey="fuse.toggle_kavi_plus"
+                    /></span>
                 </label>
             </section>
 
             <section className="panel">
-                <div className="panel-title">退出商店守护</div>
+                <div className="panel-title"><Trans
+                    i18nKey="fuse.section_exit_life_title"
+                /></div>
                 <p className="hint" style={{marginTop: 0, lineHeight: 1.5}}>
-                    若当前护身符中<strong>没有</strong>携带「生命」印章（600100），阻止退出商店。
+                    <Trans
+                        i18nKey="fuse.section_exit_life_desc"
+                    />
                 </p>
 
                 <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
@@ -172,12 +200,14 @@ export default function FusePage() {
                         checked={Boolean(config.enable_exit_life_guard)}
                         onChange={(e) => patchFuseConfig({enable_exit_life_guard: e.target.checked})}
                     />
-                    <span>启用退出商店守护</span>
+                    <span><Trans
+                        i18nKey="fuse.toggle_exit_life"
+                    /></span>
                 </label>
             </section>
 
             <button className="nav-btn" onClick={onSave} disabled={saving}>
-                {saving ? "保存中…" : "保存熔断配置"}
+                {saving ? t("fuse.btn_saving") : t("fuse.btn_save")}
             </button>
 
             <AmuletPickerModal

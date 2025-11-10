@@ -2,6 +2,7 @@ import React from "react";
 import "../styles/theme.css";
 import Modal from "./Modal";
 import { useRegistry } from "../lib/registryStore";
+import { useTranslation } from "react-i18next";
 
 const RARS = ["ALL", "RED", "BLUE", "BROWN"] as const;
 type Rar = typeof RARS[number];
@@ -15,6 +16,7 @@ export default function BadgePickerModal({
     onClose: () => void;
     onSelect: (badgeId: number) => void;
 }) {
+    const { t } = useTranslation();
     const { badges } = useRegistry();
     const [q, setQ] = React.useState("");
     const [rar, setRar] = React.useState<Rar>("ALL");
@@ -30,9 +32,8 @@ export default function BadgePickerModal({
 
     const list = badges.filter((b) => {
         const okR = rar === "ALL" ? true : b.rarity === rar;
-        const okQ = q.trim()
-            ? b.name.toLowerCase().includes(q.trim().toLowerCase()) || String(b.id).includes(q.trim())
-            : true;
+        const key = q.trim().toLowerCase();
+        const okQ = key ? b.name.toLowerCase().includes(key) || String(b.id).includes(key) : true;
         return okR && okQ;
     });
 
@@ -44,18 +45,20 @@ export default function BadgePickerModal({
                 onClose();
             }}
             disabled={sel == null}
+            title={sel == null ? t("badge_picker.action_confirm_hint") : undefined}
         >
-            确认
+            {t("badge_picker.action_confirm")}
         </button>
     );
 
     return (
-        <Modal open={open} onClose={onClose} title="选择印章" actions={actions}>
+        <Modal open={open} onClose={onClose} title={t("badge_picker.title")} actions={actions}>
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                 <input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    placeholder="搜索名称或ID…"
+                    placeholder={t("badge_picker.search_ph")}
+                    aria-label={t("badge_picker.search_aria")}
                     style={{
                         flex: 1,
                         padding: "8px 10px",
@@ -70,6 +73,7 @@ export default function BadgePickerModal({
                 <select
                     value={rar}
                     onChange={(e) => setRar(e.target.value as Rar)}
+                    aria-label={t("badge_picker.rarity_label")}
                     style={{
                         padding: "8px 10px",
                         borderRadius: 8,
@@ -82,7 +86,7 @@ export default function BadgePickerModal({
                 >
                     {RARS.map((r) => (
                         <option key={r} value={r}>
-                            {r}
+                            {t(`badge_picker.rarity.${r}`)}
                         </option>
                     ))}
                 </select>
@@ -102,22 +106,42 @@ export default function BadgePickerModal({
                         <button
                             key={b.id}
                             onClick={() => setSel(b.id)}
+                            title={t("badge_picker.card_title", { name: b.name, id: b.id })}
                             style={{
                                 textAlign: "left",
-                                border: `1px solid ${chosen ? "color-mix(in srgb, var(--color-ring) 65%, transparent)" : "var(--border)"}`,
-                                boxShadow: chosen ? "0 0 0 2px color-mix(in srgb, var(--color-ring) 35%, transparent)" : "none",
+                                border: `1px solid ${
+                                    chosen
+                                        ? "color-mix(in srgb, var(--color-ring) 65%, transparent)"
+                                        : "var(--border)"
+                                }`,
+                                boxShadow: chosen
+                                    ? "0 0 0 2px color-mix(in srgb, var(--color-ring) 35%, transparent)"
+                                    : "none",
                                 borderRadius: 12,
                                 padding: 10,
                                 background: "var(--panel)",
                                 cursor: "pointer",
                                 transition: "box-shadow 120ms ease, border-color 120ms ease",
                             }}
-                            title={`${b.name} (#${b.id})`}
+                            onMouseEnter={(e) => {
+                                if (!chosen) e.currentTarget.style.borderColor = "var(--input-hover-border)";
+                            }}
+                            onMouseLeave={(e) => {
+                                if (!chosen) e.currentTarget.style.borderColor = "var(--border)";
+                            }}
                         >
-                            <div style={{ fontSize: 12, color: "var(--muted)" }}>ID: {b.id}</div>
+                            <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                                {t("badge_picker.field_id", { id: b.id })}
+                            </div>
                             <div style={{ fontWeight: 600, margin: "4px 0", color: "var(--text)" }}>{b.name}</div>
-                            <div style={{ fontSize: 12, color: "color-mix(in srgb, var(--text) 60%, transparent)", marginBottom: 6 }}>
-                                {b.rarity}
+                            <div
+                                style={{
+                                    fontSize: 12,
+                                    color: "color-mix(in srgb, var(--text) 60%, transparent)",
+                                    marginBottom: 6,
+                                }}
+                            >
+                                {t(`badge_picker.rarity.${b.rarity as Rar}`)}
                             </div>
                             <img
                                 src={icon}
