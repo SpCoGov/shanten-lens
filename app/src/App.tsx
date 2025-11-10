@@ -87,7 +87,7 @@ function Topbar() {
 }
 
 export default function App() {
-    const {t, i18n} = useTranslation();
+    const {t} = useTranslation();
     const {toast, visible: toastVisible} = useGlobalToast();
     const [route, setRoute] = React.useState<Route>("home");
     const [connected, setConnected] = React.useState(false);
@@ -194,10 +194,8 @@ export default function App() {
             });
         };
 
-        // 初次绑定
         bindAll(document);
 
-        // 监听后续新增（路由切换/弹窗）
         const mo = new MutationObserver((muts) => {
             for (const m of muts) {
                 m.addedNodes.forEach((n) => {
@@ -246,8 +244,10 @@ export default function App() {
                 const wallList = Array.isArray(d.wall_tiles) ? d.wall_tiles.map((id) => deck.get(id) ?? "5m") : [];
                 setWallStatsTiles(wallList);
 
-                setPlanSuuAnkou(null);
-                setPlanChiitoi(null);
+                if (!(d.stage === 2 || d.stage === 3)) {
+                    setPlanSuuAnkou(null);
+                    setPlanChiitoi(null);
+                }
 
                 setAmulets(Array.isArray(d.effect_list) ? d.effect_list : []);
                 setGoods(d.goods ?? []);
