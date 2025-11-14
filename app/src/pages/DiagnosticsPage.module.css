@@ -1,4 +1,19 @@
+.mj-panel.card,
+.diag-wrap .mj-panel.card {
+    min-width: 0;
+}
+
 .line {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.log {
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .ts {

@@ -38,6 +38,13 @@ export const useLogStore = create<LogState>((set, get) => ({
         else console.log(`[${item.ts}] [${level}] ${msg}`);
     },
     addFrame: (dir, raw) => {
+        try {
+            if (raw.length <= 128 && raw[0] === "{") {
+                const obj = JSON.parse(raw);
+                if (obj && obj.type === "keep_alive") return;
+            }
+        } catch {
+        }
         const item: FrameItem = { ts: now(), dir, raw };
         const next = [...get().frames, item].slice(-MAX_FRAMES);
         set({ frames: next });

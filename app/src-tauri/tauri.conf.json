@@ -26,12 +26,12 @@
         "label": "main",
         "title": "向听镜 - Shanten Lens",
         "width": 1500,
-        "height": 900,
-        "minWidth": 1024,
-        "minHeight": 640,
+        "height": 920,
+        "minWidth": 1300,
+        "minHeight": 920,
         "resizable": true,
         "visible": false,
-        "devtools": false,
+        "devtools": true,
         "decorations": false
       }
     ],
@@ -43,7 +43,8 @@
           "identifier": "window-controls",
           "windows": [
             "main",
-            "splash"
+            "splash",
+            "settings"
           ],
           "permissions": [
             "core:default",
@@ -53,6 +54,11 @@
             "core:window:allow-start-dragging",
             "core:window:allow-minimize",
             "core:window:allow-toggle-maximize",
+            "core:window:allow-create",
+            "core:window:allow-set-focus",
+            "core:window:allow-show",
+            "core:window:allow-center",
+            "core:webview:allow-create-webview-window",
             "core:window:allow-close"
           ]
         }

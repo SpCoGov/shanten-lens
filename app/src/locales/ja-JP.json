@@ -192,7 +192,7 @@
       "game": {
         "modify_announcement": "お知らせを変更",
         "modify_announcement_desc": "向聴レンズの起動成功を知らせるお知らせを追加",
-        "public_all": "牌山を公開",
+        "public_all": "公開山牌",
         "public_all_desc": "ゲーム内のすべての牌を公開にする",
         "auto_discard": "自動打牌",
         "auto_discard_desc": "七対子の提案に従って自動で打牌（クリックの擬似操作）",

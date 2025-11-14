@@ -153,6 +153,16 @@ input, textarea, select, code, pre, .selectable {
     align-items: center;
 }
 
+.sidebar-spacer {
+    flex: 1 1 auto;
+}
+
+.sidebar-bottom {
+    display: grid;
+    gap: 8px;
+    padding-bottom: 0;
+}
+
 .nav {
     display: flex;
     gap: 6px;
@@ -204,13 +214,6 @@ input, textarea, select, code, pre, .selectable {
     display: flex;
     flex-direction: column;
     overflow: auto;
-}
-
-.app-main {
-    width: 100%;
-    margin: 0;
-    padding: clamp(12px, 2vw, 16px);
-    max-width: var(--content-max);
 }
 
 .card {
@@ -551,10 +554,11 @@ input, textarea, select, code, pre, .selectable {
 }
 
 .app-main {
-    display: block !important;
-    max-width: none !important;
-    width: 100% !important;
-    margin: 0 !important;
+    display: flow-root;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: clamp(12px, 2vw, 16px);
 }
 
 .gamebar {
@@ -718,7 +722,34 @@ input:invalid, textarea:invalid, select:invalid {
     box-shadow: 0 0 0 3px rgba(248, 113, 113, .18);
 }
 
-.toolbar { align-items: center; }
-.badge { white-space: nowrap; }
-.row.tight { gap: 6px; }
-.hint-inline { display: inline-flex; align-items: center; }
+.toolbar {
+    align-items: center;
+}
+
+.badge {
+    white-space: nowrap;
+}
+
+.row.tight {
+    gap: 6px;
+}
+
+.hint-inline {
+    display: inline-flex;
+    align-items: center;
+}
+
+.app-main {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0;
+}
+
+.home-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+}

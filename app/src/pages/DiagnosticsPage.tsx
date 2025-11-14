@@ -41,7 +41,7 @@ export default function DiagnosticsPage() {
 
             <section className="mj-panel card">
                 <h3 style={{marginTop: 0}}>{t("diagnostics.section_frames_title")}</h3>
-                <div id="ws-frames" className="log ${styles.noAnchor}">
+                <div id="ws-frames" className={`log ${styles.noAnchor}`}>
                     {frames.map((f, i) => (
                         <div key={i} className={`${styles.line} ${f.dir === "in" ? styles.info : styles.out}`}>
                             <span className={styles.ts}>[{f.ts}]</span>{" "}
@@ -55,7 +55,7 @@ export default function DiagnosticsPage() {
 
             <section className="mj-panel card">
                 <h3 style={{marginTop: 0}}>{t("diagnostics.section_logs_title")}</h3>
-                <div id="diag-logpanel" className="log ${styles.noAnchor}">
+                <div id="diag-logpanel" className={`log ${styles.noAnchor}`}>
                     {logs.map((l, i) => {
                         const cls =
                             l.level === "ERROR" || l.level === "STDERR" ? styles.err :
