@@ -387,8 +387,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
         anns: List[Dict] = newd.get("announcements", [])
         anns.insert(0, {
             "id": 9999,
-            "title": "欢迎使用向听镜",
-            "content": "向听镜已启动，祝各位大大欧气满满！",
+            "title": "欢迎使用向听镜·向聴レンズへようこそ",
+            "content": "向听镜已启动，祝各位大大欧气满满！\n向聴レンズが起動しました！みなさんにガチャ運がモリモリ湧いてきますように！",
             "headerImage": "internal://2.jpg"
         })
         return "modify", newd

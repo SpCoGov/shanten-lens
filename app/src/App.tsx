@@ -14,6 +14,7 @@ import WallStats from "./components/WallStats";
 import ReplacementPanel from "./components/ReplacementPanel";
 import AdvisorPanel, {type PlanData} from "./components/AdvisorPanel";
 import AmuletBar from "./components/AmuletBar";
+import { setAppLanguage } from "./lib/i18n";
 import {
     buildCells,
     CandidateEffectRef,
@@ -32,6 +33,38 @@ import "./fonts/material-symbols.css";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import "./lib/i18n";
 import {useTranslation} from "react-i18next";
+import {WebviewWindow, getAllWebviewWindows} from '@tauri-apps/api/webviewWindow';
+import {t} from "i18next";
+
+const settingsUrl = import.meta.env.DEV
+    ? `${location.origin}/settings.html`
+    : 'settings.html';
+
+async function openSettingsWindow() {
+    try {
+        const existing = (await getAllWebviewWindows()).find(w => w.label === 'settings');
+        if (existing) {
+            await existing.show();
+            await existing.setFocus();
+            return;
+        }
+        const win = new WebviewWindow('settings', {
+            url: settingsUrl,
+            title: t("settings.title"),
+            width: 680,
+            height: 580,
+            minWidth: 680,
+            minHeight: 580,
+            center: true,
+            resizable: true,
+            decorations: false
+        });
+        win.once('tauri://created', () => console.log('[settings] created'));
+        win.once('tauri://error', (e) => console.error('[settings] error', e));
+    } catch (err) {
+        console.error('[settings] failed to open', err);
+    }
+}
 
 type Route = "home" | "fuse" | "autorun" | "settings" | "diagnostics" | "about";
 
@@ -291,9 +324,15 @@ export default function App() {
         };
     }, []);
 
-    const Dot = ({ok}: { ok: boolean }) => (
-        <span className={`dot ${ok ? "ok" : "down"}`} aria-label={ok ? "connected" : "disconnected"}/>
-    );
+    React.useEffect(() => {
+        let un = () => {};
+        (async () => {
+            un = await listen<{ lng: string }>("i18n:set-language", (e) => {
+                setAppLanguage(e.payload.lng);
+            });
+        })();
+        return () => un();
+    }, []);
 
     return (
         <div className="app">
@@ -312,30 +351,43 @@ export default function App() {
                     <button className={`nav-icon ${route === "autorun" ? "active" : ""}`} title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
                         <span className="ms">autoplay</span>
                     </button>
-                    <button className={`nav-icon ${route === "settings" ? "active" : ""}`} title={t("nav.settings")} onClick={() => setRoute("settings")}>
-                        <span className="ms">settings</span>
-                    </button>
                     <button className={`nav-icon ${route === "diagnostics" ? "active" : ""}`} title={t("nav.diagnostics")} onClick={() => setRoute("diagnostics")}>
                         <span className="ms">article</span>
                     </button>
                     <button className={`nav-icon ${route === "about" ? "active" : ""}`} title={t("nav.about")} onClick={() => setRoute("about")}>
                         <span className="ms">help</span>
                     </button>
-                    <button
-                        className="nav-icon"
-                        title={t("app.theme.toggle", {name: themeLabel})}
-                        onClick={toggleTheme}
-                    >
-                        <span className="ms">{themeIcon}</span>
-                    </button>
+
+                    <div className="sidebar-spacer" />
+
+                    <div className="sidebar-bottom">
+                        <button
+                            className="nav-icon"
+                            title={t("nav.settings")}
+                            onClick={openSettingsWindow}
+                        >
+                            <span className="ms">settings</span>
+                        </button>
+
+                        <button
+                            className="nav-icon"
+                            title={t("app.theme.toggle", { name: themeLabel })}
+                            onClick={toggleTheme}
+                        >
+                            <span className="ms">{themeIcon}</span>
+                        </button>
+                    </div>
                 </aside>
 
                 <main className="main-pane">
-                    <div className="app-main" style={{padding: `${OUTER_PADDING}px`, boxSizing: "border-box"}}>
+                    <div
+                        className="app-main"
+                        style={{padding: `${OUTER_PADDING}px ${OUTER_PADDING}px 0 ${OUTER_PADDING}px`, boxSizing: "border-box"}}
+                    >
                         {route === "home" && (
                             <div
                                 className="home-grid"
-                                style={{display: "flex", alignItems: "stretch", gap: MAIN_GAP, minHeight: "100%"}}
+                                style={{display: "flex", alignItems: "stretch", gap: MAIN_GAP}}
                             >
                                 {(stage === 2 || stage === 3) && (
                                     <div className="panel advisor" style={{width: SIDEBAR_WIDTH, flex: "0 0 auto"}}>
@@ -375,7 +427,7 @@ export default function App() {
                                 </div>
 
                                 {(stage === 2 || stage === 3) && (
-                                    <div className="panel" style={{flex: "0 0 auto", width: "auto", marginRight: 0}}>
+                                    <div style={{flex: "0 0 auto", width: "auto", marginRight: 0}}>
                                         <WallStats wallTiles={wallStatsTiles}/>
                                     </div>
                                 )}

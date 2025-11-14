@@ -1,6 +1,7 @@
 {
   "devDependencies": {
     "@tauri-apps/cli": "^2.9.2",
+    "@types/node": "^24.10.0",
     "concurrently": "^9.2.1",
     "typescript": "^5.9.3"
   },

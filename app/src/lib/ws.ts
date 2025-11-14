@@ -3,6 +3,7 @@ import {setRegistry, type RegistryPayload} from "./registryStore";
 import {setFuseConfig, type FuseConfig} from "./fuseStore";
 import {AutoRunnerConfig, setAutoConfig} from "./autoRunnerStore";
 import { pushToast } from "./toast";
+import {openMsgBoxWindow} from "./msgbox";
 
 export type UpdateConfigPacket = { type: "update_config"; data: Record<string, Record<string, any>> };
 export type Packet =
@@ -209,5 +210,23 @@ ws.onPacket((pkt) => {
         const dur = Number.isFinite(Number(d.duration)) ? Number(d.duration) : 2200;
         if (msg) pushToast(msg, kind, dur);
         return;
+    }
+});
+
+ws.onPacket((pkt) => {
+    if (pkt.type === "msgbox") {
+        // 期望后端传 { id, title?, message, okText?, cancelText? }
+        const d = pkt.data || {};
+        if (!d.id) {
+            console.warn("[msgbox] missing id in packet:", pkt);
+            return;
+        }
+        openMsgBoxWindow({
+            id: String(d.id),
+            title: d.title ? String(d.title) : undefined,
+            message: String(d.message ?? ""),
+            okText: d.okText ? String(d.okText) : undefined,
+            cancelText: d.cancelText ? String(d.cancelText) : undefined,
+        });
     }
 });
