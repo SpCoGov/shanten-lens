@@ -22,8 +22,8 @@
 
    然后点击 **OK**。
 
-   > [!WARNING]  
-   > 首次添加代理服务器时，Proxifier 可能会弹出 “Do you want Proxifier to use this proxy by default?” 提示框，请选择 **No (否)**。
+> [!WARNING]  
+> 首次添加代理服务器时，Proxifier 可能会弹出 “Do you want Proxifier to use this proxy by default?” 提示框，请选择 **No (否)**。
 
 4. 在 Proxifier 中添加规则：依次点击顶部菜单 **Profile -> Proxification Rules... -> Add...**。
 5. 在弹出的窗口中填写：
