@@ -22,8 +22,8 @@
 
    入力後、**OK** をクリックします。
 
-   > [!WARNING]  
-   > 初めてプロキシサーバーを追加する際、Proxifier が “Do you want Proxifier to use this proxy by default?” というダイアログを表示する場合があります。その場合は **No（いいえ）** を選択してください。
+> [!WARNING]  
+> 初めてプロキシサーバーを追加する際、Proxifier が “Do you want Proxifier to use this proxy by default?” というダイアログを表示する場合があります。その場合は **No（いいえ）** を選択してください。
 
 4. Proxifier でプロキシルールを追加します。上部メニューの **Profile -> Proxification Rules... -> Add...** を順にクリックします。
 5. 表示されたウィンドウで、次のように設定します：
