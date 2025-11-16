@@ -41,11 +41,7 @@
       "capabilities": [
         {
           "identifier": "window-controls",
-          "windows": [
-            "main",
-            "splash",
-            "settings"
-          ],
+          "windows": ["main", "settings", "splash", "msgbox", "msgbox-*"],
           "permissions": [
             "core:default",
             "core:event:default",
@@ -59,7 +55,9 @@
             "core:window:allow-show",
             "core:window:allow-center",
             "core:webview:allow-create-webview-window",
-            "core:window:allow-close"
+            "core:window:allow-close",
+            "core:event:allow-listen",
+            "core:event:allow-emit"
           ]
         }
       ]

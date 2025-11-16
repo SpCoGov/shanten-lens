@@ -50,6 +50,7 @@ class PacketBot(GameBot):
         try:
             return f"{f.client_conn.address[0]}|{f.server_conn.address[0]}"
         except Exception:
+            logger.error("failed to get peer key")
             return None
 
     def _ops_allow(self, t: int) -> bool:
@@ -59,6 +60,7 @@ class PacketBot(GameBot):
         try:
             ops = st.next_operation or []
         except Exception:
+            logger.error("failed to get next_operation")
             return True
         return any(op.get("type") == t for op in ops)
 
@@ -73,6 +75,7 @@ class PacketBot(GameBot):
         try:
             return st.deck_map.get(tile_id, "??")
         except Exception:
+            logger.error("failed to get tile label")
             return "??"
 
     def _inject_and_wait(
@@ -110,6 +113,7 @@ class PacketBot(GameBot):
                 return False, f"error code: {resp.get('data', {}).get('error', {}).get('code', 0)}", None
             return True, "ok", resp
         except Exception as e:
+            logger.error(f"wait-error")
             addon.discard_waiter_sync(msg_id)
             return False, f"wait-error:{e}", None
 
@@ -212,6 +216,8 @@ class PacketBot(GameBot):
         st = self._state()
         if not self._check_stage(5):
             return False, "in the illegal stage", None
+        if int(selected_id) == 0:
+            logger.warning("select_effect: selected_id is 0")
         if int(selected_id) == 0 or any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
             ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySelectPack", data={"activityId": self.activity_id, "id": selected_id}, delay_sec=delay_sec)
             return ok, reason, resp

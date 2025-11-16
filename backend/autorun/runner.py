@@ -31,6 +31,7 @@ def _now_mono_ms() -> int:
 
 
 SMTP_TIMEOUT_SEC = 12
+NEED_PIONNER_BADGE_COUNT = 4
 
 
 class AutoRunner:
@@ -1523,7 +1524,7 @@ def select_amulet_from_candidates(
 
     # 指引 600070 未满 3 个
     WANT_BADGE_STACK = 600070
-    if _owned_count_with_badge(effect_list, WANT_BADGE_STACK) < 3:
+    if _owned_count_with_badge(effect_list, WANT_BADGE_STACK) < NEED_PIONNER_BADGE_COUNT:
         for c in candidate_effect_list:
             bid = _candidate_badge_id(c)
             if bid == WANT_BADGE_STACK:
@@ -1664,7 +1665,7 @@ def sort_sell_priority(effect_list: List[Dict[str, Any]], targets: List[Dict[str
             continue  # 目标需要的护身符：移出结果
 
         _, __, badge_id = _extract_amulet_signature(it)
-        if badge_id == KEEP_BADGE and demoted_taken < 3:
+        if badge_id == KEEP_BADGE and demoted_taken < NEED_PIONNER_BADGE_COUNT:
             demoted.append(it)  # 降权：排在最后
             demoted_taken += 1
         else:

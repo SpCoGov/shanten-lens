@@ -1,6 +1,6 @@
 import "./styles/theme.css";
 import "./App.css";
-import "./fonts/material-symbols.css"; // ← 图标（见第3点）
+import "./fonts/material-symbols.css";
 import {applyTheme, readTheme} from "./lib/theme";
 import SettingsWindow from "./windows/SettingsWindow";
 import React from "react";

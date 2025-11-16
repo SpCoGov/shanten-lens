@@ -27,9 +27,17 @@ from backend.config import build_manager
 from backend.data.registry_loader import load_registry_list
 from backend.model.game_state import GameState
 from backend.model.items import AmuletRegistry, BadgeRegistry
+from backend.ui_runtime import start_ui_loop_once, get_ui_loop, post_coro, mark_ui_services_started
 
 GAME_STATE = GameState()
 PACKET_BOT: PacketBot
+APP_LOOP: asyncio.AbstractEventLoop | None = None
+UI_STOP: asyncio.Event | None = None
+
+
+def get_app_loop() -> asyncio.AbstractEventLoop:
+    return get_ui_loop()
+
 
 try:
     ctypes.windll.user32.SetProcessDPIAware()
@@ -57,9 +65,6 @@ cfg = BotConfig(
     ack_timeout_sec=1.6, ack_retry=2, ack_settle_ms=140, ack_check_ms=70,
 )
 pipeline = BotPipeline(cfg)
-
-
-# pipeline.selftest_move()
 
 
 def default_data_root() -> Path:
@@ -142,7 +147,52 @@ def set_data_root(path: str | Path) -> None:
 _load_registries()
 
 CLIENTS: Set[WebSocketServerProtocol] = set()
-CLIENTS_LOCK = asyncio.Lock()
+
+
+async def _broadcast_on_ui_loop(pkt: Dict[str, Any]) -> None:
+    dead: list[WebSocketServerProtocol] = []
+    for c in list(CLIENTS):
+        try:
+            await c.send(json.dumps(pkt, ensure_ascii=False))
+        except Exception:
+            dead.append(c)
+    for c in dead:
+        CLIENTS.discard(c)
+
+
+async def _ui_services_main(host: str, ws_port: int):
+    global UI_STOP
+    if UI_STOP is None:
+        UI_STOP = asyncio.Event()
+    watcher_cfg = asyncio.create_task(_watch_configs())
+    watcher_reg = asyncio.create_task(_watch_data_tables())
+
+    api_port = int(MANAGER.get("api_port", 8788))
+    api_task = asyncio.create_task(run_http_server(host, api_port))
+
+    antiafk_task = asyncio.create_task(anti_afk_loop())
+
+    async with serve(ws_handler, host, ws_port, max_size=2 ** 20):
+        logger.info(f"Websocket listening on ws://{host}:{ws_port}/")
+        try:
+            await UI_STOP.wait()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            for t in (watcher_cfg, watcher_reg, api_task, antiafk_task):
+                t.cancel()
+            await asyncio.gather(watcher_cfg, watcher_reg, api_task, antiafk_task, return_exceptions=True)
+
+
+_UI_TASK_FUT = None
+
+
+def start_ui_services(host: str = "127.0.0.1", ws_port: int = 8787) -> None:
+    if not mark_ui_services_started():
+        return
+    loop = start_ui_loop_once()
+    global _UI_TASK_FUT
+    _UI_TASK_FUT = asyncio.run_coroutine_threadsafe(_ui_services_main(host, ws_port), loop)
 
 
 async def _watch_data_tables():
@@ -164,16 +214,23 @@ async def ws_send(ws: WebSocketServerProtocol, pkt: Dict[str, Any]):
         pass
 
 
-async def broadcast(pkt: Dict[str, Any]):
-    dead: list[WebSocketServerProtocol] = []
-    async with CLIENTS_LOCK:
-        for c in list(CLIENTS):
-            try:
-                await c.send(json.dumps(pkt, ensure_ascii=False))
-            except Exception:
-                dead.append(c)
-        for c in dead:
-            CLIENTS.discard(c)
+async def broadcast(pkt: Dict[str, Any]) -> None:
+    ui_loop = get_ui_loop()
+    try:
+        cur_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        cur_loop = None
+
+    if cur_loop is ui_loop:
+        await _broadcast_on_ui_loop(pkt)
+        return
+
+    fut = asyncio.run_coroutine_threadsafe(_broadcast_on_ui_loop(pkt), ui_loop)
+    await asyncio.wrap_future(fut)
+
+
+def post_broadcast(pkt: Dict[str, Any]) -> None:
+    post_coro(_broadcast_on_ui_loop(pkt))
 
 
 def _open_dir(path: str):
@@ -254,8 +311,7 @@ async def run_http_server(host: str, port: int):
 
 
 async def ws_handler(ws: WebSocketServerProtocol):
-    async with CLIENTS_LOCK:
-        CLIENTS.add(ws)
+    CLIENTS.add(ws)
 
     await ws_send(ws, {"type": "update_fuse_config", "data": MANAGER.to_table_payload("fuse")})
     await ws_send(ws, {"type": "update_autorun_config", "data": MANAGER.to_table_payload("autorun")})
@@ -396,12 +452,13 @@ async def ws_handler(ws: WebSocketServerProtocol):
                             "type": "ui_toast",
                             "data": {"kind": "error", "msg": f"发送失败: {reason or ''}", "duration": 2600}
                         })
-
+            elif t == "msgbox_result":
+                from backend.msgbox import handle_msgbox_result
+                handle_msgbox_result(pkt)
     except Exception:
         pass
     finally:
-        async with CLIENTS_LOCK:
-            CLIENTS.discard(ws)
+        CLIENTS.discard(ws)
 
 
 async def _watch_configs():
@@ -475,28 +532,3 @@ async def anti_afk_loop():
         except Exception:
             logger.exception("anti-AFK loop error")
             await asyncio.sleep(3.0)
-
-
-async def run_ws_server(host: str, port: int):
-    watcher_cfg = asyncio.create_task(_watch_configs())
-    watcher_reg = asyncio.create_task(_watch_data_tables())
-
-    api_port = int(MANAGER.get("api_port", 8788))
-    api_task = asyncio.create_task(run_http_server(host, api_port))
-
-    antiafk_task = asyncio.create_task(anti_afk_loop())
-
-    async with serve(ws_handler, host, port, max_size=2 ** 20):
-        logger.info(f"Websocket listening on ws://{host}:{port}/")
-        try:
-            await asyncio.Future()
-        finally:
-            watcher_cfg.cancel()
-            watcher_reg.cancel()
-            api_task.cancel()
-            antiafk_task.cancel()
-            with contextlib.suppress(Exception):
-                await watcher_cfg
-                await watcher_reg
-                await api_task
-                await antiafk_task

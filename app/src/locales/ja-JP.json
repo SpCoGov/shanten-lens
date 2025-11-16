@@ -180,6 +180,14 @@
       "unknown_badge": "スタンプ#{{id}}",
       "title_select": "{{kind}} {{name}}（ID:{{id}}）— クリックで選択",
       "title_unselect": "{{kind}} {{name}}（ID:{{id}}）— クリックで選択解除"
+    },
+    "guard": {
+      "noLife": {
+        "title": "ヒューズ確認：生命スタンプがありません",
+        "message": "現在のお守りに「生命」スタンプ（{{lifeBadgeId}}）が装備されていません。ショップを終了しますか？",
+        "listTitle": "現在のお守り一覧：",
+        "item": "{{name}}（スタンプ：{{badgeLabel}}）"
+      }
     }
   },
   "settings": {
@@ -356,5 +364,9 @@
     "coin": "⭐ {{coin}}",
     "ended": "終了",
     "running": "進行中"
+  },
+  "common": {
+    "continue": "続行",
+    "cancel": "キャンセル"
   }
 }
