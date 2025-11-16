@@ -13,6 +13,7 @@ from backend.app import AMULET_REG, BADGE_REG, pipeline
 from backend.app import MANAGER, GAME_STATE, broadcast
 from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
 from backend.autorun.util.chiitoi_recommender import chiitoi_recommendation_json
+from backend.msgbox import _ui_confirm_blocking
 
 ID_KAVI = 230
 BADGE_LIFE = 600100
@@ -338,26 +339,37 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
             cfg = MANAGER.to_table_payload("fuse") or {}
             if not bool(cfg.get("enable_exit_life_guard", True)):
                 return "pass", None
-
             ef = _effects()
             has_life = any(_bid(e) == BADGE_LIFE for e in ef)
             if has_life:
                 return "pass", None
 
-            lines: list[str] = [
-                "检测到：当前护身符中没有携带「生命」印章（600100）。",
-                "",
-                "当前护身符列表：",
+            amulets_payload = [
+                {
+                    "name": _name(r),
+                    "badgeLabel": _badge_label(r),
+                    "baseId": _base(r.get("id", 0)),
+                    "rawId": int(r.get("id", 0) or 0),
+                }
+                for r in ef
             ]
-            for r in ef:
-                lines.append(f"  • {_name(r)}，印章：{_badge_label(r)}")
-            lines.append("")
-            lines.append("是否仍然继续退出商店？")
-
-            # 用户确认：继续=放行；取消=拦截
-            return ("pass", None) if _confirm("熔断确认：无生命印章", "\n".join(lines)) else ("drop", None)
+            logger.info("run _ui_confirm_blocking")
+            ok = _ui_confirm_blocking(
+                title_key="fuse.guard.noLife.title",
+                message_key="fuse.guard.noLife.message",
+                values={
+                    "lifeBadgeId": BADGE_LIFE,
+                    "amulets": amulets_payload,
+                },
+                ok_key="common.continue",
+                cancel_key="common.cancel",
+                timeout=45.0,
+            )
+            logger.info(f"result: {ok}")
+            return ("pass", None) if ok else ("drop", None)
         return "pass", None
     except Exception:
+        logger.exception("error occurred")
         return "pass", None
 
 

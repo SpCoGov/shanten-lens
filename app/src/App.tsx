@@ -7,14 +7,14 @@ import DiagnosticsPage from "./pages/DiagnosticsPage";
 import AutoRunnerPage from "./pages/AutoRunnerPage";
 import FusePage from "./pages/FusePage";
 import AboutPage from "./pages/AboutPage";
-import {ws} from "./lib/ws";
+import {ws, ensureWsStartedOnce} from "./lib/ws";
 import {type LogLevel, useLogStore} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
 import WallStats from "./components/WallStats";
 import ReplacementPanel from "./components/ReplacementPanel";
 import AdvisorPanel, {type PlanData} from "./components/AdvisorPanel";
 import AmuletBar from "./components/AmuletBar";
-import { setAppLanguage } from "./lib/i18n";
+import {setAppLanguage} from "./lib/i18n";
 import {
     buildCells,
     CandidateEffectRef,
@@ -35,6 +35,7 @@ import "./lib/i18n";
 import {useTranslation} from "react-i18next";
 import {WebviewWindow, getAllWebviewWindows} from '@tauri-apps/api/webviewWindow';
 import {t} from "i18next";
+import {openMsgBoxWindow} from "./lib/msgbox";
 
 const settingsUrl = import.meta.env.DEV
     ? `${location.origin}/settings.html`
@@ -248,7 +249,7 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
-        ws.connect();
+        ensureWsStartedOnce();
         setConnected(ws.connected);
         installWsToastBridge(ws);
         const offOpen = ws.onOpen(() => setConnected(true));
@@ -294,6 +295,18 @@ export default function App() {
                 }
             } else if (pkt.type === "autorun_status" && pkt.data) {
                 setAutoStatus(pkt.data as AutoRunnerStatus);
+            } else if (pkt.type === "msgbox" && pkt.data) {
+                const d = pkt.data || {};
+                if (!d.id) return;
+                openMsgBoxWindow({
+                    id: String(d.id),
+                    title: d.title ? String(d.title) : undefined,
+                    message: String(d.message ?? ""),
+                    okText: d.okText ? String(d.okText) : undefined,
+                    cancelText: d.cancelText ? String(d.cancelText) : undefined,
+                    values: d.values ?? undefined,
+                });
+                return;
             }
         });
 
@@ -325,7 +338,8 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
-        let un = () => {};
+        let un = () => {
+        };
         (async () => {
             un = await listen<{ lng: string }>("i18n:set-language", (e) => {
                 setAppLanguage(e.payload.lng);
@@ -358,7 +372,7 @@ export default function App() {
                         <span className="ms">help</span>
                     </button>
 
-                    <div className="sidebar-spacer" />
+                    <div className="sidebar-spacer"/>
 
                     <div className="sidebar-bottom">
                         <button
@@ -371,7 +385,7 @@ export default function App() {
 
                         <button
                             className="nav-icon"
-                            title={t("app.theme.toggle", { name: themeLabel })}
+                            title={t("app.theme.toggle", {name: themeLabel})}
                             onClick={toggleTheme}
                         >
                             <span className="ms">{themeIcon}</span>
