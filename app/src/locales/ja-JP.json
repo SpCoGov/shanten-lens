@@ -184,9 +184,27 @@
     "guard": {
       "noLife": {
         "title": "ヒューズ確認：生命スタンプがありません",
-        "message": "現在のお守りに「生命」スタンプ（{{lifeBadgeId}}）が装備されていません。ショップを終了しますか？",
-        "listTitle": "現在のお守り一覧：",
-        "item": "{{name}}（スタンプ：{{badgeLabel}}）"
+        "message": "現在のお守りに「生命」スタンプ（{{lifeBadgeId}}）が装備されていません。ショップを終了しますか？"
+      },
+      "kaviTheft": {
+        "title": "ヒューズ確認：保護対象のスタンプが失われる可能性",
+        "message": "<b>リスクのある組み合わせを検出しました</b><br/>保護対象スタンプ: {{protectedBadges}}<br/><br/>{{pairsText}}<br/><br/>このまま和了を続行しますか？"
+      },
+      "kaviPrestartConduction": {
+        "title": "ヒューズ確認：開局を続行しますか？",
+        "message": "検出：伝導カーヴィを装備（{{kaviTypeText}}）<br/>伝導カード枚数：{{cnt}}（閾値：{{minCnt}}）<br/><br/>隣接：<br/>　左：{{leftName}}（{{leftBadgeLabel}}）<br/>　右：{{rightName}}（{{rightBadgeLabel}}）<br/><br/>注意：誤作動を避けるため、カーヴィの隣接は少なくとも片側を「スタンプなし」にしてください。<br/>現在：両側にスタンプがあります。このまま開局しますか？"
+      },
+      "kaviPrestartExpansion": {
+        "title": "ヒューズ確認：開局を続行しますか？",
+        "message": "<b>検出：カーヴィ Plus と「拡張」（{{expBadgeId}}）の間にバッファお守りがありません。</b><br/><br/>左側：{{leftStateText}}　{{leftName}}（{{leftBadgeLabel}}）<br/>右側：{{rightStateText}}　{{rightName}}（{{rightBadgeLabel}}）<br/><br/>推奨：誤作動を避けるため、カーヴィと拡張の間は少なくとも1枚「非・拡張」のお守りを挟んでください。<br/><br/>このまま開局しますか？"
+      },
+      "forcePick": {
+        "title": "ヒューズ確認：監視対象から選択が必須",
+        "message": "<b>監視対象を検出しました</b><br/>候補に監視対象のお守り／スタンプが含まれていますが、現在の選択は監視対象ではありません。<br/><br/>現在の選択：お守りID={{selBaseId}}（raw={{selRawId}}）<br/><br/>このまま続行しますか？"
+      },
+      "skipPack": {
+        "title": "ヒューズ確認：監視対象を含むパックです",
+        "message": "<b>監視対象を検出しました</b><br/>このパックには監視対象のお守り／スタンプが含まれています。<br/>お守りヒット：{{amuletHitCount}}、スタンプヒット：{{badgeHitCount}}。<br/><br/>このままスキップしますか？"
       }
     }
   },

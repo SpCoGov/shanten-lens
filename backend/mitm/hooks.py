@@ -1,8 +1,6 @@
 import asyncio
-import ctypes
-import platform
 from collections import OrderedDict
-from typing import Tuple, Any, Dict, List, Set, Iterable, Optional, Union
+from typing import Tuple, Any, Dict, List, Set, Optional, Union
 
 from loguru import logger
 from mitmproxy import ctx
@@ -11,8 +9,8 @@ import backend.app
 import backend.mitm.addon as _addon
 from backend.app import AMULET_REG, BADGE_REG, pipeline
 from backend.app import MANAGER, GAME_STATE, broadcast
-from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
 from backend.autorun.util.chiitoi_recommender import chiitoi_recommendation_json
+from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
 from backend.msgbox import _ui_confirm_blocking
 
 ID_KAVI = 230
@@ -65,9 +63,9 @@ def _effects() -> List[dict]:
 
 
 def _name(row: Optional[dict]) -> str:
-    if not isinstance(row, dict): return "(无)"
+    if not isinstance(row, dict): return "—"
     a = AMULET_REG.get(_base(row.get("id"))) if AMULET_REG else None
-    return a.name if a else f"护身符#{_base(row.get('id'))}"
+    return a.name if a else f"#{_base(row.get('id'))}"
 
 
 def _badge_label(row: Optional[dict]) -> str:
@@ -92,40 +90,6 @@ def _neighbors_of_kavi() -> dict:
     return {"left": None, "right": None, "kavi_raw_id": 0, "kavi_index": -1}
 
 
-def _effects_with_badge(bid: int) -> List[dict]:
-    out: List[dict] = []
-    for i, row in enumerate(_effects()):
-        if _bid(row) == bid:
-            rid = row.get("id", 0)
-            out.append({"index": i, "raw_id": rid, "base_id": _base(rid), "row": row})
-    return out
-
-
-def _effects_without_badge() -> List[dict]:
-    out: List[dict] = []
-    for i, row in enumerate(_effects()):
-        if _bid(row) <= 0:
-            rid = row.get("id", 0)
-            out.append({"index": i, "raw_id": rid, "base_id": _base(rid), "row": row})
-    return out
-
-
-def _fmt_amulets(ids: Iterable[int]) -> List[str]:
-    s: List[str] = []
-    for aid in sorted(set(ids)):
-        a = AMULET_REG.get(aid) if AMULET_REG else None
-        s.append(f"  • {(a.name if a else f'护符#{aid}')}（ID:{aid}）")
-    return s
-
-
-def _fmt_badges(ids: Iterable[int]) -> List[str]:
-    s: List[str] = []
-    for bid in sorted(set(ids)):
-        b = BADGE_REG.get(bid) if BADGE_REG else None
-        s.append(f"  • {(b.name if b else f'印章#{bid}')}（ID:{bid}）")
-    return s
-
-
 def _collect_candidate_sets() -> tuple[Set[int], Set[int], List[dict]]:
     lst: List[dict] = list(getattr(GAME_STATE, "candidate_effect_list", []) or [])
     a_set, b_set = set(), set()
@@ -140,55 +104,35 @@ def _collect_candidate_sets() -> tuple[Set[int], Set[int], List[dict]]:
     return a_set, b_set, lst
 
 
-def _fuse_hits() -> tuple[Set[int], Set[int], str]:
-    cfg = MANAGER.to_table_payload("fuse")
-    guard = (cfg or {}).get("guard_skip_contains", {}) or {}
-    watch_a = set(map(int, guard.get("amulets", [])))
-    watch_b = set(map(int, guard.get("badges", [])))
+def _fuse_hits_values() -> tuple[bool, dict]:
+    cfg = MANAGER.to_table_payload("fuse") or {}
+    guard = (cfg.get("guard_skip_contains") or {}) if isinstance(cfg.get("guard_skip_contains"), dict) else {}
+
+    watch_a = set(map(int, guard.get("amulets", []) or []))
+    watch_b = set(map(int, guard.get("badges", []) or []))
+
     cand_a, cand_b, _ = _collect_candidate_sets()
-    hit_a, hit_b = cand_a & watch_a, cand_b & watch_b
-    if not (hit_a or hit_b): return hit_a, hit_b, ""
-    lines = ["检测到：卡包包含监控的护身符/印章", ""]
-    if hit_a: lines += ["护身符：", *_fmt_amulets(hit_a), ""]
-    if hit_b: lines += ["印章：", *_fmt_badges(hit_b), ""]
-    lines.append("是否仍然跳过卡包？")
-    return hit_a, hit_b, "\n".join(lines)
+
+    hit_a = cand_a & watch_a
+    hit_b = cand_b & watch_b
+
+    has_hit = bool(hit_a or hit_b)
+
+    values = {
+        "amuletHitCount": len(hit_a),
+        "badgeHitCount": len(hit_b)
+    }
+    return has_hit, values
 
 
-def _confirm(title: str, msg: str) -> bool:
-    if platform.system() != "Windows": return False
-    flags = 0x00000004 | 0x00000030 | 0x00001000 | 0x00010000 | 0x00040000
-    return ctypes.windll.user32.MessageBoxW(0, str(msg), str(title), flags) == 6
-
-
-def _build_kavi_msg(is_plus: bool, min_cnt: int, cnt: int, left: Optional[dict], right: Optional[dict]) -> str:
-    lines: List[str] = [f"检测到：传导卡维已装备（{'Plus' if is_plus else '普通'}）", f"传导卡数量：{cnt}（阈值：{min_cnt}）"]
-    lines += ["", "邻位：",
-              f"  左邻：{_name(left)}，印章：{_badge_label(left)}",
-              f"  右邻：{_name(right)}，印章：{_badge_label(right)}", "",
-              "规则：为避免误触发，请确保卡维相邻至少有一侧是「没有印章」的护身符。",
-              "当前：两侧均带有印章。是否仍然继续开局？"]
-    return "\n".join(lines)
-
-
-def _build_kavi_plus_buffer_msg(left_row: dict | None, right_row: dict | None,
-                                left_state: str, right_state: str) -> str:
-    state_text = {"hit": "紧邻即膨胀", "ok": "最近为非膨胀", "none": "无护身符"}
-    lines = ["检测到：卡维 Plus 与膨胀（600170）之间缺少缓冲护身符。", "", f"左侧：{state_text.get(left_state, '?')}  " + (f"（{_name(left_row)}，印章：{_badge_label(left_row)}）" if left_row else ""), f"右侧：{state_text.get(right_state, '?')} " + (f"（{_name(right_row)}，印章：{_badge_label(right_row)}）" if right_row else ""), "", "建议：为避免误触发，至少让卡维一侧与膨胀之间隔一个“非膨胀”的护身符。", "是否仍然继续开局？"]
-    return "\n".join(lines)
-
-
-def _must_pick_guard(selected_raw_id: int) -> tuple[bool, bool, str]:
-    """
-    返回: (候选是否存在命中项, 选中的是否为命中项, 提示文案)
-    用于“强制选择监控项”。
-    """
+def _must_pick_guard(selected_raw_id: int) -> tuple[bool, bool, dict]:
     cfg = MANAGER.to_table_payload("fuse") or {}
     guard = (cfg.get("guard_skip_contains") or {}) if isinstance(cfg.get("guard_skip_contains"), dict) else {}
     watch_a = set(map(int, guard.get("amulets", []) or []))
     watch_b = set(map(int, guard.get("badges", []) or []))
 
     cand_a, cand_b, cand_list = _collect_candidate_sets()
+
     # 候选中是否有命中项
     hit_a_all = cand_a & watch_a
     hit_b_all = cand_b & watch_b
@@ -212,18 +156,12 @@ def _must_pick_guard(selected_raw_id: int) -> tuple[bool, bool, str]:
         if base in watch_a or (bid > 0 and bid in watch_b):
             picked_is_hit = True
 
-    # 组织提示
-    if hit_exist and not picked_is_hit:
-        lines = ["检测到：卡包出现监控项，但未选择其一", ""]
-        if hit_a_all:
-            lines += ["护身符（可选其一）：", *_fmt_amulets(hit_a_all), ""]
-        if hit_b_all:
-            lines += ["印章（可选其一）：", *_fmt_badges(hit_b_all), ""]
-        base_sel = _base(sel_raw)
-        lines.append(f"当前选择：护身符 ID={base_sel}（raw={sel_raw}）不在监控项中。是否仍然继续？")
-        return hit_exist, picked_is_hit, "\n".join(lines)
+    values = {
+        "selBaseId": _base(sel_raw),
+        "selRawId": sel_raw
+    }
 
-    return hit_exist, picked_is_hit, ""
+    return hit_exist, picked_is_hit, values
 
 
 def on_outbound(view: Dict) -> Tuple[str, Any]:
@@ -236,14 +174,30 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
             cfg = MANAGER.to_table_payload("fuse") or {}
             if raw_id == 0:
                 if bool(cfg.get("enable_skip_guard", True)):
-                    a, b, text = _fuse_hits()
-                    if a or b:
-                        return ("pass", None) if _confirm("熔断确认：跳过卡包？", text) else ("drop", None)
+                    has_hit, values = _fuse_hits_values()
+                    if has_hit:
+                        ok = _ui_confirm_blocking(
+                            title_key="fuse.guard.skipPack.title",
+                            message_key="fuse.guard.skipPack.message",
+                            values=values,
+                            ok_key="common.continue",
+                            cancel_key="common.cancel",
+                            timeout=45.0,
+                        )
+                        return ("pass", None) if ok else ("drop", None)
                 return "pass", None
             if bool(cfg.get("enable_shop_force_pick", False)):
-                hit_exist, picked_is_hit, msg = _must_pick_guard(raw_id)
+                hit_exist, picked_is_hit, values = _must_pick_guard(raw_id)
                 if hit_exist and not picked_is_hit:
-                    return ("pass", None) if _confirm("熔断确认：购物必须选择监控项", msg) else ("drop", None)
+                    ok = _ui_confirm_blocking(
+                        title_key="fuse.guard.forcePick.title",
+                        message_key="fuse.guard.forcePick.message",
+                        values=values,
+                        ok_key="common.continue",
+                        cancel_key="common.cancel",
+                        timeout=45.0,
+                    )
+                    return ("pass", None) if ok else ("drop", None)
 
             return "pass", None
 
@@ -259,17 +213,36 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
                         nb = _neighbors_of_kavi()
                         if nb["kavi_index"] >= 0:
                             left, right = nb["left"], nb["right"]
-                            if not ((left is not None and _bid(left) == 0) or (right is not None and _bid(right) == 0)):
-                                msg = _build_kavi_msg(_plus(nb["kavi_raw_id"]), min_cnt, cnt, left, right)
-                                return ("pass", None) if _confirm("熔断确认：确认开局？", msg) else ("drop", None)
+                            no_badge_left = (left is not None and _bid(left) == 0)
+                            no_badge_right = (right is not None and _bid(right) == 0)
+                            if not (no_badge_left or no_badge_right):
+                                values = {
+                                    "kaviTypeText": ("P" if _plus(nb["kavi_raw_id"]) else "NP"),
+                                    "minCnt": min_cnt,
+                                    "cnt": cnt,
+                                    "leftName": _name(left) or "—",
+                                    "leftBadgeLabel": _badge_label(left) or "—",
+                                    "rightName": _name(right) or "—",
+                                    "rightBadgeLabel": _badge_label(right) or "—",
+                                }
+                                ok = _ui_confirm_blocking(
+                                    title_key="fuse.guard.kaviPrestartConduction.title",
+                                    message_key="fuse.guard.kaviPrestartConduction.message",
+                                    values=values,
+                                    ok_key="common.continue",
+                                    cancel_key="common.cancel",
+                                    timeout=45.0,
+                                )
+                                return ("pass", None) if ok else ("drop", None)
             if bool(cfg.get("enable_kavi_plus_buffer_guard", True)):
                 # 找到卡维 Plus
                 try:
                     k_idx = next((i for i, e in enumerate(ef) if _base(e.get("id")) == ID_KAVI and _plus(e.get("id"))), -1)
                 except Exception:
                     k_idx = -1
+
                 if k_idx >= 0:
-                    # 只有场上真的存在膨胀时才需要检查
+                    # 只有场上真的存在“膨胀”时才检查
                     if any(_bid(e) == BADGE_EXPANSION for e in ef):
                         n = len(ef)
 
@@ -277,16 +250,41 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
                             j = k_idx + step
                             while 0 <= j < n:
                                 row = ef[j]
-                                return "hit" if _bid(row) == BADGE_EXPANSION else "ok", row
+                                # 命中膨胀
+                                if _bid(row) == BADGE_EXPANSION:
+                                    return "hit", row
+                                # 第一枚非膨胀就返回
+                                return "ok", row
                             return "none", None
 
                         l_state, l_row = first_seen(-1)
                         r_state, r_row = first_seen(1)
 
-                        # 只要有一侧“紧邻即膨胀”（无缓冲），就提示
+                        # 只要有一侧紧邻即膨胀，就提示
                         if l_state == "hit" or r_state == "hit":
-                            msg2 = _build_kavi_plus_buffer_msg(l_row, r_row, l_state, r_state)
-                            return ("pass", None) if _confirm("熔断确认：确认开局？", msg2) else ("drop", None)
+                            state_text = {
+                                "hit": "E",
+                                "ok": "NE",
+                                "none": "N",
+                            }
+                            values2 = {
+                                "expBadgeId": BADGE_EXPANSION,
+                                "leftStateText": state_text.get(l_state, l_state),
+                                "rightStateText": state_text.get(r_state, r_state),
+                                "leftName": _name(l_row) or "—",
+                                "leftBadgeLabel": _badge_label(l_row) or "—",
+                                "rightName": _name(r_row) or "—",
+                                "rightBadgeLabel": _badge_label(r_row) or "—",
+                            }
+                            ok2 = _ui_confirm_blocking(
+                                title_key="fuse.guard.kaviPrestartExpansion.title",
+                                message_key="fuse.guard.kaviPrestartExpansion.message",
+                                values=values2,
+                                ok_key="common.continue",
+                                cancel_key="common.cancel",
+                                timeout=45.0,
+                            )
+                            return ("pass", None) if ok2 else ("drop", None)
 
             return "pass", None
         # 黑客、不稳定存的第一个数据为复制或变身的护身符：{"id":2320,"store":[2290,1234]} 229为盗印，不稳定228、黑客232、卡维230
@@ -296,7 +294,7 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
                 return "pass", None
             if view.get("data").get("type") != 8:
                 return "pass", None
-            prot_badges: List[int] = list(map(int, [BADGE_CONDUCTION, BADGE_CONDUCTION]))
+            prot_badges: List[int] = list(map(int, [BADGE_CONDUCTION]))
 
             ef = _effects()
 
@@ -325,16 +323,29 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
             if not risky_pairs:
                 return "pass", None
 
-            # 组织提示
-            lines: List[str] = ["检测到：盗印/伪装盗印与卡维相邻，可能吃掉受保护印章。", "受保护印章：{}".format("、".join(str(x) for x in prot_badges)), ""]
-            for (l, k, r) in risky_pairs:
-                lines.append(f"卡维：{_name(k)}，印章：{_badge_label(k)}")
-                lines.append(f"  左邻：{_name(l)}，印章：{_badge_label(l)}")
-                lines.append(f"  右邻：{_name(r)}，印章：{_badge_label(r)}")
-                lines.append("")
-            lines.append("是否仍然继续和牌？")
+            protected_badges_text = "、".join(str(x) for x in prot_badges)
 
-            return ("pass", None) if _confirm("熔断确认：可能吞噬卡维印章", "\n".join(lines)) else ("drop", None)
+            lines: List[str] = []
+            for (l, k, r) in risky_pairs:
+                lines.append(f"• {_name(k)}（{_badge_label(k)}）")
+                lines.append(f"  {_name(l) if l else '-'}（{_badge_label(l) if l else '-'}）")
+                lines.append(f"  {_name(r) if r else '-'}（{_badge_label(r) if r else '-'}）")
+                lines.append("")
+
+            pairs_text = "\n".join(lines).strip()
+
+            ok = _ui_confirm_blocking(
+                title_key="fuse.guard.kaviTheft.title",
+                message_key="fuse.guard.kaviTheft.message",
+                values={
+                    "protectedBadges": protected_badges_text,
+                    "pairsText": pairs_text,
+                },
+                ok_key="common.continue",
+                cancel_key="common.cancel",
+                timeout=45.0,
+            )
+            return ("pass", None) if ok else ("drop", None)
         if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityEndShopping":
             cfg = MANAGER.to_table_payload("fuse") or {}
             if not bool(cfg.get("enable_exit_life_guard", True)):

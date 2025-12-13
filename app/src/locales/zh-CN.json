@@ -184,9 +184,27 @@
     "guard": {
       "noLife": {
         "title": "熔断确认：无生命印章",
-        "message": "检测到：当前护身符中没有携带「生命」印章（{{lifeBadgeId}}）。是否仍然继续退出商店？",
-        "listTitle": "当前护身符列表：",
-        "item": "{{name}}，印章：{{badgeLabel}}"
+        "message": "检测到：当前护身符中没有携带「生命」印章（{{lifeBadgeId}}）。是否仍然继续退出商店？"
+      },
+      "kaviTheft": {
+        "title": "熔断确认：可能吞噬受保护印章",
+        "message": "<b>检测到风险组合</b><br/>受保护印章: {{protectedBadges}}<br/><br/>{{pairsText}}<br/><br/>是否继续和牌？"
+      },
+      "kaviPrestartConduction": {
+        "title": "熔断确认：确认开局？",
+        "message": "检测到：传导卡维已装备（{{kaviTypeText}}）<br/>传导卡数量：{{cnt}}（阈值：{{minCnt}}）<br/><br/>邻位：<br/>　左邻：{{leftName}}（{{leftBadgeLabel}}）<br/>　右邻：{{rightName}}（{{rightBadgeLabel}}）<br/><br/>规则：为避免误触发，请确保卡维相邻至少有一侧是「没有印章」的护身符。<br/>当前：两侧均带有印章。是否仍然继续开局？"
+      },
+      "kaviPrestartExpansion": {
+        "title": "熔断确认：确认开局？",
+        "message": "<b>检测到：卡维 Plus 与膨胀（{{expBadgeId}}）之间缺少缓冲护身符。</b><br/><br/>左侧：{{leftStateText}}　{{leftName}}（{{leftBadgeLabel}}）<br/>右侧：{{rightStateText}}　{{rightName}}（{{rightBadgeLabel}}）<br/><br/>建议：为避免误触发，至少让卡维一侧与膨胀之间隔一个“非膨胀”的护身符。<br/><br/>是否仍然继续开局？"
+      },
+      "forcePick": {
+        "title": "熔断确认：必须选择监控项",
+        "message": "<b>检测到监控项</b><br/>候选中包含监控护身符/印章，但当前选择不在监控项内。<br/><br/>当前选择：护身符ID={{selBaseId}}（raw={{selRawId}}）<br/><br/>是否继续？"
+      },
+      "skipPack": {
+        "title": "熔断确认：卡包包含监控项",
+        "message": "<b>检测到监控项</b><br/>当前卡包包含监控的护身符/印章。<br/>护身符命中：{{amuletHitCount}}；印章命中：{{badgeHitCount}}。<br/><br/>仍要跳过卡包吗？"
       }
     }
   },
