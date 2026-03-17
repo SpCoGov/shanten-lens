@@ -55,6 +55,8 @@ export async function openMsgBoxWindow(payload: MsgBoxPayload) {
             title: "Message",
             width: 520,
             height: 220,
+            minWidth: 420,
+            minHeight: 200,
             resizable: false,
             decorations: false,
             center: true,

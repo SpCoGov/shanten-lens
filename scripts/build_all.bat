@@ -35,7 +35,11 @@ echo.
 echo [1/6] 檢查/修復 pip...
 "%PYTHON%" -m ensurepip --upgrade >nul 2>nul
 "%PYTHON%" -m pip --version || (echo [ERROR] pip 不可用 & popd & exit /b 1)
-"%PYTHON%" -m pip install --upgrade pip setuptools wheel || (echo [WARN] 升級 pip/工具鏈失敗，繼續嘗試)
+"%PYTHON%" -m pip install --upgrade pip wheel || (echo [WARN] 升級 pip/wheel 失敗，繼續嘗試)
+REM PyInstaller 依賴鏈（altgraph）仍會 import pkg_resources；新版本 setuptools 可能不再提供它
+echo [INFO] 固定 setuptools 版本（避免 pkg_resources 缺失）...
+"%PYTHON%" -m pip install --upgrade --force-reinstall setuptools==80.9.0 || (echo [ERROR] 安裝 setuptools==80.9.0 失敗 & popd & exit /b 1)
+echo [INFO] setuptools 固定完成
 
 echo.
 echo [2/6] 安裝後端依賴（python -m pip）...
