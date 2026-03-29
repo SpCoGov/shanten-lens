@@ -18,8 +18,8 @@ export default function AboutPage() {
             <div className={styles.meta}>
                 <span className={styles.author}>{t("app.author")}</span>
                 <span className={styles.sep} aria-hidden>·</span>
-                <span className={styles.version}>v1.1.5</span>
-                <span className={styles.build}>(build&nbsp;3)</span>
+                <span className={styles.version}>v1.1.6</span>
+                <span className={styles.build}>(build&nbsp;1)</span>
             </div>
 
             <section>

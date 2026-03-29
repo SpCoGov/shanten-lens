@@ -78,9 +78,11 @@ def setup_logging():
 
     logger.remove()
 
+    stdout_level = "DEBUG" if MANAGER.get("general.debug", False) else "INFO"
+
     logger.add(
         sys.stdout,
-        level="INFO",
+        level=stdout_level,
         backtrace=True,
         diagnose=False,
         enqueue=True,
@@ -108,9 +110,9 @@ CONF_DIR: Path = DATA_ROOT / "configs"
 DATA_DIR: Path = DATA_ROOT / "data"
 LOG_DIR: Path = DATA_ROOT / "logs"
 
-setup_logging()
-
 MANAGER = build_manager(CONF_DIR)
+
+setup_logging()
 AMULET_REG: AmuletRegistry | None = None
 BADGE_REG: BadgeRegistry | None = None
 

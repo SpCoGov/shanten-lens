@@ -181,6 +181,15 @@ input, textarea, select, code, pre, .selectable {
     background: var(--hover-bg);
 }
 
+.btn-mini {
+    padding: 3px 8px;
+    font-size: 12px;
+    line-height: 1.2;
+    color: var(--muted);
+    border-radius: 999px;
+}
+
+
 .nav-icon {
     width: 44px;
     height: 44px;
@@ -440,6 +449,98 @@ input, textarea, select, code, pre, .selectable {
     max-width: 1100px;
 }
 
+.settings-wrap.wide-page {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding-inline: clamp(16px, 2vw, 28px);
+}
+
+.page-stack {
+    display: grid;
+    gap: 12px;
+}
+
+.responsive-two-col {
+    display: grid;
+    gap: 12px;
+}
+
+.target-list {
+    display: grid;
+    gap: 12px;
+}
+
+.target-card {
+    display: grid;
+    gap: 14px;
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr);
+    position: relative;
+}
+
+.target-card-button {
+    appearance: none;
+    border: var(--panel-border);
+    background: var(--panel-bg);
+    width: 100%;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.target-card-button:hover {
+    background: var(--hover-bg);
+}
+
+.target-card-main {
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+    align-items: center;
+    grid-template-columns: auto minmax(0, 1fr);
+}
+
+.target-card-copy {
+    min-width: 0;
+    line-height: 1.6;
+}
+
+.target-card-copy > div,
+.target-card-copy > .hint {
+    overflow-wrap: anywhere;
+}
+
+.target-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.target-value-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.fuse-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.fuse-grid .panel:first-child {
+    min-width: 0;
+}
+
+.fuse-grid .panel:first-child .toolbar,
+.fuse-grid .panel:first-child .rows {
+    max-width: min(760px, 100%);
+}
+
 .title {
     margin: 0 0 12px 0;
 }
@@ -695,12 +796,12 @@ select option {
 }
 
 select option:checked {
-    background: var(--input-selected-bg) linear-gradient(0 0);
+    background: linear-gradient(0deg, var(--input-selected-bg), var(--input-selected-bg));
     color: var(--input-selected-fg);
 }
 
 select:focus option:checked {
-    background: var(--ring) linear-gradient(0 0);
+    background: linear-gradient(0deg, var(--ring), var(--ring));
     color: #fff;
 }
 
@@ -752,4 +853,61 @@ input:invalid, textarea:invalid, select:invalid {
     display: flex;
     align-items: stretch;
     gap: 12px;
+}
+
+@media (min-width: 1440px) {
+    .settings-wrap.wide-page {
+        padding-inline: clamp(24px, 3vw, 40px);
+    }
+
+    .responsive-two-col {
+        grid-template-columns: minmax(360px, 1fr) minmax(420px, 1fr);
+    }
+
+    .target-card {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .target-card-actions {
+        justify-content: flex-end;
+        align-self: center;
+    }
+
+    .target-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+    }
+
+    .fuse-grid {
+        grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+        align-items: start;
+    }
+
+    .fuse-grid .panel:first-child {
+        grid-row: span 2;
+    }
+}
+
+@media (min-width: 1680px) {
+    .target-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .fuse-grid {
+        grid-template-columns: minmax(0, 1.25fr) minmax(360px, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .target-card-main {
+        grid-template-columns: 1fr;
+    }
+
+    .target-card-actions {
+        justify-content: flex-start;
+    }
+
+    .target-value-box {
+        white-space: normal;
+    }
 }
