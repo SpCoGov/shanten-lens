@@ -1,4 +1,5 @@
 import asyncio
+import copy
 from collections import OrderedDict
 from typing import Tuple, Any, Dict, List, Set, Optional, Union
 
@@ -656,7 +657,8 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             GAME_STATE.update_other_info(stage=stage, reason=".lq.Lobby.amuletActivityOperate:24")
     # 进入青云之志界面时获取已经开始的游戏数据
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.fetchAmuletActivityData":
-        data = view.get("data", {}).get("data", {})
+        dataBig = dict(view["data"])
+        data = dataBig.get("data", {})
         game = data.get("game", None)
         if game:
             round_info = game.get("round", {})
@@ -686,9 +688,9 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             next_operation = round_info.get("nextOperation", None)
             GAME_STATE.update_record(record)
             if desktop_remain < 36:
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, boss_buff=boss_buff, push_gamestate=False)
                 new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, effect_list)
                 GAME_STATE.update_wall(new_wall)
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, boss_buff=boss_buff, push_gamestate=False)
                 GAME_STATE.refresh_wall_by_remaning()
             else:
                 new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, effect_list)
@@ -697,6 +699,18 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             error_number_test = MANAGER.get("general.error_code_test")
             if error_number_test != 0:
                 return "modify", dict({"error": {"code": error_number_test, "u32Params": [], "strParams": [], "jsonParam": ""}})
+            if MANAGER.get("game.public_all"):
+                show_desktop_tiles = round_info.get("showDesktopTiles", [])
+                show_desktop_tiles.clear()
+                pos = len(GAME_STATE.wall_tiles) + len(GAME_STATE.locked_tiles) - 1
+                for tile in GAME_STATE.wall_tiles:
+                    show_desktop_tiles.append({"id": tile, "pos": pos})
+                    pos -= 1
+                for tile in GAME_STATE.locked_tiles:
+                    show_desktop_tiles.append({"id": tile, "pos": pos})
+                    pos -= 1
+                return "modify", dataBig
+
     # 只是用来更新一下状态
     if view["type"] == "Res" and view["method"] == ".lq.Lobby.amuletActivityGiveup":
         GAME_STATE.on_giveup()

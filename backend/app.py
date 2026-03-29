@@ -354,6 +354,27 @@ async def ws_handler(ws: WebSocketServerProtocol):
                 await ws_send(ws, {"type": "update_gamestate", "data": GAME_STATE.to_dict()})
                 await ws_send(ws, {"type": "update_registry", "data": _registry_payload()})
 
+            elif t == "fetch_amulet_activity_data":
+                try:
+                    activity_id = int((data or {}).get("activityId", getattr(PACKET_BOT, "activity_id", 250811)))
+
+                    addon = PACKET_BOT.get_addon()
+                    if not addon:
+                        await ws_send(ws, {"type": "ui_toast", "data": {"kind": "error", "msg": "注入失败：addon 未就绪"}})
+                        continue
+
+                    ok, detail, msg_id = addon.inject_now(
+                        method=".lq.Lobby.fetchAmuletActivityData",
+                        data={"activityId": activity_id},
+                        t="Req",
+                    )
+                    if not ok:
+                        await ws_send(ws, {"type": "ui_toast", "data": {"kind": "error", "msg": f"注入失败：{detail}"}})
+                    else:
+                        await ws_send(ws, {"type": "ui_toast", "data": {"kind": "success", "msg": f"已发送刷新请求（msg_id={msg_id}）"}})
+                except Exception as e:
+                    await ws_send(ws, {"type": "ui_toast", "data": {"kind": "error", "msg": f"注入异常：{e}"}})
+
             elif t == "open_config_dir":
                 try:
                     _open_dir(str(CONF_DIR))

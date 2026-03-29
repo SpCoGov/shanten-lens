@@ -19,6 +19,7 @@
     "home": "主页",
     "fuse": "熔断",
     "autorun": "自动化",
+    "refreshGame": "刷新对局",
     "settings": "设置",
     "diagnostics": "日志",
     "about": "关于"
@@ -54,6 +55,9 @@
     "section_assets_body": "部分资源来源于「雀魂」。仅用于非商业用途与学习研究。",
     "section_usage_title": "使用提醒",
     "section_usage_body_html": "为减小影响范围，请<strong>不要在公开场合传播或宣传</strong>本软件及其运行画面（例如：直播、公开群聊、公开社媒等）。该提醒仅为使用建议，不构成对 Apache 许可的附加法律限制。",
+    "section_known_issues_title": "已知问题",
+    "known_issue_225_html": "拥有<strong>ニャセウスの船</strong>护身符时，重新进入已开始的关卡界面时牌山顺序错误。",
+    "known_issue_218_html": "拥有<strong>ランプの猫神</strong>护身符时，换牌顺序会出现错误。",
     "section_repo_title": "仓库地址",
     "repo_link_text": "GitHub"
   },

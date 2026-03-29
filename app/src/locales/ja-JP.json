@@ -19,6 +19,7 @@
     "home": "ホーム",
     "fuse": "ヒューズ",
     "autorun": "自動化",
+    "refreshGame": "更新",
     "settings": "設定",
     "diagnostics": "ログ",
     "about": "情報"
@@ -54,6 +55,9 @@
     "section_assets_body": "一部のリソースは「雀魂」に由来します。非営利目的・学習研究のみで使用します。",
     "section_usage_title": "利用上の注意",
     "section_usage_body_html": "影響範囲を抑えるため、<strong>公開の場での配布・宣伝</strong>（配信・公開チャット・公開SNS 等）は控えてください。これは利用上の推奨であり、Apache ライセンスへの法的な追加制限ではありません。",
+    "section_known_issues_title": "既知の問題",
+    "known_issue_225_html": "<strong>ニャセウスの船</strong>所持時、開始済みのステージ画面に戻ると牌山順が崩れることがあります。",
+    "known_issue_218_html": "<strong>ランプの猫神</strong>所持時、換牌の順序が崩れることがあります。",
     "section_repo_title": "リポジトリ",
     "repo_link_text": "GitHub"
   },

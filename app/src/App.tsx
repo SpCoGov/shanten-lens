@@ -377,6 +377,14 @@ export default function App() {
                     <div className="sidebar-bottom">
                         <button
                             className="nav-icon"
+                            title={t("nav.refreshGame")}
+                            onClick={() => ws.send({type: "fetch_amulet_activity_data", data: {activityId: 250811}})}
+                        >
+                            <span className="ms">refresh</span>
+                        </button>
+
+                        <button
+                            className="nav-icon"
                             title={t("nav.settings")}
                             onClick={openSettingsWindow}
                         >

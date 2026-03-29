@@ -24,6 +24,7 @@ ignore_methods = [
     '.lq.Lobby.fetchCommentList',
     '.lq.Lobby.fetchAccountChallengeRankInfo',
     '.lq.Lobby.fetchAccountInfoExtra',
+    '.lq.Lobby.amuletActivityFetchBrief'
 ]
 
 
@@ -40,7 +41,7 @@ class WsAddon:
     def __init__(self, codec: LiqiCodec):
         self.codec = codec
         self.on_outbound: Optional[HookFn] = None
-        self.on_inbound: Optional[HookFn] = None
+        self.   on_inbound: Optional[HookFn] = None
         self.subscribers: List[Callable[[Dict], None]] = []
         self._flows: Dict[str, http.HTTPFlow] = {}  # peer_key -> flow
         self.last_flow: Optional[http.HTTPFlow] = None  # 最近一次触达的 flow

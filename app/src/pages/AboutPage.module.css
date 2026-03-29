@@ -105,3 +105,22 @@ summary {
         color: color-mix(in oklab, white 70%, transparent);
     }
 }
+
+.knownIssueRow {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 0;
+}
+
+.knownIssueRow + .knownIssueRow {
+    border-top: 1px solid var(--border);
+}
+
+.knownIssueText {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text);
+    opacity: 0.92;
+    line-height: 1.5;
+}

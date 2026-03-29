@@ -2,9 +2,15 @@ import React from "react";
 import "../styles/theme.css";
 import styles from "./AboutPage.module.css";
 import {useTranslation, Trans} from "react-i18next";
+import AmuletCard from "../components/AmuletCard";
+import {type EffectItem} from "../lib/gamestate";
 
 export default function AboutPage() {
     const {t} = useTranslation();
+
+    const amulet225: EffectItem = {id: 2250, uid: 0, volume: 1, store: [], tags: []};
+    const amulet218: EffectItem = {id: 2180, uid: 0, volume: 1, store: [], tags: []};
+
     return (
         <div className={styles.wrap}>
             <h1>{t("app.title")} <span className={styles.sub}>{t("app.subtitle")}</span></h1>
@@ -12,8 +18,8 @@ export default function AboutPage() {
             <div className={styles.meta}>
                 <span className={styles.author}>{t("app.author")}</span>
                 <span className={styles.sep} aria-hidden>·</span>
-                <span className={styles.version}>v1.1.0</span>
-                <span className={styles.build}>(build&nbsp;1)</span>
+                <span className={styles.version}>v1.1.5</span>
+                <span className={styles.build}>(build&nbsp;3)</span>
             </div>
 
             <section>
@@ -47,6 +53,24 @@ Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
                         values={{ year: new Date().getFullYear() }}
                     />
                 </p>
+            </section>
+
+            <section>
+                <h2>{t("about.section_known_issues_title")}</h2>
+
+                <div className={styles.knownIssueRow}>
+                    <AmuletCard item={amulet225} scale={0.42}/>
+                    <div className={styles.knownIssueText}>
+                        <Trans i18nKey="about.known_issue_225_html"/>
+                    </div>
+                </div>
+
+                <div className={styles.knownIssueRow}>
+                    <AmuletCard item={amulet218} scale={0.42}/>
+                    <div className={styles.knownIssueText}>
+                        <Trans i18nKey="about.known_issue_218_html"/>
+                    </div>
+                </div>
             </section>
 
             <footer className={styles.footer}>

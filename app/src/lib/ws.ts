@@ -10,6 +10,7 @@ export type Packet =
     | { type: "keep_alive"; data: {} }
     | { type: "edit_config"; data: any }
     | { type: "request_update"; data: {} }
+    | { type: "fetch_amulet_activity_data"; data: { activityId: number } }
     | { type: "open_config_dir"; data: {} }
     | { type: "open_result"; data: { ok: boolean; error?: string } }
     | { type: string; data: any };
