@@ -3,21 +3,15 @@ import "../styles/theme.css";
 import styles from "./AdvisorPanel.module.css";
 import Tile from "./Tile";
 import {t} from "i18next";
+import type {PlanData} from "../lib/planTypes";
 
-export type PlanData = {
-    status: "win_now" | "plan" | "impossible";
-    draws_needed?: number;
-    target14?: string[];
-    discards?: number[];
-    mode?: string;
-    reason?: string;
-};
+export type {PlanData} from "../lib/planTypes";
 
 export default function AdvisorPanel({
-                                         suuAnkou,
-                                         chiitoi,
-                                         resolveFace,
-                                     }: {
+    suuAnkou,
+    chiitoi,
+    resolveFace,
+}: {
     suuAnkou: PlanData | null;
     chiitoi: PlanData | null;
     resolveFace?: (id: number) => string | null;
@@ -31,11 +25,11 @@ export default function AdvisorPanel({
 }
 
 function StrategyCard({
-                          title,
-                          data,
-                          resolveFace,
-                          badge
-                      }: {
+    title,
+    data,
+    resolveFace,
+    badge,
+}: {
     title: string;
     data: PlanData | null;
     resolveFace?: (id: number) => string | null;
@@ -98,36 +92,18 @@ function StrategyCard({
                         <div className={styles.bandActionLabel}>{t("advisor.recommend_discard")}</div>
                         {firstDiscardId != null ? (
                             <div className={styles.actionChip}>
-                <span className={`${styles.tilePill} ${styles.tileReset} ${styles.tileRound}`}>
-                  <Tile tile={firstDiscardFace || "-"}/>
-                </span>
+                                <span className={`${styles.tilePill} ${styles.tileReset} ${styles.tileRound}`}>
+                                    <Tile tile={firstDiscardFace || "-"}/>
+                                </span>
                                 <span className={styles.chipText}>{t("advisor.id_label", {id: firstDiscardId})}</span>
                             </div>
                         ) : (
-                            <div className={`${styles.actionChip} ${styles.chipDisabled}`}>—</div>
+                            <div className={`${styles.actionChip} ${styles.chipDisabled}`}>-</div>
                         )}
                     </div>
                 </div>
             )}
         </section>
-    );
-}
-
-function Metric({label, value}: { label: string; value: string }) {
-    return (
-        <div className={styles.metric}>
-            <div className={styles.metricLabel}>{label}</div>
-            <div className={styles.metricValue}>{value}</div>
-        </div>
-    );
-}
-
-function TilePill({face}: { face: string | null }) {
-    if (!face) return <span>-</span>;
-    return (
-        <span className={`${styles.tilePill} ${styles.tileReset} ${styles.tileRound}`}>
-      <Tile tile={face}/>
-    </span>
     );
 }
 

@@ -17,6 +17,7 @@
   },
   "nav": {
     "home": "ホーム",
+    "blackhole": "ブラックホールガイド",
     "fuse": "ヒューズ",
     "autorun": "自動化",
     "refreshGame": "更新",
@@ -264,15 +265,67 @@
     "toast_open_config_fail": "開けませんでした：{{error}}"
   },
   "advisor": {
+    "title_souzu_switch": "交換ガイド",
     "title_suu_ankou": "四暗刻",
     "title_chiitoi": "七対子",
     "awaiting_backend": "バックエンド結果を待機中…",
+    "searching": "探索中",
+    "stop_search": "停止",
     "win_now": "今すぐ和了可能",
     "need_draws_label": "必要ツモ数",
     "impossible": "不可能",
     "menzen_only": "門前のみ",
     "recommend_discard": "打牌の推奨",
-    "id_label": "ID: {{id}}"
+    "id_label": "ID: {{id}}",
+    "badge_switch_plan": "案あり",
+    "plan_mode": "プラン種別",
+    "mode_exact-two-draw": "目標解: 最初の2ツモで索子待ち",
+    "mode_wall-fastest-fallback": "代替解: 牌山から最速で索子待ち",
+    "mode_quad-first-dfs": "新プランナー: 二杠を先に決めて残りを探索",
+    "switch_batches": "各交換の枚数",
+    "batch_size": "{{count}}枚交換",
+    "switch_batch_title": "第{{index}}回交換",
+    "switch_batch_out": "第{{index}}回で選んで換え出す牌",
+    "switch_batch_in": "第{{index}}回で換え入る牌",
+    "remaining_changes": "残り交換数",
+    "switch_out": "交換で出す牌",
+    "switch_in": "交換で入る牌",
+    "quad_faces": "交換終了時の2カン候補",
+    "final_quads": "最終的な2カン",
+    "first_two_draws": "牌山の最初の2枚",
+    "wall_draw_sequence": "鍵になる牌山牌",
+    "post_draw_discards": "追加で必要な仮置き牌",
+    "waits": "待ち一覧",
+    "final_waits": "最終待ち",
+    "quad_catalog_title": "見えている全カンと交換手順",
+    "quad_catalog_item": "カン {{index}}：{{face}}",
+    "quad_catalog_empty": "今は一覧に出せるカンがありません。",
+    "reason_switch-hand-must-be-13": "現在の手牌が交換段階の13枚ではないため、このガイドを計算できません。",
+    "reason_wall-less-than-two-draws": "牌山の残りが2枚未満のため、最初の2ツモ条件を確認できません。",
+    "reason_replacement-not-enough": "交換山の残りが不足していて、必要な交換を完了できません。",
+    "reason_cannot-form-two-quads": "残りの交換順では、交換終了前に4枚同種のカン候補を2組作れません。",
+    "reason_cannot-reach-souzu-only-tenpai-in-first-two-draws": "双カン候補を作れても、最初の2ツモ後に索子だけの待ちテンパイへ持ち込めません。",
+    "reason_needs-deeper-replacements-than-current-planner": "この局面は総量上は双カン候補を作れますが、複数回の交換でより深い交換牌まで到達する必要があります。現在のプランナーは終局で直接残す13枚の交換牌までしか扱っていません。",
+    "reason_search-timeout": "探索時間が上限に達し、今回は信頼できる案を時間内に見つけられませんでした。",
+    "reason_stopped-by-user": "探索は手動で停止されました。",
+    "reason_no-reliable-plan-found": "検証済みの信頼できる案だけを返すようにしています。今回は条件を満たす信頼できる交換案が見つかりませんでした。",
+    "reason_stage-not-switch": "このガイドは交換段階でのみ表示されます。",
+    "reason_unknown": "利用できる結果がまだありません。"
+  },
+  "blackhole": {
+    "title": "ブラックホールガイド",
+    "card_title": "ブラックホールガイド案",
+    "start": "検索開始",
+    "stop": "検索停止",
+    "continue": "続けて検索",
+    "next": "次の案",
+    "list_quads": "全カン一覧",
+    "clear_cache": "キャッシュを消す",
+    "auto_stop_first": "最初の案を見つけたら自動停止",
+    "verbose_progress": "詳細な進捗を表示",
+    "stage_ready": "現在は交換段階なので、手動で検索を始められます。",
+    "stage_not_ready": "現在は交換段階ではありません。開始前に止めます。",
+    "need_switch_stage": "現在は交換段階ではないため、ブラックホールガイドを開始できません。"
   },
   "amulet_card": {
     "title_unknown": "未知のお守り ID={{regId}}（raw={{rawId}}）",
@@ -390,5 +443,15 @@
   "common": {
     "continue": "続行",
     "cancel": "キャンセル"
+  },
+  "right_panel": {
+    "title": "右側統計",
+    "replacement": "交換牌統計",
+    "wall": "牌山統計"
+  },
+  "replacement_stats": {
+    "title": "交換牌統計",
+    "empty": "現在、交換できる牌がありません",
+    "still_available": "まだ交換に使える"
   }
 }

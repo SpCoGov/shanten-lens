@@ -7,12 +7,14 @@ import DiagnosticsPage from "./pages/DiagnosticsPage";
 import AutoRunnerPage from "./pages/AutoRunnerPage";
 import FusePage from "./pages/FusePage";
 import AboutPage from "./pages/AboutPage";
+import BlackHolePage from "./pages/BlackHolePage";
 import {ws, ensureWsStartedOnce} from "./lib/ws";
 import {type LogLevel, useLogStore} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
 import WallStats from "./components/WallStats";
 import ReplacementPanel from "./components/ReplacementPanel";
-import AdvisorPanel, {type PlanData} from "./components/AdvisorPanel";
+import ReplacementStats from "./components/ReplacementStats";
+import AdvisorPanel from "./components/AdvisorPanel";
 import AmuletBar from "./components/AmuletBar";
 import {setAppLanguage} from "./lib/i18n";
 import {
@@ -36,6 +38,7 @@ import {useTranslation} from "react-i18next";
 import {WebviewWindow, getAllWebviewWindows} from '@tauri-apps/api/webviewWindow';
 import {t} from "i18next";
 import {openMsgBoxWindow} from "./lib/msgbox";
+import type {PlanData} from "./lib/planTypes";
 
 const settingsUrl = import.meta.env.DEV
     ? `${location.origin}/settings.html`
@@ -67,7 +70,7 @@ async function openSettingsWindow() {
     }
 }
 
-type Route = "home" | "fuse" | "autorun" | "settings" | "diagnostics" | "about";
+type Route = "home" | "blackhole" | "fuse" | "autorun" | "settings" | "diagnostics" | "about";
 
 const OUTER_PADDING = 16;
 const SIDEBAR_WIDTH = 320;
@@ -137,11 +140,13 @@ export default function App() {
 
     const [replacementTiles, setReplacementTiles] = React.useState<string[]>([]);
     const [switchUsedCount, setSwitchUsedCount] = React.useState<number>(0);
+    const [rightPanelMode, setRightPanelMode] = React.useState<"replacementStats" | "wall">("replacementStats");
 
     const [deckMap, setDeckMap] = React.useState<Map<number, string>>(new Map());
 
     const [planSuuAnkou, setPlanSuuAnkou] = React.useState<PlanData | null>(null);
     const [planChiitoi, setPlanChiitoi] = React.useState<PlanData | null>(null);
+    const [planSouzuSwitch, setPlanSouzuSwitch] = React.useState<PlanData | null>(null);
 
     const [amulets, setAmulets] = React.useState<EffectItem[]>([]);
     const [goods, setGoods] = React.useState<GoodsItem[]>([]);
@@ -249,6 +254,15 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
+        if (stage === 2) return;
+        if (stage === 3) {
+            setRightPanelMode("wall");
+            return;
+        }
+        setRightPanelMode("replacementStats");
+    }, [stage]);
+
+    React.useEffect(() => {
         ensureWsStartedOnce();
         setConnected(ws.connected);
         installWsToastBridge(ws);
@@ -292,6 +306,7 @@ export default function App() {
                     if (!item || !item.yaku) continue;
                     if (item.yaku === "chiitoi") setPlanChiitoi(item.data ?? null);
                     else if (item.yaku === "suuannkou") setPlanSuuAnkou(item.data ?? null);
+                    else if (item.yaku === "souzu_switch") setPlanSouzuSwitch(item.data ?? null);
                 }
             } else if (pkt.type === "autorun_status" && pkt.data) {
                 setAutoStatus(pkt.data as AutoRunnerStatus);
@@ -348,6 +363,32 @@ export default function App() {
         return () => un();
     }, []);
 
+    const statsHeader = stage === 2 ? (
+        <div className="right-panel-title-switch" role="tablist" aria-label={t("right_panel.title")}>
+            {rightPanelMode === "replacementStats" ? (
+                <>
+                    <span className="right-panel-title-active">{t("right_panel.replacement")}</span>
+                    <button
+                        className="right-panel-title-inactive"
+                        onClick={() => setRightPanelMode("wall")}
+                    >
+                        {t("right_panel.wall")}
+                    </button>
+                </>
+            ) : (
+                <>
+                    <span className="right-panel-title-active">{t("right_panel.wall")}</span>
+                    <button
+                        className="right-panel-title-inactive"
+                        onClick={() => setRightPanelMode("replacementStats")}
+                    >
+                        {t("right_panel.replacement")}
+                    </button>
+                </>
+            )}
+        </div>
+    ) : undefined;
+
     return (
         <div className="app">
             <div className={`toast ${toastVisible ? "visible" : ""} ${toast?.kind || "info"}`}>{toast?.msg}</div>
@@ -361,6 +402,9 @@ export default function App() {
                     </button>
                     <button className={`nav-icon ${route === "fuse" ? "active" : ""}`} title={t("nav.fuse")} onClick={() => setRoute("fuse")}>
                         <span className="ms">gpp_maybe</span>
+                    </button>
+                    <button className={`nav-icon ${route === "blackhole" ? "active" : ""}`} title={t("nav.blackhole")} onClick={() => setRoute("blackhole")}>
+                        <span className="ms">deblur</span>
                     </button>
                     <button className={`nav-icon ${route === "autorun" ? "active" : ""}`} title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
                         <span className="ms">autoplay</span>
@@ -446,17 +490,30 @@ export default function App() {
                                     {stage === 2 && replacementTiles.length > 0 && (
                                         <ReplacementPanel replacementTiles={replacementTiles} usedCount={switchUsedCount}/>
                                     )}
+
                                 </div>
 
                                 {(stage === 2 || stage === 3) && (
-                                    <div style={{flex: "0 0 auto", width: "auto", marginRight: 0}}>
-                                        <WallStats wallTiles={wallStatsTiles}/>
+                                    <div className="right-side-panel">
+                                        {stage === 2 && rightPanelMode === "replacementStats" ? (
+                                            <ReplacementStats replacementTiles={replacementTiles} usedCount={switchUsedCount} headerSlot={statsHeader}/>
+                                        ) : (
+                                            <WallStats wallTiles={wallStatsTiles} headerSlot={statsHeader}/>
+                                        )}
                                     </div>
                                 )}
                             </div>
                         )}
 
                         {route === "fuse" && <FusePage/>}
+                        {route === "blackhole" && (
+                            <BlackHolePage
+                                stage={stage}
+                                data={planSouzuSwitch}
+                                resolveFace={(id) => deckMap.get(id) ?? null}
+                                onClear={() => setPlanSouzuSwitch(null)}
+                            />
+                        )}
                         {route === "autorun" && <AutoRunnerPage/>}
                         {route === "settings" && <SettingsPage/>}
                         {route === "diagnostics" && <DiagnosticsPage/>}

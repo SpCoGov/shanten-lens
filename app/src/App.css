@@ -855,6 +855,83 @@ input:invalid, textarea:invalid, select:invalid {
     gap: 12px;
 }
 
+.right-side-panel {
+    width: 256px;
+    flex: 0 0 256px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.right-panel-title-switch {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+}
+
+.right-panel-title-active {
+    font-size: 20px;
+    line-height: 1.2;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.right-panel-title-inactive {
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 18px;
+    line-height: 1.2;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.right-panel-title-inactive:hover {
+    color: var(--text);
+}
+
+.blackhole-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.blackhole-layout.with-drawer {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.blackhole-main {
+    min-width: 0;
+}
+
+.blackhole-drawer {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    min-width: 0;
+    width: 100%;
+}
+
+.blackhole-drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.blackhole-section {
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-divider);
+    border-radius: 12px;
+    background: color-mix(in oklab, var(--panel-bg) 88%, white);
+}
+
 @media (min-width: 1440px) {
     .settings-wrap.wide-page {
         padding-inline: clamp(24px, 3vw, 40px);

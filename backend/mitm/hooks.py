@@ -1,7 +1,9 @@
 import asyncio
 import copy
+import threading
 from collections import OrderedDict
 from typing import Tuple, Any, Dict, List, Set, Optional, Union
+import time
 
 from loguru import logger
 from mitmproxy import ctx
@@ -11,6 +13,7 @@ import backend.mitm.addon as _addon
 from backend.app import AMULET_REG, BADGE_REG, pipeline
 from backend.app import MANAGER, GAME_STATE, broadcast
 from backend.autorun.util.chiitoi_recommender import chiitoi_recommendation_json
+from backend.autorun.util.souzu_switch_recommender import recommend_souzu_tenpai_switch, list_reachable_quads_for_switch
 from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
 from backend.msgbox import _ui_confirm_blocking
 
@@ -21,6 +24,273 @@ BADGE_EXPANSION = 600160
 ID_UNSTABLE = 228
 ID_THEFT = 229
 ID_HACKER = 232
+_SWITCH_RECOMMENDATION_SEQ = 0
+_SWITCH_STOP_EVENT = threading.Event()
+_SWITCH_SEARCH_TASK: asyncio.Task | None = None
+
+
+def _current_discard(plan: dict) -> int | None:
+    if not isinstance(plan, dict):
+        return None
+    if plan.get("status") != "plan":
+        return None
+    d = plan.get("discards") or []
+    return int(d[0]) if d else None
+
+
+def _wrap_entry(yaku_key: str, plan: dict) -> dict:
+    entry = {
+        "status": plan.get("status"),
+        "draws_needed": plan.get("draws_needed"),
+        "target14": plan.get("target14") or [],
+        "discards": plan.get("discards") or [],
+    }
+    for key in (
+            "pair_hint",
+            "mode",
+            "reason",
+            "progress",
+            "switch_discards",
+            "switch_in",
+            "wall_draws",
+            "post_draw_discards",
+            "waits",
+            "quad_faces",
+            "switch_batch_sizes",
+            "remaining_changes",
+            "target13",
+            "plan_signature",
+            "quad_catalog",
+    ):
+        if key in plan:
+            entry[key] = plan[key]
+    cur = _current_discard(plan)
+    if cur is not None:
+        entry["discard"] = cur
+    return {"yaku": yaku_key, "data": entry}
+
+
+async def _broadcast_switch_recommendation(
+        *,
+        stop_after_first: bool,
+        skip_signatures: list[str] | None = None,
+        wall_limit: int = 36,
+) -> None:
+    global _SWITCH_RECOMMENDATION_SEQ, _SWITCH_STOP_EVENT, _SWITCH_SEARCH_TASK
+    _SWITCH_RECOMMENDATION_SEQ += 1
+    seq = _SWITCH_RECOMMENDATION_SEQ
+    _SWITCH_STOP_EVENT = threading.Event()
+    loop = asyncio.get_running_loop()
+    send_state = {
+        "scheduled": False,
+        "sending": False,
+        "sent_text": None,
+        "sent_candidate_version": -1,
+        "flush_queued": False,
+        "finished": False,
+    }
+
+    await broadcast({
+        "type": "discard_recommendation",
+        "data": [_wrap_entry("souzu_switch", {
+            "status": "searching",
+            "progress": "正在准备搜索…",
+        })],
+    })
+    logger.debug("souzu_switch search start")
+
+    latest_progress = {"text": "正在准备搜索…", "candidate": None, "candidate_version": 0}
+
+    progress_log_state = {"count": 0, "truncated": False}
+
+    async def _flush_progress(force: bool = False) -> None:
+        send_state["flush_queued"] = False
+        if send_state["finished"]:
+            send_state["scheduled"] = False
+            send_state["sending"] = False
+            return
+        if seq != _SWITCH_RECOMMENDATION_SEQ:
+            send_state["scheduled"] = False
+            send_state["sending"] = False
+            return
+        if send_state["sending"]:
+            return
+        send_state["sending"] = True
+        try:
+            while True:
+                message = latest_progress["text"]
+                candidate_version = latest_progress["candidate_version"]
+                if not force and message == send_state["sent_text"] and candidate_version == send_state["sent_candidate_version"]:
+                    break
+                await broadcast({
+                    "type": "discard_recommendation",
+                    "data": [_wrap_entry("souzu_switch", {
+                        "status": "searching",
+                        "progress": message,
+                        **(latest_progress["candidate"] or {}),
+                    })],
+                })
+                send_state["sent_text"] = message
+                send_state["sent_candidate_version"] = candidate_version
+                if (
+                        latest_progress["text"] == message
+                        and latest_progress["candidate_version"] == candidate_version
+                ):
+                    break
+        finally:
+            send_state["sending"] = False
+            send_state["scheduled"] = False
+
+    def _request_flush(force: bool = False) -> None:
+        if send_state["finished"]:
+            return
+        if seq != _SWITCH_RECOMMENDATION_SEQ:
+            return
+        if send_state["flush_queued"] and not force:
+            return
+        send_state["flush_queued"] = True
+
+        def _spawn() -> None:
+            if send_state["finished"]:
+                send_state["flush_queued"] = False
+                return
+            if seq != _SWITCH_RECOMMENDATION_SEQ:
+                send_state["flush_queued"] = False
+                return
+            asyncio.create_task(_flush_progress(force=force))
+
+        loop.call_soon_threadsafe(_spawn)
+
+    def progress_cb(message: str) -> None:
+        if send_state["finished"]:
+            return
+        if seq != _SWITCH_RECOMMENDATION_SEQ:
+            return
+        latest_progress["text"] = message
+        _request_flush()
+        progress_log_state["count"] += 1
+        if progress_log_state["count"] <= 100:
+            logger.debug("souzu_switch progress\n{}", message)
+        elif not progress_log_state["truncated"]:
+            progress_log_state["truncated"] = True
+            logger.debug("souzu_switch progress log truncated after 100 entries")
+
+    def candidate_cb(plan: dict) -> None:
+        if send_state["finished"]:
+            return
+        if seq != _SWITCH_RECOMMENDATION_SEQ:
+            return
+        latest_progress["candidate"] = {
+            "draws_needed": plan.get("draws_needed"),
+            "mode": plan.get("mode"),
+            "switch_discards": plan.get("switch_discards") or [],
+            "switch_in": plan.get("switch_in") or [],
+            "wall_draws": plan.get("wall_draws") or [],
+            "post_draw_discards": plan.get("post_draw_discards") or [],
+            "waits": plan.get("waits") or [],
+            "quad_faces": plan.get("quad_faces") or [],
+            "switch_batch_sizes": plan.get("switch_batch_sizes") or [],
+            "remaining_changes": plan.get("remaining_changes"),
+            "target13": plan.get("target13") or [],
+            "plan_signature": plan.get("plan_signature"),
+        }
+        latest_progress["candidate_version"] += 1
+        _request_flush(force=True)
+
+    async def _progress_pump() -> None:
+        try:
+            while seq == _SWITCH_RECOMMENDATION_SEQ and not send_state["finished"]:
+                if not send_state["sending"]:
+                    await _flush_progress(force=True)
+                await asyncio.sleep(0.1)
+        finally:
+            send_state["scheduled"] = False
+
+    send_state["scheduled"] = True
+    asyncio.create_task(_progress_pump())
+
+    search_task = asyncio.create_task(asyncio.to_thread(
+        recommend_souzu_tenpai_switch,
+        GAME_STATE.deck_map,
+        GAME_STATE.hand_tiles,
+        GAME_STATE.replacement_tiles,
+        list(GAME_STATE.wall_tiles if wall_limit >= 36 else GAME_STATE.wall_tiles[:max(2, wall_limit)]),
+        GAME_STATE.switch_used_tiles,
+        GAME_STATE.total_change_tile_count,
+        GAME_STATE.change_tile_count,
+        progress_cb,
+        candidate_cb,
+        _SWITCH_STOP_EVENT.is_set,
+        stop_after_first,
+        set(skip_signatures or []),
+    ))
+    _SWITCH_SEARCH_TASK = search_task
+    plan = await search_task
+    if seq != _SWITCH_RECOMMENDATION_SEQ:
+        return
+    send_state["finished"] = True
+    send_state["flush_queued"] = False
+    logger.debug("souzu_switch result: {}", plan)
+    await broadcast({
+        "type": "discard_recommendation",
+        "data": [_wrap_entry("souzu_switch", plan)],
+    })
+
+
+async def start_switch_recommendation_search(
+        *,
+        stop_after_first: bool,
+        skip_signatures: list[str] | None = None,
+        wall_limit: int = 36,
+) -> None:
+    _SWITCH_STOP_EVENT.set()
+    if int(getattr(GAME_STATE, "stage", 0) or 0) != 2:
+        await broadcast({
+            "type": "discard_recommendation",
+            "data": [_wrap_entry("souzu_switch", {
+                "status": "impossible",
+                "reason": "stage-not-switch",
+            })],
+        })
+        return
+    asyncio.create_task(_broadcast_switch_recommendation(
+        stop_after_first=stop_after_first,
+        skip_signatures=skip_signatures or [],
+        wall_limit=wall_limit,
+    ))
+
+
+async def broadcast_switch_quad_catalog(*, wall_limit: int = 36) -> None:
+    plan = await asyncio.to_thread(
+        list_reachable_quads_for_switch,
+        GAME_STATE.deck_map,
+        GAME_STATE.hand_tiles,
+        GAME_STATE.replacement_tiles,
+        list(GAME_STATE.wall_tiles if wall_limit >= 36 else GAME_STATE.wall_tiles[:max(2, wall_limit)]),
+        GAME_STATE.switch_used_tiles,
+        GAME_STATE.total_change_tile_count,
+        GAME_STATE.change_tile_count,
+    )
+    await broadcast({
+        "type": "discard_recommendation",
+        "data": [_wrap_entry("souzu_switch", plan)],
+    })
+
+
+async def stop_switch_recommendation_search(*, notify_client: bool = True) -> None:
+    global _SWITCH_RECOMMENDATION_SEQ, _SWITCH_SEARCH_TASK
+    _SWITCH_RECOMMENDATION_SEQ += 1
+    _SWITCH_STOP_EVENT.set()
+    _SWITCH_SEARCH_TASK = None
+    logger.debug("souzu_switch stop requested")
+    if notify_client:
+        await broadcast({
+            "type": "discard_recommendation",
+            "data": [_wrap_entry("souzu_switch", {
+                "status": "impossible",
+                "reason": "stopped-by-user",
+            })],
+        })
 
 
 def _first_src_base(row: dict) -> int:
@@ -513,7 +783,6 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             next_operation = round_info.get("nextOperation", {}).get("value", None)
             ting_list = round_info.get("tingList", {}).get("value", None)
             GAME_STATE.update_other_info(stage=stage, change_tile_count=change_tile_count, next_operation=next_operation, ting_list=ting_list)
-
         # type = 6: 摸牌
         draw_event = next((e for e in events if e.get("type") == 6), None)
         if draw_event:

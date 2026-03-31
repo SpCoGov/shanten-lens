@@ -7,6 +7,7 @@ import i18next, {t} from "i18next";
 export interface WallStatsProps {
     wallTiles: string[];
     className?: string;
+    headerSlot?: React.ReactNode;
 }
 
 function normalize(raw: string): string {
@@ -92,7 +93,7 @@ function emitHover(tile: string | null) {
     window.dispatchEvent(new CustomEvent("shanten:hover-tile-eq", { detail: group }));
 }
 
-export default function WallStats({ wallTiles, className }: WallStatsProps) {
+export default function WallStats({ wallTiles, className, headerSlot }: WallStatsProps) {
     const list = useMemo(() => {
         const map = new Map<string, { count: number; sample: string }>();
         for (const t of wallTiles) {
@@ -115,7 +116,7 @@ export default function WallStats({ wallTiles, className }: WallStatsProps) {
         <aside className={[styles.wrap, className].filter(Boolean).join(" ")}>
             <div className={`mj-panel ${styles.panel}`}>
                 <div className={styles.header}>
-                    <div className={styles.title}>{t("wall_stats.title")}</div>
+                    {headerSlot ?? <div className={styles.title}>{t("wall_stats.title")}</div>}
                 </div>
 
                 <div className={styles.list}>

@@ -475,6 +475,27 @@ async def ws_handler(ws: WebSocketServerProtocol):
                             "type": "ui_toast",
                             "data": {"kind": "error", "msg": f"发送失败: {reason or ''}", "duration": 2600}
                         })
+            elif t == "souzu_switch_control":
+                action = (data or {}).get("action")
+                if action == "start":
+                    from backend.mitm.hooks import start_switch_recommendation_search
+                    opts = (data or {}).get("options") or {}
+                    await start_switch_recommendation_search(
+                        stop_after_first=bool(opts.get("stop_after_first", False)),
+                        skip_signatures=list(opts.get("skip_signatures") or []),
+                        wall_limit=int(opts.get("wall_limit", 36) or 36),
+                    )
+                elif action == "stop":
+                    from backend.mitm.hooks import stop_switch_recommendation_search
+                    await stop_switch_recommendation_search(
+                        notify_client=bool((data or {}).get("notify", True))
+                    )
+                elif action == "list_quads":
+                    from backend.mitm.hooks import broadcast_switch_quad_catalog
+                    opts = (data or {}).get("options") or {}
+                    await broadcast_switch_quad_catalog(
+                        wall_limit=int(opts.get("wall_limit", 36) or 36)
+                    )
             elif t == "msgbox_result":
                 from backend.msgbox import handle_msgbox_result
                 handle_msgbox_result(pkt)

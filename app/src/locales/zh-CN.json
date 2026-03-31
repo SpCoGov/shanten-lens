@@ -17,6 +17,7 @@
   },
   "nav": {
     "home": "主页",
+    "blackhole": "黑洞指导",
     "fuse": "熔断",
     "autorun": "自动化",
     "refreshGame": "刷新对局",
@@ -264,15 +265,69 @@
     "toast_open_config_fail": "打开失败：{{error}}"
   },
   "advisor": {
+    "title_souzu_switch": "换牌指导",
     "title_suu_ankou": "四暗刻",
     "title_chiitoi": "七对子",
     "awaiting_backend": "等待后端结果…",
+    "searching": "搜索中",
+    "stop_search": "停止",
     "win_now": "当前可立刻和",
+    "badge_switch_plan": "已找到方案",
+    "plan_mode": "方案类型",
+    "mode_exact-two-draw": "目标解：前两摸听条",
+    "mode_wall-fastest-fallback": "后备解：牌山最快听条",
+    "mode_quad-first-dfs": "新规划器：先定双杠，再搜剩余组合",
+    "switch_batches": "每次换牌张数",
+    "batch_size": "换 {{count}} 张",
+    "switch_batch_title": "第 {{index}} 次换牌",
+    "switch_batch_out": "第 {{index}} 次选中换出",
+    "switch_batch_in": "第 {{index}} 次换入",
     "need_draws_label": "还需摸",
     "impossible": "无解",
     "menzen_only": "门前清限定",
     "recommend_discard": "推荐打牌",
-    "id_label": "ID: {{id}}"
+    "id_label": "ID: {{id}}",
+    "remaining_changes": "剩余换牌",
+    "switch_out": "换出顺序",
+    "switch_in": "换入顺序",
+    "quad_faces": "换牌结束双杠",
+    "final_quads": "最终双杠",
+    "first_two_draws": "牌山前两摸",
+    "wall_draw_sequence": "关键牌山牌",
+    "post_draw_discards": "额外占位牌需求",
+    "waits": "听牌列表",
+    "final_waits": "最终听牌",
+    "quad_catalog_title": "所有可见杠与换法",
+    "quad_catalog_item": "杠 {{index}}：{{face}}",
+    "quad_catalog_empty": "当前没有可列出的杠。",
+    "reason_switch-hand-must-be-13": "当前不是 13 张换牌手牌，暂时无法计算这条指导。",
+    "reason_wall-less-than-two-draws": "牌山剩余不足两张，无法验证“前两摸听条”。",
+    "reason_replacement-not-enough": "换牌堆剩余数量不足，无法完成剩余换牌。",
+    "reason_cannot-form-two-quads": "按剩余换牌顺序无论怎么换，都无法在换牌阶段结束前凑出两个四张同牌的杠。",
+    "reason_cannot-reach-souzu-only-tenpai-in-first-two-draws": "即使能做出双杠，也无法在牌山前两摸后把听牌列表限制为条子。",
+    "reason_needs-deeper-replacements-than-current-planner": "这局从总量上可以做出双杠，但需要跨多次换牌吃到更深的替换牌区；当前规划器还只覆盖终局直接保留的13张换入牌。",
+    "reason_search-timeout": "搜索时间已到上限，这次没能及时找到可靠方案。",
+    "reason_stopped-by-user": "搜索已由你主动停止。",
+    "reason_no-reliable-plan-found": "这次只保留经过验证的可靠方案；当前没有找到满足条件的可靠换牌指导。",
+    "reason_stage-not-switch": "该指导只在换牌阶段显示。",
+    "reason_unknown": "暂时没有可用结果。"
+  },
+  "blackhole": {
+    "title": "黑洞指导",
+    "card_title": "黑洞指导方案",
+    "start": "启动搜索",
+    "stop": "停止搜索",
+    "continue": "继续搜索",
+    "next": "下一个方案",
+    "list_quads": "列出所有杠",
+    "clear_cache": "清空缓存数据",
+    "auto_stop_first": "找到第一个方案后自动停",
+    "verbose_progress": "显示详细调试进度",
+    "wall_limit": "牌山读取上限",
+    "wall_limit_hint": "设为 2 时最多只读取牌山前 2 张；设为 36 时视为不限制。",
+    "stage_ready": "当前在换牌阶段，可以手动启动搜索。",
+    "stage_not_ready": "当前不在换牌阶段，启动前会先拦下。",
+    "need_switch_stage": "当前不在换牌阶段，无法启动黑洞指导。"
   },
   "amulet_card": {
     "title_unknown": "未知护身符 ID={{regId}} (raw={{rawId}})",
@@ -334,6 +389,11 @@
     "badge_used": "已替",
     "pointer_current": "当前"
   },
+  "right_panel": {
+    "title": "右侧统计",
+    "replacement": "替换牌区统计",
+    "wall": "牌山统计"
+  },
   "wall_stats": {
     "title": "牌山统计",
     "empty": "当前无可摸牌",
@@ -388,5 +448,10 @@
   "common": {
     "continue": "继续",
     "cancel": "取消"
+  },
+  "replacement_stats": {
+    "title": "替换牌区统计",
+    "empty": "当前无可替换牌",
+    "still_available": "仍可替入"
   }
 }

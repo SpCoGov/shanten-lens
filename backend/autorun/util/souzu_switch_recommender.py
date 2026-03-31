@@ -1,0 +1,1542 @@
+import time
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from functools import lru_cache
+from itertools import combinations
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+
+RED_MAP = {"0m": "5m", "0p": "5p", "0s": "5s"}
+ALL_TILES = [f"{n}{s}" for s in "mps" for n in range(1, 10)] + [f"{n}z" for n in range(1, 8)]
+TILE_INDEX = {tile: idx for idx, tile in enumerate(ALL_TILES)}
+
+
+@dataclass(frozen=True)
+class PoolEntry:
+    order: int
+    tile_id: int
+    face: str
+    source: str
+    source_index: int
+
+
+def _norm(tile: str) -> str:
+    return RED_MAP.get(tile, tile)
+
+
+def _parse_face(face: str) -> tuple[int, str]:
+    return int(face[0]), face[1]
+
+
+def _candidate_ids(ids: Iterable[int], deck_map: Dict[int, str]) -> List[int]:
+    def key(tile_id: int) -> tuple[int, int, int]:
+        raw = deck_map[tile_id]
+        norm = _norm(raw)
+        is_red = 1 if raw in RED_MAP else 0
+        return is_red, TILE_INDEX.get(norm, 99), tile_id
+
+    return sorted(ids, key=key)
+
+
+def _entry_label(entry: PoolEntry) -> str:
+    source_map = {"hand": "手牌", "replacement": "换牌堆", "wall": "牌山"}
+    if entry.source == "hand":
+        obtain_text = f"取得=起手#{entry.source_index + 1}"
+    elif entry.source == "replacement":
+        obtain_text = f"取得=换入#{entry.source_index + 1}"
+    else:
+        obtain_text = f"取得=摸到#{entry.source_index + 1}"
+    return (
+        f"{entry.face}(id={entry.tile_id},来源={source_map.get(entry.source, entry.source)},"
+        f"来源序号={entry.source_index + 1},{obtain_text})"
+    )
+
+
+def _quad_label(ids: Sequence[int], by_id: Dict[int, PoolEntry]) -> str:
+    if not ids:
+        return "-"
+    face = by_id[ids[0]].face
+    return f"{face} <- " + " / ".join(_entry_label(by_id[tile_id]) for tile_id in ids)
+
+
+def _quad_score_text(time_key: tuple[int, int, int]) -> str:
+    return f"总序号={time_key[0]} / 换牌深度={time_key[1]} / 牌山深度={time_key[2]}"
+
+
+def _component_text(parts: Sequence[str]) -> str:
+    return " | ".join(parts) if parts else "尚未选定组合"
+
+
+def _chiitoi_win(tiles: List[str]) -> bool:
+    if len(tiles) != 14:
+        return False
+    cnt = Counter(t for t in tiles if t != "bd")
+    jokers = tiles.count("bd")
+    pair_kinds = sum(1 for v in cnt.values() if v >= 2)
+    single_kinds = sum(1 for v in cnt.values() if v == 1)
+    need_pairs = max(0, 7 - pair_kinds)
+    use_on_singles = min(need_pairs, single_kinds)
+    need_jokers = use_on_singles + (need_pairs - use_on_singles) * 2
+    return jokers >= need_jokers
+
+
+@lru_cache(maxsize=None)
+def _can_form_melds(counts: tuple[int, ...], jokers: int) -> bool:
+    total = sum(counts)
+    if total == 0:
+        return jokers % 3 == 0
+
+    first = next(i for i, v in enumerate(counts) if v > 0)
+
+    triplet_take = min(3, counts[first])
+    triplet_need = 3 - triplet_take
+    if triplet_need <= jokers:
+        nxt = list(counts)
+        nxt[first] -= triplet_take
+        if _can_form_melds(tuple(nxt), jokers - triplet_need):
+            return True
+
+    if first < 27 and first % 9 <= 6:
+        nxt = list(counts)
+        nxt[first] -= 1
+        need = 0
+        for off in (1, 2):
+            idx = first + off
+            if nxt[idx] > 0:
+                nxt[idx] -= 1
+            else:
+                need += 1
+        if need <= jokers and _can_form_melds(tuple(nxt), jokers - need):
+            return True
+
+    return False
+
+
+def _standard_win(tiles: List[str]) -> bool:
+    counts = [0] * len(ALL_TILES)
+    jokers = 0
+    for tile in tiles:
+        if tile == "bd":
+            jokers += 1
+        else:
+            counts[TILE_INDEX[tile]] += 1
+
+    base = tuple(counts)
+    if jokers >= 2 and _can_form_melds(base, jokers - 2):
+        return True
+
+    for idx, have in enumerate(base):
+        if have >= 2:
+            nxt = list(base)
+            nxt[idx] -= 2
+            if _can_form_melds(tuple(nxt), jokers):
+                return True
+        if have >= 1 and jokers >= 1:
+            nxt = list(base)
+            nxt[idx] -= 1
+            if _can_form_melds(tuple(nxt), jokers - 1):
+                return True
+    return False
+
+
+def _is_win_14(tiles: List[str]) -> bool:
+    return _standard_win(tiles) or _chiitoi_win(tiles)
+
+
+def _waits_for_hand13_faces(hand13: List[str]) -> List[str]:
+    cnt = Counter(t for t in hand13 if t != "bd")
+    waits: List[str] = []
+    for face in ALL_TILES:
+        if cnt[face] >= 4:
+            continue
+        if _is_win_14(hand13 + [face]):
+            waits.append(face)
+    return waits
+
+
+def _is_open_two_melds_pair_win(tiles8: List[str]) -> bool:
+    if len(tiles8) != 8:
+        return False
+    counts = [0] * len(ALL_TILES)
+    jokers = 0
+    for tile in tiles8:
+        if tile == "bd":
+            jokers += 1
+        else:
+            counts[TILE_INDEX[tile]] += 1
+
+    base = tuple(counts)
+    if jokers >= 2 and _can_form_melds(base, jokers - 2):
+        return True
+
+    for idx, have in enumerate(base):
+        if have >= 2:
+            nxt = list(base)
+            nxt[idx] -= 2
+            if _can_form_melds(tuple(nxt), jokers):
+                return True
+        if have >= 1 and jokers >= 1:
+            nxt = list(base)
+            nxt[idx] -= 1
+            if _can_form_melds(tuple(nxt), jokers - 1):
+                return True
+    return False
+
+
+def _waits_for_open_two_melds_faces(hand7: List[str], used_face_cnt: Optional[Counter[str]] = None) -> List[str]:
+    if len(hand7) != 7:
+        return []
+    used_face_cnt = used_face_cnt or Counter()
+    hand_cnt = Counter(t for t in hand7 if t != "bd")
+    waits: List[str] = []
+    for face in ALL_TILES:
+        if hand_cnt[face] + used_face_cnt[face] >= 4:
+            continue
+        if _is_open_two_melds_pair_win(hand7 + [face]):
+            waits.append(face)
+    return waits
+
+
+def _is_exact_meld3(faces3: Sequence[str]) -> bool:
+    if len(faces3) != 3:
+        return False
+    if faces3[0] == faces3[1] == faces3[2]:
+        return True
+    ordered = sorted(faces3, key=lambda tile: TILE_INDEX[tile])
+    a, b, c = ordered
+    ra, sa = _parse_face(a)
+    rb, sb = _parse_face(b)
+    rc, sc = _parse_face(c)
+    return sa in "mps" and sa == sb == sc and rb == ra + 1 and rc == rb + 1
+
+
+def _non_souzu_pair_wait_shape_reason(hand7: Sequence[str]) -> Optional[str]:
+    cnt = Counter(hand7)
+    pair_faces = sorted([face for face, n in cnt.items() if n >= 2], key=lambda tile: TILE_INDEX[tile])
+    for i, face_b in enumerate(pair_faces):
+        for face_c in pair_faces[i + 1:]:
+            tmp = cnt.copy()
+            tmp[face_b] -= 2
+            tmp[face_c] -= 2
+            leftover = []
+            for face, n in tmp.items():
+                leftover.extend([face] * n)
+            if len(leftover) != 3:
+                continue
+            if not _is_exact_meld3(leftover):
+                continue
+            if not face_b.endswith("s") or not face_c.endswith("s"):
+                shape = "".join(sorted(leftover, key=lambda tile: TILE_INDEX[tile]))
+                return (
+                    f"去杠后7张呈现 1 面子 + 2 对子形，且对子含非条子: "
+                    f"面子={shape}, 对子={face_b}/{face_c}"
+                )
+    return None
+
+
+def _build_pool(
+        deck_map: Dict[int, str],
+        hand_ids: Sequence[int],
+        replacement_ids: Sequence[int],
+        wall_ids: Sequence[int],
+) -> tuple[List[PoolEntry], Dict[int, PoolEntry]]:
+    entries: List[PoolEntry] = []
+    by_id: Dict[int, PoolEntry] = {}
+    for source, ids in (("hand", hand_ids), ("replacement", replacement_ids), ("wall", wall_ids)):
+        for source_index, tile_id in enumerate(ids):
+            entry = PoolEntry(
+                order=len(entries),
+                tile_id=int(tile_id),
+                face=_norm(deck_map[int(tile_id)]),
+                source=source,
+                source_index=source_index,
+            )
+            entries.append(entry)
+            by_id[entry.tile_id] = entry
+    return entries, by_id
+
+
+def _quad_time(entry_ids: Sequence[int], by_id: Dict[int, PoolEntry]) -> tuple[int, int, int]:
+    entries = [by_id[tile_id] for tile_id in entry_ids]
+    return (
+        max(entry.order for entry in entries),
+        max((entry.source_index + 1 for entry in entries if entry.source == "replacement"), default=0),
+        max((entry.source_index + 1 for entry in entries if entry.source == "wall"), default=0),
+    )
+
+
+def _enumerate_quads(pool: Sequence[PoolEntry], by_id: Dict[int, PoolEntry]) -> List[dict]:
+    face_map: Dict[str, List[int]] = defaultdict(list)
+    for entry in pool:
+        face_map[entry.face].append(entry.tile_id)
+
+    quads: List[dict] = []
+    for face, ids in face_map.items():
+        if len(ids) < 4:
+            continue
+        for combo in combinations(ids, 4):
+            ids4 = tuple(sorted(combo))
+            quads.append({
+                "face": face,
+                "ids": ids4,
+                "time_key": _quad_time(ids4, by_id),
+            })
+    quads.sort(key=lambda item: (item["time_key"], TILE_INDEX.get(item["face"], 99), item["ids"]))
+    return quads
+
+
+def _enumerate_quad_pairs(quads: Sequence[dict]) -> List[dict]:
+    pairs: List[dict] = []
+    for i in range(len(quads)):
+        for j in range(i + 1, len(quads)):
+            if quads[i]["face"] == quads[j]["face"]:
+                continue
+            first = quads[i]
+            second = quads[j]
+            if second["time_key"] < first["time_key"]:
+                first, second = second, first
+            score = (
+                first["time_key"][0],
+                second["time_key"][0],
+                first["time_key"][1],
+                second["time_key"][1],
+                first["time_key"][2],
+                second["time_key"][2],
+                TILE_INDEX.get(first["face"], 99),
+                TILE_INDEX.get(second["face"], 99),
+            )
+            pairs.append({
+                "faces": (first["face"], second["face"]),
+                "quad_ids": tuple(first["ids"] + second["ids"]),
+                "pair_score": score,
+            })
+    pairs.sort(key=lambda item: (item["pair_score"], item["quad_ids"]))
+    return pairs
+
+
+def _build_switch_batches(
+        hand_ids: Sequence[int],
+        consumed_ids: Sequence[int],
+        target_face_counts: Counter[str],
+        deck_map: Dict[int, str],
+        remaining_changes: int,
+        per_change_limit: int,
+) -> Optional[List[int]]:
+    c = len(consumed_ids)
+    if c == 0:
+        return []
+
+    faces = tuple(sorted(target_face_counts.keys(), key=lambda tile: TILE_INDEX.get(tile, 99)))
+    suffix_counts: List[Counter[str]] = [Counter() for _ in range(c + 1)]
+    running = Counter()
+    for idx in range(c - 1, -1, -1):
+        face = _norm(deck_map[consumed_ids[idx]])
+        if face in target_face_counts:
+            running[face] += 1
+        suffix_counts[idx] = running.copy()
+
+    def required_keep_count(pos: int) -> int:
+        future = suffix_counts[pos]
+        return sum(max(0, target_face_counts[face] - future.get(face, 0)) for face in faces)
+
+    @lru_cache(maxsize=None)
+    def solve(pos: int, ops_left: int) -> Optional[Tuple[int, ...]]:
+        if pos == c:
+            return ()
+        if ops_left <= 0:
+            return None
+        available = max(0, 13 - required_keep_count(pos))
+        if available <= 0:
+            return None
+        max_batch = min(per_change_limit, c - pos, available)
+        for batch in range(1, max_batch + 1):
+            rest = solve(pos + batch, ops_left - 1)
+            if rest is not None:
+                return (batch,) + rest
+        return None
+
+    result = solve(0, remaining_changes)
+    return list(result) if result is not None else None
+
+
+def _explain_switch_batch_failure(
+        hand_ids: Sequence[int],
+        consumed_ids: Sequence[int],
+        target_face_counts: Counter[str],
+        deck_map: Dict[int, str],
+        remaining_changes: int,
+        per_change_limit: int,
+) -> str:
+    c = len(consumed_ids)
+    if c == 0:
+        return "无需从换牌堆继续吃牌"
+
+    faces = tuple(sorted(target_face_counts.keys(), key=lambda tile: TILE_INDEX.get(tile, 99)))
+    suffix_counts: List[Counter[str]] = [Counter() for _ in range(c + 1)]
+    running = Counter()
+    for idx in range(c - 1, -1, -1):
+        face = _norm(deck_map[consumed_ids[idx]])
+        if face in target_face_counts:
+            running[face] += 1
+        suffix_counts[idx] = running.copy()
+
+    def required_keep_count(pos: int) -> int:
+        future = suffix_counts[pos]
+        return sum(max(0, target_face_counts[face] - future.get(face, 0)) for face in faces)
+
+    @lru_cache(maxsize=None)
+    def solve(pos: int, ops_left: int) -> bool:
+        if pos == c:
+            return True
+        if ops_left <= 0:
+            return False
+        available = max(0, 13 - required_keep_count(pos))
+        if available <= 0:
+            return False
+        max_batch = min(per_change_limit, c - pos, available)
+        for batch in range(1, max_batch + 1):
+            if solve(pos + batch, ops_left - 1):
+                return True
+        return False
+
+    pos = 0
+    ops_left = remaining_changes
+    step = 1
+    while pos < c:
+        if ops_left <= 0:
+            return f"到第 {step} 次换牌前已无剩余次数，但还剩 {c - pos} 张必须按顺序吃入的换牌牌"
+        available = max(0, 13 - required_keep_count(pos))
+        if available <= 0:
+            return f"到第 {step} 次换牌前，按当前最终目标至少要保留 13 张牌，已没有可继续换出的槽位，但还剩 {c - pos} 张必须按顺序吃入的换牌牌"
+        max_batch = min(per_change_limit, c - pos, available)
+        feasible_batch = None
+        for batch in range(1, max_batch + 1):
+            if solve(pos + batch, ops_left - 1):
+                feasible_batch = batch
+                break
+        if feasible_batch is None:
+            return (
+                f"第 {step} 次换牌无法继续：当前最多只能换 {max_batch} 张，"
+                f"按当前最终目标至少要保留 {13 - available} 张牌，"
+                f"但后续还剩 {c - pos} 张必须按顺序吃入的换牌牌"
+            )
+        pos += feasible_batch
+        ops_left -= 1
+        step += 1
+
+    return "换牌可达性失败，但未定位到更具体的死点"
+
+
+def _materialize_switch_plan(
+        hand_ids: Sequence[int],
+        consumed_ids: Sequence[int],
+        target_face_counts: Counter[str],
+        deck_map: Dict[int, str],
+        batches: Sequence[int],
+) -> tuple[List[int], List[int]]:
+    cur_hand = list(hand_ids)
+    switch_discards: List[int] = []
+    switch_in: List[int] = []
+    pos = 0
+    c = len(consumed_ids)
+    faces = tuple(sorted(target_face_counts.keys(), key=lambda tile: TILE_INDEX.get(tile, 99)))
+    suffix_counts: List[Counter[str]] = [Counter() for _ in range(c + 1)]
+    running = Counter()
+    for idx in range(c - 1, -1, -1):
+        face = _norm(deck_map[consumed_ids[idx]])
+        if face in target_face_counts:
+            running[face] += 1
+        suffix_counts[idx] = running.copy()
+
+    for batch in batches:
+        future = suffix_counts[pos]
+        keep_need = {face: max(0, target_face_counts[face] - future.get(face, 0)) for face in faces}
+        by_face_ids: Dict[str, List[int]] = defaultdict(list)
+        for tile_id in _candidate_ids(cur_hand, deck_map):
+            by_face_ids[_norm(deck_map[tile_id])].append(tile_id)
+        keep_ids: Set[int] = set()
+        for face in faces:
+            keep_ids.update(by_face_ids.get(face, [])[:keep_need[face]])
+        discard_candidates = [tile_id for tile_id in _candidate_ids(cur_hand, deck_map) if tile_id not in keep_ids]
+        discard_batch = discard_candidates[:batch]
+        switch_discards.extend(discard_batch)
+        for tile_id in discard_batch:
+            cur_hand.remove(tile_id)
+
+        incoming_batch = list(consumed_ids[pos:pos + batch])
+        pos += batch
+        switch_in.extend(incoming_batch)
+        cur_hand.extend(incoming_batch)
+
+    return switch_discards, switch_in
+
+
+def _max_consumable_replacements(
+        consumed_ids: Sequence[int],
+        target_face_counts: Counter[str],
+        deck_map: Dict[int, str],
+        remaining_changes: int,
+        per_change_limit: int,
+) -> int:
+    c = len(consumed_ids)
+    if c == 0 or remaining_changes <= 0:
+        return 0
+
+    faces = tuple(sorted(target_face_counts.keys(), key=lambda tile: TILE_INDEX.get(tile, 99)))
+    suffix_counts: List[Counter[str]] = [Counter() for _ in range(c + 1)]
+    running = Counter()
+    for idx in range(c - 1, -1, -1):
+        face = _norm(deck_map[consumed_ids[idx]])
+        if face in target_face_counts:
+            running[face] += 1
+        suffix_counts[idx] = running.copy()
+
+    def required_keep_count(pos: int) -> int:
+        future = suffix_counts[pos]
+        return sum(max(0, target_face_counts[face] - future.get(face, 0)) for face in faces)
+
+    pos = 0
+    for _ in range(remaining_changes):
+        if pos >= c:
+            break
+        available = max(0, 13 - required_keep_count(pos))
+        if available <= 0:
+            break
+        batch = min(per_change_limit, c - pos, available)
+        if batch <= 0:
+            break
+        pos += batch
+    return pos
+
+
+def _select_initial_fillers(
+        hand_ids: Sequence[int],
+        essential_ids: Set[int],
+        need: int,
+        deck_map: Dict[int, str],
+) -> Optional[List[int]]:
+    if need == 0:
+        return []
+    fillers = [tile_id for tile_id in _candidate_ids(hand_ids, deck_map) if tile_id not in essential_ids]
+    if len(fillers) < need:
+        return None
+    return fillers[:need]
+
+
+def _pair_components(
+        pool: Sequence[PoolEntry],
+        blocked_orders: Set[int],
+        *,
+        allow_replacement: bool = True,
+        min_order: int = 0,
+) -> List[dict]:
+    by_face: Dict[str, List[PoolEntry]] = defaultdict(list)
+    for entry in pool:
+        if entry.order in blocked_orders:
+            continue
+        if entry.order < min_order:
+            continue
+        if not allow_replacement and entry.source == "replacement":
+            continue
+        by_face[entry.face].append(entry)
+    result: List[dict] = []
+    for face, entries in by_face.items():
+        if len(entries) < 2:
+            continue
+        for a, b in combinations(entries, 2):
+            result.append({
+                "ids": (a.tile_id, b.tile_id),
+                "orders": (a.order, b.order),
+                "face": face,
+                "kind": "pair",
+                "desc": f"雀头[{face}] <- {_entry_label(a)} / {_entry_label(b)}",
+                "sort_key": (max(a.order, b.order), TILE_INDEX.get(face, 99), a.tile_id, b.tile_id),
+            })
+    result.sort(key=lambda item: item["sort_key"])
+    return result
+
+
+def _meld_components(
+        pool: Sequence[PoolEntry],
+        blocked_orders: Set[int],
+        *,
+        allow_replacement: bool = True,
+        min_order: int = 0,
+) -> List[dict]:
+    by_face: Dict[str, List[PoolEntry]] = defaultdict(list)
+    for entry in pool:
+        if entry.order in blocked_orders:
+            continue
+        if entry.order < min_order:
+            continue
+        if not allow_replacement and entry.source == "replacement":
+            continue
+        by_face[entry.face].append(entry)
+
+    result: List[dict] = []
+    seen: Set[tuple] = set()
+
+    for face, entries in by_face.items():
+        if len(entries) >= 3:
+            for combo in combinations(entries, 3):
+                ids = tuple(sorted(entry.tile_id for entry in combo))
+                sig = ("triplet", ids)
+                if sig in seen:
+                    continue
+                seen.add(sig)
+                result.append({
+                    "ids": ids,
+                    "orders": tuple(sorted(entry.order for entry in combo)),
+                    "face": face,
+                    "kind": "triplet",
+                    "desc": f"面子[刻子 {face}] <- " + " / ".join(_entry_label(entry) for entry in combo),
+                    "sort_key": (max(entry.order for entry in combo), 0, TILE_INDEX.get(face, 99), ids),
+                })
+
+    for face, entries in by_face.items():
+        rank, suit = _parse_face(face)
+        if suit not in "mps" or rank > 7:
+            continue
+        face2 = f"{rank + 1}{suit}"
+        face3 = f"{rank + 2}{suit}"
+        if face2 not in by_face or face3 not in by_face:
+            continue
+        for a in entries:
+            for b in by_face[face2]:
+                for c in by_face[face3]:
+                    ids = tuple(sorted((a.tile_id, b.tile_id, c.tile_id)))
+                    sig = ("sequence", ids)
+                    if sig in seen:
+                        continue
+                    seen.add(sig)
+                    seq = f"{face}{face2}{face3}"
+                    result.append({
+                        "ids": ids,
+                        "orders": tuple(sorted((a.order, b.order, c.order))),
+                        "face": face,
+                        "kind": "sequence",
+                        "desc": f"面子[顺子 {seq}] <- {_entry_label(a)} / {_entry_label(b)} / {_entry_label(c)}",
+                        "sort_key": (max(a.order, b.order, c.order), 1, TILE_INDEX.get(face, 99), ids),
+                    })
+
+    result.sort(key=lambda item: item["sort_key"])
+    return result
+
+
+def _win_components_for_wall_tile(
+        win_entry: PoolEntry,
+        pool: Sequence[PoolEntry],
+        blocked_orders: Set[int],
+        *,
+        allow_replacement: bool = True,
+        min_order: int = 0,
+) -> List[dict]:
+    by_face: Dict[str, List[PoolEntry]] = defaultdict(list)
+    for entry in pool:
+        if entry.order in blocked_orders or entry.tile_id == win_entry.tile_id:
+            continue
+        if entry.order < min_order:
+            continue
+        if not allow_replacement and entry.source == "replacement":
+            continue
+        by_face[entry.face].append(entry)
+
+    result: List[dict] = []
+    same_face_entries = by_face.get(win_entry.face, [])
+
+    for entry in same_face_entries:
+        result.append({
+            "role": "pair",
+            "ids": (entry.tile_id,),
+            "orders": (entry.order,),
+            "face": win_entry.face,
+            "kind": "pair",
+            "desc": f"雀头[{win_entry.face}] <- {_entry_label(entry)} + 胡牌 {_entry_label(win_entry)}",
+            "sort_key": (entry.order, 0, TILE_INDEX.get(win_entry.face, 99), entry.tile_id),
+        })
+
+    if len(same_face_entries) >= 2:
+        for a, b in combinations(same_face_entries, 2):
+            result.append({
+                "role": "meld",
+                "ids": (a.tile_id, b.tile_id),
+                "orders": tuple(sorted((a.order, b.order))),
+                "face": win_entry.face,
+                "kind": "triplet",
+                "desc": f"面子[刻子 {win_entry.face}] <- {_entry_label(a)} / {_entry_label(b)} / 胡牌 {_entry_label(win_entry)}",
+                "sort_key": (max(a.order, b.order), 1, TILE_INDEX.get(win_entry.face, 99), a.tile_id, b.tile_id),
+            })
+
+    rank, suit = _parse_face(win_entry.face)
+    if suit in "mps":
+        patterns = []
+        if rank >= 3:
+            patterns.append((f"{rank - 2}{suit}", f"{rank - 1}{suit}"))
+        if 2 <= rank <= 8:
+            patterns.append((f"{rank - 1}{suit}", f"{rank + 1}{suit}"))
+        if rank <= 7:
+            patterns.append((f"{rank + 1}{suit}", f"{rank + 2}{suit}"))
+        for fa, fb in patterns:
+            for a in by_face.get(fa, []):
+                for b in by_face.get(fb, []):
+                    ids = tuple(sorted((a.tile_id, b.tile_id)))
+                    seq = ''.join(sorted((fa, fb, win_entry.face), key=lambda tile: TILE_INDEX.get(tile, 99)))
+                    result.append({
+                        "role": "meld",
+                        "ids": ids,
+                        "orders": tuple(sorted((a.order, b.order))),
+                        "face": win_entry.face,
+                        "kind": "sequence",
+                        "desc": f"面子[顺子 {seq}] <- {_entry_label(a)} / {_entry_label(b)} / 胡牌 {_entry_label(win_entry)}",
+                        "sort_key": (max(a.order, b.order), 2, TILE_INDEX.get(win_entry.face, 99), ids),
+                    })
+
+    result.sort(key=lambda item: item["sort_key"])
+    return result
+
+
+def _plan_summary(plan: dict, deck_map: Dict[int, str]) -> str:
+    return "\n".join([
+        f"换出: {', '.join(f'{_norm(deck_map[t])}(id={t})' for t in plan.get('switch_discards', [])) or '-'}",
+        f"换入: {', '.join(f'{_norm(deck_map[t])}(id={t})' for t in plan.get('switch_in', [])) or '-'}",
+        f"摸牌序列: {', '.join(f'{_norm(deck_map[t])}(id={t})' for t in plan.get('wall_draws', [])) or '-'}",
+        f"最终需打掉的占位牌: {', '.join(f'{_norm(deck_map[t])}(id={t})' for t in plan.get('post_draw_discards', [])) or '-'}",
+        f"听牌: {', '.join(plan.get('waits', [])) or '-'}",
+        f"组合: {' | '.join(plan.get('component_descs', [])) or '-'}",
+    ])
+
+
+def _equivalent_hand13_faces(
+        quad_ids: Sequence[int],
+        prewin_ids: Sequence[int],
+        deck_map: Dict[int, str],
+) -> List[str]:
+    faces: List[str] = []
+    quad_face_cnt = Counter(_norm(deck_map[tile_id]) for tile_id in quad_ids)
+    for face, cnt in quad_face_cnt.items():
+        # 双杠在和牌结构里按刻子计入，只占 3 张等价值。
+        faces.extend([face] * min(cnt, 3))
+    faces.extend(_norm(deck_map[tile_id]) for tile_id in prewin_ids)
+    return faces
+
+
+def _candidate_signature(win_tile_id: int, prewin_ids: Sequence[int]) -> tuple[int, tuple[int, ...]]:
+    return win_tile_id, tuple(sorted(prewin_ids))
+
+
+def _blocked_key(blocked_orders: Set[int]) -> frozenset[int]:
+    return frozenset(blocked_orders)
+
+
+def _latest_nonquad_wall_win_id(
+        prewin_ids: Sequence[int],
+        win_tile_id: int,
+        by_id: Dict[int, PoolEntry],
+) -> int:
+    candidate_ids = [tile_id for tile_id in list(prewin_ids) + [win_tile_id] if by_id[tile_id].source == "wall"]
+    if not candidate_ids:
+        return win_tile_id
+    return max(candidate_ids, key=lambda tile_id: by_id[tile_id].source_index)
+
+
+def _target13_lower_bound(
+        quad_ids: Sequence[int],
+        selected_ids: Sequence[int],
+        win_tile_id: int,
+        by_id: Dict[int, PoolEntry],
+) -> int:
+    all_ids = list(quad_ids) + list(selected_ids) + [win_tile_id]
+    wall_count = sum(1 for tile_id in all_ids if by_id[tile_id].source == "wall")
+    nonwall_count = len(all_ids) - wall_count
+    kong_slot_gain = len(quad_ids) // 4
+    future_wall_need = max(0, wall_count - 1)
+    filler_need = max(0, future_wall_need - kong_slot_gain)
+    return nonwall_count + filler_need
+
+
+def _nonwall_selected_count(
+        quad_ids: Sequence[int],
+        selected_ids: Sequence[int],
+        win_tile_id: int,
+        by_id: Dict[int, PoolEntry],
+) -> int:
+    all_ids = list(quad_ids) + list(selected_ids) + [win_tile_id]
+    return sum(1 for tile_id in all_ids if by_id[tile_id].source != "wall")
+
+
+def _occupied_prefix_count(
+        quad_ids: Sequence[int],
+        selected_ids: Sequence[int],
+        win_tile_id: Optional[int],
+        by_id: Dict[int, PoolEntry],
+        wall_start_order: int,
+) -> int:
+    all_ids = list(quad_ids) + list(selected_ids)
+    if win_tile_id is not None:
+        all_ids.append(win_tile_id)
+    return sum(1 for tile_id in all_ids if by_id[tile_id].order < wall_start_order)
+
+
+def _replacement_used_count(tile_ids: Sequence[int], by_id: Dict[int, PoolEntry]) -> int:
+    return sum(1 for tile_id in tile_ids if by_id[tile_id].source == "replacement")
+
+
+def _hand13_debug_text(faces: Sequence[str]) -> str:
+    return ", ".join(faces) if faces else "-"
+
+
+def _component_is_souzu_only(component: dict) -> bool:
+    return str(component.get("face", "")).endswith("s")
+
+
+def list_reachable_quads_for_switch(
+        deck_map: Dict[int, str],
+        hand_ids: List[int],
+        replacement_ids: List[int],
+        wall_ids: List[int],
+        switch_used_tiles: List[int],
+        total_change_tile_count: int,
+        change_tile_count: int,
+) -> dict:
+    remaining_changes = max(0, int(total_change_tile_count or 0) - int(change_tile_count or 0))
+    used_count = len(switch_used_tiles or [])
+    remaining_replacements = list(replacement_ids[used_count:])
+    pool, by_id = _build_pool(deck_map, hand_ids, remaining_replacements, wall_ids)
+    quads = _enumerate_quads(pool, by_id)
+
+    catalog: List[dict] = []
+    for quad in quads:
+        nonwall_ids = [tile_id for tile_id in quad["ids"] if by_id[tile_id].source != "wall"]
+        target_face_counts = Counter(_norm(deck_map[tile_id]) for tile_id in nonwall_ids)
+        replacement_needed_entries = [by_id[tile_id] for tile_id in nonwall_ids if by_id[tile_id].source == "replacement"]
+        consume_len = max((entry.source_index + 1 for entry in replacement_needed_entries), default=0)
+        consumed_ids = list(remaining_replacements[:consume_len])
+        batches = _build_switch_batches(
+            hand_ids,
+            consumed_ids,
+            target_face_counts,
+            deck_map,
+            remaining_changes,
+            13,
+        )
+        if batches is None:
+            reason = _explain_switch_batch_failure(
+                hand_ids,
+                consumed_ids,
+                target_face_counts,
+                deck_map,
+                remaining_changes,
+                13,
+            ) if consume_len > 0 else "该杠包含牌山牌，换牌阶段无法直接做成"
+            catalog.append({
+                "face": quad["face"],
+                "label": _quad_label(quad["ids"], by_id),
+                "score": _quad_score_text(quad["time_key"]),
+                "switch_batch_sizes": [],
+                "switch_discards": [],
+                "switch_in": [],
+                "reachable": False,
+                "reason": reason,
+            })
+            continue
+
+        switch_discards, switch_in = _materialize_switch_plan(
+            hand_ids,
+            consumed_ids,
+            target_face_counts,
+            deck_map,
+            batches,
+        )
+        catalog.append({
+            "face": quad["face"],
+            "label": _quad_label(quad["ids"], by_id),
+            "score": _quad_score_text(quad["time_key"]),
+            "switch_batch_sizes": batches,
+            "switch_discards": switch_discards,
+            "switch_in": switch_in,
+            "reachable": True,
+            "reason": "",
+        })
+
+    return {
+        "status": "catalog",
+        "reason": "quad-catalog",
+        "quad_catalog": catalog,
+        "remaining_changes": remaining_changes,
+    }
+
+
+def _signature_to_text(signature: tuple[int, tuple[int, ...]]) -> str:
+    win_tile_id, prewin_ids = signature
+    return f"{win_tile_id}|" + ",".join(str(tile_id) for tile_id in prewin_ids)
+
+
+def _evaluate_candidate(
+        deck_map: Dict[int, str],
+        hand_ids: Sequence[int],
+        replacement_ids: Sequence[int],
+        by_id: Dict[int, PoolEntry],
+        quad_ids: Sequence[int],
+        prewin_ids: Sequence[int],
+        win_tile_id: int,
+        component_descs: Sequence[str],
+        remaining_changes: int,
+        per_change_limit: int,
+) -> tuple[Optional[dict], str]:
+    actual_win_tile_id = _latest_nonquad_wall_win_id(prewin_ids, win_tile_id, by_id)
+    actual_prewin_ids = [tile_id for tile_id in prewin_ids if tile_id != actual_win_tile_id]
+    if actual_win_tile_id != win_tile_id:
+        actual_prewin_ids.append(win_tile_id)
+
+    prewin_physical_ids = list(quad_ids) + list(actual_prewin_ids)
+    concealed_hand7 = [_norm(deck_map[tile_id]) for tile_id in actual_prewin_ids]
+    if len(concealed_hand7) != 7:
+        return None, (
+            f"去掉双杠后的待和手牌需要是 7 张，但当前为 {len(concealed_hand7)} 张"
+            f"（物理牌数 {len(prewin_physical_ids)} 张；双杠已移到桌面）"
+        )
+
+    pair_wait_shape_reason = _non_souzu_pair_wait_shape_reason(concealed_hand7)
+    if pair_wait_shape_reason is not None:
+        return None, f"{pair_wait_shape_reason}；去杠后7张={_hand13_debug_text(concealed_hand7)}"
+
+    # Only the opened quads should reduce the remaining copy budget here.
+    # `concealed_hand7` is already counted inside `_waits_for_open_two_melds_faces`.
+    opened_face_cnt = Counter(_norm(deck_map[tile_id]) for tile_id in list(quad_ids))
+    waits = _waits_for_open_two_melds_faces(concealed_hand7, opened_face_cnt)
+    waits = sorted(waits, key=lambda tile: TILE_INDEX[tile])
+    if any(not face.endswith("s") for face in waits):
+        return None, (
+            f"听牌列表含非条子: {','.join(waits)}"
+            f"；去杠后7张={_hand13_debug_text(concealed_hand7)}"
+        )
+
+    win_face = _norm(deck_map[actual_win_tile_id])
+    if win_face not in waits:
+        return None, (
+            f"目标胡牌 {win_face} 不在实际听牌列表中: {','.join(waits) if waits else '-'}"
+            f"；去杠后7张={_hand13_debug_text(concealed_hand7)}"
+        )
+
+    win_entry = by_id[actual_win_tile_id]
+    prewin_wall_entries = sorted(
+        [by_id[tile_id] for tile_id in prewin_physical_ids if by_id[tile_id].source == "wall"],
+        key=lambda entry: entry.source_index,
+    )
+    if any(entry.source_index >= win_entry.source_index for entry in prewin_wall_entries):
+        return None, "胡牌前手牌里含有比目标胡牌更晚的牌山牌，摸牌顺序不可达"
+
+    essential_nonwall_ids = {tile_id for tile_id in prewin_physical_ids if by_id[tile_id].source != "wall"}
+    if len(essential_nonwall_ids) > 13:
+        return None, (
+            f"这套方案不成立：换牌结束、开始摸牌前，手里必须先留下 {len(essential_nonwall_ids)} 张"
+            "不是从牌山摸来的牌，但那时手牌上限只有 13 张"
+        )
+    kong_slot_gain = len(quad_ids) // 4
+    filler_need = max(0, len(prewin_wall_entries) - kong_slot_gain)
+    filler_ids = _select_initial_fillers(hand_ids, essential_nonwall_ids, filler_need, deck_map)
+    if filler_ids is None:
+        return None, (
+            f"初始 13 张里没有足够占位牌承接未来牌山牌"
+            f"（牌山预摸 {len(prewin_wall_entries)} 张，双杠可腾位 {kong_slot_gain} 张）"
+        )
+
+    switch_target_ids = list(essential_nonwall_ids) + filler_ids
+    if len(switch_target_ids) != 13:
+        return None, (
+            f"换牌终局目标张数异常: {len(switch_target_ids)} 张"
+            f"（非牌山牌 {len(essential_nonwall_ids)} 张，占位牌 {len(filler_ids)} 张，"
+            f"双杠腾位 {kong_slot_gain} 张）"
+        )
+    target_face_counts = Counter(_norm(deck_map[tile_id]) for tile_id in essential_nonwall_ids)
+    needed_replacement_entries = [
+        by_id[tile_id] for tile_id in switch_target_ids if by_id[tile_id].source == "replacement"
+    ]
+    consume_len = max((entry.source_index + 1 for entry in needed_replacement_entries), default=0)
+    consumed_ids = list(replacement_ids[:consume_len])
+    max_consumable = _max_consumable_replacements(
+        consumed_ids,
+        target_face_counts,
+        deck_map,
+        remaining_changes,
+        per_change_limit,
+    )
+    if max_consumable < consume_len:
+        return None, (
+            f"换牌可达性上界不足：剩余 {remaining_changes} 次换牌里，按当前最终目标最多只能顺序吃入 {max_consumable} 张换牌牌，"
+            f"但这套方案需要吃入前 {consume_len} 张"
+        )
+    batches = _build_switch_batches(
+        hand_ids,
+        consumed_ids,
+        target_face_counts,
+        deck_map,
+        remaining_changes,
+        per_change_limit,
+    )
+    if batches is None:
+        detail = _explain_switch_batch_failure(
+            hand_ids,
+            consumed_ids,
+            target_face_counts,
+            deck_map,
+            remaining_changes,
+            per_change_limit,
+        )
+        return None, f"换牌可达性验证失败: {detail}"
+
+    switch_discards, switch_in = _materialize_switch_plan(
+        hand_ids,
+        consumed_ids,
+        target_face_counts,
+        deck_map,
+        batches,
+    )
+    final8_faces = list(concealed_hand7) + [win_face]
+    if not _is_open_two_melds_pair_win(final8_faces):
+        return None, "去掉双杠后的 8 张余牌本身不是和牌"
+
+    ordered_wall_draws = [
+        entry.tile_id
+        for entry in sorted(
+            {
+                by_id[tile_id]
+                for tile_id in list(quad_ids) + list(actual_prewin_ids) + [actual_win_tile_id]
+                if by_id[tile_id].source == "wall"
+            },
+            key=lambda entry: entry.source_index,
+        )
+    ]
+
+    return {
+        "status": "plan",
+        "mode": "quad-first-dfs",
+        "draws_needed": win_entry.source_index + 1,
+        "switch_discards": switch_discards,
+        "switch_in": switch_in,
+        "switch_batch_sizes": batches,
+        "wall_draws": ordered_wall_draws,
+        "post_draw_discards": filler_ids,
+        "waits": waits,
+        "quad_faces": [],
+        "target13": concealed_hand7,
+        "remaining_changes": remaining_changes,
+        "win_tile_faces": [win_face],
+        "win_tile_draw_index": win_entry.source_index + 1,
+        "component_descs": list(component_descs),
+        "retargeted_win_tile_id": actual_win_tile_id if actual_win_tile_id != win_tile_id else None,
+    }, "ok"
+
+
+def _search_remaining_plan(
+        pool: Sequence[PoolEntry],
+        by_id: Dict[int, PoolEntry],
+        quad_pair: dict,
+        deck_map: Dict[int, str],
+        hand_ids: Sequence[int],
+        replacement_ids: Sequence[int],
+        remaining_changes: int,
+        per_change_limit: int,
+        stats: dict,
+        emit_progress: Callable[[str], None],
+        emit_candidate: Optional[Callable[[dict], None]],
+        timed_out: Callable[[], bool],
+        best_draws_limit: Optional[int] = None,
+        stop_after_first: bool = False,
+        skip_signatures: Optional[Set[str]] = None,
+) -> Optional[dict]:
+    quad_orders = {by_id[tile_id].order for tile_id in quad_pair["quad_ids"]}
+    seen_candidate_signatures: Set[tuple[int, tuple[int, ...]]] = set()
+    pair_cache: Dict[tuple[frozenset[int], bool], List[dict]] = {}
+    meld_cache: Dict[tuple[frozenset[int], bool], List[dict]] = {}
+    win_component_cache: Dict[tuple[int, frozenset[int], bool], List[dict]] = {}
+    best_plan: Optional[dict] = None
+    local_best_draws = best_draws_limit
+    wall_start_order = len(hand_ids) + len(replacement_ids)
+
+    def get_pairs(blocked_orders: Set[int], *, allow_replacement: bool, min_order: int) -> List[dict]:
+        key = (_blocked_key(blocked_orders), allow_replacement, min_order)
+        cached = pair_cache.get(key)
+        if cached is not None:
+            stats["state_cache_hits"] += 1
+            return cached
+        built = _pair_components(pool, blocked_orders, allow_replacement=allow_replacement, min_order=min_order)
+        pair_cache[key] = built
+        return built
+
+    def get_melds(blocked_orders: Set[int], *, allow_replacement: bool, min_order: int) -> List[dict]:
+        key = (_blocked_key(blocked_orders), allow_replacement, min_order)
+        cached = meld_cache.get(key)
+        if cached is not None:
+            stats["state_cache_hits"] += 1
+            return cached
+        built = _meld_components(pool, blocked_orders, allow_replacement=allow_replacement, min_order=min_order)
+        meld_cache[key] = built
+        return built
+
+    def get_win_components(win_entry: PoolEntry, blocked_orders: Set[int], *, allow_replacement: bool, min_order: int) -> List[dict]:
+        key = (win_entry.tile_id, _blocked_key(blocked_orders), allow_replacement, min_order)
+        cached = win_component_cache.get(key)
+        if cached is not None:
+            stats["state_cache_hits"] += 1
+            return cached
+        built = _win_components_for_wall_tile(
+            win_entry,
+            pool,
+            blocked_orders,
+            allow_replacement=allow_replacement,
+            min_order=min_order,
+        )
+        win_component_cache[key] = built
+        return built
+
+    win_candidates = [
+        entry for entry in pool
+        if entry.source == "wall" and entry.order not in quad_orders and entry.face.endswith("s")
+    ]
+
+    emit_progress(
+        "开始搜索目标 14 张\n"
+        "说明: 固定双杠 8 张后，搜索其余 6 张；其中最后 1 张必须来自牌山\n"
+        f"当前双杠: {_quad_label(quad_pair['quad_ids'][:4], by_id)} | {_quad_label(quad_pair['quad_ids'][4:], by_id)}",
+        force=True,
+    )
+
+    skip_signatures = skip_signatures or set()
+
+    for win_entry_index, win_entry in enumerate(win_candidates, start=1):
+        if timed_out():
+            return best_plan
+        draw_index = win_entry.source_index + 1
+        if local_best_draws is not None and draw_index > local_best_draws:
+            stats["speed_prunes"] += len(win_candidates) - win_entry_index + 1
+            break
+        stats["branch_attempts"] += 1
+        stats["node_total"] = len(win_candidates)
+        stats["node_index"] = win_entry_index
+        stats["node_searchable"] = len(pool) - len(quad_orders)
+        stats["latest_result"] = f"尝试胡牌张 {win_entry.face}(牌山#{win_entry.source_index + 1})"
+        emit_progress(
+            "正在尝试目标胡牌张\n"
+            f"搜索次数: {stats['branch_attempts']}\n"
+            f"当前节点类型: 胡牌张候选\n"
+            f"胡牌张: {_entry_label(win_entry)}\n"
+            f"当前双杠1: {_quad_label(quad_pair['quad_ids'][:4], by_id)}\n"
+            f"当前双杠2: {_quad_label(quad_pair['quad_ids'][4:], by_id)}",
+            force=True,
+        )
+
+        allow_replacement_after_quad = _replacement_used_count(quad_pair["quad_ids"], by_id) <= 13
+        min_order_after_quad = wall_start_order if _occupied_prefix_count(
+            quad_pair["quad_ids"], [], None, by_id, wall_start_order
+        ) > 13 else 0
+        win_components = get_win_components(
+            win_entry,
+            quad_orders,
+            allow_replacement=allow_replacement_after_quad,
+            min_order=min_order_after_quad,
+        )
+        for win_component_index, win_component in enumerate(win_components, start=1):
+            if timed_out():
+                return best_plan
+            if win_component.get("kind") == "triplet" and not str(win_component.get("face", "")).endswith("s"):
+                continue
+            blocked = set(quad_orders)
+            blocked.add(win_entry.order)
+            blocked.update(by_id[tile_id].order for tile_id in win_component["ids"])
+            if _target13_lower_bound(quad_pair["quad_ids"], win_component["ids"], win_entry.tile_id, by_id) > 13:
+                stats["target13_prunes"] += 1
+                continue
+            stats["dfs_nodes"] += 1
+            stats["node_total"] = len(win_components)
+            stats["node_index"] = win_component_index
+            stats["node_searchable"] = len(pool) - len(blocked)
+
+            emit_progress(
+                "正在扩展胡牌组合\n"
+                f"搜索次数: {stats['branch_attempts']}\n"
+                f"当前节点类型: 胡牌组合候选\n"
+                f"胡牌张: {_entry_label(win_entry)}\n"
+                f"已定组合: {win_component['desc']}",
+                force=True,
+            )
+
+            if win_component["role"] == "pair":
+                allow_replacement_after_win = _replacement_used_count(
+                    list(quad_pair["quad_ids"]) + list(win_component["ids"]),
+                    by_id,
+                ) <= 13
+                min_order_after_win = wall_start_order if _occupied_prefix_count(
+                    quad_pair["quad_ids"], list(win_component["ids"]), win_entry.tile_id, by_id, wall_start_order
+                ) > 13 else 0
+                melds = get_melds(blocked, allow_replacement=allow_replacement_after_win, min_order=min_order_after_win)
+                for meld1_index, meld1 in enumerate(melds, start=1):
+                    if meld1.get("kind") == "triplet" and not str(meld1.get("face", "")).endswith("s"):
+                        continue
+                    blocked1 = blocked | {by_id[tile_id].order for tile_id in meld1["ids"]}
+                    if _target13_lower_bound(
+                            quad_pair["quad_ids"],
+                            list(win_component["ids"]) + list(meld1["ids"]),
+                            win_entry.tile_id,
+                            by_id,
+                    ) > 13:
+                        stats["target13_prunes"] += 1
+                        continue
+                    allow_replacement_after_meld1 = _replacement_used_count(
+                        list(quad_pair["quad_ids"]) + list(win_component["ids"]) + list(meld1["ids"]),
+                        by_id,
+                    ) <= 13
+                    min_order_after_meld1 = wall_start_order if _occupied_prefix_count(
+                        quad_pair["quad_ids"],
+                        list(win_component["ids"]) + list(meld1["ids"]),
+                        win_entry.tile_id,
+                        by_id,
+                        wall_start_order,
+                    ) > 13 else 0
+                    meld2_list = get_melds(
+                        blocked1,
+                        allow_replacement=allow_replacement_after_meld1,
+                        min_order=min_order_after_meld1,
+                    )
+                    stats["node_total"] = len(melds)
+                    stats["node_index"] = meld1_index
+                    stats["node_searchable"] = len(pool) - len(blocked1)
+                    for meld2_index, meld2 in enumerate(meld2_list, start=1):
+                        if timed_out():
+                            return best_plan
+                        if not _component_is_souzu_only(meld2):
+                            stats["last_node_souzu_prunes"] += 1
+                            continue
+                        if meld2.get("kind") == "triplet" and not str(meld2.get("face", "")).endswith("s"):
+                            continue
+                        stats["node_total"] = len(meld2_list)
+                        stats["node_index"] = meld2_index
+                        stats["node_searchable"] = len(pool) - len(blocked1 | {by_id[tile_id].order for tile_id in meld2["ids"]})
+                        component_descs = [win_component["desc"], meld1["desc"], meld2["desc"]]
+                        prewin_ids = list(win_component["ids"]) + list(meld1["ids"]) + list(meld2["ids"])
+                        if _occupied_prefix_count(
+                                quad_pair["quad_ids"],
+                                prewin_ids,
+                                win_entry.tile_id,
+                                by_id,
+                                wall_start_order,
+                        ) > 13:
+                            stats["nonwall_prunes"] += 1
+                            continue
+                        signature = _candidate_signature(win_entry.tile_id, prewin_ids)
+                        signature_text = _signature_to_text(signature)
+                        if signature_text in skip_signatures:
+                            stats["duplicate_prunes"] += 1
+                            continue
+                        if signature in seen_candidate_signatures:
+                            stats["duplicate_prunes"] += 1
+                            continue
+                        seen_candidate_signatures.add(signature)
+                        emit_progress(
+                            "开始验证目标 14 张方案\n"
+                            f"搜索次数: {stats['branch_attempts']}\n"
+                            f"当前节点类型: 双面子验证\n"
+                            f"当前双杠1: {_quad_label(quad_pair['quad_ids'][:4], by_id)}\n"
+                            f"当前双杠2: {_quad_label(quad_pair['quad_ids'][4:], by_id)}\n"
+                            f"当前组合: {_component_text(component_descs)}",
+                            force=True,
+                        )
+                        plan, reason = _evaluate_candidate(
+                            deck_map,
+                            hand_ids,
+                            replacement_ids,
+                            by_id,
+                            quad_pair["quad_ids"],
+                            prewin_ids,
+                            win_entry.tile_id,
+                            component_descs,
+                            remaining_changes,
+                            per_change_limit,
+                        )
+                        stats["reachability_checks"] += 1
+                        if plan is not None:
+                            plan["quad_faces"] = list(quad_pair["faces"])
+                            plan["plan_signature"] = signature_text
+                            stats["candidate_hands"] += 1
+                            if stop_after_first:
+                                if emit_candidate is not None:
+                                    emit_candidate(plan)
+                                emit_progress("方案验证成功\n" + _plan_summary(plan, deck_map), force=True)
+                                return plan
+                            if best_plan is None or plan["draws_needed"] < best_plan["draws_needed"]:
+                                best_plan = plan
+                                local_best_draws = plan["draws_needed"]
+                                stats["latest_result"] = f"已找到更快方案: waits={','.join(plan['waits'])}"
+                                if emit_candidate is not None:
+                                    emit_candidate(plan)
+                                emit_progress("方案验证成功\n" + _plan_summary(plan, deck_map), force=True)
+                            continue
+                        if reason.startswith("换牌可达性上界不足"):
+                            stats["reachability_upper_prunes"] += 1
+                        stats["latest_result"] = f"最近失败: {reason}"
+                        emit_progress(
+                            "方案验证失败\n"
+                            f"当前双杠1: {_quad_label(quad_pair['quad_ids'][:4], by_id)}\n"
+                            f"当前双杠2: {_quad_label(quad_pair['quad_ids'][4:], by_id)}\n"
+                            f"当前组合: {_component_text(component_descs)}\n"
+                            f"失败原因: {reason}",
+                            force=True,
+                        )
+            else:
+                allow_replacement_after_win = _replacement_used_count(
+                    list(quad_pair["quad_ids"]) + list(win_component["ids"]),
+                    by_id,
+                ) <= 13
+                min_order_after_win = wall_start_order if _occupied_prefix_count(
+                    quad_pair["quad_ids"], list(win_component["ids"]), win_entry.tile_id, by_id, wall_start_order
+                ) > 13 else 0
+                pairs = get_pairs(blocked, allow_replacement=allow_replacement_after_win, min_order=min_order_after_win)
+                melds = get_melds(blocked, allow_replacement=allow_replacement_after_win, min_order=min_order_after_win)
+                for pair_index, pair in enumerate(pairs, start=1):
+                    if not str(pair.get("face", "")).endswith("s"):
+                        continue
+                    blocked1 = blocked | {by_id[tile_id].order for tile_id in pair["ids"]}
+                    if _target13_lower_bound(
+                            quad_pair["quad_ids"],
+                            list(pair["ids"]) + list(win_component["ids"]),
+                            win_entry.tile_id,
+                            by_id,
+                    ) > 13:
+                        stats["target13_prunes"] += 1
+                        continue
+                    stats["node_total"] = len(pairs)
+                    stats["node_index"] = pair_index
+                    stats["node_searchable"] = len(pool) - len(blocked1)
+                    for meld_index, meld in enumerate(melds, start=1):
+                        if not _component_is_souzu_only(meld):
+                            stats["last_node_souzu_prunes"] += 1
+                            continue
+                        if meld.get("kind") == "triplet" and not str(meld.get("face", "")).endswith("s"):
+                            continue
+                        meld_orders = {by_id[tile_id].order for tile_id in meld["ids"]}
+                        if blocked1 & meld_orders:
+                            continue
+                        if timed_out():
+                            return best_plan
+                        stats["node_total"] = len(melds)
+                        stats["node_index"] = meld_index
+                        stats["node_searchable"] = len(pool) - len(blocked1 | meld_orders)
+                        component_descs = [pair["desc"], win_component["desc"], meld["desc"]]
+                        prewin_ids = list(pair["ids"]) + list(win_component["ids"]) + list(meld["ids"])
+                        if _occupied_prefix_count(
+                                quad_pair["quad_ids"],
+                                prewin_ids,
+                                win_entry.tile_id,
+                                by_id,
+                                wall_start_order,
+                        ) > 13:
+                            stats["nonwall_prunes"] += 1
+                            continue
+                        signature = _candidate_signature(win_entry.tile_id, prewin_ids)
+                        signature_text = _signature_to_text(signature)
+                        if signature_text in skip_signatures:
+                            stats["duplicate_prunes"] += 1
+                            continue
+                        if signature in seen_candidate_signatures:
+                            stats["duplicate_prunes"] += 1
+                            continue
+                        seen_candidate_signatures.add(signature)
+                        emit_progress(
+                            "开始验证目标 14 张方案\n"
+                            f"搜索次数: {stats['branch_attempts']}\n"
+                            f"当前节点类型: 雀头+面子验证\n"
+                            f"当前双杠1: {_quad_label(quad_pair['quad_ids'][:4], by_id)}\n"
+                            f"当前双杠2: {_quad_label(quad_pair['quad_ids'][4:], by_id)}\n"
+                            f"当前组合: {_component_text(component_descs)}",
+                            force=True,
+                        )
+                        plan, reason = _evaluate_candidate(
+                            deck_map,
+                            hand_ids,
+                            replacement_ids,
+                            by_id,
+                            quad_pair["quad_ids"],
+                            prewin_ids,
+                            win_entry.tile_id,
+                            component_descs,
+                            remaining_changes,
+                            per_change_limit,
+                        )
+                        stats["reachability_checks"] += 1
+                        if plan is not None:
+                            plan["quad_faces"] = list(quad_pair["faces"])
+                            plan["plan_signature"] = signature_text
+                            stats["candidate_hands"] += 1
+                            if stop_after_first:
+                                if emit_candidate is not None:
+                                    emit_candidate(plan)
+                                emit_progress("方案验证成功\n" + _plan_summary(plan, deck_map), force=True)
+                                return plan
+                            if best_plan is None or plan["draws_needed"] < best_plan["draws_needed"]:
+                                best_plan = plan
+                                local_best_draws = plan["draws_needed"]
+                                stats["latest_result"] = f"已找到更快方案: waits={','.join(plan['waits'])}"
+                                if emit_candidate is not None:
+                                    emit_candidate(plan)
+                                emit_progress("方案验证成功\n" + _plan_summary(plan, deck_map), force=True)
+                            continue
+                        if reason.startswith("换牌可达性上界不足"):
+                            stats["reachability_upper_prunes"] += 1
+                        stats["latest_result"] = f"最近失败: {reason}"
+                        emit_progress(
+                            "方案验证失败\n"
+                            f"当前双杠1: {_quad_label(quad_pair['quad_ids'][:4], by_id)}\n"
+                            f"当前双杠2: {_quad_label(quad_pair['quad_ids'][4:], by_id)}\n"
+                            f"当前组合: {_component_text(component_descs)}\n"
+                            f"失败原因: {reason}",
+                            force=True,
+                        )
+    return best_plan
+
+
+def recommend_souzu_tenpai_switch(
+        deck_map: Dict[int, str],
+        hand_ids: List[int],
+        replacement_ids: List[int],
+        wall_ids: List[int],
+        switch_used_tiles: List[int],
+        total_change_tile_count: int,
+        change_tile_count: int,
+        progress_cb: Optional[Callable[[str], None]] = None,
+        candidate_cb: Optional[Callable[[dict], None]] = None,
+        should_stop: Optional[Callable[[], bool]] = None,
+        stop_after_first: bool = False,
+        skip_signatures: Optional[Set[str]] = None,
+) -> dict:
+    started_at = time.monotonic()
+    remaining_changes = max(0, int(total_change_tile_count or 0) - int(change_tile_count or 0))
+    per_change_limit = 13
+    used_count = len(switch_used_tiles or [])
+    remaining_replacements = list(replacement_ids[used_count:])
+
+    stats = {
+        "quads": 0,
+        "quad_pairs": 0,
+        "current_quad_pair": 0,
+        "dfs_nodes": 0,
+        "branch_attempts": 0,
+        "candidate_hands": 0,
+        "reachability_checks": 0,
+        "latest_result": "尚无结果",
+        "node_total": 0,
+        "node_index": 0,
+        "node_searchable": 0,
+        "duplicate_prunes": 0,
+        "state_cache_hits": 0,
+        "target13_prunes": 0,
+        "nonwall_prunes": 0,
+        "reachability_upper_prunes": 0,
+        "speed_prunes": 0,
+        "last_node_souzu_prunes": 0,
+    }
+
+    def stop_requested() -> bool:
+        return bool(should_stop and should_stop())
+
+    def emit_progress(text: str, *, force: bool = False) -> None:
+        if progress_cb is None:
+            return
+        elapsed = max(time.monotonic() - started_at, 1e-6)
+        speed = stats["reachability_checks"] / elapsed
+        progress_cb(
+            "\n".join([
+                text,
+                f"已耗时: {elapsed:.1f}s",
+                f"剩余换牌次数: {remaining_changes}",
+                f"已完成搜索次数: {stats['reachability_checks']}",
+                f"搜索速度: {speed:.1f} 次/秒",
+                f"可成杠数量: {stats['quads']}",
+                f"双杠候选数: {stats['quad_pairs']}",
+                f"当前双杠序号: {stats['current_quad_pair']}",
+                f"目标14搜索节点: {stats['dfs_nodes']}",
+                f"分支搜索次数: {stats['branch_attempts']}",
+                f"当前节点可搜牌数: {stats['node_searchable']}",
+                f"当前节点进度: {stats['node_index']} / {stats['node_total']}",
+                f"已找到候选方案: {stats['candidate_hands']}",
+                f"重复分支剪枝: {stats['duplicate_prunes']}",
+                f"状态缓存命中: {stats['state_cache_hits']}",
+                f"目标13下界剪枝: {stats['target13_prunes']}",
+                f"非牌山超限剪枝: {stats['nonwall_prunes']}",
+                f"吞牌上界剪枝: {stats['reachability_upper_prunes']}",
+                f"速度劣化剪枝: {stats['speed_prunes']}",
+                f"最后节点非条剪枝: {stats['last_node_souzu_prunes']}",
+                f"换牌可达性校验: {stats['reachability_checks']}",
+                f"当前最新结果: {stats['latest_result']}",
+            ])
+        )
+
+    if len(hand_ids) != 13:
+        return {"status": "impossible", "reason": "switch-hand-must-be-13"}
+    if len(wall_ids) < 1:
+        return {"status": "impossible", "reason": "wall-less-than-two-draws"}
+
+    emit_progress("正在准备搜索\n当前阶段: 构建牌池", force=True)
+    pool, by_id = _build_pool(deck_map, hand_ids, remaining_replacements, wall_ids)
+    quads = _enumerate_quads(pool, by_id)
+    quad_pairs = _enumerate_quad_pairs(quads)
+    stats["quads"] = len(quads)
+    stats["quad_pairs"] = len(quad_pairs)
+
+    emit_progress("正在搜索双杠组合", force=True)
+    if quads:
+        quad_lines = [
+            f"{idx}. {_quad_label(quad['ids'], by_id)} | 速度评分: {_quad_score_text(quad['time_key'])}"
+            for idx, quad in enumerate(quads, start=1)
+        ]
+        emit_progress("杠搜索完成，所有可成杠如下\n" + "\n".join(quad_lines), force=True)
+
+    if not quad_pairs:
+        return {"status": "impossible", "reason": "cannot-form-two-quads", "remaining_changes": remaining_changes}
+
+    best_plan: Optional[dict] = None
+    best_draws_limit: Optional[int] = None
+    for quad_index, quad_pair in enumerate(quad_pairs, start=1):
+        if stop_requested():
+            return {"status": "impossible", "reason": "stopped-by-user", "remaining_changes": remaining_changes}
+        stats["current_quad_pair"] = quad_index
+        stats["latest_result"] = f"正在验证双杠 {quad_index}/{len(quad_pairs)}"
+        emit_progress(
+            "正在验证双杠组合\n"
+            f"双杠评分: {quad_pair['pair_score']}\n"
+            f"一杠: {_quad_label(quad_pair['quad_ids'][:4], by_id)}\n"
+            f"二杠: {_quad_label(quad_pair['quad_ids'][4:], by_id)}",
+            force=True,
+        )
+        plan = _search_remaining_plan(
+            pool,
+            by_id,
+            quad_pair,
+            deck_map,
+            hand_ids,
+            remaining_replacements,
+            remaining_changes,
+            per_change_limit,
+            stats,
+            emit_progress,
+            candidate_cb,
+            stop_requested,
+            best_draws_limit,
+            stop_after_first,
+            skip_signatures,
+        )
+        if plan is not None:
+            plan["quad_faces"] = list(quad_pair["faces"])
+            if best_plan is None or plan["draws_needed"] < best_plan["draws_needed"]:
+                best_plan = plan
+                best_draws_limit = plan["draws_needed"]
+                stats["latest_result"] = f"已更新当前最快方案: 需要摸 {best_draws_limit}"
+                emit_progress("已更新当前最快方案", force=True)
+                if best_draws_limit <= 1:
+                    return best_plan
+            if stop_after_first:
+                return best_plan
+
+    if stop_requested():
+        return {"status": "impossible", "reason": "stopped-by-user", "remaining_changes": remaining_changes}
+    if best_plan is not None:
+        return best_plan
+    return {"status": "impossible", "reason": "no-reliable-plan-found", "remaining_changes": remaining_changes}
