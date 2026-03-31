@@ -3,6 +3,7 @@ use std::{
   io::{BufRead, BufReader},
   path::{Path, PathBuf},
   process::{Child, Command, Stdio},
+  time::{Duration, Instant},
   sync::{Arc, Mutex},
   thread,
 };
@@ -11,7 +12,19 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
+use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+
+const LOG_BATCH_MAX_LINES: usize = 64;
+const LOG_BATCH_MAX_BYTES: usize = 64 * 1024;
+const LOG_CHUNK_MAX_BYTES: usize = 16 * 1024;
+
+#[derive(Clone, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum LogPayload {
+  Lines { lines: Vec<String> },
+  Chunk { id: u64, index: usize, total: usize, text: String },
+}
 
 #[derive(Default)]
 struct BackendProcState {
@@ -27,6 +40,31 @@ struct GateState {
 
 struct SharedGate(pub Arc<GateState>);
 
+fn split_utf8_chunks(s: &str, max_bytes: usize) -> Vec<String> {
+  if s.len() <= max_bytes {
+    return vec![s.to_string()];
+  }
+
+  let mut chunks = Vec::new();
+  let mut start = 0;
+  while start < s.len() {
+    let mut end = (start + max_bytes).min(s.len());
+    while end > start && !s.is_char_boundary(end) {
+      end -= 1;
+    }
+    if end == start {
+      end = s[start..]
+        .char_indices()
+        .nth(1)
+        .map(|(i, _)| start + i)
+        .unwrap_or(s.len());
+    }
+    chunks.push(s[start..end].to_string());
+    start = end;
+  }
+  chunks
+}
+
 fn maybe_switch(app: &AppHandle, gate: &GateState) {
   if gate.switched.load(Ordering::SeqCst) { return; }
   if gate.backend_ready.load(Ordering::SeqCst) && gate.frontend_ready.load(Ordering::SeqCst) {
@@ -39,6 +77,68 @@ fn maybe_switch(app: &AppHandle, gate: &GateState) {
       }
     }
   }
+}
+
+fn spawn_log_pump(
+  app: AppHandle,
+  event_name: &'static str,
+  ready_gate: Option<Arc<GateState>>,
+  reader: impl std::io::Read + Send + 'static,
+) {
+  thread::spawn(move || {
+    let reader = BufReader::new(reader);
+    let mut batch: Vec<String> = Vec::new();
+    let mut batch_bytes = 0usize;
+    let mut last_flush = Instant::now();
+    let mut chunk_id = 0u64;
+
+    let flush = |app: &AppHandle, batch: &mut Vec<String>, batch_bytes: &mut usize, last_flush: &mut Instant| {
+      if batch.is_empty() {
+        return;
+      }
+      let payload = LogPayload::Lines {
+        lines: std::mem::take(batch),
+      };
+      let _ = app.emit(event_name, payload);
+      *batch_bytes = 0;
+      *last_flush = Instant::now();
+    };
+
+    for line in reader.lines().flatten() {
+      if line.contains("SL_BACKEND_READY") {
+        if let Some(gate2) = ready_gate.as_ref() {
+          gate2.backend_ready.store(true, Ordering::SeqCst);
+          maybe_switch(&app, gate2);
+        }
+        let _ = app.emit("backend:ready", line.clone());
+      }
+
+      if line.len() > LOG_CHUNK_MAX_BYTES {
+        flush(&app, &mut batch, &mut batch_bytes, &mut last_flush);
+        let parts = split_utf8_chunks(&line, LOG_CHUNK_MAX_BYTES);
+        let total = parts.len();
+        chunk_id = chunk_id.wrapping_add(1);
+        for (index, text) in parts.into_iter().enumerate() {
+          let payload = LogPayload::Chunk { id: chunk_id, index, total, text };
+          let _ = app.emit(event_name, payload);
+        }
+        continue;
+      }
+
+      batch_bytes += line.len();
+      batch.push(line);
+
+      let should_flush =
+        batch.len() >= LOG_BATCH_MAX_LINES ||
+        batch_bytes >= LOG_BATCH_MAX_BYTES ||
+        last_flush.elapsed() >= Duration::from_millis(50);
+      if should_flush {
+        flush(&app, &mut batch, &mut batch_bytes, &mut last_flush);
+      }
+    }
+
+    flush(&app, &mut batch, &mut batch_bytes, &mut last_flush);
+  });
 }
 
 struct BackendState(pub Arc<Mutex<BackendProcState>>);
@@ -87,6 +187,7 @@ fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Resul
   }
 
   let exe = resolve_backend_path(&app).ok_or_else(|| "backend exe not found".to_string())?;
+  let gate = app.state::<SharedGate>().0.clone();
 
   let mut cmd = Command::new(&exe);
   cmd.args([
@@ -107,21 +208,12 @@ fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Resul
 
   if let Some(out) = child.stdout.take() {
     let app2 = app.clone();
-    thread::spawn(move || {
-      let reader = BufReader::new(out);
-      for line in reader.lines().flatten() {
-        let _ = app2.emit("backend:stdout", line);
-      }
-    });
+    let gate2 = gate.clone();
+    spawn_log_pump(app2, "backend:stdout", Some(gate2), out);
   }
   if let Some(err) = child.stderr.take() {
     let app2 = app.clone();
-    thread::spawn(move || {
-      let reader = BufReader::new(err);
-      for line in reader.lines().flatten() {
-        let _ = app2.emit("backend:stderr", line);
-      }
-    });
+    spawn_log_pump(app2, "backend:stderr", None, err);
   }
 
   {
@@ -129,7 +221,7 @@ fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Resul
     g.child = Some(child);
   }
 
-  let _ = app.emit("backend:ready", "spawn ok");
+  let _ = app.emit("backend:spawn", format!("spawned: {}", exe.display()));
   Ok(format!("spawned: {}", exe.display()))
 }
 
@@ -196,18 +288,12 @@ pub fn run() {
       #[cfg(debug_assertions)]
       {
         if force_autostart {
-          if start_backend_with(ah.clone(), st.clone()).is_ok() {
-            gate.backend_ready.store(true, Ordering::SeqCst);
-            maybe_switch(&ah, &gate);
-          }
+          let _ = start_backend_with(ah.clone(), st.clone());
         }
       }
       #[cfg(not(debug_assertions))]
       {
-        if start_backend_with(ah.clone(), st.clone()).is_ok() {
-          gate.backend_ready.store(true, Ordering::SeqCst);
-          maybe_switch(&ah, &gate);
-        }
+        let _ = start_backend_with(ah.clone(), st.clone());
       }
 
       if let Some(win) = app.get_webview_window("main") {
@@ -224,7 +310,7 @@ pub fn run() {
         let ah2 = ah.clone();
         let gate2 = gate.clone();
         tauri::async_runtime::spawn(async move {
-          std::thread::sleep(std::time::Duration::from_secs(5));
+          std::thread::sleep(std::time::Duration::from_secs(20));
           if !gate2.switched.load(Ordering::SeqCst) {
             if let Some(s) = ah2.get_webview_window("splash") { let _ = s.close(); }
             if let Some(m) = ah2.get_webview_window("main") {
@@ -232,8 +318,6 @@ pub fn run() {
               let _ = m.set_focus();
             }
             gate2.switched.store(true, Ordering::SeqCst);
-            gate2.backend_ready.store(true, Ordering::SeqCst);
-            gate2.frontend_ready.store(true, Ordering::SeqCst);
           }
         });
       }

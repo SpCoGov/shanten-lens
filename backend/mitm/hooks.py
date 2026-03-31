@@ -112,13 +112,10 @@ async def _broadcast_switch_recommendation(
             "progress": "正在准备搜索…",
         })],
     })
-    logger.debug("souzu_switch search start")
 
     latest_progress = {"text": "正在准备搜索…", "candidate": None, "candidate_version": 0}
 
     latest_progress["candidate"] = dict(search_params)
-    progress_log_state = {"count": 0, "truncated": False}
-
     async def _flush_progress(force: bool = False) -> None:
         send_state["flush_queued"] = False
         if send_state["finished"]:
@@ -184,12 +181,6 @@ async def _broadcast_switch_recommendation(
             return
         latest_progress["text"] = message
         _request_flush()
-        progress_log_state["count"] += 1
-        if progress_log_state["count"] <= 100:
-            logger.debug("souzu_switch progress\n{}", message)
-        elif not progress_log_state["truncated"]:
-            progress_log_state["truncated"] = True
-            logger.debug("souzu_switch progress log truncated after 100 entries")
 
     def candidate_cb(plan: dict) -> None:
         if send_state["finished"]:
@@ -250,7 +241,6 @@ async def _broadcast_switch_recommendation(
         plan = {**search_params, **plan}
     send_state["finished"] = True
     send_state["flush_queued"] = False
-    logger.debug("souzu_switch result: {}", plan)
     await broadcast({
         "type": "discard_recommendation",
         "data": [_wrap_entry("souzu_switch", plan)],
@@ -305,7 +295,6 @@ async def stop_switch_recommendation_search(*, notify_client: bool = True) -> No
     _SWITCH_RECOMMENDATION_SEQ += 1
     _SWITCH_STOP_EVENT.set()
     _SWITCH_SEARCH_TASK = None
-    logger.debug("souzu_switch stop requested")
     if notify_client:
         await broadcast({
             "type": "discard_recommendation",

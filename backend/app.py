@@ -78,11 +78,11 @@ def setup_logging():
 
     logger.remove()
 
-    stdout_level = "DEBUG" if MANAGER.get("general.debug", False) else "INFO"
+    # stdout_level = "DEBUG" if MANAGER.get("general.debug", False) else "INFO"
 
     logger.add(
         sys.stdout,
-        level=stdout_level,
+        level="INFO",
         backtrace=True,
         diagnose=False,
         enqueue=True,
@@ -190,6 +190,7 @@ _UI_TASK_FUT = None
 
 
 def start_ui_services(host: str = "127.0.0.1", ws_port: int = 8787) -> None:
+
     if not mark_ui_services_started():
         return
     loop = start_ui_loop_once()

@@ -40,6 +40,18 @@ import {t} from "i18next";
 import {openMsgBoxWindow} from "./lib/msgbox";
 import type {PlanData} from "./lib/planTypes";
 
+type BackendLogPayload =
+    | string
+    | string[]
+    | {
+    kind?: "lines" | "chunk";
+    lines?: string[];
+    id?: number;
+    index?: number;
+    total?: number;
+    text?: string;
+};
+
 const settingsUrl = import.meta.env.DEV
     ? `${location.origin}/settings.html`
     : 'settings.html';
@@ -326,12 +338,50 @@ export default function App() {
         });
 
         const addLog = useLogStore.getState().addLog;
+        const addLogs = useLogStore.getState().addLogs;
         let unsubs: Array<() => void> = [];
         (async () => {
-            const sub = async (event: string, level: LogLevel = "INFO") => {
-                const un = await listen<string>(event, (e) => {
-                    const payload = e.payload;
+            const chunkBuffers = new Map<string, { total: number; parts: string[] }>();
+
+            const handleBackendLogPayload = (event: string, level: LogLevel, payload: BackendLogPayload) => {
+                if (typeof payload === "string") {
                     addLog(level, `${event}: ${payload}`);
+                    return;
+                }
+
+                if (Array.isArray(payload)) {
+                    addLogs(level, payload.map((line) => `${event}: ${line}`));
+                    return;
+                }
+
+                if (!payload || typeof payload !== "object") return;
+
+                if (payload.kind === "lines" && Array.isArray(payload.lines)) {
+                    addLogs(level, payload.lines.map((line) => `${event}: ${line}`));
+                    return;
+                }
+
+                if (payload.kind === "chunk" && typeof payload.id === "number" && typeof payload.total === "number") {
+                    const key = `${event}:${payload.id}`;
+                    const bucket = chunkBuffers.get(key) ?? {
+                        total: payload.total,
+                        parts: Array.from({length: payload.total}, () => ""),
+                    };
+                    bucket.total = payload.total;
+                    if (typeof payload.index === "number" && payload.index >= 0 && payload.index < bucket.parts.length) {
+                        bucket.parts[payload.index] = payload.text ?? "";
+                    }
+                    chunkBuffers.set(key, bucket);
+                    if (bucket.parts.every((part) => part !== "")) {
+                        chunkBuffers.delete(key);
+                        addLog(level, `${event}: ${bucket.parts.join("")}`);
+                    }
+                }
+            };
+
+            const sub = async (event: string, level: LogLevel = "INFO") => {
+                const un = await listen<BackendLogPayload>(event, (e) => {
+                    handleBackendLogPayload(event, level, e.payload);
                 });
                 unsubs.push(un);
             };

@@ -1,4 +1,7 @@
 import asyncio
+import contextlib
+import os
+import socket
 from typing import Dict, Any, Callable, List, Optional
 
 from loguru import logger
@@ -57,10 +60,16 @@ class MitmBridge:
 
             logger.info(f"MitmBridge starting on {self.host}:{self.port}")
 
-            import contextlib, os
-            with open(os.devnull, "w") as devnull:
-                with contextlib.redirect_stdout(devnull), contextlib.redirect_stderr(devnull):
-                    await self._master.run()
+            run_task = asyncio.create_task(self._run_master())
+            try:
+                await self._wait_until_listening(timeout=20.0)
+                logger.info(f"SL_BACKEND_READY mitm={self.host}:{self.port}")
+                await run_task
+            except Exception:
+                run_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await run_task
+                raise
 
             logger.info("MitmBridge run() finished normally")
 
@@ -70,6 +79,24 @@ class MitmBridge:
         except Exception as e:
             logger.exception(f"MitmBridge.start() failed: {e}")
             raise
+
+    async def _run_master(self):
+        with open(os.devnull, "w") as devnull:
+            with contextlib.redirect_stdout(devnull), contextlib.redirect_stderr(devnull):
+                await self._master.run()
+
+    async def _wait_until_listening(self, timeout: float = 20.0):
+        deadline = asyncio.get_running_loop().time() + timeout
+        probe_host = "127.0.0.1" if self.host in ("0.0.0.0", "::") else self.host
+
+        while True:
+            try:
+                with socket.create_connection((probe_host, self.port), timeout=0.5):
+                    return
+            except OSError:
+                if asyncio.get_running_loop().time() >= deadline:
+                    raise TimeoutError(f"MITM listen timeout on {probe_host}:{self.port}")
+                await asyncio.sleep(0.2)
 
     def _emit(self, event: Dict[str, Any]):
         for fn in list(self._listeners):

@@ -11,7 +11,7 @@ function now() {
     const d = new Date();
     return (
         [d.getHours(), d.getMinutes(), d.getSeconds()]
-            .map(n => n.toString().padStart(2, "0"))
+            .map((n) => n.toString().padStart(2, "0"))
             .join(":") + "." + d.getMilliseconds().toString().padStart(3, "0")
     );
 }
@@ -20,10 +20,18 @@ type LogState = {
     logs: LogItem[];
     frames: FrameItem[];
     addLog: (level: LogLevel, msg: string) => void;
+    addLogs: (level: LogLevel, msgs: string[]) => void;
     addFrame: (dir: "in" | "out", raw: string) => void;
     clearLogs: () => void;
     clearFrames: () => void;
 };
+
+function mirrorToConsole(item: LogItem) {
+    if (item.level === "STDOUT" || item.level === "STDERR") return;
+    if (item.level === "ERROR") console.error(`[${item.ts}] [${item.level}] ${item.msg}`);
+    else if (item.level === "WARN") console.warn(`[${item.ts}] [${item.level}] ${item.msg}`);
+    else console.log(`[${item.ts}] [${item.level}] ${item.msg}`);
+}
 
 export const useLogStore = create<LogState>((set, get) => ({
     logs: [],
@@ -32,10 +40,14 @@ export const useLogStore = create<LogState>((set, get) => ({
         const item: LogItem = { ts: now(), level, msg };
         const next = [...get().logs, item].slice(-MAX_LOGS);
         set({ logs: next });
-        // 同步到控制台
-        if (level === "ERROR" || level === "STDERR") console.error(`[${item.ts}] [${level}] ${msg}`);
-        else if (level === "WARN") console.warn(`[${item.ts}] [${level}] ${msg}`);
-        else console.log(`[${item.ts}] [${level}] ${msg}`);
+        mirrorToConsole(item);
+    },
+    addLogs: (level, msgs) => {
+        if (!msgs.length) return;
+        const items = msgs.map((msg) => ({ ts: now(), level, msg } as LogItem));
+        const next = [...get().logs, ...items].slice(-MAX_LOGS);
+        set({ logs: next });
+        for (const item of items) mirrorToConsole(item);
     },
     addFrame: (dir, raw) => {
         try {

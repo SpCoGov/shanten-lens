@@ -1,4 +1,5 @@
 import json
+import queue
 import threading
 from typing import Callable, Tuple, Any, Dict, List, Optional
 import asyncio
@@ -52,6 +53,13 @@ class WsAddon:
         self.master = None
         self.preferred_flow: Optional[http.HTTPFlow] = None
         self.preferred_peer_key: Optional[str] = None
+        self._debug_log_queue: "queue.SimpleQueue[Optional[dict[str, Any]]]" = queue.SimpleQueue()
+        self._debug_log_worker = threading.Thread(
+            target=self._debug_log_pump,
+            name="WsAddonDebugLog",
+            daemon=True,
+        )
+        self._debug_log_worker.start()
 
         global WS_ADDON_INSTANCE
         WS_ADDON_INSTANCE = self
@@ -99,6 +107,27 @@ class WsAddon:
             )
             return "pass", None
 
+    def _debug_log_pump(self):
+        while True:
+            item = self._debug_log_queue.get()
+            if item is None:
+                return
+            try:
+                pretty = json.dumps(item.get("data"), ensure_ascii=False)
+                logger.debug(
+                    "== FULL MESSAGE BEGIN ==\n"
+                    f"method: {item.get('method')}\n"
+                    f"from_client: {item.get('from_client')}\n"
+                    f"msg_id: {item.get('msg_id')}\n"
+                    f"parsed:\n{pretty}\n"
+                    f"cur_f={item.get('flow_id')} cur_key={item.get('cur_key')} "
+                    f"pref_f={item.get('pref_flow_id')} pref_key={item.get('pref_key')} "
+                    f"on_pref={item.get('on_pref')}\n"
+                    "== FULL MESSAGE END =="
+                )
+            except Exception as e:
+                logger.error(f"logging full message failed: {e}")
+
     def websocket_message(self, flow: http.HTTPFlow):
         if not flow.websocket:
             return
@@ -144,21 +173,21 @@ class WsAddon:
             if backend.app.MANAGER.get("general.debug"):
                 if view.get('method') not in ignore_methods:
                     logger.debug(f"{'已发送' if message.from_client else '接收到'}：{view.get('method')} (id={view.get('id')})")
-                    import json
-                    pretty = json.dumps(view.get('data'), ensure_ascii=False)
                     cur_key = _peer_key_ws(flow)
                     pf = self.preferred_flow
                     pf_key = _peer_key_ws(pf) if pf else None
                     on_pref = (pf is not None and pf is flow)
-                    logger.debug(
-                        "== FULL MESSAGE BEGIN ==\n"
-                        f"method: {view.get('method')}\n"
-                        f"from_client: {view.get('from_client')}\n"
-                        f"msg_id: {view.get('id')}\n"
-                        f"parsed:\n{pretty}\n"
-                        f"cur_f={id(flow)} cur_key={cur_key} pref_f={id(pf) if pf else None} pref_key={pf_key or 'None'} on_pref={on_pref}\n"
-                        "== FULL MESSAGE END =="
-                    )
+                    self._debug_log_queue.put({
+                        "method": view.get("method"),
+                        "from_client": view.get("from_client"),
+                        "msg_id": view.get("id"),
+                        "data": view.get("data"),
+                        "flow_id": id(flow),
+                        "cur_key": cur_key,
+                        "pref_flow_id": id(pf) if pf else None,
+                        "pref_key": pf_key or "None",
+                        "on_pref": on_pref,
+                    })
         except Exception as e:
             logger.error(f"logging full message failed: {e}")
 
