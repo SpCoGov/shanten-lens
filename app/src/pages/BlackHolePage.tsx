@@ -24,7 +24,10 @@ function readWallLimit() {
 
 function summarizeProgress(progress?: string) {
     if (!progress) return "";
-    const lines = progress.split("\n").map((line) => line.trim()).filter(Boolean);
+    const lines = progress
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line && !line.includes("剩余换牌") && !line.includes("鍓╀綑鎹㈢墝"));
     const keepPrefixes = [
         "已耗时",
         "已完成搜索次数",
@@ -38,6 +41,15 @@ function summarizeProgress(progress?: string) {
         return keepPrefixes.some((prefix) => line.startsWith(prefix));
     });
     return summary.join("\n");
+}
+
+function visibleProgress(progress?: string) {
+    if (!progress) return "";
+    return progress
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line && !line.includes("剩余换牌") && !line.includes("鍓╀綑鎹㈢墝"))
+        .join("\n");
 }
 
 export default function BlackHolePage({
@@ -132,7 +144,13 @@ export default function BlackHolePage({
     }, [onClear]);
 
     const viewData = React.useMemo(() => {
-        if (verboseProgress || !mainData || mainData.status !== "searching") return mainData;
+        if (!mainData || mainData.status !== "searching") return mainData;
+        if (verboseProgress) {
+            return {
+                ...mainData,
+                progress: visibleProgress(mainData.progress),
+            };
+        }
         return {
             ...mainData,
             progress: summarizeProgress(mainData.progress),
@@ -256,12 +274,16 @@ function BlackHoleStrategyCard({
                     <div className={styles.cardBodyMuted} style={{whiteSpace: "pre-wrap"}}>
                         {data.progress || t("advisor.searching")}
                     </div>
+                    {!hasPlanPreview ? <div style={{padding: "0 12px 12px"}}><SearchParamsBand data={data}/></div> : null}
                     {hasPlanPreview ? <PlanBody data={data} resolveFace={resolveFace}/> : null}
                 </div>
             ) : data.status === "impossible" ? (
-                <div className={styles.bandSingle}>
-                    <div className={styles.bandValue}>{t("advisor.impossible")}</div>
-                    <div className={styles.cardBodyMuted}>{reasonText(t, data.reason)}</div>
+                <div style={{padding: 12, display: "grid", gap: 12}}>
+                    <SearchParamsBand data={data}/>
+                    <div className={styles.bandSingle} style={{padding: 0}}>
+                        <div className={styles.bandValue}>{t("advisor.impossible")}</div>
+                        <div className={styles.cardBodyMuted} style={{padding: 0}}>{reasonText(t, data.reason)}</div>
+                    </div>
                 </div>
             ) : data.status === "plan" ? (
                 <PlanBody data={data} resolveFace={resolveFace}/>
@@ -277,13 +299,9 @@ function PlanBody({data, resolveFace}: { data: PlanData; resolveFace?: (id: numb
     const batches = zipBatches(data.switch_discards, data.switch_in, data.switch_batch_sizes);
     return (
         <div style={{padding: 12, display: "grid", gap: 14}}>
+            <SearchParamsBand data={data}/>
             <div className={styles.band}>
-                <div className={styles.bandLeft}>
-                    <div className={styles.bandLabel}>{t("advisor.remaining_changes")}</div>
-                    <div className={styles.bandValue}>{String(data.remaining_changes ?? "-")}</div>
-                </div>
-                <div className={styles.vbar}/>
-                <div className={styles.bandRight}>
+                <div className={styles.bandLeft} style={{gridColumn: "1 / -1"}}>
                     <div className={styles.bandActionLabel}>{t("advisor.need_draws_label")}</div>
                     <div className={styles.bandValue}>{String(data.draws_needed ?? "-")}</div>
                 </div>
@@ -302,6 +320,50 @@ function PlanBody({data, resolveFace}: { data: PlanData; resolveFace?: (id: numb
             <TileGroup title={t("advisor.wall_draw_sequence")} ids={data.wall_draws || []} resolveFace={resolveFace}/>
             <TileGroup title={t("advisor.post_draw_discards")} ids={data.post_draw_discards || []} resolveFace={resolveFace}/>
             <FaceChipList title={t("advisor.final_waits")} faces={data.waits || []}/>
+        </div>
+    );
+}
+
+function SearchParamsBand({data}: { data: PlanData }) {
+    if (
+        typeof data.max_change_count !== "number" &&
+        typeof data.per_change_limit !== "number" &&
+        typeof data.considered_tile_count !== "number"
+    ) {
+        return null;
+    }
+    const perChangeLimit = typeof data.per_change_limit === "number"
+        ? (data.per_change_limit === 13 ? "无限制" : String(data.per_change_limit))
+        : "-";
+    const items = [
+        {label: "最大换牌次数", value: String(data.max_change_count ?? "-")},
+        {label: "换牌限制", value: perChangeLimit},
+        {label: "可使用的牌数", value: String(data.considered_tile_count ?? "-")},
+    ];
+
+    return (
+        <div style={{display: "grid", gap: 8}}>
+            <div className={styles.label}>当前参数</div>
+            <div style={{display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10}}>
+                {items.map((item) => (
+                    <div
+                        key={item.label}
+                        style={{
+                            border: "1px solid var(--color-divider)",
+                            borderRadius: 10,
+                            padding: "10px 12px",
+                            display: "grid",
+                            gap: 6,
+                            minWidth: 0,
+                        }}
+                    >
+                        <div className={styles.bandLabel}>{item.label}</div>
+                        <div style={{fontSize: 20, fontWeight: 800, lineHeight: 1.05, wordBreak: "break-word"}}>
+                            {item.value}
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }

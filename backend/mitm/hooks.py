@@ -38,6 +38,17 @@ def _current_discard(plan: dict) -> int | None:
     return int(d[0]) if d else None
 
 
+def _switch_search_params(wall_limit: int = 36) -> dict:
+    hand_tiles = list(getattr(GAME_STATE, "hand_tiles", None) or [])
+    replacement_tiles = list(getattr(GAME_STATE, "replacement_tiles", None) or [])
+    considered_tiles = list(GAME_STATE.wall_tiles if wall_limit >= 36 else GAME_STATE.wall_tiles[:max(2, wall_limit)])
+    return {
+        "max_change_count": int(getattr(GAME_STATE, "total_change_tile_count", 0) or 0),
+        "per_change_limit": 3 if 916 in (getattr(GAME_STATE, "boss_buff", None) or []) else 13,
+        "considered_tile_count": len(hand_tiles) + len(replacement_tiles) + len(considered_tiles),
+    }
+
+
 def _wrap_entry(yaku_key: str, plan: dict) -> dict:
     entry = {
         "status": plan.get("status"),
@@ -61,6 +72,9 @@ def _wrap_entry(yaku_key: str, plan: dict) -> dict:
             "target13",
             "plan_signature",
             "quad_catalog",
+            "max_change_count",
+            "per_change_limit",
+            "considered_tile_count",
     ):
         if key in plan:
             entry[key] = plan[key]
@@ -89,6 +103,7 @@ async def _broadcast_switch_recommendation(
         "flush_queued": False,
         "finished": False,
     }
+    search_params = _switch_search_params(wall_limit)
 
     await broadcast({
         "type": "discard_recommendation",
@@ -101,6 +116,7 @@ async def _broadcast_switch_recommendation(
 
     latest_progress = {"text": "正在准备搜索…", "candidate": None, "candidate_version": 0}
 
+    latest_progress["candidate"] = dict(search_params)
     progress_log_state = {"count": 0, "truncated": False}
 
     async def _flush_progress(force: bool = False) -> None:
@@ -193,6 +209,7 @@ async def _broadcast_switch_recommendation(
             "remaining_changes": plan.get("remaining_changes"),
             "target13": plan.get("target13") or [],
             "plan_signature": plan.get("plan_signature"),
+            **search_params,
         }
         latest_progress["candidate_version"] += 1
         _request_flush(force=True)
@@ -218,6 +235,7 @@ async def _broadcast_switch_recommendation(
         GAME_STATE.switch_used_tiles,
         GAME_STATE.total_change_tile_count,
         GAME_STATE.change_tile_count,
+        GAME_STATE.boss_buff,
         progress_cb,
         candidate_cb,
         _SWITCH_STOP_EVENT.is_set,
@@ -228,6 +246,8 @@ async def _broadcast_switch_recommendation(
     plan = await search_task
     if seq != _SWITCH_RECOMMENDATION_SEQ:
         return
+    if isinstance(plan, dict):
+        plan = {**search_params, **plan}
     send_state["finished"] = True
     send_state["flush_queued"] = False
     logger.debug("souzu_switch result: {}", plan)
@@ -250,6 +270,7 @@ async def start_switch_recommendation_search(
             "data": [_wrap_entry("souzu_switch", {
                 "status": "impossible",
                 "reason": "stage-not-switch",
+                **_switch_search_params(wall_limit),
             })],
         })
         return
@@ -271,6 +292,8 @@ async def broadcast_switch_quad_catalog(*, wall_limit: int = 36) -> None:
         GAME_STATE.total_change_tile_count,
         GAME_STATE.change_tile_count,
     )
+    if isinstance(plan, dict):
+        plan = {**_switch_search_params(wall_limit), **plan}
     await broadcast({
         "type": "discard_recommendation",
         "data": [_wrap_entry("souzu_switch", plan)],
@@ -289,6 +312,7 @@ async def stop_switch_recommendation_search(*, notify_client: bool = True) -> No
             "data": [_wrap_entry("souzu_switch", {
                 "status": "impossible",
                 "reason": "stopped-by-user",
+                **_switch_search_params(),
             })],
         })
 

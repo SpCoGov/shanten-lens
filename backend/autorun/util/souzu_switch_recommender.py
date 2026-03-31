@@ -1401,6 +1401,7 @@ def recommend_souzu_tenpai_switch(
         switch_used_tiles: List[int],
         total_change_tile_count: int,
         change_tile_count: int,
+        boss_buff: Optional[Sequence[int]] = None,
         progress_cb: Optional[Callable[[str], None]] = None,
         candidate_cb: Optional[Callable[[dict], None]] = None,
         should_stop: Optional[Callable[[], bool]] = None,
@@ -1409,7 +1410,7 @@ def recommend_souzu_tenpai_switch(
 ) -> dict:
     started_at = time.monotonic()
     remaining_changes = max(0, int(total_change_tile_count or 0) - int(change_tile_count or 0))
-    per_change_limit = 13
+    per_change_limit = 3 if 916 in (boss_buff or []) else 13
     used_count = len(switch_used_tiles or [])
     remaining_replacements = list(replacement_ids[used_count:])
 

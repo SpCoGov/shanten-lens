@@ -29,4 +29,7 @@ export type PlanData = {
     waits?: string[];
     quad_faces?: string[];
     quad_catalog?: QuadCatalogItem[];
+    max_change_count?: number;
+    per_change_limit?: number;
+    considered_tile_count?: number;
 };
