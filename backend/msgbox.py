@@ -48,6 +48,34 @@ async def ui_confirm(*, title_key, message_key, values=None,
         _PENDING_ASYNC.pop(mid, None)
 
 
+async def ui_alert(*, title_key, message_key, values=None,
+                   ok_key="common.ok", timeout=_DEFAULT_TIMEOUT) -> bool:
+    mid = _new_id()
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future = loop.create_future()
+    _PENDING_ASYNC[mid] = fut
+
+    pkt = {
+        "type": "msgbox",
+        "data": {
+            "id": mid,
+            "title": title_key,
+            "message": message_key,
+            "okText": ok_key,
+            "values": values or {},
+        },
+    }
+    post_broadcast(pkt)
+
+    try:
+        ok: bool = await asyncio.wait_for(fut, timeout=timeout)
+        return bool(ok)
+    except asyncio.TimeoutError:
+        return False
+    finally:
+        _PENDING_ASYNC.pop(mid, None)
+
+
 def ui_confirm_sync(*, title_key, message_key, values=None,
                     ok_key="common.continue", cancel_key="common.cancel",
                     timeout=_DEFAULT_TIMEOUT) -> bool:
@@ -65,6 +93,30 @@ def ui_confirm_sync(*, title_key, message_key, values=None,
             "message": message_key,
             "okText": ok_key,
             "cancelText": cancel_key,
+            "values": values or {},
+        },
+    }
+    post_broadcast(pkt)
+
+    signaled = ev.wait(timeout)
+    _PENDING_SYNC.pop(mid, None)
+    return holder["ok"] if signaled else False
+
+
+def ui_alert_sync(*, title_key, message_key, values=None,
+                  ok_key="common.ok", timeout=_DEFAULT_TIMEOUT) -> bool:
+    mid = _new_id()
+    ev = threading.Event()
+    holder: Dict[str, bool] = {"ok": False}
+    _PENDING_SYNC[mid] = (ev, holder)
+
+    pkt = {
+        "type": "msgbox",
+        "data": {
+            "id": mid,
+            "title": title_key,
+            "message": message_key,
+            "okText": ok_key,
             "values": values or {},
         },
     }

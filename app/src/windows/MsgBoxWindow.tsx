@@ -13,7 +13,7 @@ type InitPayload = {
     title?: string;
     message: string;
     okText?: string;
-    cancelText?: string;
+    cancelText?: string | null;
     values?: Record<string, unknown>;
 };
 
@@ -86,7 +86,7 @@ export default function MsgBoxWindow() {
                     title: p.title || "msgbox.defaultTitle",
                     message: p.message || "msgbox.defaultMessage",
                     okText: p.okText || "common.ok",
-                    cancelText: p.cancelText || "common.cancel",
+                    cancelText: p.cancelText ?? undefined,
                     values: p.values || {},
                 });
             }
@@ -169,11 +169,18 @@ export default function MsgBoxWindow() {
         }
     };
 
+    const hasCancel = !!data?.cancelText;
+
     const reply = async (ok: boolean) => {
         const id = idRef.current;
         if (!id) return close();
         ws.send({ type: "msgbox_result", data: { id, ok } as any });
         await close();
+    };
+
+    const closeFromChrome = async () => {
+        if (!data) return close();
+        await reply(hasCancel ? false : true);
     };
 
     const values = data?.values || {};
@@ -185,7 +192,7 @@ export default function MsgBoxWindow() {
                     <Trans i18nKey={data?.title || "msgbox.defaultTitle"} values={values} />
                 </div>
                 <div className={styles.actions}>
-                    <button className={styles.iconBtn} onClick={close} title={t("window.close") as string}>
+                    <button className={styles.iconBtn} onClick={closeFromChrome} title={t("window.close") as string}>
                         <span className="ms">close</span>
                     </button>
                 </div>
@@ -201,9 +208,11 @@ export default function MsgBoxWindow() {
                 </div>
 
                 <div className={styles.btns}>
-                    <button className={`btn ghost ${styles.btn}`} onClick={() => reply(false)}>
-                        <Trans i18nKey={data?.cancelText || "common.cancel"} />
-                    </button>
+                    {hasCancel ? (
+                        <button className={`btn ghost ${styles.btn}`} onClick={() => reply(false)}>
+                            <Trans i18nKey={data?.cancelText || "common.cancel"} />
+                        </button>
+                    ) : null}
                     <button className={`btn ${styles.btn}`} onClick={() => reply(true)}>
                         <Trans i18nKey={data?.okText || "common.ok"} />
                     </button>

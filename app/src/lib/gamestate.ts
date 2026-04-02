@@ -13,6 +13,7 @@ export interface GameStateData {
     effect_list?: EffectItem[];
     goods?: GoodsItem[];
     candidate_effect_list?: CandidateEffectRef[];
+    boss_buff?: number[];
 }
 
 export interface BadgeAffix {

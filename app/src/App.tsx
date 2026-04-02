@@ -147,6 +147,7 @@ export default function App() {
     const [ended, setEnded] = React.useState<boolean>(false);
     const [remain, setRemain] = React.useState<number>(0);
     const [hasGame, setHasGame] = React.useState<boolean>(false);
+    const [bossBuff, setBossBuff] = React.useState<number[]>([]);
 
     const [wallStatsTiles, setWallStatsTiles] = React.useState<string[]>([]);
 
@@ -293,6 +294,7 @@ export default function App() {
                 setEnded(!!d.ended);
                 setRemain(d.desktop_remain ?? 0);
                 setHasGame(d.stage !== undefined && d.ended !== undefined && d.stage >= 0);
+                setBossBuff(Array.isArray((d as any).boss_buff) ? (d as any).boss_buff : []);
 
                 const repl = Array.isArray(d.replacement_tiles)
                     ? d.replacement_tiles.map((id) => deck.get(id) ?? "5m")
@@ -586,6 +588,9 @@ export default function App() {
                             <span className="badge">{t("status.remaining", {count: remain})}</span>
                             <span className="badge">{t("status.stage", {stage: stage})}</span>
                             <span className="badge">{t("status.coin", {coin: coin})}</span>
+                            {bossBuff.length > 0 ? (
+                                <span className="badge">{t("status.bossBuff", {buffs: bossBuff.join(", ")})}</span>
+                            ) : null}
                             <span className={`badge ${ended ? "down" : "ok"}`}>{ended ? t("status.ended") : t("status.running")}</span>
                         </>
                     ) : (

@@ -320,6 +320,7 @@
     "continue": "続けて検索",
     "next": "次の案",
     "list_quads": "全カン一覧",
+    "execute_plan": "一括で交換実行",
     "clear_cache": "キャッシュを消す",
     "auto_stop_first": "最初の案を見つけたら自動停止",
     "verbose_progress": "詳細な進捗を表示",
@@ -439,10 +440,12 @@
     "remaining": "残り：{{count}}",
     "stage": "段階：{{stage}}",
     "coin": "⭐ {{coin}}",
+    "bossBuff": "BossBuff: {{buffs}}",
     "ended": "終了",
     "running": "進行中"
   },
   "common": {
+    "ok": "OK",
     "continue": "続行",
     "cancel": "キャンセル"
   },

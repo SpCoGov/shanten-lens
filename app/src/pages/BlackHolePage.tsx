@@ -103,6 +103,12 @@ export default function BlackHolePage({
     const canOperate = stage === 2;
     const isSearching = mainData?.status === "searching";
     const canResume = !!planSignature && !isSearching;
+    const hasExecutablePlan = !!(
+        mainData &&
+        mainData.status === "plan" &&
+        Array.isArray(mainData.switch_discards) &&
+        mainData.switch_discards.length > 0
+    );
 
     const startSearch = React.useCallback((opts?: { stopAfterFirst?: boolean; resume?: boolean }) => {
         if (!canOperate) {
@@ -135,6 +141,10 @@ export default function BlackHolePage({
         setQuadDrawerOpen(true);
         ws.send({type: "souzu_switch_control", data: {action: "list_quads", options: {wall_limit: wallLimit}}} as any);
     }, [wallLimit]);
+    const executePlan = React.useCallback(() => {
+        if (!canOperate || !hasExecutablePlan) return;
+        ws.send({type: "souzu_switch_control", data: {action: "execute_plan"}} as any);
+    }, [canOperate, hasExecutablePlan]);
     const clearCache = React.useCallback(() => {
         setSeenSignatures([]);
         setQuadCatalogData(null);
@@ -176,6 +186,9 @@ export default function BlackHolePage({
                     </button>
                     <button className="nav-btn" onClick={listQuads}>
                         {t("blackhole.list_quads")}
+                    </button>
+                    <button className="nav-btn" onClick={executePlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
+                        {t("blackhole.execute_plan")}
                     </button>
                     <button className="nav-btn" onClick={clearCache}>
                         {t("blackhole.clear_cache")}
@@ -302,7 +315,7 @@ function PlanBody({data, resolveFace}: { data: PlanData; resolveFace?: (id: numb
             <SearchParamsBand data={data}/>
             <div className={styles.band}>
                 <div className={styles.bandLeft} style={{gridColumn: "1 / -1"}}>
-                    <div className={styles.bandActionLabel}>{t("advisor.need_draws_label")}</div>
+                    <div className={styles.bandActionLabel}>{"\u7b2c\u51e0\u5f20\u542c\u724c"}</div>
                     <div className={styles.bandValue}>{String(data.draws_needed ?? "-")}</div>
                 </div>
             </div>
@@ -316,7 +329,7 @@ function PlanBody({data, resolveFace}: { data: PlanData; resolveFace?: (id: numb
                 </div>
             ))}
 
-            <FaceChipList title={t("advisor.final_quads")} faces={data.quad_faces || []}/>
+            <FinalShapeGroup quadFaces={data.quad_faces || []} tenpaiFaces={data.target13 || []}/>
             <TileGroup title={t("advisor.wall_draw_sequence")} ids={data.wall_draws || []} resolveFace={resolveFace}/>
             <TileGroup title={t("advisor.post_draw_discards")} ids={data.post_draw_discards || []} resolveFace={resolveFace}/>
             <FaceChipList title={t("advisor.final_waits")} faces={data.waits || []}/>
@@ -432,16 +445,80 @@ function TileGroup({
     );
 }
 
+function FinalShapeGroup({quadFaces, tenpaiFaces}: { quadFaces: string[]; tenpaiFaces: string[] }) {
+    const quadTiles = quadFaces.flatMap((face) => [face, face, face, face]);
+    if (!quadTiles.length && !tenpaiFaces.length) {
+        return null;
+    }
+
+    return (
+        <div style={{display: "grid", gap: 6}}>
+            <div className={styles.label}>{"\u6700\u7ec8\u724c\u578b"}</div>
+            <div
+                style={{
+                    border: "1px solid var(--color-divider)",
+                    borderRadius: 14,
+                    padding: "10px 12px",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: 12,
+                    background: "var(--panel)",
+                }}
+            >
+                {quadTiles.length > 0 ? (
+                    <div style={{display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center"}}>
+                        {quadTiles.map((face, index) => (
+                            <Tile key={`quad-${face}-${index}`} tile={face} width={44} height={58}/>
+                        ))}
+                    </div>
+                ) : null}
+
+                {quadTiles.length > 0 && tenpaiFaces.length > 0 ? (
+                    <div
+                        style={{
+                            width: 1,
+                            alignSelf: "stretch",
+                            minHeight: 44,
+                            background: "var(--color-divider)",
+                            opacity: 0.8,
+                        }}
+                    />
+                ) : null}
+
+                {tenpaiFaces.length > 0 ? (
+                    <div style={{display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center"}}>
+                        {tenpaiFaces.map((face, index) => (
+                            <Tile key={`tenpai-${face}-${index}`} tile={face} width={44} height={58}/>
+                        ))}
+                    </div>
+                ) : (
+                    <div className={styles.cardBodyMuted} style={{padding: 0}}>-</div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function FaceChipList({title, faces}: { title: string; faces: string[] }) {
     return (
         <div style={{display: "grid", gap: 6}}>
             <div className={styles.label}>{title}</div>
             {faces && faces.length > 0 ? (
-                <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
+                <div
+                    style={{
+                        border: "1px solid var(--color-divider)",
+                        borderRadius: 14,
+                        padding: "10px 12px",
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 4,
+                        alignItems: "center",
+                        background: "var(--panel)",
+                    }}
+                >
                     {faces.map((face, index) => (
-                        <div key={`${face}-${index}`} className={styles.actionChip}>
-                            <span>{face}</span>
-                        </div>
+                        <Tile key={`${face}-${index}`} tile={face} width={44} height={58}/>
                     ))}
                 </div>
             ) : (

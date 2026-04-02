@@ -13,9 +13,10 @@ import backend.mitm.addon as _addon
 from backend.app import AMULET_REG, BADGE_REG, pipeline
 from backend.app import MANAGER, GAME_STATE, broadcast
 from backend.autorun.util.chiitoi_recommender import chiitoi_recommendation_json
+from backend.autorun.util.retry_1004 import call_with_1004_retry_async
 from backend.autorun.util.souzu_switch_recommender import recommend_souzu_tenpai_switch, list_reachable_quads_for_switch
 from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
-from backend.msgbox import _ui_confirm_blocking
+from backend.msgbox import _ui_confirm_blocking, ui_alert
 
 ID_KAVI = 230
 BADGE_LIFE = 600100
@@ -27,6 +28,106 @@ ID_HACKER = 232
 _SWITCH_RECOMMENDATION_SEQ = 0
 _SWITCH_STOP_EVENT = threading.Event()
 _SWITCH_SEARCH_TASK: asyncio.Task | None = None
+_LAST_SWITCH_PLAN: dict | None = None
+
+
+def _cache_switch_plan(plan: dict | None) -> None:
+    global _LAST_SWITCH_PLAN
+    _LAST_SWITCH_PLAN = copy.deepcopy(plan) if isinstance(plan, dict) else None
+
+
+async def _wait_for_switch_state_advance(prev_change_count: int, timeout_sec: float = 5.0) -> bool:
+    deadline = time.monotonic() + max(0.1, float(timeout_sec))
+    while time.monotonic() < deadline:
+        cur_stage = int(getattr(GAME_STATE, "stage", -1) or -1)
+        cur_count = int(getattr(GAME_STATE, "change_tile_count", 0) or 0)
+        if cur_stage != 2 or cur_count > prev_change_count:
+            return True
+        await asyncio.sleep(0.1)
+    return False
+
+
+def _plan_batches(plan: dict) -> list[list[int]]:
+    discards = list(plan.get("switch_discards") or [])
+    batches = list(plan.get("switch_batch_sizes") or [])
+    if not discards:
+        return []
+    if isinstance(discards[0], int):
+        flat_discards = [int(x) for x in discards]
+        if not batches:
+            return [flat_discards] if flat_discards else []
+        out: list[list[int]] = []
+        cursor = 0
+        for size in batches:
+            size_int = max(0, int(size or 0))
+            out.append(flat_discards[cursor:cursor + size_int])
+            cursor += size_int
+        return [batch for batch in out if batch]
+    if not batches:
+        return [list(batch or []) for batch in discards if isinstance(batch, list)]
+    normalized_discards = [list(batch or []) for batch in discards if isinstance(batch, (list, tuple))]
+    return [batch for batch in normalized_discards if batch]
+
+
+async def execute_current_switch_plan() -> tuple[bool, str]:
+    plan = copy.deepcopy(_LAST_SWITCH_PLAN) if isinstance(_LAST_SWITCH_PLAN, dict) else None
+    if not plan or plan.get("status") != "plan":
+        return False, "当前没有可执行的黑洞换牌方案。"
+
+    batches = _plan_batches(plan)
+    if not batches:
+        return False, "当前方案没有可执行的换牌步骤。"
+
+    if int(getattr(GAME_STATE, "stage", 0) or 0) != 2:
+        return False, "当前不在换牌阶段，无法执行黑洞换牌。"
+
+    bot = getattr(backend.app, "PACKET_BOT", None)
+    if not bot:
+        return False, "发包模块未就绪，请先进入青云之志并保持连接。"
+
+    for index, discard_ids in enumerate(batches, start=1):
+        current_hand = list(getattr(GAME_STATE, "hand_tiles", None) or [])
+        if not current_hand:
+            return False, "当前手牌为空，无法继续换牌。"
+        missing = [tid for tid in discard_ids if tid not in current_hand]
+        if missing:
+            return False, f"第 {index} 步换牌所需的手牌已发生变化，请重进青云之志查看最新状态。"
+
+        prefer_keep = [tid for tid in current_hand if tid not in discard_ids]
+        buffs = set(getattr(GAME_STATE, "boss_buff", None) or [])
+        if 901 in buffs:
+            keep_target = max(0, len(current_hand) - 3)
+            if len(prefer_keep) >= keep_target:
+                filtered_ids = prefer_keep[:keep_target]
+            else:
+                rest = [tid for tid in current_hand if tid not in prefer_keep]
+                take_more = rest[: max(0, keep_target - len(prefer_keep))]
+                filtered_ids = prefer_keep + take_more
+        else:
+            filtered_ids = prefer_keep
+
+        prev_change_count = int(getattr(GAME_STATE, "change_tile_count", 0) or 0)
+        ok, reason, _resp = await call_with_1004_retry_async(
+            bot.op_change,
+            tile_ids=filtered_ids,
+            delay_sec=3,
+            interval=3,
+            timeout=3000,
+            to_thread=True,
+        )
+        if not ok:
+            return False, reason or f"第 {index} 步换牌失败"
+        advanced = await _wait_for_switch_state_advance(prev_change_count)
+        if not advanced and index < len(batches):
+            return False, f"第 {index} 步换牌后状态未及时刷新，请重进青云之志查看最新状态。"
+
+    await ui_alert(
+        title_key="黑洞换牌已完成",
+        message_key="已按当前方案完成全部换牌，请按“跳过”键结束换牌阶段。",
+        ok_key="common.ok",
+        timeout=45.0,
+    )
+    return True, ""
 
 
 def _current_discard(plan: dict) -> int | None:
@@ -44,7 +145,7 @@ def _switch_search_params(wall_limit: int = 36) -> dict:
     considered_tiles = list(GAME_STATE.wall_tiles if wall_limit >= 36 else GAME_STATE.wall_tiles[:max(2, wall_limit)])
     return {
         "max_change_count": int(getattr(GAME_STATE, "total_change_tile_count", 0) or 0),
-        "per_change_limit": 3 if 916 in (getattr(GAME_STATE, "boss_buff", None) or []) else 13,
+        "per_change_limit": 3 if 901 in (getattr(GAME_STATE, "boss_buff", None) or []) else 13,
         "considered_tile_count": len(hand_tiles) + len(replacement_tiles) + len(considered_tiles),
     }
 
@@ -239,6 +340,7 @@ async def _broadcast_switch_recommendation(
         return
     if isinstance(plan, dict):
         plan = {**search_params, **plan}
+    _cache_switch_plan(plan)
     send_state["finished"] = True
     send_state["flush_queued"] = False
     await broadcast({
@@ -255,6 +357,11 @@ async def start_switch_recommendation_search(
 ) -> None:
     _SWITCH_STOP_EVENT.set()
     if int(getattr(GAME_STATE, "stage", 0) or 0) != 2:
+        _cache_switch_plan({
+            "status": "impossible",
+            "reason": "stage-not-switch",
+            **_switch_search_params(wall_limit),
+        })
         await broadcast({
             "type": "discard_recommendation",
             "data": [_wrap_entry("souzu_switch", {
@@ -284,6 +391,7 @@ async def broadcast_switch_quad_catalog(*, wall_limit: int = 36) -> None:
     )
     if isinstance(plan, dict):
         plan = {**_switch_search_params(wall_limit), **plan}
+    _cache_switch_plan(plan)
     await broadcast({
         "type": "discard_recommendation",
         "data": [_wrap_entry("souzu_switch", plan)],
@@ -296,6 +404,11 @@ async def stop_switch_recommendation_search(*, notify_client: bool = True) -> No
     _SWITCH_STOP_EVENT.set()
     _SWITCH_SEARCH_TASK = None
     if notify_client:
+        _cache_switch_plan({
+            "status": "impossible",
+            "reason": "stopped-by-user",
+            **_switch_search_params(),
+        })
         await broadcast({
             "type": "discard_recommendation",
             "data": [_wrap_entry("souzu_switch", {
@@ -718,14 +831,21 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
             game = value_changes.get("game", {})
             boss_buff = game.get("bossBuff", {}).get("value", None)
+            used = round_info.get("hands", {}).get("value", None)
             record = value_changes.get("record", None)
             GAME_STATE.update_record(record)
             if hands and pool:
-                GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, push_gamestate=False)
+                GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, used=used, push_gamestate=False)
                 new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, GAME_STATE.effect_list)
                 GAME_STATE.update_wall(new_wall)
                 desktop_remain = round_info.get("desktopRemain", {}).get("value", 0)
                 level = value_changes.get("game", {}).get("level", {}).get("value", 0)
+                try:
+                    level_int = int(level)
+                except (TypeError, ValueError):
+                    level_int = 0
+                if level_int <= 503 and str(level_int)[-1] != "3":
+                    boss_buff = []
                 # 进入换牌阶段
                 switch_stage_event = next((e for e in events if e.get("type") == 19), None)
                 if switch_stage_event:
@@ -950,13 +1070,21 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             effect_list = game.get("effect", {}).get("effectList", None)
             total_chance_tile_count = round_info.get("totalChangeTileCount", None)
             chance_tile_count = round_info.get("changeTileCount", None)
-            GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, push_gamestate=False, reason=".lq.Lobby.fetchAmuletActivityData")
+            used = round_info.get("used", [])
+            GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, push_gamestate=False, used=used, reason=".lq.Lobby.fetchAmuletActivityData")
             desktop_remain = round_info.get("desktopRemain", 0)
             stage = game.get("stage", -1)
             ended = game.get("ended", False)
             coin = int(game.get("game", {}).get("coin", ""))
             boss_buff = game.get("game", {}).get("bossBuff", None)
-            level = game.get("level", None)
+            level = game.get("game", {}).get("level", 0)
+            if boss_buff and level:
+                try:
+                    level_int = int(level)
+                except (TypeError, ValueError):
+                    level_int = 0
+                if level_int <= 503 and str(level_int)[-1] != "3":
+                    boss_buff = []
             shop = game.get("shop", {})
             free_candidate_effect_list = game.get("effect", {}).get("freeRewardCandidates", None)
             max_effect_volume = game.get("effect", {}).get("maxEffectVolume", 0)

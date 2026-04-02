@@ -82,7 +82,7 @@ class GameState:
         await broadcast({"type": "update_gamestate", "data": self.to_dict()})
         self.update_reason.clear()
 
-    def update_pool(self, pool: list[dict], hand_tiles: list[int], locked_tiles: list[int], push_gamestate: bool = True, reason: str = ""):
+    def update_pool(self, pool: list[dict], hand_tiles: list[int], locked_tiles: list[int], used: list[int], push_gamestate: bool = True, reason: str = ""):
         self.deck_map.clear()
         self.hand_tiles.clear()
         self.dora_tiles.clear()
@@ -101,6 +101,12 @@ class GameState:
             temp.pop(hand_tile_id)
         ids = list(temp.keys())
         cursor = 0
+
+        # 从候选 ids 中移除 used 的 id（<del>喵修斯之船fix</del>修不好不修了）
+        # 看不懂傻逼猫粮的封包
+        # if used is not None:
+        #     used_set = set(used)
+        #     ids = [tile_id for tile_id in ids if tile_id not in used_set]
 
         # 取前 10 张 → dora
         self.dora_tiles = ids[cursor:cursor + 10]

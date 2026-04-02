@@ -320,6 +320,7 @@
     "continue": "继续搜索",
     "next": "下一个方案",
     "list_quads": "列出所有杠",
+    "execute_plan": "一键执行换牌",
     "clear_cache": "清空缓存数据",
     "auto_stop_first": "找到第一个方案后自动停",
     "verbose_progress": "显示详细调试进度",
@@ -442,10 +443,12 @@
     "remaining": "剩余：{{count}}",
     "stage": "阶段：{{stage}}",
     "coin": "⭐ {{coin}}",
+    "bossBuff": "BossBuff：{{buffs}}",
     "ended": "已结束",
     "running": "进行中"
   },
   "common": {
+    "ok": "确定",
     "continue": "继续",
     "cancel": "取消"
   },
