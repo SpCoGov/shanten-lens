@@ -267,6 +267,17 @@ def _build_pool(
     return entries, by_id
 
 
+def _limit_replacement_search_window(
+        replacement_ids: Sequence[int],
+        remaining_changes: int,
+        per_change_limit: int,
+) -> List[int]:
+    if remaining_changes <= 0 or per_change_limit <= 0:
+        return []
+    max_read = min(len(replacement_ids), remaining_changes * per_change_limit)
+    return [int(tile_id) for tile_id in replacement_ids[:max_read]]
+
+
 def _quad_time(entry_ids: Sequence[int], by_id: Dict[int, PoolEntry]) -> tuple[int, int, int]:
     entries = [by_id[tile_id] for tile_id in entry_ids]
     return (
@@ -1052,10 +1063,16 @@ def list_reachable_quads_for_switch(
         switch_used_tiles: List[int],
         total_change_tile_count: int,
         change_tile_count: int,
+        boss_buff: Optional[Sequence[int]] = None,
 ) -> dict:
     remaining_changes = max(0, int(total_change_tile_count or 0) - int(change_tile_count or 0))
+    per_change_limit = 3 if 901 in (boss_buff or []) else 13
     used_count = len(switch_used_tiles or [])
-    remaining_replacements = list(replacement_ids[used_count:])
+    remaining_replacements = _limit_replacement_search_window(
+        replacement_ids[used_count:],
+        remaining_changes,
+        per_change_limit,
+    )
     pool, by_id = _build_pool(deck_map, hand_ids, remaining_replacements, wall_ids)
     quads = _enumerate_quads(pool, by_id)
 
@@ -1067,7 +1084,7 @@ def list_reachable_quads_for_switch(
             remaining_replacements,
             0,
             remaining_changes,
-            13,
+            per_change_limit,
             deck_map,
         )
         if not ok:
@@ -1166,18 +1183,15 @@ def _analyze_manual_searchability(
     other_faces = meld2_faces if short_key == "meld1" else meld1_faces
     if len(pair_faces) != 2 or not _is_exact_pair2(pair_faces):
         return False, "当缺的是面子时，雀头必须是完整对子"
-    if not pair_faces[0].endswith("s"):
-        return False, "当前搜索器在“缺一张面子”的分支里，只会枚举索子雀头"
     if len(short_faces) != 2 or not _is_valid_taatsu2(short_faces):
         return False, "缺一张的面子必须是可补成和牌的两张搭子"
+    if _is_exact_pair2(short_faces) and not pair_faces[0].endswith("s"):
+        return False, "当前搜索器在“缺一张面子”的分支里，且这个面子是刻子时，只枚举索子雀头"
     ok_other, reason_other = _manual_meld_searchable(other_faces)
     if not ok_other:
         which = "面子 B" if short_key == "meld1" else "面子 A"
         return False, f"{which} 无法被搜索器按完整面子枚举: {reason_other}"
-    if not all(face.endswith("s") for face in other_faces):
-        which = "面子 B" if short_key == "meld1" else "面子 A"
-        return False, f"当前搜索器在“缺一张面子”的分支里，只会搭配索子完整面子，所以 {which} 不能是非索子面子"
-    return True, "该形状符合搜索器的“索子雀头 + 一个完整索子面子 + 一个缺一张面子”枚举规则"
+    return True, "该形状符合搜索器的“一个完整面子 + 一个缺一张面子”枚举规则"
 
 
 def validate_manual_souzu_switch_plan(
@@ -1195,7 +1209,11 @@ def validate_manual_souzu_switch_plan(
     remaining_changes = max(0, int(total_change_tile_count or 0) - int(change_tile_count or 0))
     per_change_limit = 3 if 901 in (boss_buff or []) else 13
     used_count = len(switch_used_tiles or [])
-    remaining_replacements = list(replacement_ids[used_count:])
+    remaining_replacements = _limit_replacement_search_window(
+        replacement_ids[used_count:],
+        remaining_changes,
+        per_change_limit,
+    )
     pool, by_id = _build_pool(deck_map, hand_ids, remaining_replacements, wall_ids)
     pool_ids = {entry.tile_id for entry in pool}
 
@@ -1680,7 +1698,7 @@ def _search_remaining_plan(
                 pairs = get_pairs(blocked, allow_replacement=allow_replacement_after_win, min_order=min_order_after_win)
                 melds = get_melds(blocked, allow_replacement=allow_replacement_after_win, min_order=min_order_after_win)
                 for pair_index, pair in enumerate(pairs, start=1):
-                    if not str(pair.get("face", "")).endswith("s"):
+                    if win_component.get("kind") == "triplet" and not str(pair.get("face", "")).endswith("s"):
                         continue
                     blocked1 = blocked | {by_id[tile_id].order for tile_id in pair["ids"]}
                     if _target13_lower_bound(
@@ -1695,9 +1713,6 @@ def _search_remaining_plan(
                     stats["node_index"] = pair_index
                     stats["node_searchable"] = len(pool) - len(blocked1)
                     for meld_index, meld in enumerate(melds, start=1):
-                        if not _component_is_souzu_only(meld):
-                            stats["last_node_souzu_prunes"] += 1
-                            continue
                         if meld.get("kind") == "triplet" and not str(meld.get("face", "")).endswith("s"):
                             continue
                         meld_orders = {by_id[tile_id].order for tile_id in meld["ids"]}
@@ -2110,7 +2125,11 @@ def recommend_souzu_tenpai_switch(
     # 换三张debuff
     per_change_limit = 3 if 901 in (boss_buff or []) else 13
     used_count = len(switch_used_tiles or [])
-    remaining_replacements = list(replacement_ids[used_count:])
+    remaining_replacements = _limit_replacement_search_window(
+        replacement_ids[used_count:],
+        remaining_changes,
+        per_change_limit,
+    )
 
     stats = {
         "quads": 0,

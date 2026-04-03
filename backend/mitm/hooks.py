@@ -223,11 +223,15 @@ def _current_discard(plan: dict) -> int | None:
 def _switch_search_params_from_state(state: dict) -> dict:
     hand_tiles = list(state.get("hand_tiles") or [])
     replacement_tiles = list(state.get("replacement_tiles") or [])
+    used_count = len(state.get("switch_used_tiles") or [])
+    remaining_changes = max(0, int(state.get("total_change_tile_count", 0) or 0) - int(state.get("change_tile_count", 0) or 0))
+    per_change_limit = 3 if 901 in (state.get("boss_buff") or []) else 13
+    replacement_read_limit = min(max(0, len(replacement_tiles) - used_count), remaining_changes * per_change_limit)
     considered_tiles = list(state.get("wall_tiles") or [])
     return {
         "max_change_count": int(state.get("total_change_tile_count", 0) or 0),
-        "per_change_limit": 3 if 901 in (state.get("boss_buff") or []) else 13,
-        "considered_tile_count": len(hand_tiles) + len(replacement_tiles) + len(considered_tiles),
+        "per_change_limit": per_change_limit,
+        "considered_tile_count": len(hand_tiles) + replacement_read_limit + len(considered_tiles),
     }
 
 
@@ -583,6 +587,7 @@ async def broadcast_switch_quad_catalog(*, wall_limit: int = 36) -> None:
         state["switch_used_tiles"],
         state["total_change_tile_count"],
         state["change_tile_count"],
+        state["boss_buff"],
     )
     if isinstance(plan, dict):
         plan = {**_switch_search_params_from_state(state), **plan, "request_source": "live"}
