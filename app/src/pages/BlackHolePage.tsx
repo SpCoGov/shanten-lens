@@ -5,6 +5,8 @@ import {ws} from "../lib/ws";
 import Tile from "../components/Tile";
 import styles from "../components/AdvisorPanel.module.css";
 import type {PlanData, TileId} from "../lib/planTypes";
+import type {GameStateData} from "../lib/gamestate";
+import {buildDebugSnapshotFromState} from "./SouzuSwitchDebugPage";
 
 const LS_AUTO_STOP = "sl-blackhole:auto-stop-first";
 const LS_VERBOSE = "sl-blackhole:verbose-progress";
@@ -59,6 +61,7 @@ export default function BlackHolePage({
                                           handIds,
                                           replacementIds,
                                           wallIds,
+                                          currentState,
                                           onClear,
                                       }: {
     stage: number;
@@ -67,6 +70,7 @@ export default function BlackHolePage({
     handIds: TileId[];
     replacementIds: TileId[];
     wallIds: TileId[];
+    currentState: GameStateData | null;
     onClear?: () => void;
 }) {
     const {t} = useTranslation();
@@ -158,6 +162,20 @@ export default function BlackHolePage({
         if (!canOperate || !hasExecutablePlan) return;
         ws.send({type: "souzu_switch_control", data: {action: "execute_plan"}} as any);
     }, [canOperate, hasExecutablePlan]);
+    const exportCurrentSnapshot = React.useCallback(async () => {
+        if (!currentState) {
+            pushToast("当前没有可导出的局面", "error", 1800);
+            return;
+        }
+        const snapshot = buildDebugSnapshotFromState(currentState);
+        const text = JSON.stringify(snapshot);
+        try {
+            await navigator.clipboard.writeText(text);
+            pushToast("已导出当前局面，并复制到剪贴板", "success", 1600);
+        } catch {
+            pushToast("已导出当前局面", "success", 1400);
+        }
+    }, [currentState]);
     const clearCache = React.useCallback(() => {
         setSeenSignatures([]);
         setQuadCatalogData(null);
@@ -211,6 +229,9 @@ export default function BlackHolePage({
                     </button>
                     <button className="nav-btn" onClick={executePlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
                         {t("blackhole.execute_plan")}
+                    </button>
+                    <button className="nav-btn" onClick={exportCurrentSnapshot}>
+                        导出当前局面
                     </button>
                     <button className="nav-btn" onClick={clearCache}>
                         {t("blackhole.clear_cache")}
@@ -274,7 +295,7 @@ export default function BlackHolePage({
     );
 }
 
-function BlackHoleStrategyCard({
+export function BlackHoleStrategyCard({
     title,
     data,
     resolveFace,

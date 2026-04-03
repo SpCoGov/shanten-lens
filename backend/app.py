@@ -486,6 +486,24 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         skip_signatures=list(opts.get("skip_signatures") or []),
                         wall_limit=int(opts.get("wall_limit", 36) or 36),
                     )
+                elif action == "start_debug":
+                    from backend.mitm.hooks import start_switch_recommendation_debug_search
+                    opts = (data or {}).get("options") or {}
+                    await start_switch_recommendation_debug_search(
+                        snapshot=(data or {}).get("snapshot") or {},
+                        stop_after_first=bool(opts.get("stop_after_first", False)),
+                        skip_signatures=list(opts.get("skip_signatures") or []),
+                        wall_limit=int(opts.get("wall_limit", 36) or 36),
+                    )
+                elif action == "validate_manual_debug":
+                    from backend.mitm.hooks import validate_manual_switch_debug_plan
+                    opts = (data or {}).get("options") or {}
+                    await validate_manual_switch_debug_plan(
+                        snapshot=(data or {}).get("snapshot") or {},
+                        quad_groups=list((data or {}).get("quad_groups") or []),
+                        structure_groups=dict((data or {}).get("structure_groups") or {}),
+                        wall_limit=int(opts.get("wall_limit", 36) or 36),
+                    )
                 elif action == "stop":
                     from backend.mitm.hooks import stop_switch_recommendation_search
                     await stop_switch_recommendation_search(

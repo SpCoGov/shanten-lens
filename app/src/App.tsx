@@ -8,6 +8,7 @@ import AutoRunnerPage from "./pages/AutoRunnerPage";
 import FusePage from "./pages/FusePage";
 import AboutPage from "./pages/AboutPage";
 import BlackHolePage from "./pages/BlackHolePage";
+import SouzuSwitchDebugPage from "./pages/SouzuSwitchDebugPage";
 import {ws, ensureWsStartedOnce} from "./lib/ws";
 import {type LogLevel, useLogStore} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
@@ -82,7 +83,7 @@ async function openSettingsWindow() {
     }
 }
 
-type Route = "home" | "blackhole" | "fuse" | "autorun" | "settings" | "diagnostics" | "about";
+type Route = "home" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "diagnostics" | "about";
 
 const OUTER_PADDING = 16;
 const SIDEBAR_WIDTH = 320;
@@ -163,6 +164,8 @@ export default function App() {
     const [planSuuAnkou, setPlanSuuAnkou] = React.useState<PlanData | null>(null);
     const [planChiitoi, setPlanChiitoi] = React.useState<PlanData | null>(null);
     const [planSouzuSwitch, setPlanSouzuSwitch] = React.useState<PlanData | null>(null);
+    const [debugSouzuSwitch, setDebugSouzuSwitch] = React.useState<PlanData | null>(null);
+    const [latestGameState, setLatestGameState] = React.useState<GameStateData | null>(null);
 
     const [amulets, setAmulets] = React.useState<EffectItem[]>([]);
     const [goods, setGoods] = React.useState<GoodsItem[]>([]);
@@ -288,6 +291,7 @@ export default function App() {
         const offPkt = ws.onPacket((pkt: WsEnvelope) => {
             if (pkt.type === "update_gamestate") {
                 const d = pkt.data as GameStateData;
+                setLatestGameState(d);
                 const deck = toDeckMap(d.deck_map);
                 setDeckMap(deck);
                 const list = buildCells(deck, d.locked_tiles ?? [], d.wall_tiles ?? [], 36);
@@ -326,7 +330,11 @@ export default function App() {
                     if (!item || !item.yaku) continue;
                     if (item.yaku === "chiitoi") setPlanChiitoi(item.data ?? null);
                     else if (item.yaku === "suuannkou") setPlanSuuAnkou(item.data ?? null);
-                    else if (item.yaku === "souzu_switch") setPlanSouzuSwitch(item.data ?? null);
+                    else if (item.yaku === "souzu_switch") {
+                        const source = (item.data as any)?.request_source;
+                        if (source === "debug") setDebugSouzuSwitch(item.data ?? null);
+                        else setPlanSouzuSwitch(item.data ?? null);
+                    }
                 }
             } else if (pkt.type === "autorun_status" && pkt.data) {
                 setAutoStatus(pkt.data as AutoRunnerStatus);
@@ -464,6 +472,9 @@ export default function App() {
                     <button className={`nav-icon ${route === "blackhole" ? "active" : ""}`} title={t("nav.blackhole")} onClick={() => setRoute("blackhole")}>
                         <span className="ms">deblur</span>
                     </button>
+                    <button className={`nav-icon ${route === "souzu-debug" ? "active" : ""}`} title="Souzu Debug" onClick={() => setRoute("souzu-debug")}>
+                        <span className="ms">science</span>
+                    </button>
                     <button className={`nav-icon ${route === "autorun" ? "active" : ""}`} title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
                         <span className="ms">autoplay</span>
                     </button>
@@ -572,7 +583,15 @@ export default function App() {
                                 handIds={handTileIds}
                                 replacementIds={replacementTileIds}
                                 wallIds={wallTileIds}
+                                currentState={latestGameState}
                                 onClear={() => setPlanSouzuSwitch(null)}
+                            />
+                        )}
+                        {route === "souzu-debug" && (
+                            <SouzuSwitchDebugPage
+                                currentState={latestGameState}
+                                data={debugSouzuSwitch}
+                                onClear={() => setDebugSouzuSwitch(null)}
                             />
                         )}
                         {route === "autorun" && <AutoRunnerPage/>}

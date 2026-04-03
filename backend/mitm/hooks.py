@@ -2,7 +2,7 @@ import asyncio
 import copy
 import threading
 from collections import OrderedDict
-from typing import Tuple, Any, Dict, List, Set, Optional, Union
+from typing import Tuple, Any, Dict, List, Set, Optional, Union, Sequence
 import time
 
 from loguru import logger
@@ -14,7 +14,11 @@ from backend.app import AMULET_REG, BADGE_REG, pipeline
 from backend.app import MANAGER, GAME_STATE, broadcast
 from backend.autorun.util.chiitoi_recommender import chiitoi_recommendation_json
 from backend.autorun.util.retry_1004 import call_with_1004_retry_async
-from backend.autorun.util.souzu_switch_recommender import recommend_souzu_tenpai_switch, list_reachable_quads_for_switch
+from backend.autorun.util.souzu_switch_recommender import (
+    recommend_souzu_tenpai_switch,
+    list_reachable_quads_for_switch,
+    validate_manual_souzu_switch_plan,
+)
 from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
 from backend.msgbox import _ui_confirm_blocking, ui_alert
 
@@ -29,6 +33,83 @@ _SWITCH_RECOMMENDATION_SEQ = 0
 _SWITCH_STOP_EVENT = threading.Event()
 _SWITCH_SEARCH_TASK: asyncio.Task | None = None
 _LAST_SWITCH_PLAN: dict | None = None
+
+
+def _coerce_int_list(values: Any) -> list[int]:
+    out: list[int] = []
+    if not isinstance(values, (list, tuple)):
+        return out
+    for value in values:
+        try:
+            out.append(int(value))
+        except Exception:
+            continue
+    return out
+
+
+def _normalize_switch_debug_snapshot(snapshot: Any, *, wall_limit: int = 36) -> dict:
+    if not isinstance(snapshot, dict):
+        raise ValueError("snapshot must be an object")
+
+    raw_deck_map = snapshot.get("deck_map")
+    if not isinstance(raw_deck_map, dict) or not raw_deck_map:
+        raise ValueError("snapshot.deck_map is required")
+
+    deck_map: dict[int, str] = {}
+    for raw_key, raw_face in raw_deck_map.items():
+        try:
+            deck_map[int(raw_key)] = str(raw_face)
+        except Exception:
+            continue
+    if not deck_map:
+        raise ValueError("snapshot.deck_map has no valid tile ids")
+
+    hand_tiles = _coerce_int_list(snapshot.get("hand_tiles"))
+    replacement_tiles = _coerce_int_list(snapshot.get("replacement_tiles"))
+    wall_tiles_all = _coerce_int_list(snapshot.get("wall_tiles"))
+    switch_used_tiles = _coerce_int_list(snapshot.get("switch_used_tiles"))
+    boss_buff = _coerce_int_list(snapshot.get("boss_buff"))
+
+    referenced_ids = hand_tiles + replacement_tiles + wall_tiles_all + switch_used_tiles
+    missing_ids = [tile_id for tile_id in referenced_ids if tile_id not in deck_map]
+    if missing_ids:
+        preview = ",".join(str(tile_id) for tile_id in missing_ids[:8])
+        suffix = "" if len(missing_ids) <= 8 else "..."
+        raise ValueError(f"snapshot.deck_map missing tile ids: {preview}{suffix}")
+
+    wall_limit_int = max(2, min(36, int(wall_limit or 36)))
+    wall_tiles = wall_tiles_all if wall_limit_int >= 36 else wall_tiles_all[:wall_limit_int]
+
+    return {
+        "stage": int(snapshot.get("stage", 2) or 0),
+        "deck_map": deck_map,
+        "hand_tiles": hand_tiles,
+        "replacement_tiles": replacement_tiles,
+        "wall_tiles_all": wall_tiles_all,
+        "wall_tiles": wall_tiles,
+        "switch_used_tiles": switch_used_tiles,
+        "total_change_tile_count": int(snapshot.get("total_change_tile_count", 0) or 0),
+        "change_tile_count": int(snapshot.get("change_tile_count", len(switch_used_tiles)) or 0),
+        "boss_buff": boss_buff,
+    }
+
+
+def _live_switch_search_state(*, wall_limit: int = 36) -> dict:
+    wall_limit_int = max(2, min(36, int(wall_limit or 36)))
+    wall_tiles_all = list(getattr(GAME_STATE, "wall_tiles", None) or [])
+    wall_tiles = wall_tiles_all if wall_limit_int >= 36 else wall_tiles_all[:wall_limit_int]
+    return {
+        "stage": int(getattr(GAME_STATE, "stage", 0) or 0),
+        "deck_map": dict(getattr(GAME_STATE, "deck_map", None) or {}),
+        "hand_tiles": list(getattr(GAME_STATE, "hand_tiles", None) or []),
+        "replacement_tiles": list(getattr(GAME_STATE, "replacement_tiles", None) or []),
+        "wall_tiles_all": wall_tiles_all,
+        "wall_tiles": wall_tiles,
+        "switch_used_tiles": list(getattr(GAME_STATE, "switch_used_tiles", None) or []),
+        "total_change_tile_count": int(getattr(GAME_STATE, "total_change_tile_count", 0) or 0),
+        "change_tile_count": int(getattr(GAME_STATE, "change_tile_count", 0) or 0),
+        "boss_buff": list(getattr(GAME_STATE, "boss_buff", None) or []),
+    }
 
 
 def _cache_switch_plan(plan: dict | None) -> None:
@@ -139,13 +220,13 @@ def _current_discard(plan: dict) -> int | None:
     return int(d[0]) if d else None
 
 
-def _switch_search_params(wall_limit: int = 36) -> dict:
-    hand_tiles = list(getattr(GAME_STATE, "hand_tiles", None) or [])
-    replacement_tiles = list(getattr(GAME_STATE, "replacement_tiles", None) or [])
-    considered_tiles = list(GAME_STATE.wall_tiles if wall_limit >= 36 else GAME_STATE.wall_tiles[:max(2, wall_limit)])
+def _switch_search_params_from_state(state: dict) -> dict:
+    hand_tiles = list(state.get("hand_tiles") or [])
+    replacement_tiles = list(state.get("replacement_tiles") or [])
+    considered_tiles = list(state.get("wall_tiles") or [])
     return {
-        "max_change_count": int(getattr(GAME_STATE, "total_change_tile_count", 0) or 0),
-        "per_change_limit": 3 if 901 in (getattr(GAME_STATE, "boss_buff", None) or []) else 13,
+        "max_change_count": int(state.get("total_change_tile_count", 0) or 0),
+        "per_change_limit": 3 if 901 in (state.get("boss_buff") or []) else 13,
         "considered_tile_count": len(hand_tiles) + len(replacement_tiles) + len(considered_tiles),
     }
 
@@ -176,6 +257,10 @@ def _wrap_entry(yaku_key: str, plan: dict) -> dict:
             "max_change_count",
             "per_change_limit",
             "considered_tile_count",
+            "request_source",
+            "component_descs",
+            "manual_searchable",
+            "manual_search_reason",
     ):
         if key in plan:
             entry[key] = plan[key]
@@ -190,6 +275,8 @@ async def _broadcast_switch_recommendation(
         stop_after_first: bool,
         skip_signatures: list[str] | None = None,
         wall_limit: int = 36,
+        snapshot_state: dict | None = None,
+        request_source: str = "live",
 ) -> None:
     global _SWITCH_RECOMMENDATION_SEQ, _SWITCH_STOP_EVENT, _SWITCH_SEARCH_TASK
     _SWITCH_RECOMMENDATION_SEQ += 1
@@ -204,13 +291,16 @@ async def _broadcast_switch_recommendation(
         "flush_queued": False,
         "finished": False,
     }
-    search_params = _switch_search_params(wall_limit)
+    state = snapshot_state or _live_switch_search_state(wall_limit=wall_limit)
+    search_params = _switch_search_params_from_state(state)
 
     await broadcast({
         "type": "discard_recommendation",
         "data": [_wrap_entry("souzu_switch", {
             "status": "searching",
             "progress": "正在准备搜索…",
+            "request_source": request_source,
+            **search_params,
         })],
     })
 
@@ -241,6 +331,7 @@ async def _broadcast_switch_recommendation(
                     "data": [_wrap_entry("souzu_switch", {
                         "status": "searching",
                         "progress": message,
+                        "request_source": request_source,
                         **(latest_progress["candidate"] or {}),
                     })],
                 })
@@ -301,6 +392,7 @@ async def _broadcast_switch_recommendation(
             "remaining_changes": plan.get("remaining_changes"),
             "target13": plan.get("target13") or [],
             "plan_signature": plan.get("plan_signature"),
+            "request_source": request_source,
             **search_params,
         }
         latest_progress["candidate_version"] += 1
@@ -320,14 +412,14 @@ async def _broadcast_switch_recommendation(
 
     search_task = asyncio.create_task(asyncio.to_thread(
         recommend_souzu_tenpai_switch,
-        GAME_STATE.deck_map,
-        GAME_STATE.hand_tiles,
-        GAME_STATE.replacement_tiles,
-        list(GAME_STATE.wall_tiles if wall_limit >= 36 else GAME_STATE.wall_tiles[:max(2, wall_limit)]),
-        GAME_STATE.switch_used_tiles,
-        GAME_STATE.total_change_tile_count,
-        GAME_STATE.change_tile_count,
-        GAME_STATE.boss_buff,
+        state["deck_map"],
+        state["hand_tiles"],
+        state["replacement_tiles"],
+        state["wall_tiles"],
+        state["switch_used_tiles"],
+        state["total_change_tile_count"],
+        state["change_tile_count"],
+        state["boss_buff"],
         progress_cb,
         candidate_cb,
         _SWITCH_STOP_EVENT.is_set,
@@ -339,7 +431,7 @@ async def _broadcast_switch_recommendation(
     if seq != _SWITCH_RECOMMENDATION_SEQ:
         return
     if isinstance(plan, dict):
-        plan = {**search_params, **plan}
+        plan = {**search_params, **plan, "request_source": request_source}
     _cache_switch_plan(plan)
     send_state["finished"] = True
     send_state["flush_queued"] = False
@@ -356,18 +448,21 @@ async def start_switch_recommendation_search(
         wall_limit: int = 36,
 ) -> None:
     _SWITCH_STOP_EVENT.set()
-    if int(getattr(GAME_STATE, "stage", 0) or 0) != 2:
+    state = _live_switch_search_state(wall_limit=wall_limit)
+    if int(state.get("stage", 0) or 0) != 2:
         _cache_switch_plan({
             "status": "impossible",
             "reason": "stage-not-switch",
-            **_switch_search_params(wall_limit),
+            "request_source": "live",
+            **_switch_search_params_from_state(state),
         })
         await broadcast({
             "type": "discard_recommendation",
             "data": [_wrap_entry("souzu_switch", {
                 "status": "impossible",
                 "reason": "stage-not-switch",
-                **_switch_search_params(wall_limit),
+                "request_source": "live",
+                **_switch_search_params_from_state(state),
             })],
         })
         return
@@ -375,22 +470,122 @@ async def start_switch_recommendation_search(
         stop_after_first=stop_after_first,
         skip_signatures=skip_signatures or [],
         wall_limit=wall_limit,
+        snapshot_state=state,
+        request_source="live",
     ))
 
 
-async def broadcast_switch_quad_catalog(*, wall_limit: int = 36) -> None:
+async def start_switch_recommendation_debug_search(
+        *,
+        snapshot: dict,
+        stop_after_first: bool,
+        skip_signatures: list[str] | None = None,
+        wall_limit: int = 36,
+) -> None:
+    _SWITCH_STOP_EVENT.set()
+    try:
+        state = _normalize_switch_debug_snapshot(snapshot, wall_limit=wall_limit)
+    except ValueError as exc:
+        plan = {
+            "status": "impossible",
+            "reason": str(exc),
+            "request_source": "debug",
+            "max_change_count": 0,
+            "per_change_limit": 13,
+            "considered_tile_count": 0,
+        }
+        _cache_switch_plan(plan)
+        await broadcast({
+            "type": "discard_recommendation",
+            "data": [_wrap_entry("souzu_switch", plan)],
+        })
+        return
+
+    if int(state.get("stage", 0) or 0) != 2:
+        plan = {
+            "status": "impossible",
+            "reason": "stage-not-switch",
+            "request_source": "debug",
+            **_switch_search_params_from_state(state),
+        }
+        _cache_switch_plan(plan)
+        await broadcast({
+            "type": "discard_recommendation",
+            "data": [_wrap_entry("souzu_switch", plan)],
+        })
+        return
+
+    asyncio.create_task(_broadcast_switch_recommendation(
+        stop_after_first=stop_after_first,
+        skip_signatures=skip_signatures or [],
+        wall_limit=wall_limit,
+        snapshot_state=state,
+        request_source="debug",
+    ))
+
+
+async def validate_manual_switch_debug_plan(
+        *,
+        snapshot: dict,
+        quad_groups: Sequence[Sequence[int]],
+        structure_groups: Dict[str, Sequence[int]],
+        wall_limit: int = 36,
+) -> None:
+    try:
+        state = _normalize_switch_debug_snapshot(snapshot, wall_limit=wall_limit)
+    except ValueError as exc:
+        plan = {
+            "status": "impossible",
+            "reason": str(exc),
+            "request_source": "debug",
+            "max_change_count": 0,
+            "per_change_limit": 13,
+            "considered_tile_count": 0,
+        }
+        _cache_switch_plan(plan)
+        await broadcast({"type": "discard_recommendation", "data": [_wrap_entry("souzu_switch", plan)]})
+        return
+
     plan = await asyncio.to_thread(
-        list_reachable_quads_for_switch,
-        GAME_STATE.deck_map,
-        GAME_STATE.hand_tiles,
-        GAME_STATE.replacement_tiles,
-        list(GAME_STATE.wall_tiles if wall_limit >= 36 else GAME_STATE.wall_tiles[:max(2, wall_limit)]),
-        GAME_STATE.switch_used_tiles,
-        GAME_STATE.total_change_tile_count,
-        GAME_STATE.change_tile_count,
+        validate_manual_souzu_switch_plan,
+        state["deck_map"],
+        state["hand_tiles"],
+        state["replacement_tiles"],
+        state["wall_tiles"],
+        state["switch_used_tiles"],
+        state["total_change_tile_count"],
+        state["change_tile_count"],
+        state["boss_buff"],
+        quad_groups,
+        structure_groups,
     )
     if isinstance(plan, dict):
-        plan = {**_switch_search_params(wall_limit), **plan}
+        plan = {
+            **_switch_search_params_from_state(state),
+            **plan,
+            "request_source": "debug",
+        }
+    _cache_switch_plan(plan)
+    await broadcast({
+        "type": "discard_recommendation",
+        "data": [_wrap_entry("souzu_switch", plan)],
+    })
+
+
+async def broadcast_switch_quad_catalog(*, wall_limit: int = 36) -> None:
+    state = _live_switch_search_state(wall_limit=wall_limit)
+    plan = await asyncio.to_thread(
+        list_reachable_quads_for_switch,
+        state["deck_map"],
+        state["hand_tiles"],
+        state["replacement_tiles"],
+        state["wall_tiles"],
+        state["switch_used_tiles"],
+        state["total_change_tile_count"],
+        state["change_tile_count"],
+    )
+    if isinstance(plan, dict):
+        plan = {**_switch_search_params_from_state(state), **plan, "request_source": "live"}
     _cache_switch_plan(plan)
     await broadcast({
         "type": "discard_recommendation",
@@ -407,14 +602,16 @@ async def stop_switch_recommendation_search(*, notify_client: bool = True) -> No
         _cache_switch_plan({
             "status": "impossible",
             "reason": "stopped-by-user",
-            **_switch_search_params(),
+            "request_source": "live",
+            **_switch_search_params_from_state(_live_switch_search_state()),
         })
         await broadcast({
             "type": "discard_recommendation",
             "data": [_wrap_entry("souzu_switch", {
                 "status": "impossible",
                 "reason": "stopped-by-user",
-                **_switch_search_params(),
+                "request_source": "live",
+                **_switch_search_params_from_state(_live_switch_search_state()),
             })],
         })
 

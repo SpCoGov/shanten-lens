@@ -1104,6 +1104,194 @@ def list_reachable_quads_for_switch(
     }
 
 
+def _is_exact_pair2(faces2: Sequence[str]) -> bool:
+    return len(faces2) == 2 and faces2[0] == faces2[1]
+
+
+def _is_valid_taatsu2(faces2: Sequence[str]) -> bool:
+    if len(faces2) != 2:
+        return False
+    a, b = sorted(faces2, key=lambda tile: TILE_INDEX.get(tile, 99))
+    if a == b:
+        return True
+    ra, sa = _parse_face(a)
+    rb, sb = _parse_face(b)
+    if sa not in "mps" or sa != sb:
+        return False
+    return rb - ra in (1, 2)
+
+
+def _manual_bucket_faces(ids: Sequence[int], deck_map: Dict[int, str]) -> List[str]:
+    return [_norm(deck_map[int(tile_id)]) for tile_id in ids]
+
+
+def _manual_meld_searchable(faces: Sequence[str]) -> tuple[bool, str]:
+    if len(faces) != 3:
+        return False, "面子必须是 3 张"
+    if not _is_exact_meld3(faces):
+        return False, "完整面子不是合法的顺子或刻子"
+    if faces[0] == faces[1] == faces[2] and not faces[0].endswith("s"):
+        return False, "搜索器不会枚举非索子刻子作为完整面子"
+    return True, ""
+
+
+def _analyze_manual_searchability(
+        deck_map: Dict[int, str],
+        structure_groups: Dict[str, Sequence[int]],
+) -> tuple[bool, str]:
+    meld1_faces = _manual_bucket_faces(structure_groups.get("meld1") or [], deck_map)
+    meld2_faces = _manual_bucket_faces(structure_groups.get("meld2") or [], deck_map)
+    pair_faces = _manual_bucket_faces(structure_groups.get("pair") or [], deck_map)
+
+    deficits = {
+        "meld1": 3 - len(meld1_faces),
+        "meld2": 3 - len(meld2_faces),
+        "pair": 2 - len(pair_faces),
+    }
+    short_keys = [key for key, miss in deficits.items() if miss == 1]
+    if len(short_keys) != 1 or any(miss < 0 or miss > 1 for miss in deficits.values()):
+        return False, "搜索器只支持恰好一个分组少 1 张的听牌形"
+
+    short_key = short_keys[0]
+    if short_key == "pair":
+        ok1, reason1 = _manual_meld_searchable(meld1_faces)
+        if not ok1:
+            return False, f"面子 A 无法被搜索器按完整面子枚举: {reason1}"
+        ok2, reason2 = _manual_meld_searchable(meld2_faces)
+        if not ok2:
+            return False, f"面子 B 无法被搜索器按完整面子枚举: {reason2}"
+        return True, "该形状符合搜索器的“单骑雀头 + 两个完整面子”枚举规则"
+
+    short_faces = meld1_faces if short_key == "meld1" else meld2_faces
+    other_faces = meld2_faces if short_key == "meld1" else meld1_faces
+    if len(pair_faces) != 2 or not _is_exact_pair2(pair_faces):
+        return False, "当缺的是面子时，雀头必须是完整对子"
+    if not pair_faces[0].endswith("s"):
+        return False, "当前搜索器在“缺一张面子”的分支里，只会枚举索子雀头"
+    if len(short_faces) != 2 or not _is_valid_taatsu2(short_faces):
+        return False, "缺一张的面子必须是可补成和牌的两张搭子"
+    ok_other, reason_other = _manual_meld_searchable(other_faces)
+    if not ok_other:
+        which = "面子 B" if short_key == "meld1" else "面子 A"
+        return False, f"{which} 无法被搜索器按完整面子枚举: {reason_other}"
+    if not all(face.endswith("s") for face in other_faces):
+        which = "面子 B" if short_key == "meld1" else "面子 A"
+        return False, f"当前搜索器在“缺一张面子”的分支里，只会搭配索子完整面子，所以 {which} 不能是非索子面子"
+    return True, "该形状符合搜索器的“索子雀头 + 一个完整索子面子 + 一个缺一张面子”枚举规则"
+
+
+def validate_manual_souzu_switch_plan(
+        deck_map: Dict[int, str],
+        hand_ids: List[int],
+        replacement_ids: List[int],
+        wall_ids: List[int],
+        switch_used_tiles: List[int],
+        total_change_tile_count: int,
+        change_tile_count: int,
+        boss_buff: Optional[Sequence[int]],
+        quad_groups: Sequence[Sequence[int]],
+        structure_groups: Dict[str, Sequence[int]],
+) -> dict:
+    remaining_changes = max(0, int(total_change_tile_count or 0) - int(change_tile_count or 0))
+    per_change_limit = 3 if 901 in (boss_buff or []) else 13
+    used_count = len(switch_used_tiles or [])
+    remaining_replacements = list(replacement_ids[used_count:])
+    pool, by_id = _build_pool(deck_map, hand_ids, remaining_replacements, wall_ids)
+    pool_ids = {entry.tile_id for entry in pool}
+
+    if len(hand_ids) != 13:
+        return {"status": "impossible", "reason": "switch-hand-must-be-13", "remaining_changes": remaining_changes}
+
+    if len(quad_groups) != 2:
+        return {"status": "impossible", "reason": "manual-quad-count-invalid"}
+
+    normalized_quads: List[tuple[int, ...]] = []
+    quad_faces: List[str] = []
+    used_ids: Set[int] = set()
+    available_quads = {tuple(sorted(quad["ids"])): quad for quad in _enumerate_quads(pool, by_id)}
+
+    for index, group in enumerate(quad_groups, start=1):
+        ids = tuple(sorted(int(tile_id) for tile_id in group))
+        if len(ids) != 4:
+            return {"status": "impossible", "reason": f"manual-quad-{index}-size-invalid"}
+        if len(set(ids)) != 4:
+            return {"status": "impossible", "reason": f"manual-quad-{index}-duplicate-tile"}
+        if any(tile_id not in pool_ids for tile_id in ids):
+            return {"status": "impossible", "reason": f"manual-quad-{index}-tile-not-in-pool"}
+        if any(tile_id in used_ids for tile_id in ids):
+            return {"status": "impossible", "reason": f"manual-quad-{index}-overlap"}
+        quad = available_quads.get(ids)
+        if quad is None:
+            return {"status": "impossible", "reason": f"manual-quad-{index}-not-a-quad"}
+        normalized_quads.append(ids)
+        quad_faces.append(str(quad["face"]))
+        used_ids.update(ids)
+
+    meld1_ids = tuple(sorted(int(tile_id) for tile_id in (structure_groups.get("meld1") or [])))
+    meld2_ids = tuple(sorted(int(tile_id) for tile_id in (structure_groups.get("meld2") or [])))
+    pair_ids = tuple(sorted(int(tile_id) for tile_id in (structure_groups.get("pair") or [])))
+
+    if len(meld1_ids) > 3 or len(meld2_ids) > 3 or len(pair_ids) > 2:
+        return {"status": "impossible", "reason": "manual-structure-size-invalid"}
+
+    prewin_ids = list(meld1_ids + meld2_ids + pair_ids)
+    if len(prewin_ids) != 7:
+        return {"status": "impossible", "reason": "manual-structure-total-invalid"}
+    if len(set(prewin_ids)) != 7:
+        return {"status": "impossible", "reason": "manual-structure-duplicate-tile"}
+    if any(tile_id not in pool_ids for tile_id in prewin_ids):
+        return {"status": "impossible", "reason": "manual-structure-tile-not-in-pool"}
+    if any(tile_id in used_ids for tile_id in prewin_ids):
+        return {"status": "impossible", "reason": "manual-structure-overlap-with-quad"}
+
+    def group_desc(name: str, ids: Sequence[int]) -> str:
+        faces = [_norm(deck_map[int(tile_id)]) for tile_id in ids]
+        return f"{name}: {' '.join(faces)}"
+
+    component_descs = [
+        group_desc("meld1", meld1_ids),
+        group_desc("meld2", meld2_ids),
+        group_desc("pair", pair_ids),
+    ]
+    manual_searchable, manual_search_reason = _analyze_manual_searchability(
+        deck_map,
+        {
+            "meld1": meld1_ids,
+            "meld2": meld2_ids,
+            "pair": pair_ids,
+        },
+    )
+    quad_ids = list(normalized_quads[0] + normalized_quads[1])
+    plan, reason = _evaluate_candidate(
+        deck_map,
+        hand_ids,
+        remaining_replacements,
+        by_id,
+        quad_ids,
+        prewin_ids,
+        component_descs,
+        remaining_changes,
+        per_change_limit,
+    )
+    if plan is None:
+        return {
+            "status": "impossible",
+            "reason": reason,
+            "remaining_changes": remaining_changes,
+            "quad_faces": quad_faces,
+            "target13": [_norm(deck_map[int(tile_id)]) for tile_id in prewin_ids],
+            "component_descs": component_descs,
+            "manual_searchable": manual_searchable,
+            "manual_search_reason": manual_search_reason,
+        }
+
+    plan["quad_faces"] = quad_faces
+    plan["component_descs"] = component_descs
+    plan["manual_searchable"] = manual_searchable
+    plan["manual_search_reason"] = manual_search_reason
+    return plan
+
+
 def _signature_to_text(signature: tuple) -> str:
     if len(signature) == 2 and isinstance(signature[1], tuple):
         return f"{signature[0]}|" + ",".join(str(tile_id) for tile_id in signature[1])

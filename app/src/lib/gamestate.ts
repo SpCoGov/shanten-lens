@@ -14,6 +14,10 @@ export interface GameStateData {
     goods?: GoodsItem[];
     candidate_effect_list?: CandidateEffectRef[];
     boss_buff?: number[];
+    change_tile_count?: number;
+    total_change_tile_count?: number;
+    max_effect_volume?: number;
+    update_reason?: string[];
 }
 
 export interface BadgeAffix {

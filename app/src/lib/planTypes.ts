@@ -38,4 +38,8 @@ export type PlanData = {
     max_change_count?: number;
     per_change_limit?: number;
     considered_tile_count?: number;
+    request_source?: "live" | "debug" | string;
+    component_descs?: string[];
+    manual_searchable?: boolean;
+    manual_search_reason?: string;
 };

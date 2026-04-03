@@ -18,7 +18,7 @@ export default function AboutPage() {
             <div className={styles.meta}>
                 <span className={styles.author}>{t("app.author")}</span>
                 <span className={styles.sep} aria-hidden>·</span>
-                <span className={styles.version}>v1.1.13</span>
+                <span className={styles.version}>v1.1.14</span>
                 <span className={styles.build}>(build&nbsp;1)</span>
             </div>
 
@@ -35,6 +35,8 @@ export default function AboutPage() {
                     <pre className={styles.license}>
 {`Licensed under the Apache License, Version 2.0 (the "License").
 You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+
 Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
           </pre>
                 </details>
