@@ -56,11 +56,17 @@ export default function BlackHolePage({
                                           stage,
                                           data,
                                           resolveFace,
+                                          handIds,
+                                          replacementIds,
+                                          wallIds,
                                           onClear,
                                       }: {
     stage: number;
     data: PlanData | null;
     resolveFace?: (id: number) => string | null;
+    handIds: TileId[];
+    replacementIds: TileId[];
+    wallIds: TileId[];
     onClear?: () => void;
 }) {
     const {t} = useTranslation();
@@ -71,6 +77,7 @@ export default function BlackHolePage({
     const [mainData, setMainData] = React.useState<PlanData | null>(null);
     const [quadCatalogData, setQuadCatalogData] = React.useState<PlanData | null>(null);
     const [quadDrawerOpen, setQuadDrawerOpen] = React.useState(false);
+    const [drawerMode, setDrawerMode] = React.useState<"quad" | "considered">("quad");
 
     React.useEffect(() => localStorage.setItem(LS_AUTO_STOP, autoStopFirst ? "1" : "0"), [autoStopFirst]);
     React.useEffect(() => localStorage.setItem(LS_VERBOSE, verboseProgress ? "1" : "0"), [verboseProgress]);
@@ -79,6 +86,7 @@ export default function BlackHolePage({
         if (!data) return;
         if ((data as any).status === "catalog") {
             setQuadCatalogData(data);
+            setDrawerMode("quad");
             setQuadDrawerOpen(true);
             return;
         }
@@ -138,9 +146,14 @@ export default function BlackHolePage({
         ws.send({type: "souzu_switch_control", data: {action: "stop"}} as any);
     }, []);
     const listQuads = React.useCallback(() => {
+        setDrawerMode("quad");
         setQuadDrawerOpen(true);
         ws.send({type: "souzu_switch_control", data: {action: "list_quads", options: {wall_limit: wallLimit}}} as any);
     }, [wallLimit]);
+    const openConsideredTiles = React.useCallback(() => {
+        setDrawerMode("considered");
+        setQuadDrawerOpen(true);
+    }, []);
     const executePlan = React.useCallback(() => {
         if (!canOperate || !hasExecutablePlan) return;
         ws.send({type: "souzu_switch_control", data: {action: "execute_plan"}} as any);
@@ -166,6 +179,15 @@ export default function BlackHolePage({
             progress: summarizeProgress(mainData.progress),
         };
     }, [mainData, verboseProgress]);
+    const consideredWallIds = React.useMemo(
+        () => (wallLimit >= 36 ? wallIds : wallIds.slice(0, Math.max(2, wallLimit))),
+        [wallIds, wallLimit],
+    );
+    const consideredSections = React.useMemo(() => ([
+        {key: "hand", title: "\u624b\u724c", ids: handIds},
+        {key: "replacement", title: "\u6362\u724c\u5806", ids: replacementIds},
+        {key: "wall", title: "\u724c\u5c71", ids: consideredWallIds},
+    ]), [consideredWallIds, handIds, replacementIds]);
 
     return (
         <div className="settings-wrap wide-page" style={{paddingBlock: 16}}>
@@ -225,6 +247,7 @@ export default function BlackHolePage({
                     <BlackHoleStrategyCard
                         data={viewData}
                         resolveFace={resolveFace}
+                        onOpenConsideredTiles={openConsideredTiles}
                         title={t("blackhole.card_title")}
                     />
                 </div>
@@ -233,13 +256,17 @@ export default function BlackHolePage({
                     <aside className="blackhole-drawer panel">
                         <div className="blackhole-drawer-head">
                             <div className="panel-title" style={{marginBottom: 0}}>
-                                {t("advisor.quad_catalog_title")}
+                                {drawerMode === "quad" ? "\u6240\u6709\u53ef\u89c1\u6760" : "\u53ef\u4f7f\u7528\u7684\u724c"}
                             </div>
                             <button className="nav-btn" onClick={() => setQuadDrawerOpen(false)}>
                                 {t("modal.close")}
                             </button>
                         </div>
-                        <QuadCatalogBody data={quadCatalogData} resolveFace={resolveFace}/>
+                        {drawerMode === "quad" ? (
+                            <QuadCatalogBody data={quadCatalogData} resolveFace={resolveFace}/>
+                        ) : (
+                            <ConsideredTilesBody sections={consideredSections} resolveFace={resolveFace}/>
+                        )}
                     </aside>
                 )}
             </div>
@@ -251,10 +278,12 @@ function BlackHoleStrategyCard({
     title,
     data,
     resolveFace,
+    onOpenConsideredTiles,
 }: {
     title: string;
     data: PlanData | null;
     resolveFace?: (id: number) => string | null;
+    onOpenConsideredTiles?: () => void;
 }) {
     const {t} = useTranslation();
     const hasPlanPreview = !!(
@@ -287,19 +316,19 @@ function BlackHoleStrategyCard({
                     <div className={styles.cardBodyMuted} style={{whiteSpace: "pre-wrap"}}>
                         {data.progress || t("advisor.searching")}
                     </div>
-                    {!hasPlanPreview ? <div style={{padding: "0 12px 12px"}}><SearchParamsBand data={data}/></div> : null}
-                    {hasPlanPreview ? <PlanBody data={data} resolveFace={resolveFace}/> : null}
+                    {!hasPlanPreview ? <div style={{padding: "0 12px 12px"}}><SearchParamsBand data={data} onOpenConsideredTiles={onOpenConsideredTiles}/></div> : null}
+                    {hasPlanPreview ? <PlanBody data={data} resolveFace={resolveFace} onOpenConsideredTiles={onOpenConsideredTiles}/> : null}
                 </div>
             ) : data.status === "impossible" ? (
                 <div style={{padding: 12, display: "grid", gap: 12}}>
-                    <SearchParamsBand data={data}/>
+                    <SearchParamsBand data={data} onOpenConsideredTiles={onOpenConsideredTiles}/>
                     <div className={styles.bandSingle} style={{padding: 0}}>
                         <div className={styles.bandValue}>{t("advisor.impossible")}</div>
                         <div className={styles.cardBodyMuted} style={{padding: 0}}>{reasonText(t, data.reason)}</div>
                     </div>
                 </div>
             ) : data.status === "plan" ? (
-                <PlanBody data={data} resolveFace={resolveFace}/>
+                <PlanBody data={data} resolveFace={resolveFace} onOpenConsideredTiles={onOpenConsideredTiles}/>
             ) : (
                 <div className={styles.cardBodyMuted}>{t("advisor.awaiting_backend")}</div>
             )}
@@ -307,12 +336,20 @@ function BlackHoleStrategyCard({
     );
 }
 
-function PlanBody({data, resolveFace}: { data: PlanData; resolveFace?: (id: number) => string | null }) {
+function PlanBody({
+    data,
+    resolveFace,
+    onOpenConsideredTiles,
+}: {
+    data: PlanData;
+    resolveFace?: (id: number) => string | null;
+    onOpenConsideredTiles?: () => void;
+}) {
     const {t} = useTranslation();
     const batches = zipBatches(data.switch_discards, data.switch_in, data.switch_batch_sizes);
     return (
         <div style={{padding: 12, display: "grid", gap: 14}}>
-            <SearchParamsBand data={data}/>
+            <SearchParamsBand data={data} onOpenConsideredTiles={onOpenConsideredTiles}/>
             <div className={styles.band}>
                 <div className={styles.bandLeft} style={{gridColumn: "1 / -1"}}>
                     <div className={styles.bandActionLabel}>{"\u7b2c\u51e0\u5f20\u542c\u724c"}</div>
@@ -337,7 +374,13 @@ function PlanBody({data, resolveFace}: { data: PlanData; resolveFace?: (id: numb
     );
 }
 
-function SearchParamsBand({data}: { data: PlanData }) {
+function SearchParamsBand({
+    data,
+    onOpenConsideredTiles,
+}: {
+    data: PlanData;
+    onOpenConsideredTiles?: () => void;
+}) {
     if (
         typeof data.max_change_count !== "number" &&
         typeof data.per_change_limit !== "number" &&
@@ -346,21 +389,26 @@ function SearchParamsBand({data}: { data: PlanData }) {
         return null;
     }
     const perChangeLimit = typeof data.per_change_limit === "number"
-        ? (data.per_change_limit === 13 ? "无限制" : String(data.per_change_limit))
+        ? (data.per_change_limit === 13 ? "\u65e0\u9650\u5236" : String(data.per_change_limit))
         : "-";
     const items = [
-        {label: "最大换牌次数", value: String(data.max_change_count ?? "-")},
-        {label: "换牌限制", value: perChangeLimit},
-        {label: "可使用的牌数", value: String(data.considered_tile_count ?? "-")},
+        {label: "\u6700\u5927\u6362\u724c\u6b21\u6570", value: String(data.max_change_count ?? "-"), clickable: false},
+        {label: "\u6362\u724c\u9650\u5236", value: perChangeLimit, clickable: false},
+        {
+            label: "\u53ef\u4f7f\u7528\u7684\u724c\u6570",
+            value: String(data.considered_tile_count ?? "-"),
+            clickable: typeof data.considered_tile_count === "number" && !!onOpenConsideredTiles,
+        },
     ];
 
     return (
         <div style={{display: "grid", gap: 8}}>
-            <div className={styles.label}>当前参数</div>
+            <div className={styles.label}>{"\u5f53\u524d\u53c2\u6570"}</div>
             <div style={{display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10}}>
                 {items.map((item) => (
                     <div
                         key={item.label}
+                        onClick={item.clickable ? onOpenConsideredTiles : undefined}
                         style={{
                             border: "1px solid var(--color-divider)",
                             borderRadius: 10,
@@ -368,15 +416,69 @@ function SearchParamsBand({data}: { data: PlanData }) {
                             display: "grid",
                             gap: 6,
                             minWidth: 0,
+                            cursor: item.clickable ? "pointer" : "default",
                         }}
                     >
                         <div className={styles.bandLabel}>{item.label}</div>
                         <div style={{fontSize: 20, fontWeight: 800, lineHeight: 1.05, wordBreak: "break-word"}}>
                             {item.value}
                         </div>
+                        {item.clickable ? (
+                            <div className={styles.cardBodyMuted} style={{padding: 0}}>{"\u70b9\u51fb\u67e5\u770b\u724c\u9762"}</div>
+                        ) : null}
                     </div>
                 ))}
             </div>
+        </div>
+    );
+}
+
+function ConsideredTilesBody({
+    sections,
+    resolveFace,
+}: {
+    sections: Array<{ key: string; title: string; ids: TileId[] }>;
+    resolveFace?: (id: number) => string | null;
+}) {
+    return (
+        <div style={{padding: 12, display: "grid", gap: 12}}>
+            {sections.map((section) => (
+                <div
+                    key={section.key}
+                    style={{
+                        display: "grid",
+                        gap: 10,
+                        border: "1px solid var(--border)",
+                        borderRadius: 10,
+                        padding: 10,
+                    }}
+                >
+                    <div style={{display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline"}}>
+                        <div style={{fontWeight: 600}}>{section.title}</div>
+                        <div className={styles.bandLabel}>{section.ids.length} {"\u5f20"}</div>
+                    </div>
+                    {section.ids.length > 0 ? (
+                        <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
+                            {section.ids.map((id, index) => (
+                                <div
+                                    key={`${section.key}-${id}-${index}`}
+                                    style={{
+                                        display: "grid",
+                                        gap: 4,
+                                        justifyItems: "center",
+                                        minWidth: 52,
+                                    }}
+                                >
+                                    <Tile tile={(resolveFace?.(id) || "-")} width={44} height={58}/>
+                                    <div className={styles.bandLabel}>#{index + 1}</div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className={styles.cardBodyMuted} style={{padding: 0}}>-</div>
+                    )}
+                </div>
+            ))}
         </div>
     );
 }
@@ -395,19 +497,80 @@ function QuadCatalogBody({data, resolveFace}: { data: PlanData | null; resolveFa
             {items.map((item, index) => (
                 <div key={`${item.face || "quad"}-${index}`} style={{display: "grid", gap: 8, border: "1px solid var(--border)", borderRadius: 10, padding: 10}}>
                     <div style={{fontWeight: 600}}>{t("advisor.quad_catalog_item", {index: index + 1, face: item.face || "-"})}</div>
-                    {item.label ? <div className={styles.cardBodyMuted} style={{padding: 0}}>{item.label}</div> : null}
                     {item.score ? <div className={styles.bandLabel}>{item.score}</div> : null}
-                    {item.switch_discards?.length ? (
-                        zipBatches(item.switch_discards, item.switch_in, item.switch_batch_sizes).map((batch, batchIndex) => (
-                            <div key={batchIndex} style={{display: "grid", gap: 8}}>
-                                <TileGroup title={t("advisor.switch_batch_out", {index: batchIndex + 1})} ids={batch.out} resolveFace={resolveFace}/>
-                                <TileGroup title={t("advisor.switch_batch_in", {index: batchIndex + 1})} ids={batch.in} resolveFace={resolveFace}/>
-                            </div>
-                        ))
-                    ) : null}
-                    {!item.reachable && item.reason ? (
-                        <div className={styles.cardBodyMuted} style={{padding: 0}}>{item.reason}</div>
-                    ) : null}
+                    <QuadTilePositions positions={normalizeQuadPositions(item)} resolveFace={resolveFace}/>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function normalizeQuadPositions(item: {
+    tile_positions?: Array<{ tile_id: TileId; source: string; source_index: number }>;
+    label?: string;
+}) {
+    if (item.tile_positions && item.tile_positions.length > 0) {
+        return item.tile_positions;
+    }
+    if (!item.label) return [];
+
+    const segments = item.label.split("/").map((part) => part.trim()).filter(Boolean);
+    return segments.map((segment) => {
+        const idMatch = segment.match(/id=(\d+)/);
+        const numMatches = Array.from(segment.matchAll(/(\d+)/g)).map((match) => Number(match[1]));
+        const sourceIndex = numMatches.length > 0 ? numMatches[numMatches.length - 1] : NaN;
+        return {
+            tile_id: idMatch ? Number(idMatch[1]) : NaN,
+            source: mapLegacySource(segment),
+            source_index: sourceIndex,
+        };
+    }).filter((entry) => Number.isFinite(entry.tile_id) && Number.isFinite(entry.source_index));
+}
+
+function mapLegacySource(source: string) {
+    if (source.includes("hand") || source.includes("\u624b\u724c")) return "hand";
+    if (source.includes("replacement") || source.includes("\u6362\u724c")) return "replacement";
+    if (source.includes("wall") || source.includes("\u724c\u5c71")) return "wall";
+    return "unknown";
+}
+
+function QuadTilePositions({
+    positions,
+    resolveFace,
+}: {
+    positions: Array<{ tile_id: TileId; source: string; source_index: number }>;
+    resolveFace?: (id: number) => string | null;
+}) {
+    const sourceLabel = (source: string) => {
+        if (source === "hand") return "\u624b\u724c";
+        if (source === "replacement") return "\u6362\u724c\u5806";
+        if (source === "wall") return "\u724c\u5c71";
+        return "\u672a\u77e5\u6765\u6e90";
+    };
+
+    if (!positions.length) {
+        return <div className={styles.cardBodyMuted} style={{padding: 0}}>-</div>;
+    }
+
+    return (
+        <div style={{display: "flex", flexWrap: "wrap", gap: 10}}>
+            {positions.map((item, index) => (
+                <div
+                    key={`${item.tile_id}-${index}`}
+                    style={{
+                        border: "1px solid var(--color-divider)",
+                        borderRadius: 12,
+                        padding: "10px 12px",
+                        display: "grid",
+                        gap: 8,
+                        justifyItems: "center",
+                        minWidth: 96,
+                        background: "var(--panel)",
+                    }}
+                >
+                    <Tile tile={(resolveFace?.(item.tile_id) || "-")} width={44} height={58}/>
+                    <div className={styles.bandLabel}>{sourceLabel(item.source)}</div>
+                    <div className={styles.cardBodyMuted} style={{padding: 0}}>{`#${item.source_index}`}</div>
                 </div>
             ))}
         </div>

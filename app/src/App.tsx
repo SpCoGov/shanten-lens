@@ -150,10 +150,13 @@ export default function App() {
     const [bossBuff, setBossBuff] = React.useState<number[]>([]);
 
     const [wallStatsTiles, setWallStatsTiles] = React.useState<string[]>([]);
+    const [handTileIds, setHandTileIds] = React.useState<number[]>([]);
 
     const [replacementTiles, setReplacementTiles] = React.useState<string[]>([]);
+    const [replacementTileIds, setReplacementTileIds] = React.useState<number[]>([]);
     const [switchUsedCount, setSwitchUsedCount] = React.useState<number>(0);
     const [rightPanelMode, setRightPanelMode] = React.useState<"replacementStats" | "wall">("replacementStats");
+    const [wallTileIds, setWallTileIds] = React.useState<number[]>([]);
 
     const [deckMap, setDeckMap] = React.useState<Map<number, string>>(new Map());
 
@@ -299,11 +302,14 @@ export default function App() {
                 const repl = Array.isArray(d.replacement_tiles)
                     ? d.replacement_tiles.map((id) => deck.get(id) ?? "5m")
                     : [];
+                setHandTileIds(Array.isArray(d.hand_tiles) ? d.hand_tiles : []);
+                setReplacementTileIds(Array.isArray(d.replacement_tiles) ? d.replacement_tiles : []);
                 const used = Array.isArray((d as any).switch_used_tiles) ? (d as any).switch_used_tiles.length : 0;
                 setReplacementTiles(repl);
                 setSwitchUsedCount(used);
 
                 const wallList = Array.isArray(d.wall_tiles) ? d.wall_tiles.map((id) => deck.get(id) ?? "5m") : [];
+                setWallTileIds(Array.isArray(d.wall_tiles) ? d.wall_tiles : []);
                 setWallStatsTiles(wallList);
 
                 if (!(d.stage === 2 || d.stage === 3)) {
@@ -563,6 +569,9 @@ export default function App() {
                                 stage={stage}
                                 data={planSouzuSwitch}
                                 resolveFace={(id) => deckMap.get(id) ?? null}
+                                handIds={handTileIds}
+                                replacementIds={replacementTileIds}
+                                wallIds={wallTileIds}
                                 onClear={() => setPlanSouzuSwitch(null)}
                             />
                         )}

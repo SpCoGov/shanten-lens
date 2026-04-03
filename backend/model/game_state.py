@@ -93,14 +93,19 @@ class GameState:
         self.candidate_effect_list.clear()
         self.ended = True
         self.stage = -1
+        # 根据池子信息构建完整的牌堆（id → 牌面）
         for item in pool:
             self.deck_map[item["id"]] = item["tile"]
+        # 拷贝一份完整牌堆，用于后续从中剔除手牌
         temp = self.deck_map.copy()
         self.hand_tiles = hand_tiles.copy()
-        for hand_tile_id in hand_tiles:
-            temp.pop(hand_tile_id)
+        # 从牌堆中移除已经分配到手牌里的牌
+        # for hand_tile_id in hand_tiles:
+        #     temp.pop(hand_tile_id)
+        # 剩余的 id 作为候选牌山/宝牌/替换牌来源
         ids = list(temp.keys())
-        cursor = 0
+        # cursor = 0
+        cursor = 13
 
         # 从候选 ids 中移除 used 的 id（<del>喵修斯之船fix</del>修不好不修了）
         # 看不懂傻逼猫粮的封包

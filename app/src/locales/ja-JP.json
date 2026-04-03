@@ -297,7 +297,7 @@
     "post_draw_discards": "追加で必要な仮置き牌",
     "waits": "待ち一覧",
     "final_waits": "最終待ち",
-    "quad_catalog_title": "見えている全カンと交換手順",
+    "quad_catalog_title": "????????",
     "quad_catalog_item": "カン {{index}}：{{face}}",
     "quad_catalog_empty": "今は一覧に出せるカンがありません。",
     "reason_switch-hand-must-be-13": "現在の手牌が交換段階の13枚ではないため、このガイドを計算できません。",

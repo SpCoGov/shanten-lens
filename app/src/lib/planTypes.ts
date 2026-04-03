@@ -3,6 +3,11 @@ export type TileId = number;
 export type QuadCatalogItem = {
     face?: string;
     label?: string;
+    tile_positions?: Array<{
+        tile_id: TileId;
+        source: "hand" | "replacement" | "wall" | string;
+        source_index: number;
+    }>;
     score?: string;
     switch_batch_sizes?: number[];
     switch_discards?: TileId[][];
@@ -15,6 +20,7 @@ export type PlanData = {
     status?: "win_now" | "plan" | "impossible" | "searching" | "catalog";
     draws_needed?: number | null;
     target14?: string[];
+    target13?: string[];
     discards?: TileId[];
     mode?: string;
     reason?: string;

@@ -58,6 +58,18 @@ def _quad_label(ids: Sequence[int], by_id: Dict[int, PoolEntry]) -> str:
     return f"{face} <- " + " / ".join(_entry_label(by_id[tile_id]) for tile_id in ids)
 
 
+def _quad_tile_positions(ids: Sequence[int], by_id: Dict[int, PoolEntry]) -> List[dict]:
+    result: List[dict] = []
+    for tile_id in ids:
+        entry = by_id[tile_id]
+        result.append({
+            "tile_id": entry.tile_id,
+            "source": entry.source,
+            "source_index": entry.source_index + 1,
+        })
+    return result
+
+
 def _quad_score_text(time_key: tuple[int, int, int]) -> str:
     return f"总序号={time_key[0]} / 换牌深度={time_key[1]} / 牌山深度={time_key[2]}"
 
@@ -1062,6 +1074,7 @@ def list_reachable_quads_for_switch(
             catalog.append({
                 "face": quad["face"],
                 "label": _quad_label(quad["ids"], by_id),
+                "tile_positions": _quad_tile_positions(quad["ids"], by_id),
                 "score": _quad_score_text(quad["time_key"]),
                 "switch_batch_sizes": [],
                 "switch_discards": [],
@@ -1074,6 +1087,7 @@ def list_reachable_quads_for_switch(
         catalog.append({
             "face": quad["face"],
             "label": _quad_label(quad["ids"], by_id),
+            "tile_positions": _quad_tile_positions(quad["ids"], by_id),
             "score": _quad_score_text(quad["time_key"]),
             "switch_batch_sizes": batches,
             "switch_discards": switch_discards,
