@@ -358,6 +358,75 @@ def _build_switch_batches(
     return list(result) if result is not None else None
 
 
+def _simulate_switch_reachability(
+        hand_ids: Sequence[int],
+        occupied_ids: Sequence[int],
+        replacement_ids: Sequence[int],
+        current_change_count: int,
+        max_change_count: int,
+        per_change_limit: int,
+        deck_map: Dict[int, str],
+) -> tuple[bool, str, List[int], List[int], List[int]]:
+    cur_hand = list(hand_ids)
+    occupied_set = {int(tile_id) for tile_id in occupied_ids}
+    replacement_list = [int(tile_id) for tile_id in replacement_ids]
+    cursor = 0
+    change_count = max(0, int(current_change_count or 0))
+    max_changes = max(0, int(max_change_count or 0))
+    per_change = max(0, int(per_change_limit or 0))
+    switch_discards: List[int] = []
+    switch_in: List[int] = []
+    batch_sizes: List[int] = []
+
+    def missing_replacement_occupied() -> List[int]:
+        hand_set = set(cur_hand)
+        return [tile_id for tile_id in replacement_list if tile_id in occupied_set and tile_id not in hand_set]
+
+    while change_count < max_changes:
+        keep_count = sum(1 for tile_id in cur_hand if tile_id in occupied_set)
+        missing = missing_replacement_occupied()
+        if keep_count == 13:
+            if missing:
+                return False, f"keep-count-full-but-missing-needed-replacements: {len(missing)}", switch_discards, switch_in, batch_sizes
+            return True, "ok", switch_discards, switch_in, batch_sizes
+
+        batch = min(13 - keep_count, per_change)
+        if batch <= 0:
+            break
+
+        discard_candidates = [tile_id for tile_id in _candidate_ids(cur_hand, deck_map) if tile_id not in occupied_set]
+        if len(discard_candidates) < batch:
+            return False, (
+                f"insufficient-discardable-tiles: step={change_count + 1}, "
+                f"have={len(discard_candidates)}, need={batch}"
+            ), switch_discards, switch_in, batch_sizes
+
+        incoming_batch = replacement_list[cursor:cursor + batch]
+        if len(incoming_batch) < batch:
+            return False, (
+                f"replacement-stack-exhausted: step={change_count + 1}, "
+                f"have={len(incoming_batch)}, need={batch}"
+            ), switch_discards, switch_in, batch_sizes
+
+        discard_batch = discard_candidates[:batch]
+        for tile_id in discard_batch:
+            cur_hand.remove(tile_id)
+        cur_hand.extend(incoming_batch)
+        cursor += batch
+        change_count += 1
+        switch_discards.extend(discard_batch)
+        switch_in.extend(incoming_batch)
+        batch_sizes.append(batch)
+
+        if not missing_replacement_occupied():
+            return True, "ok", switch_discards, switch_in, batch_sizes
+
+    missing = missing_replacement_occupied()
+    if missing:
+        return False, f"changes-exhausted-but-missing-needed-replacements: {len(missing)}", switch_discards, switch_in, batch_sizes
+    return True, "ok", switch_discards, switch_in, batch_sizes
+
+
 def _explain_switch_batch_failure(
         hand_ids: Sequence[int],
         consumed_ids: Sequence[int],
@@ -980,28 +1049,16 @@ def list_reachable_quads_for_switch(
 
     catalog: List[dict] = []
     for quad in quads:
-        nonwall_ids = [tile_id for tile_id in quad["ids"] if by_id[tile_id].source != "wall"]
-        target_face_counts = Counter(_norm(deck_map[tile_id]) for tile_id in nonwall_ids)
-        replacement_needed_entries = [by_id[tile_id] for tile_id in nonwall_ids if by_id[tile_id].source == "replacement"]
-        consume_len = max((entry.source_index + 1 for entry in replacement_needed_entries), default=0)
-        consumed_ids = list(remaining_replacements[:consume_len])
-        batches = _build_switch_batches(
+        ok, reason, switch_discards, switch_in, batches = _simulate_switch_reachability(
             hand_ids,
-            consumed_ids,
-            target_face_counts,
-            deck_map,
+            quad["ids"],
+            remaining_replacements,
+            0,
             remaining_changes,
             13,
+            deck_map,
         )
-        if batches is None:
-            reason = _explain_switch_batch_failure(
-                hand_ids,
-                consumed_ids,
-                target_face_counts,
-                deck_map,
-                remaining_changes,
-                13,
-            ) if consume_len > 0 else "该杠包含牌山牌，换牌阶段无法直接做成"
+        if not ok:
             catalog.append({
                 "face": quad["face"],
                 "label": _quad_label(quad["ids"], by_id),
@@ -1014,13 +1071,6 @@ def list_reachable_quads_for_switch(
             })
             continue
 
-        switch_discards, switch_in = _materialize_switch_plan(
-            hand_ids,
-            consumed_ids,
-            target_face_counts,
-            deck_map,
-            batches,
-        )
         catalog.append({
             "face": quad["face"],
             "label": _quad_label(quad["ids"], by_id),
@@ -1106,50 +1156,17 @@ def _evaluate_candidate(
             f"最终目标牌数量异常：{len(switch_target_ids)} 张。"
             f"非牌山牌 {len(essential_nonwall_ids)} 张，补位牌 {len(filler_ids)} 张，双杠腾出 {kong_slot_gain} 个位置。"
         )
-    target_face_counts = Counter(_norm(deck_map[tile_id]) for tile_id in essential_nonwall_ids)
-    needed_replacement_entries = [
-        by_id[tile_id] for tile_id in switch_target_ids if by_id[tile_id].source == "replacement"
-    ]
-    consume_len = max((entry.source_index + 1 for entry in needed_replacement_entries), default=0)
-    consumed_ids = list(replacement_ids[:consume_len])
-    max_consumable = _max_consumable_replacements(
-        consumed_ids,
-        target_face_counts,
-        deck_map,
+    ok, reason, switch_discards, switch_in, batches = _simulate_switch_reachability(
+        hand_ids,
+        prewin_physical_ids,
+        replacement_ids,
+        0,
         remaining_changes,
         per_change_limit,
-    )
-    if max_consumable < consume_len:
-        return None, (
-            f"换牌可达性上界不足：剩余 {remaining_changes} 次换牌里，按当前最终目标最多只能顺序吃入 {max_consumable} 张换牌牌，"
-            f"但这套方案需要吃入前 {consume_len} 张。"
-        )
-    batches = _build_switch_batches(
-        hand_ids,
-        consumed_ids,
-        target_face_counts,
         deck_map,
-        remaining_changes,
-        per_change_limit,
     )
-    if batches is None:
-        detail = _explain_switch_batch_failure(
-            hand_ids,
-            consumed_ids,
-            target_face_counts,
-            deck_map,
-            remaining_changes,
-            per_change_limit,
-        )
-        return None, f"换牌批次构造失败：{detail}"
-
-    switch_discards, switch_in = _materialize_switch_plan(
-        hand_ids,
-        consumed_ids,
-        target_face_counts,
-        deck_map,
-        batches,
-    )
+    if not ok:
+        return None, f"switch-reachability-failed: {reason}"
     ordered_wall_draws = [
         entry.tile_id
         for entry in sorted(
@@ -1606,50 +1623,17 @@ def _evaluate_tenpai_candidate(
     switch_target_ids = list(essential_nonwall_ids) + filler_ids
     if len(switch_target_ids) != 13:
         return None, f"target13-size-invalid: {len(switch_target_ids)}"
-    target_face_counts = Counter(_norm(deck_map[tile_id]) for tile_id in essential_nonwall_ids)
-    needed_replacement_entries = [
-        by_id[tile_id] for tile_id in switch_target_ids if by_id[tile_id].source == "replacement"
-    ]
-    consume_len = max((entry.source_index + 1 for entry in needed_replacement_entries), default=0)
-    consumed_ids = list(replacement_ids[:consume_len])
-    max_consumable = _max_consumable_replacements(
-        consumed_ids,
-        target_face_counts,
-        deck_map,
+    ok, reason, switch_discards, switch_in, batches = _simulate_switch_reachability(
+        hand_ids,
+        prewin_physical_ids,
+        replacement_ids,
+        0,
         remaining_changes,
         per_change_limit,
-    )
-    if max_consumable < consume_len:
-        return None, (
-            f"换牌可达性上界不足：剩余 {remaining_changes} 次换牌里，按当前最终目标最多只能顺序吃入 {max_consumable} 张换牌牌，"
-            f"但这套方案需要吃入前 {consume_len} 张"
-        )
-    batches = _build_switch_batches(
-        hand_ids,
-        consumed_ids,
-        target_face_counts,
         deck_map,
-        remaining_changes,
-        per_change_limit,
     )
-    if batches is None:
-        detail = _explain_switch_batch_failure(
-            hand_ids,
-            consumed_ids,
-            target_face_counts,
-            deck_map,
-            remaining_changes,
-            per_change_limit,
-        )
-        return None, f"换牌可达性验证失败: {detail}"
-
-    switch_discards, switch_in = _materialize_switch_plan(
-        hand_ids,
-        consumed_ids,
-        target_face_counts,
-        deck_map,
-        batches,
-    )
+    if not ok:
+        return None, f"switch-reachability-failed: {reason}"
     ordered_wall_draws = [
         entry.tile_id
         for entry in sorted(
