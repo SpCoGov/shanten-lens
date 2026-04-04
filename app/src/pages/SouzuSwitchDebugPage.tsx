@@ -38,11 +38,17 @@ type ManualStructureKey = "meld1" | "meld2" | "pair";
 type ManualStructureState = Record<ManualStructureKey, number[]>;
 
 const DEFAULT_WALL_LIMIT = 36;
+const RED_MAP: Record<string, string> = {"0m": "5m", "0p": "5p", "0s": "5s"};
 const STRUCTURE_LIMITS: Record<ManualStructureKey, number> = {
     meld1: 3,
     meld2: 3,
     pair: 2,
 };
+
+function normFace(face: string | null | undefined) {
+    if (!face) return "?";
+    return RED_MAP[face] || face;
+}
 
 export function buildDebugSnapshotFromState(state: GameStateData): DebugSnapshot {
     return {
@@ -118,13 +124,20 @@ function allManualIds(structure: ManualStructureState) {
 function buildPoolEntries(snapshot: DebugSnapshot, wallLimit: number): PoolEntry[] {
     const deckMap = snapshot.deck_map || {};
     const usedCount = Array.isArray(snapshot.switch_used_tiles) ? snapshot.switch_used_tiles.length : 0;
-    const replacementTiles = (snapshot.replacement_tiles || []).slice(usedCount);
+    const remainingChanges = Math.max(0, Number(snapshot.total_change_tile_count || 0) - Number(snapshot.change_tile_count || 0));
+    const perChangeLimit = (snapshot.boss_buff || []).includes(901) ? 3 : 13;
+    const replacementReadLimit = Math.min(
+        Math.max(0, (snapshot.replacement_tiles || []).length - usedCount),
+        remainingChanges * perChangeLimit,
+    );
+    const replacementTiles = (snapshot.replacement_tiles || []).slice(usedCount, usedCount + replacementReadLimit);
     const wallTiles = (snapshot.wall_tiles || []).slice(0, wallLimit);
     const entries: PoolEntry[] = [];
 
     const pushGroup = (source: PoolSource, ids: number[]) => {
         ids.forEach((tileId, sourceIndex) => {
-            const face = deckMap[String(tileId)] ?? (deckMap as Record<number, string>)[tileId] ?? "?";
+            const rawFace = deckMap[String(tileId)] ?? (deckMap as Record<number, string>)[tileId] ?? "?";
+            const face = normFace(rawFace);
             entries.push({
                 tileId,
                 face,
@@ -477,6 +490,7 @@ export default function SouzuSwitchDebugPage({
             <div className="blackhole-layout">
                 <div className="blackhole-main">
                     <ManualSearchabilityCard data={data}/>
+                    <DebugPoolCard data={data} resolveFace={resolveFace}/>
                     <BlackHoleStrategyCard title="调试结果" data={data} resolveFace={resolveFace}/>
                 </div>
             </div>
@@ -499,6 +513,173 @@ function ManualSearchabilityCard({data}: { data: PlanData | null }) {
                 ) : null}
             </div>
         </section>
+    );
+}
+
+function DebugPoolCard({
+    data,
+    resolveFace,
+}: {
+    data: PlanData | null;
+    resolveFace: (id: number) => string | null;
+}) {
+    const debugPool = data?.debug_pool;
+    if (!debugPool) return null;
+
+    const focusFace = debugPool.focus_face || "5s";
+    const focusEntries = Array.isArray(debugPool.focus_entries) ? debugPool.focus_entries : [];
+    const availableQuads = Array.isArray(debugPool.available_quads) ? debugPool.available_quads : [];
+    const focusQuads = availableQuads.filter((item) => item.face === focusFace);
+    const normCounts = Object.entries(debugPool.norm_face_counts || {})
+        .sort((a, b) => (b[1] || 0) - (a[1] || 0) || a[0].localeCompare(b[0]));
+
+    return (
+        <section className="panel" style={{marginBottom: 12}}>
+            <div className="panel-title">搜索池诊断</div>
+            <div style={{display: "grid", gap: 14}}>
+                <div style={{display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10}}>
+                    <InfoStat label={`${focusFace} 归一后数量`} value={String(debugPool.focus_count ?? 0)}/>
+                    <InfoStat label="原始 0s 数量" value={String(debugPool.raw_focus_counts?.["0s"] ?? 0)}/>
+                    <InfoStat label="原始 5s 数量" value={String(debugPool.raw_focus_counts?.["5s"] ?? 0)}/>
+                    <InfoStat label={`${focusFace} 可成杠数`} value={String(focusQuads.length)}/>
+                </div>
+
+                <div style={{display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10}}>
+                    <InfoStat label="手牌入池" value={String(debugPool.pool_counts?.hand ?? 0)}/>
+                    <InfoStat label="换牌窗口入池" value={String(debugPool.pool_counts?.replacement_window ?? 0)}/>
+                    <InfoStat label="牌山入池" value={String(debugPool.pool_counts?.wall ?? 0)}/>
+                    <InfoStat label="总入池数" value={String(debugPool.pool_counts?.total ?? 0)}/>
+                </div>
+
+                <div style={{display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10}}>
+                    <InfoStat label="已消耗换牌数" value={String(debugPool.replacement_window?.used_count ?? 0)}/>
+                    <InfoStat label="剩余换牌堆总数" value={String(debugPool.replacement_window?.total_remaining ?? 0)}/>
+                    <InfoStat label="实际读取窗口" value={String(debugPool.replacement_window?.window_count ?? 0)}/>
+                </div>
+
+                <div style={{display: "grid", gap: 8}}>
+                    <div style={{fontWeight: 600}}>{`${focusFace} 明细`}</div>
+                    {focusEntries.length > 0 ? (
+                        <DebugTilePositions positions={focusEntries} resolveFace={resolveFace}/>
+                    ) : (
+                        <div className="hint">当前搜索池里没有归一到 {focusFace} 的牌。</div>
+                    )}
+                </div>
+
+                <div style={{display: "grid", gap: 8}}>
+                    <div style={{fontWeight: 600}}>当前可成杠</div>
+                    {availableQuads.length > 0 ? (
+                        <div style={{display: "grid", gap: 10}}>
+                            {availableQuads.map((quad, index) => (
+                                <div
+                                    key={`${quad.face || "quad"}-${index}`}
+                                    style={{
+                                        border: "1px solid var(--border)",
+                                        borderRadius: 10,
+                                        padding: 10,
+                                        display: "grid",
+                                        gap: 8,
+                                        background: quad.face === focusFace ? "color-mix(in oklab, var(--badge-ok-bg) 60%, var(--panel-bg))" : "var(--panel-bg)",
+                                    }}
+                                >
+                                    <div style={{fontWeight: 600}}>{`${index + 1}. ${quad.face || "-"}`}</div>
+                                    <DebugTilePositions positions={quad.tile_positions || []} resolveFace={resolveFace}/>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="hint">当前搜索池里没有任何可成杠组合。</div>
+                    )}
+                </div>
+
+                <div style={{display: "grid", gap: 8}}>
+                    <div style={{fontWeight: 600}}>归一后牌面计数</div>
+                    {normCounts.length > 0 ? (
+                        <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
+                            {normCounts.map(([face, count]) => (
+                                <span
+                                    key={face}
+                                    className={`badge ${face === focusFace ? "ok" : ""}`}
+                                    style={{fontWeight: face === focusFace ? 800 : 500}}
+                                >
+                                    {`${face}: ${count}`}
+                                </span>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="hint">-</div>
+                    )}
+                </div>
+            </div>
+        </section>
+    );
+}
+
+function InfoStat({label, value}: { label: string; value: string }) {
+    return (
+        <div
+            style={{
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+                padding: "10px 12px",
+                display: "grid",
+                gap: 6,
+            }}
+        >
+            <div className="hint" style={{fontSize: 12}}>{label}</div>
+            <div style={{fontSize: 22, fontWeight: 800, lineHeight: 1.05}}>{value}</div>
+        </div>
+    );
+}
+
+function DebugTilePositions({
+    positions,
+    resolveFace,
+}: {
+    positions: Array<{
+        tile_id: number;
+        source: string;
+        source_index: number;
+        raw_face?: string;
+        norm_face?: string;
+    }>;
+    resolveFace: (id: number) => string | null;
+}) {
+    const sourceLabel = (source: string) => {
+        if (source === "hand") return "手牌";
+        if (source === "replacement") return "换牌窗口";
+        if (source === "wall") return "牌山";
+        return source;
+    };
+
+    if (!positions.length) {
+        return <div className="hint">-</div>;
+    }
+
+    return (
+        <div style={{display: "flex", flexWrap: "wrap", gap: 10}}>
+            {positions.map((item, index) => (
+                <div
+                    key={`${item.tile_id}-${index}`}
+                    style={{
+                        border: "1px solid var(--border)",
+                        borderRadius: 10,
+                        padding: 10,
+                        minWidth: 100,
+                        display: "grid",
+                        gap: 6,
+                        justifyItems: "center",
+                    }}
+                >
+                    <Tile tile={(resolveFace(item.tile_id) || item.raw_face || "-")} width={40} height={54}/>
+                    <div className="hint" style={{fontSize: 11}}>{`ID ${item.tile_id}`}</div>
+                    <div className="hint" style={{fontSize: 11}}>{`${sourceLabel(item.source)} #${item.source_index}`}</div>
+                    {"raw_face" in item ? (
+                        <div className="hint" style={{fontSize: 11}}>{`${item.raw_face || "-"} → ${item.norm_face || "-"}`}</div>
+                    ) : null}
+                </div>
+            ))}
+        </div>
     );
 }
 

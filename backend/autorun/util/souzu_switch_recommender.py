@@ -336,6 +336,69 @@ def _enumerate_quad_pairs(quads: Sequence[dict]) -> List[dict]:
     return pairs
 
 
+def _build_debug_pool_info(
+        deck_map: Dict[int, str],
+        hand_ids: Sequence[int],
+        remaining_replacements: Sequence[int],
+        wall_ids: Sequence[int],
+        quads: Sequence[dict],
+        by_id: Dict[int, PoolEntry],
+        *,
+        replacement_total_remaining: int,
+        replacement_window_count: int,
+        replacement_used_count: int,
+        focus_face: str = "5s",
+) -> dict:
+    pool_ids = list(hand_ids) + list(remaining_replacements) + list(wall_ids)
+    raw_counts = Counter(deck_map[int(tile_id)] for tile_id in pool_ids)
+    norm_counts = Counter(_norm(deck_map[int(tile_id)]) for tile_id in pool_ids)
+
+    focus_entries: List[dict] = []
+    for tile_id in pool_ids:
+        raw_face = deck_map[int(tile_id)]
+        norm_face = _norm(raw_face)
+        if norm_face != focus_face:
+            continue
+        entry = by_id[int(tile_id)]
+        focus_entries.append({
+            "tile_id": int(tile_id),
+            "raw_face": raw_face,
+            "norm_face": norm_face,
+            "source": entry.source,
+            "source_index": entry.source_index + 1,
+        })
+
+    available_quads: List[dict] = []
+    for quad in quads:
+        available_quads.append({
+            "face": quad["face"],
+            "tile_positions": _quad_tile_positions(quad["ids"], by_id),
+        })
+
+    return {
+        "focus_face": focus_face,
+        "focus_count": norm_counts.get(focus_face, 0),
+        "raw_focus_counts": {
+            "0s": raw_counts.get("0s", 0),
+            "5s": raw_counts.get("5s", 0),
+        },
+        "pool_counts": {
+            "hand": len(hand_ids),
+            "replacement_window": len(remaining_replacements),
+            "wall": len(wall_ids),
+            "total": len(pool_ids),
+        },
+        "replacement_window": {
+            "used_count": replacement_used_count,
+            "total_remaining": replacement_total_remaining,
+            "window_count": replacement_window_count,
+        },
+        "focus_entries": focus_entries,
+        "norm_face_counts": dict(sorted(norm_counts.items(), key=lambda item: TILE_INDEX.get(item[0], 99))),
+        "available_quads": available_quads,
+    }
+
+
 def _build_switch_batches(
         hand_ids: Sequence[int],
         consumed_ids: Sequence[int],
@@ -886,10 +949,6 @@ def _hand13_debug_text(faces: Sequence[str]) -> str:
     return ", ".join(faces) if faces else "-"
 
 
-def _component_is_souzu_only(component: dict) -> bool:
-    return str(component.get("face", "")).endswith("s")
-
-
 def _single_components(
         pool: Sequence[PoolEntry],
         blocked_orders: Set[int],
@@ -1075,6 +1134,17 @@ def list_reachable_quads_for_switch(
     )
     pool, by_id = _build_pool(deck_map, hand_ids, remaining_replacements, wall_ids)
     quads = _enumerate_quads(pool, by_id)
+    debug_pool = _build_debug_pool_info(
+        deck_map,
+        hand_ids,
+        remaining_replacements,
+        wall_ids,
+        quads,
+        by_id,
+        replacement_total_remaining=max(0, len(replacement_ids) - used_count),
+        replacement_window_count=len(remaining_replacements),
+        replacement_used_count=used_count,
+    )
 
     catalog: List[dict] = []
     for quad in quads:
@@ -1118,6 +1188,7 @@ def list_reachable_quads_for_switch(
         "reason": "quad-catalog",
         "quad_catalog": catalog,
         "remaining_changes": remaining_changes,
+        "debug_pool": debug_pool,
     }
 
 
@@ -1147,8 +1218,6 @@ def _manual_meld_searchable(faces: Sequence[str]) -> tuple[bool, str]:
         return False, "面子必须是 3 张"
     if not _is_exact_meld3(faces):
         return False, "完整面子不是合法的顺子或刻子"
-    if faces[0] == faces[1] == faces[2] and not faces[0].endswith("s"):
-        return False, "搜索器不会枚举非索子刻子作为完整面子"
     return True, ""
 
 
@@ -1185,8 +1254,6 @@ def _analyze_manual_searchability(
         return False, "当缺的是面子时，雀头必须是完整对子"
     if len(short_faces) != 2 or not _is_valid_taatsu2(short_faces):
         return False, "缺一张的面子必须是可补成和牌的两张搭子"
-    if _is_exact_pair2(short_faces) and not pair_faces[0].endswith("s"):
-        return False, "当前搜索器在“缺一张面子”的分支里，且这个面子是刻子时，只枚举索子雀头"
     ok_other, reason_other = _manual_meld_searchable(other_faces)
     if not ok_other:
         which = "面子 B" if short_key == "meld1" else "面子 A"
@@ -1216,31 +1283,43 @@ def validate_manual_souzu_switch_plan(
     )
     pool, by_id = _build_pool(deck_map, hand_ids, remaining_replacements, wall_ids)
     pool_ids = {entry.tile_id for entry in pool}
+    quads = _enumerate_quads(pool, by_id)
+    debug_pool = _build_debug_pool_info(
+        deck_map,
+        hand_ids,
+        remaining_replacements,
+        wall_ids,
+        quads,
+        by_id,
+        replacement_total_remaining=max(0, len(replacement_ids) - used_count),
+        replacement_window_count=len(remaining_replacements),
+        replacement_used_count=used_count,
+    )
 
     if len(hand_ids) != 13:
-        return {"status": "impossible", "reason": "switch-hand-must-be-13", "remaining_changes": remaining_changes}
+        return {"status": "impossible", "reason": "switch-hand-must-be-13", "remaining_changes": remaining_changes, "debug_pool": debug_pool}
 
     if len(quad_groups) != 2:
-        return {"status": "impossible", "reason": "manual-quad-count-invalid"}
+        return {"status": "impossible", "reason": "manual-quad-count-invalid", "debug_pool": debug_pool}
 
     normalized_quads: List[tuple[int, ...]] = []
     quad_faces: List[str] = []
     used_ids: Set[int] = set()
-    available_quads = {tuple(sorted(quad["ids"])): quad for quad in _enumerate_quads(pool, by_id)}
+    available_quads = {tuple(sorted(quad["ids"])): quad for quad in quads}
 
     for index, group in enumerate(quad_groups, start=1):
         ids = tuple(sorted(int(tile_id) for tile_id in group))
         if len(ids) != 4:
-            return {"status": "impossible", "reason": f"manual-quad-{index}-size-invalid"}
+            return {"status": "impossible", "reason": f"manual-quad-{index}-size-invalid", "debug_pool": debug_pool}
         if len(set(ids)) != 4:
-            return {"status": "impossible", "reason": f"manual-quad-{index}-duplicate-tile"}
+            return {"status": "impossible", "reason": f"manual-quad-{index}-duplicate-tile", "debug_pool": debug_pool}
         if any(tile_id not in pool_ids for tile_id in ids):
-            return {"status": "impossible", "reason": f"manual-quad-{index}-tile-not-in-pool"}
+            return {"status": "impossible", "reason": f"manual-quad-{index}-tile-not-in-pool", "debug_pool": debug_pool}
         if any(tile_id in used_ids for tile_id in ids):
-            return {"status": "impossible", "reason": f"manual-quad-{index}-overlap"}
+            return {"status": "impossible", "reason": f"manual-quad-{index}-overlap", "debug_pool": debug_pool}
         quad = available_quads.get(ids)
         if quad is None:
-            return {"status": "impossible", "reason": f"manual-quad-{index}-not-a-quad"}
+            return {"status": "impossible", "reason": f"manual-quad-{index}-not-a-quad", "debug_pool": debug_pool}
         normalized_quads.append(ids)
         quad_faces.append(str(quad["face"]))
         used_ids.update(ids)
@@ -1250,17 +1329,17 @@ def validate_manual_souzu_switch_plan(
     pair_ids = tuple(sorted(int(tile_id) for tile_id in (structure_groups.get("pair") or [])))
 
     if len(meld1_ids) > 3 or len(meld2_ids) > 3 or len(pair_ids) > 2:
-        return {"status": "impossible", "reason": "manual-structure-size-invalid"}
+        return {"status": "impossible", "reason": "manual-structure-size-invalid", "debug_pool": debug_pool}
 
     prewin_ids = list(meld1_ids + meld2_ids + pair_ids)
     if len(prewin_ids) != 7:
-        return {"status": "impossible", "reason": "manual-structure-total-invalid"}
+        return {"status": "impossible", "reason": "manual-structure-total-invalid", "debug_pool": debug_pool}
     if len(set(prewin_ids)) != 7:
-        return {"status": "impossible", "reason": "manual-structure-duplicate-tile"}
+        return {"status": "impossible", "reason": "manual-structure-duplicate-tile", "debug_pool": debug_pool}
     if any(tile_id not in pool_ids for tile_id in prewin_ids):
-        return {"status": "impossible", "reason": "manual-structure-tile-not-in-pool"}
+        return {"status": "impossible", "reason": "manual-structure-tile-not-in-pool", "debug_pool": debug_pool}
     if any(tile_id in used_ids for tile_id in prewin_ids):
-        return {"status": "impossible", "reason": "manual-structure-overlap-with-quad"}
+        return {"status": "impossible", "reason": "manual-structure-overlap-with-quad", "debug_pool": debug_pool}
 
     def group_desc(name: str, ids: Sequence[int]) -> str:
         faces = [_norm(deck_map[int(tile_id)]) for tile_id in ids]
@@ -1301,12 +1380,14 @@ def validate_manual_souzu_switch_plan(
             "component_descs": component_descs,
             "manual_searchable": manual_searchable,
             "manual_search_reason": manual_search_reason,
+            "debug_pool": debug_pool,
         }
 
     plan["quad_faces"] = quad_faces
     plan["component_descs"] = component_descs
     plan["manual_searchable"] = manual_searchable
     plan["manual_search_reason"] = manual_search_reason
+    plan["debug_pool"] = debug_pool
     return plan
 
 
@@ -1546,8 +1627,6 @@ def _search_remaining_plan(
         for win_component_index, win_component in enumerate(win_components, start=1):
             if timed_out():
                 return best_plan
-            if win_component.get("kind") == "triplet" and not str(win_component.get("face", "")).endswith("s"):
-                continue
             blocked = set(quad_orders)
             blocked.update(by_id[tile_id].order for tile_id in win_component["ids"])
             if _target13_lower_bound(quad_pair["quad_ids"], win_component["ids"], None, by_id) > 13:
@@ -1577,8 +1656,6 @@ def _search_remaining_plan(
                 ) > 13 else 0
                 melds = get_melds(blocked, allow_replacement=allow_replacement_after_win, min_order=min_order_after_win)
                 for meld1_index, meld1 in enumerate(melds, start=1):
-                    if meld1.get("kind") == "triplet" and not str(meld1.get("face", "")).endswith("s"):
-                        continue
                     blocked1 = blocked | {by_id[tile_id].order for tile_id in meld1["ids"]}
                     if _target13_lower_bound(
                             quad_pair["quad_ids"],
@@ -1610,11 +1687,6 @@ def _search_remaining_plan(
                     for meld2_index, meld2 in enumerate(meld2_list, start=1):
                         if timed_out():
                             return best_plan
-                        if not _component_is_souzu_only(meld2):
-                            stats["last_node_souzu_prunes"] += 1
-                            continue
-                        if meld2.get("kind") == "triplet" and not str(meld2.get("face", "")).endswith("s"):
-                            continue
                         stats["node_total"] = len(meld2_list)
                         stats["node_index"] = meld2_index
                         stats["node_searchable"] = len(pool) - len(blocked1 | {by_id[tile_id].order for tile_id in meld2["ids"]})
@@ -1698,8 +1770,6 @@ def _search_remaining_plan(
                 pairs = get_pairs(blocked, allow_replacement=allow_replacement_after_win, min_order=min_order_after_win)
                 melds = get_melds(blocked, allow_replacement=allow_replacement_after_win, min_order=min_order_after_win)
                 for pair_index, pair in enumerate(pairs, start=1):
-                    if win_component.get("kind") == "triplet" and not str(pair.get("face", "")).endswith("s"):
-                        continue
                     blocked1 = blocked | {by_id[tile_id].order for tile_id in pair["ids"]}
                     if _target13_lower_bound(
                             quad_pair["quad_ids"],
@@ -1713,8 +1783,6 @@ def _search_remaining_plan(
                     stats["node_index"] = pair_index
                     stats["node_searchable"] = len(pool) - len(blocked1)
                     for meld_index, meld in enumerate(melds, start=1):
-                        if meld.get("kind") == "triplet" and not str(meld.get("face", "")).endswith("s"):
-                            continue
                         meld_orders = {by_id[tile_id].order for tile_id in meld["ids"]}
                         if blocked1 & meld_orders:
                             continue
@@ -2032,9 +2100,6 @@ def _search_remaining_tenpai_plan(
     for meld1_index, meld1 in enumerate(melds0, start=1):
         if timed_out():
             return best_plan
-        if not _component_is_souzu_only(meld1):
-            stats["last_node_souzu_prunes"] += 1
-            continue
         blocked1 = quad_orders | {by_id[tile_id].order for tile_id in meld1["ids"]}
         if _target13_lower_bound(quad_pair["quad_ids"], list(meld1["ids"]), None, by_id) > 13:
             stats["target13_prunes"] += 1
@@ -2053,9 +2118,6 @@ def _search_remaining_tenpai_plan(
         for meld2 in melds1:
             if timed_out():
                 return best_plan
-            if not _component_is_souzu_only(meld2):
-                stats["last_node_souzu_prunes"] += 1
-                continue
             blocked2 = blocked1 | {by_id[tile_id].order for tile_id in meld2["ids"]}
             pre_ids = list(meld1["ids"]) + list(meld2["ids"])
             if _target13_lower_bound(quad_pair["quad_ids"], pre_ids, None, by_id) > 13:
@@ -2064,8 +2126,6 @@ def _search_remaining_tenpai_plan(
 
             singles = get_singles(blocked2, allow_replacement=allow_after_meld1, min_order=min_after_meld1)
             for single in singles:
-                if not _component_is_souzu_only(single):
-                    continue
                 plan = try_candidate(pre_ids + list(single["ids"]), [meld1["desc"], meld2["desc"], single["desc"]])
                 if stop_after_first and plan is not None:
                     return plan
@@ -2074,8 +2134,6 @@ def _search_remaining_tenpai_plan(
         for pair1 in pairs1:
             if timed_out():
                 return best_plan
-            if not _component_is_souzu_only(pair1):
-                continue
             blocked_pair = blocked1 | {by_id[tile_id].order for tile_id in pair1["ids"]}
             pre_ids = list(meld1["ids"]) + list(pair1["ids"])
             if _target13_lower_bound(quad_pair["quad_ids"], pre_ids, None, by_id) > 13:
@@ -2084,8 +2142,6 @@ def _search_remaining_tenpai_plan(
 
             pairs2 = get_pairs(blocked_pair, allow_replacement=allow_after_meld1, min_order=min_after_meld1)
             for pair2 in pairs2:
-                if not _component_is_souzu_only(pair2):
-                    continue
                 if set(pair1["ids"]) & set(pair2["ids"]):
                     continue
                 plan = try_candidate(pre_ids + list(pair2["ids"]), [meld1["desc"], pair1["desc"], pair2["desc"]])
@@ -2094,8 +2150,6 @@ def _search_remaining_tenpai_plan(
 
             taatsus = get_taatsus(blocked_pair, allow_replacement=allow_after_meld1, min_order=min_after_meld1)
             for taatsu in taatsus:
-                if not _component_is_souzu_only(taatsu):
-                    continue
                 if set(pair1["ids"]) & set(taatsu["ids"]):
                     continue
                 plan = try_candidate(pre_ids + list(taatsu["ids"]), [meld1["desc"], pair1["desc"], taatsu["desc"]])
@@ -2196,6 +2250,17 @@ def recommend_souzu_tenpai_switch(
     pool, by_id = _build_pool(deck_map, hand_ids, remaining_replacements, wall_ids)
     quads = _enumerate_quads(pool, by_id)
     quad_pairs = _enumerate_quad_pairs(quads)
+    debug_pool = _build_debug_pool_info(
+        deck_map,
+        hand_ids,
+        remaining_replacements,
+        wall_ids,
+        quads,
+        by_id,
+        replacement_total_remaining=max(0, len(replacement_ids) - used_count),
+        replacement_window_count=len(remaining_replacements),
+        replacement_used_count=used_count,
+    )
     stats["quads"] = len(quads)
     stats["quad_pairs"] = len(quad_pairs)
 
@@ -2208,7 +2273,7 @@ def recommend_souzu_tenpai_switch(
         emit_progress("杠搜索完成，所有可成杠如下\n" + "\n".join(quad_lines), force=True)
 
     if not quad_pairs:
-        return {"status": "impossible", "reason": "cannot-form-two-quads", "remaining_changes": remaining_changes}
+        return {"status": "impossible", "reason": "cannot-form-two-quads", "remaining_changes": remaining_changes, "debug_pool": debug_pool}
 
     best_plan: Optional[dict] = None
     best_draws_limit: Optional[int] = None
@@ -2254,7 +2319,8 @@ def recommend_souzu_tenpai_switch(
                 return best_plan
 
     if stop_requested():
-        return {"status": "impossible", "reason": "stopped-by-user", "remaining_changes": remaining_changes}
+        return {"status": "impossible", "reason": "stopped-by-user", "remaining_changes": remaining_changes, "debug_pool": debug_pool}
     if best_plan is not None:
+        best_plan["debug_pool"] = debug_pool
         return best_plan
-    return {"status": "impossible", "reason": "no-reliable-plan-found", "remaining_changes": remaining_changes}
+    return {"status": "impossible", "reason": "no-reliable-plan-found", "remaining_changes": remaining_changes, "debug_pool": debug_pool}

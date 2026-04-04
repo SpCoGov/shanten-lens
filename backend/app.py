@@ -17,6 +17,7 @@ from fastapi import FastAPI, Query
 from loguru import logger
 from platformdirs import user_data_dir
 from watchfiles import awatch
+from websockets.exceptions import ConnectionClosed
 from websockets.legacy.server import WebSocketServerProtocol, serve
 
 from backend.autorun.runner import AutoRunner
@@ -174,7 +175,14 @@ async def _ui_services_main(host: str, ws_port: int):
 
     antiafk_task = asyncio.create_task(anti_afk_loop())
 
-    async with serve(ws_handler, host, ws_port, max_size=2 ** 20):
+    async with serve(
+        ws_handler,
+        host,
+        ws_port,
+        max_size=2 ** 20,
+        ping_interval=20,
+        ping_timeout=60,
+    ):
         logger.info(f"Websocket listening on ws://{host}:{ws_port}/")
         try:
             await UI_STOP.wait()
@@ -546,6 +554,8 @@ async def ws_handler(ws: WebSocketServerProtocol):
             elif t == "msgbox_result":
                 from backend.msgbox import handle_msgbox_result
                 handle_msgbox_result(pkt)
+    except ConnectionClosed as e:
+        logger.info("websocket disconnected: code={} reason={}", e.code, e.reason or "")
     except Exception:
         logger.exception("ws_handler failed")
     finally:
@@ -603,13 +613,13 @@ async def anti_afk_loop():
             edge_ratio = 0.015
 
             if enabled:
-                ok1 = pipeline.click_left_center_once()
+                ok1 = await asyncio.to_thread(pipeline.click_left_center_once)
                 if not ok1:
                     logger.debug("anti-AFK: first click (left-center) skipped/failed")
 
                 await asyncio.sleep(3)
 
-                ok2 = pipeline.click_left_edge_nudged_once(edge_ratio)
+                ok2 = await asyncio.to_thread(pipeline.click_left_edge_nudged_once, edge_ratio)
                 if not ok2:
                     logger.debug("anti-AFK: second click (left-edge-nudged) skipped/failed")
 

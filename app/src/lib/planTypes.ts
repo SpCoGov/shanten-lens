@@ -16,6 +16,33 @@ export type QuadCatalogItem = {
     reason?: string;
 };
 
+export type DebugPoolTilePosition = {
+    tile_id: TileId;
+    source: "hand" | "replacement" | "wall" | string;
+    source_index: number;
+};
+
+export type DebugPoolData = {
+    focus_face?: string;
+    focus_count?: number;
+    raw_focus_counts?: Record<string, number>;
+    pool_counts?: Record<string, number>;
+    replacement_window?: {
+        used_count?: number;
+        total_remaining?: number;
+        window_count?: number;
+    };
+    focus_entries?: Array<DebugPoolTilePosition & {
+        raw_face?: string;
+        norm_face?: string;
+    }>;
+    norm_face_counts?: Record<string, number>;
+    available_quads?: Array<{
+        face?: string;
+        tile_positions?: DebugPoolTilePosition[];
+    }>;
+};
+
 export type PlanData = {
     status?: "win_now" | "plan" | "impossible" | "searching" | "catalog";
     draws_needed?: number | null;
@@ -42,4 +69,5 @@ export type PlanData = {
     component_descs?: string[];
     manual_searchable?: boolean;
     manual_search_reason?: string;
+    debug_pool?: DebugPoolData;
 };

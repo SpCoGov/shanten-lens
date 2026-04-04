@@ -265,6 +265,7 @@ def _wrap_entry(yaku_key: str, plan: dict) -> dict:
             "component_descs",
             "manual_searchable",
             "manual_search_reason",
+            "debug_pool",
     ):
         if key in plan:
             entry[key] = plan[key]
