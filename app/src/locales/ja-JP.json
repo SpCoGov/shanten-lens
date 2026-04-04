@@ -225,12 +225,8 @@
         "modify_announcement_desc": "向聴レンズの起動成功を知らせるお知らせを追加",
         "public_all": "公開山牌",
         "public_all_desc": "ゲーム内のすべての牌を公開にする",
-        "auto_discard": "自動打牌",
-        "auto_discard_desc": "七対子の提案に従って自動で打牌（クリックの擬似操作）",
         "auto_tsumo": "自動ツモ",
-        "auto_tsumo_desc": "ツモ可能なとき自動でツモ（パケット送信）",
-        "anti_afk": "AFK防止",
-        "anti_afk_desc": "離席扱いによる強制切断を防ぐ"
+        "auto_tsumo_desc": "ツモ可能なとき自動でツモ（パケット送信）"
       },
       "general": {
         "debug": "デバッグモード",

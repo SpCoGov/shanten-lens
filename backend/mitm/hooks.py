@@ -10,7 +10,7 @@ from mitmproxy import ctx
 
 import backend.app
 import backend.mitm.addon as _addon
-from backend.app import AMULET_REG, BADGE_REG, pipeline
+from backend.app import AMULET_REG, BADGE_REG
 from backend.app import MANAGER, GAME_STATE, broadcast
 from backend.autorun.util.chiitoi_recommender import chiitoi_recommendation_json
 from backend.autorun.util.retry_1004 import call_with_1004_retry_async
@@ -1410,28 +1410,6 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
 
                     ctx.master.event_loop.call_later(0.3, _do_inject)
 
-            else:
-                if MANAGER.get("game.auto_discard"):
-                    plan_candidates = [
-                        e for e in payload["data"]
-                        if e["data"].get("status") == "plan" and isinstance(e["data"].get("discards"), list) and e["data"]["discards"]
-                    ]
-                    if plan_candidates:
-                        plan_candidates.sort(
-                            key=lambda e: (e["data"].get("draws_needed") if e["data"].get("draws_needed") is not None else 10 ** 9)
-                        )
-                        best = plan_candidates[0]
-                        discard_id = int(best["data"]["discards"][0])
-
-                        def _do():
-                            pipeline.click_discard_by_tile_id(
-                                tile_id=discard_id,
-                                hand_ids_with_draw=GAME_STATE.hand_tiles,
-                                id2label=GAME_STATE.deck_map,
-                                allow_tsumogiri=True
-                            )
-
-                        loop.call_later(1, _do)
         coin_event = next((e for e in events if e.get("type") == 11), None)
         if coin_event:
             value_changes = coin_event.get("valueChanges", {})

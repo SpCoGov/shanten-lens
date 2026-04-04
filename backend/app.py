@@ -22,7 +22,6 @@ from websockets.legacy.server import WebSocketServerProtocol, serve
 
 from backend.autorun.runner import AutoRunner
 from backend.autorun.util.retry_1004 import call_with_1004_retry_async
-from backend.bot import BotPipeline, BotConfig
 from backend.bot.drivers.packet.packet_bot import PacketBot
 from backend.config import build_manager
 from backend.data.registry_loader import load_registry_list
@@ -45,28 +44,6 @@ try:
 except Exception:
     pass
 
-cfg = BotConfig(
-    screen_width=1920,
-    screen_height=1080,
-    window_title_keyword="雀魂",
-
-    hand_bar_norm=(0.10243, 0.85450, 0.82811, 0.99513),
-    button_bar_norm=(0.47454, 0.70785, 0.82542, 0.81008),
-
-    hand_slots=14,
-    hand_margin=0.02,
-    hand_left_comp_px=0,
-    hand_right_comp_px=10,
-    button_order=[4, 8, 100],
-    button_margin=0.06,
-
-    btn_x_left=6.40, btn_x_right=10.875, btn_y_line=6.45,
-
-    # 点击确认参数
-    ack_timeout_sec=1.6, ack_retry=2, ack_settle_ms=140, ack_check_ms=70,
-)
-pipeline = BotPipeline(cfg)
-
 
 def default_data_root() -> Path:
     return Path(user_data_dir(appname="Shanten Lens", appauthor=None))
@@ -80,14 +57,15 @@ def setup_logging():
     logger.remove()
 
     # stdout_level = "DEBUG" if MANAGER.get("general.debug", False) else "INFO"
-
-    logger.add(
-        sys.stdout,
-        level="INFO",
-        backtrace=True,
-        diagnose=False,
-        enqueue=True,
-    )
+    console_sink = sys.stdout if sys.stdout is not None else sys.stderr
+    if console_sink is not None:
+        logger.add(
+            console_sink,
+            level="INFO",
+            backtrace=True,
+            diagnose=False,
+            enqueue=True,
+        )
 
     logger.add(
         str(log_file),
@@ -173,15 +151,13 @@ async def _ui_services_main(host: str, ws_port: int):
     api_port = int(MANAGER.get("api_port", 8788))
     api_task = asyncio.create_task(run_http_server(host, api_port))
 
-    antiafk_task = asyncio.create_task(anti_afk_loop())
-
     async with serve(
-        ws_handler,
-        host,
-        ws_port,
-        max_size=2 ** 20,
-        ping_interval=20,
-        ping_timeout=60,
+            ws_handler,
+            host,
+            ws_port,
+            max_size=2 ** 20,
+            ping_interval=20,
+            ping_timeout=60,
     ):
         logger.info(f"Websocket listening on ws://{host}:{ws_port}/")
         try:
@@ -189,16 +165,15 @@ async def _ui_services_main(host: str, ws_port: int):
         except asyncio.CancelledError:
             pass
         finally:
-            for t in (watcher_cfg, watcher_reg, api_task, antiafk_task):
+            for t in (watcher_cfg, watcher_reg, api_task):
                 t.cancel()
-            await asyncio.gather(watcher_cfg, watcher_reg, api_task, antiafk_task, return_exceptions=True)
+            await asyncio.gather(watcher_cfg, watcher_reg, api_task, return_exceptions=True)
 
 
 _UI_TASK_FUT = None
 
 
 def start_ui_services(host: str = "127.0.0.1", ws_port: int = 8787) -> None:
-
     if not mark_ui_services_started():
         return
     loop = start_ui_loop_once()
@@ -272,22 +247,6 @@ def api_effect_list():
 @api_app.get("/api/gamestate/level")
 def api_level():
     return {"type": "request_level", "data": GAME_STATE.level}
-
-
-@api_app.get("/api/discard")
-def api_discard(tile_id: int = Query(..., description="要丢的牌的 tile_id")):
-    return {"type": "discard", "data": {"ok": pipeline.click_discard_by_tile_id(
-        tile_id=tile_id,
-        hand_ids_with_draw=GAME_STATE.hand_tiles,
-        id2label=GAME_STATE.deck_map,
-        allow_tsumogiri=False
-    )}}
-
-
-@api_app.get("/api/testmove")
-def api_testmove():
-    pipeline.selftest_move()
-    return {"type": "testmove", "data": {"ok": True}}
 
 
 @api_app.get("/api/buy")
@@ -602,40 +561,3 @@ async def _watch_configs():
             await broadcast({"type": "update_autorun_config", "data": MANAGER.to_table_payload("autorun")})
             AUTORUNNER.update_config(MANAGER.to_table_payload("autorun"))
             logger.info("autorun config updated & broadcast")
-
-
-async def anti_afk_loop():
-    if platform.system().lower() != "windows":
-        logger.info("anti-AFK disabled: non-Windows platform")
-        return
-
-    logger.info("anti-AFK loop started")
-    await asyncio.sleep(1.0)
-
-    while True:
-        try:
-            enabled = bool(MANAGER.get("game.anti_afk", False))
-            interval = 30
-            edge_ratio = 0.015
-
-            if enabled:
-                ok1 = await asyncio.to_thread(pipeline.click_left_center_once)
-                if not ok1:
-                    logger.debug("anti-AFK: first click (left-center) skipped/failed")
-
-                await asyncio.sleep(3)
-
-                ok2 = await asyncio.to_thread(pipeline.click_left_edge_nudged_once, edge_ratio)
-                if not ok2:
-                    logger.debug("anti-AFK: second click (left-edge-nudged) skipped/failed")
-
-                remaining = max(0, interval - 3)
-                await asyncio.sleep(remaining)
-            else:
-                await asyncio.sleep(2.0)
-
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("anti-AFK loop error")
-            await asyncio.sleep(3.0)

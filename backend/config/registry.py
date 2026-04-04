@@ -1,25 +1,22 @@
 from pathlib import Path
+
 from backend.config.manager import ConfigManager
 from backend.config.table import ConfigTable
 
 
 def build_manager(conf_dir: Path) -> ConfigManager:
-    """
-    唯一的“默认配置表定义处”。以后新增/修改配置项只改这里。
-    """
+    """Build the default config tables."""
     mgr = ConfigManager(conf_dir)
     mgr.add_table(
         ConfigTable("game", file=conf_dir / "game.json")
-        .add("modify_announcement", True, desc="修改公告", kind="bool")
-        .add("public_all", False, desc="公开全部", kind="bool")
-        .add("auto_discard", False, desc="自动打牌", kind="bool")
-        .add("auto_tsumo", False, desc="自动自摸", kind="bool")
-        .add("anti_afk", False, desc="防止AFK", kind="bool")
+        .add("modify_announcement", True, desc="modify announcement", kind="bool")
+        .add("public_all", False, desc="public all tiles", kind="bool")
+        .add("auto_tsumo", False, desc="auto tsumo", kind="bool")
     )
     mgr.add_table(
         ConfigTable("general", file=conf_dir / "general.json")
-        .add("debug", False, desc="调试模式", kind="bool")
-        .add("error_code_test", 0, desc="错误测试", kind="number")
+        .add("debug", False, desc="debug mode", kind="bool")
+        .add("error_code_test", 0, desc="error code test", kind="number")
     )
     mgr.add_table(
         ConfigTable("backend", file=conf_dir / "backend.json")
@@ -33,7 +30,7 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         .add(
             "guard_skip_contains",
             {"amulets": [], "badges": []},
-            desc="当卡包包含以下护身符/印章时，禁止跳过",
+            desc="guard skip contains",
             kind="object",
         )
         .add("enable_skip_guard", True, kind="bool")
@@ -46,10 +43,10 @@ def build_manager(conf_dir: Path) -> ConfigManager:
     )
     mgr.add_table(
         ConfigTable("autorun", file=conf_dir / "autorun.json")
-        .add("end_count", 1, desc="达成的目标数量（护身符/印章混计）", kind="int")
-        .add("targets", [], desc="结束判定的目标清单", kind="object")
-        .add("cutoff_level", 0, desc="截止关卡（101..503；0=不限制）", kind="int")
-        .add("op_interval_ms", 1000, desc="操作间隔", kind="int")
+        .add("end_count", 1, desc="target count", kind="int")
+        .add("targets", [], desc="targets", kind="object")
+        .add("cutoff_level", 0, desc="cutoff level", kind="int")
+        .add("op_interval_ms", 1000, desc="operation interval", kind="int")
         .add(
             "email_notify",
             {
@@ -61,7 +58,7 @@ def build_manager(conf_dir: Path) -> ConfigManager:
                 "pass": "",
                 "to": "",
             },
-            desc="邮件通知（完成/出错后，SMTP）",
+            desc="email notify",
             kind="object",
         )
     )

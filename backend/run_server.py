@@ -1,6 +1,7 @@
 from __future__ import annotations
 import argparse
 import asyncio
+import multiprocessing
 from pathlib import Path
 from loguru import logger
 
@@ -47,6 +48,7 @@ async def main():
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

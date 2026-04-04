@@ -225,12 +225,8 @@
         "modify_announcement_desc": "添加一条公告以提示向听镜启动成功",
         "public_all": "公开牌山",
         "public_all_desc": "让游戏中所有牌成为公开牌",
-        "auto_discard": "自动打牌",
-        "auto_discard_desc": "按照自动和七对子的提示自动打牌（模拟点击）",
         "auto_tsumo": "自动自摸",
-        "auto_tsumo_desc": "在可以自摸的时候自动自摸（发送封包）",
-        "anti_afk": "防止挂机",
-        "anti_afk_desc": "防止被判定为挂机而强制断开链接"
+        "auto_tsumo_desc": "在可以自摸的时候自动自摸（发送封包）"
       },
       "general": {
         "debug": "调试模式",
