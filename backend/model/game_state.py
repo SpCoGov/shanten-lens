@@ -36,6 +36,8 @@ class GameState:
     total_change_tile_count: int = field(default_factory=int)
     max_effect_volume: int = field(default_factory=int)
     boss_buff: List[int] = field(default_factory=list)
+    opening_hand_tiles: List[int] = field(default_factory=list)
+    used_desktop_tiles: List[int] = field(default_factory=list)
 
     update_reason: List[str] = field(default_factory=list)
 
@@ -52,7 +54,7 @@ class GameState:
             "wall_tiles": self.wall_tiles,
             "switch_used_tiles": self.switch_used_tiles,
             "ended": self.ended,
-            "desktop_remain": self.desktop_remain,  
+            "desktop_remain": self.desktop_remain,
             "locked_tiles": self.locked_tiles,
             "coin": self.coin,
             "level": self.level,
@@ -82,13 +84,50 @@ class GameState:
         await broadcast({"type": "update_gamestate", "data": self.to_dict()})
         self.update_reason.clear()
 
-    def update_pool(self, pool: list[dict], hand_tiles: list[int], locked_tiles: list[int], used: list[int], push_gamestate: bool = True, reason: str = ""):
+    def _infer_opening_hand_tiles(self, current_hand_tiles: list[int], dora_tiles: list[int] | None = None) -> List[int]:
+        ids = list(self.deck_map.keys())
+        if not ids:
+            return []
+
+        dora_hint = list(dora_tiles or [])
+        if dora_hint:
+            first_dora_id = dora_hint[0]
+            try:
+                dora_idx = ids.index(first_dora_id)
+            except ValueError:
+                dora_idx = -1
+            if dora_idx >= 0:
+                opening_hand_tiles = ids[:dora_idx]
+                last_id = ids[-1]
+                if self.deck_map.get(last_id) == "bd" and last_id in (current_hand_tiles or []) and last_id not in opening_hand_tiles:
+                    opening_hand_tiles.append(last_id)
+                return opening_hand_tiles
+
+        return list(current_hand_tiles or [])
+
+    def _candidate_pool_ids(self) -> List[int]:
+        # 从 pool 中剔除开局手牌的 id，剩余顺序与协议保持一致
+        hand_set = set(self.opening_hand_tiles)
+        return [tile_id for tile_id in self.deck_map.keys() if tile_id not in hand_set]
+
+    def _rebuild_sections_from_pool(self):
+        # 协议定义：从 pool 排除 hand 后，前 10 张是 dora，再后 36 张是 wall，剩下的是 replacement
+        ids = self._candidate_pool_ids()
+        self.dora_tiles = ids[:10]
+        self.wall_tiles = ids[10:46]
+        self.replacement_tiles = ids[46:]
+
+    def update_pool(self, pool: list[dict], hand_tiles: list[int], locked_tiles: list[int], used: list[int],
+                    dora_tiles: list[int] | None = None, used_desktop: list[int] | None = None,
+                    push_gamestate: bool = True, reason: str = ""):
         self.deck_map.clear()
         self.hand_tiles.clear()
         self.dora_tiles.clear()
         self.replacement_tiles.clear()
         self.wall_tiles.clear()
         self.locked_tiles.clear()
+        self.opening_hand_tiles.clear()
+        self.used_desktop_tiles.clear()
         self.switch_used_tiles.clear()
         self.candidate_effect_list.clear()
         self.ended = True
@@ -96,37 +135,21 @@ class GameState:
         # 根据池子信息构建完整的牌堆（id → 牌面）
         for item in pool:
             self.deck_map[item["id"]] = item["tile"]
-        # 拷贝一份完整牌堆，用于后续从中剔除手牌
-        temp = self.deck_map.copy()
         self.hand_tiles = hand_tiles.copy()
-        # 从牌堆中移除已经分配到手牌里的牌
-        # for hand_tile_id in hand_tiles:
-        #     temp.pop(hand_tile_id)
-        # 剩余的 id 作为候选牌山/宝牌/替换牌来源
-        ids = list(temp.keys())
-        # cursor = 0
-        cursor = 13
+        self.opening_hand_tiles = self._infer_opening_hand_tiles(self.hand_tiles, dora_tiles)
+        self.used_desktop_tiles = used_desktop.copy() if used_desktop else []
 
-        # 从候选 ids 中移除 used 的 id（<del>喵修斯之船fix</del>修不好不修了）
-        # 看不懂傻逼猫粮的封包
-        # if used is not None:
-        #     used_set = set(used)
-        #     ids = [tile_id for tile_id in ids if tile_id not in used_set]
+        # 按协议从 pool 中排除手牌后重新切 dora / wall / replacement
+        self._rebuild_sections_from_pool()
 
-        # 取前 10 张 → dora
-        self.dora_tiles = ids[cursor:cursor + 10]
-        cursor += 10
-
-        # 取后 36 张 → wall
-        self.wall_tiles = ids[cursor:cursor + 36]
-        cursor += 36
-
-        # 剩下全部 → replacement
-        self.replacement_tiles = ids[cursor:]
-
-        self.locked_tiles = locked_tiles.copy()
-        for locked_id in self.locked_tiles:
-            self.wall_tiles.remove(locked_id)
+        # lockedTile 一定是牌山的子集，但这里仍做容错，避免异常中断整个 hook
+        self.locked_tiles = locked_tiles.copy() if locked_tiles else []
+        if self.locked_tiles:
+            locked_set = set(self.locked_tiles)
+            self.wall_tiles = [tile_id for tile_id in self.wall_tiles if tile_id not in locked_set]
+        if self.used_desktop_tiles:
+            used_desktop_set = set(self.used_desktop_tiles)
+            self.wall_tiles = [tile_id for tile_id in self.wall_tiles if tile_id not in used_desktop_set]
 
         self.update_reason.append(reason)
         if push_gamestate:
@@ -140,22 +163,24 @@ class GameState:
         locked = 0
         if self.locked_tiles:
             locked = len(self.locked_tiles)
-        # 原本剩余的牌加上锁的牌的数量、因为wall tiles已经减去了锁的牌
-        remain = self.desktop_remain + locked
+        # wall tiles 里保存的是“当前还可能摸到的未锁牌”，因此直接按 desktop_remain 对齐即可
+        remain = self.desktop_remain
         # 优先裁剪当前 wall（可能已被外部重排）
-        if isinstance(self.wall_tiles, list) and self.desktop_remain is not None and len(self.wall_tiles) >= int(self.desktop_remain):
-            self.wall_tiles = self.wall_tiles[: int(remain)]
+        if isinstance(self.wall_tiles, list) and self.desktop_remain is not None and len(self.wall_tiles) >= int(remain):
+            self.wall_tiles = self.wall_tiles[-int(remain):]
         else:
-            # fallback：从 deck_map 推导（用于 wall 尚未建立的场景）
-            temp = self.deck_map.copy()
-            hand_tiles = self.hand_tiles.copy()
-            for hand_tile_id in hand_tiles:
-                temp.pop(hand_tile_id, None)
-            ids = list(temp.keys())
-            # 跳过 dora 和 已经摸牌的数量
-            cursor = 10 + 36 - int(remain)
-            # 取后 剩余多少张 → wall
-            self.wall_tiles = ids[cursor:cursor + int(remain)]
+            # fallback：从 deck_map 按与 update_pool 一致的规则重新推导
+            self._rebuild_sections_from_pool()
+            if self.locked_tiles:
+                locked_set = set(self.locked_tiles)
+                self.wall_tiles = [tile_id for tile_id in self.wall_tiles if tile_id not in locked_set]
+            if self.used_desktop_tiles:
+                used_desktop_set = set(self.used_desktop_tiles)
+                self.wall_tiles = [tile_id for tile_id in self.wall_tiles if tile_id not in used_desktop_set]
+            self.wall_tiles = self.wall_tiles[-int(remain):]
+
+        if remain <= 0:
+            self.wall_tiles = []
 
         self.update_reason.append(reason)
         if push_gamestate:
@@ -163,7 +188,9 @@ class GameState:
             loop.create_task(self.on_gamestage_change())
 
     def on_draw_tile(self, hand_tiles: list[int], tile_id: int, push_gamestate: bool = True, reason: str = ""):
-        self.wall_tiles.remove(tile_id)
+        # 正常情况下摸到的牌一定在 wall 里；这里保留容错避免状态不同步时直接抛异常
+        if tile_id in self.wall_tiles:
+            self.wall_tiles.remove(tile_id)
         self.hand_tiles = hand_tiles.copy()
         self.update_reason.append(reason)
         if push_gamestate:
@@ -237,6 +264,8 @@ class GameState:
         self.ended = True
         self.desktop_remain = 0
         self.locked_tiles.clear()
+        self.opening_hand_tiles.clear()
+        self.used_desktop_tiles.clear()
         self.coin = 0
         self.level = 0
         self.effect_list.clear()

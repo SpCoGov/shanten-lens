@@ -254,6 +254,13 @@ def _switch_search_params_from_state(state: dict) -> dict:
     }
 
 
+def _souzu_switch_disabled_reason(state: dict) -> str | None:
+    deck_map = state.get("deck_map") or {}
+    if any(str(face) == "bd" for face in deck_map.values()):
+        return "当前有万象，暂不支持条子换牌推荐"
+    return None
+
+
 def _wrap_entry(yaku_key: str, plan: dict) -> dict:
     entry = {
         "status": plan.get("status"),
@@ -510,6 +517,20 @@ async def start_switch_recommendation_search(
     _cache_switch_runtime(terminate_active_search_workers())
     await broadcast_switch_runtime_status()
     state = _live_switch_search_state(wall_limit=wall_limit)
+    disabled_reason = _souzu_switch_disabled_reason(state)
+    if disabled_reason is not None:
+        plan = {
+            "status": "impossible",
+            "reason": disabled_reason,
+            "request_source": "live",
+            **_switch_search_params_from_state(state),
+        }
+        _cache_switch_plan(plan)
+        await broadcast({
+            "type": "discard_recommendation",
+            "data": [_wrap_entry("souzu_switch", plan)],
+        })
+        return
     if int(state.get("stage", 0) or 0) != 2:
         _cache_switch_plan({
             "status": "impossible",
@@ -564,6 +585,21 @@ async def start_switch_recommendation_debug_search(
         })
         return
 
+    disabled_reason = _souzu_switch_disabled_reason(state)
+    if disabled_reason is not None:
+        plan = {
+            "status": "impossible",
+            "reason": disabled_reason,
+            "request_source": "debug",
+            **_switch_search_params_from_state(state),
+        }
+        _cache_switch_plan(plan)
+        await broadcast({
+            "type": "discard_recommendation",
+            "data": [_wrap_entry("souzu_switch", plan)],
+        })
+        return
+
     if int(state.get("stage", 0) or 0) != 2:
         plan = {
             "status": "impossible",
@@ -609,6 +645,18 @@ async def validate_manual_switch_debug_plan(
         await broadcast({"type": "discard_recommendation", "data": [_wrap_entry("souzu_switch", plan)]})
         return
 
+    disabled_reason = _souzu_switch_disabled_reason(state)
+    if disabled_reason is not None:
+        plan = {
+            "status": "impossible",
+            "reason": disabled_reason,
+            "request_source": "debug",
+            **_switch_search_params_from_state(state),
+        }
+        _cache_switch_plan(plan)
+        await broadcast({"type": "discard_recommendation", "data": [_wrap_entry("souzu_switch", plan)]})
+        return
+
     plan = await asyncio.to_thread(
         validate_manual_souzu_switch_plan,
         state["deck_map"],
@@ -637,6 +685,20 @@ async def validate_manual_switch_debug_plan(
 
 async def broadcast_switch_quad_catalog(*, wall_limit: int = 36) -> None:
     state = _live_switch_search_state(wall_limit=wall_limit)
+    disabled_reason = _souzu_switch_disabled_reason(state)
+    if disabled_reason is not None:
+        plan = {
+            "status": "impossible",
+            "reason": disabled_reason,
+            "request_source": "live",
+            **_switch_search_params_from_state(state),
+        }
+        _cache_switch_plan(plan)
+        await broadcast({
+            "type": "discard_recommendation",
+            "data": [_wrap_entry("souzu_switch", plan)],
+        })
+        return
     plan = await asyncio.to_thread(
         list_reachable_quads_for_switch,
         state["deck_map"],
@@ -1161,17 +1223,19 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             change_tile_count = round_info.get("changeTileCount", {}).get("value", None)
             hands = round_info.get("hands", {}).get("value", None)
             pool = round_info.get("pool", {}).get("value", None)
+            dora_tiles = round_info.get("dora", {}).get("value", None)
             ting_list = round_info.get("tingList", {}).get("value", None)
             next_operation = round_info.get("nextOperation", {}).get("value", None)
             locked_tiles = round_info.get("lockedTile", {}).get("value", None)
+            used_desktop = round_info.get("usedDesktop", {}).get("value", None)
             effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
             game = value_changes.get("game", {})
             boss_buff = game.get("bossBuff", {}).get("value", None)
-            used = round_info.get("hands", {}).get("value", None)
+            used = round_info.get("used", {}).get("value", None)
             record = value_changes.get("record", None)
             GAME_STATE.update_record(record)
             if hands and pool:
-                GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, used=used, push_gamestate=False)
+                GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, used=used, dora_tiles=dora_tiles, used_desktop=used_desktop, push_gamestate=False)
                 new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, GAME_STATE.effect_list)
                 GAME_STATE.update_wall(new_wall)
                 desktop_remain = round_info.get("desktopRemain", {}).get("value", 0)
@@ -1402,12 +1466,14 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             round_info = game.get("round", {})
             hands = round_info.get("hands", [])
             pool = round_info.get("pool", [])
+            dora_tiles = round_info.get("dora", [])
             locked_tiles = round_info.get("lockedTile", [])
             effect_list = game.get("effect", {}).get("effectList", None)
             total_chance_tile_count = round_info.get("totalChangeTileCount", None)
             chance_tile_count = round_info.get("changeTileCount", None)
             used = round_info.get("used", [])
-            GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, push_gamestate=False, used=used, reason=".lq.Lobby.fetchAmuletActivityData")
+            used_desktop = round_info.get("usedDesktop", [])
+            GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, push_gamestate=False, used=used, dora_tiles=dora_tiles, used_desktop=used_desktop, reason=".lq.Lobby.fetchAmuletActivityData")
             desktop_remain = round_info.get("desktopRemain", 0)
             stage = game.get("stage", -1)
             ended = game.get("ended", False)
