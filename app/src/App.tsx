@@ -39,7 +39,7 @@ import {useTranslation} from "react-i18next";
 import {WebviewWindow, getAllWebviewWindows} from '@tauri-apps/api/webviewWindow';
 import {t} from "i18next";
 import {openMsgBoxWindow} from "./lib/msgbox";
-import type {PlanData} from "./lib/planTypes";
+import type {PlanData, SearchRuntimeData} from "./lib/planTypes";
 
 type BackendLogPayload =
     | string
@@ -165,6 +165,7 @@ export default function App() {
     const [planChiitoi, setPlanChiitoi] = React.useState<PlanData | null>(null);
     const [planSouzuSwitch, setPlanSouzuSwitch] = React.useState<PlanData | null>(null);
     const [debugSouzuSwitch, setDebugSouzuSwitch] = React.useState<PlanData | null>(null);
+    const [souzuSwitchRuntime, setSouzuSwitchRuntime] = React.useState<SearchRuntimeData | null>(null);
     const [latestGameState, setLatestGameState] = React.useState<GameStateData | null>(null);
 
     const [amulets, setAmulets] = React.useState<EffectItem[]>([]);
@@ -331,11 +332,14 @@ export default function App() {
                     if (item.yaku === "chiitoi") setPlanChiitoi(item.data ?? null);
                     else if (item.yaku === "suuannkou") setPlanSuuAnkou(item.data ?? null);
                     else if (item.yaku === "souzu_switch") {
+                        if ((item.data as any)?.runtime) setSouzuSwitchRuntime((item.data as any).runtime ?? null);
                         const source = (item.data as any)?.request_source;
                         if (source === "debug") setDebugSouzuSwitch(item.data ?? null);
                         else setPlanSouzuSwitch(item.data ?? null);
                     }
                 }
+            } else if (pkt.type === "souzu_switch_runtime") {
+                setSouzuSwitchRuntime((pkt.data as SearchRuntimeData) ?? null);
             } else if (pkt.type === "autorun_status" && pkt.data) {
                 setAutoStatus(pkt.data as AutoRunnerStatus);
             } else if (pkt.type === "msgbox" && pkt.data) {
@@ -584,6 +588,7 @@ export default function App() {
                                 replacementIds={replacementTileIds}
                                 wallIds={wallTileIds}
                                 currentState={latestGameState}
+                                runtime={souzuSwitchRuntime}
                                 onClear={() => setPlanSouzuSwitch(null)}
                             />
                         )}
@@ -591,6 +596,7 @@ export default function App() {
                             <SouzuSwitchDebugPage
                                 currentState={latestGameState}
                                 data={debugSouzuSwitch}
+                                runtime={souzuSwitchRuntime}
                                 onClear={() => setDebugSouzuSwitch(null)}
                             />
                         )}

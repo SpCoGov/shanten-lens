@@ -18,6 +18,8 @@ from backend.autorun.util.souzu_switch_recommender import (
     recommend_souzu_tenpai_switch,
     list_reachable_quads_for_switch,
     validate_manual_souzu_switch_plan,
+    get_active_search_runtime_snapshot,
+    terminate_active_search_workers,
 )
 from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
 from backend.msgbox import _ui_confirm_blocking, ui_alert
@@ -33,6 +35,7 @@ _SWITCH_RECOMMENDATION_SEQ = 0
 _SWITCH_STOP_EVENT = threading.Event()
 _SWITCH_SEARCH_TASK: asyncio.Task | None = None
 _LAST_SWITCH_PLAN: dict | None = None
+_LAST_SWITCH_RUNTIME: dict = get_active_search_runtime_snapshot(searching=False)
 
 
 def _coerce_int_list(values: Any) -> list[int]:
@@ -115,6 +118,22 @@ def _live_switch_search_state(*, wall_limit: int = 36) -> dict:
 def _cache_switch_plan(plan: dict | None) -> None:
     global _LAST_SWITCH_PLAN
     _LAST_SWITCH_PLAN = copy.deepcopy(plan) if isinstance(plan, dict) else None
+
+
+def _cache_switch_runtime(runtime: dict | None) -> None:
+    global _LAST_SWITCH_RUNTIME
+    if isinstance(runtime, dict):
+        _LAST_SWITCH_RUNTIME = copy.deepcopy(runtime)
+    else:
+        _LAST_SWITCH_RUNTIME = get_active_search_runtime_snapshot(searching=False)
+
+
+async def broadcast_switch_runtime_status() -> None:
+    runtime = copy.deepcopy(_LAST_SWITCH_RUNTIME) if isinstance(_LAST_SWITCH_RUNTIME, dict) else get_active_search_runtime_snapshot(searching=False)
+    await broadcast({
+        "type": "souzu_switch_runtime",
+        "data": runtime,
+    })
 
 
 async def _wait_for_switch_state_advance(prev_change_count: int, timeout_sec: float = 5.0) -> bool:
@@ -266,6 +285,9 @@ def _wrap_entry(yaku_key: str, plan: dict) -> dict:
             "manual_searchable",
             "manual_search_reason",
             "debug_pool",
+            "worker_states",
+            "parallel_info",
+            "runtime",
     ):
         if key in plan:
             entry[key] = plan[key]
@@ -298,6 +320,8 @@ async def _broadcast_switch_recommendation(
     }
     state = snapshot_state or _live_switch_search_state(wall_limit=wall_limit)
     search_params = _switch_search_params_from_state(state)
+    _cache_switch_runtime(get_active_search_runtime_snapshot(searching=True))
+    await broadcast_switch_runtime_status()
 
     await broadcast({
         "type": "discard_recommendation",
@@ -305,12 +329,20 @@ async def _broadcast_switch_recommendation(
             "status": "searching",
             "progress": "正在准备搜索…",
             "request_source": request_source,
+            "runtime": copy.deepcopy(_LAST_SWITCH_RUNTIME),
             **search_params,
         })],
     })
 
-    latest_progress = {"text": "正在准备搜索…", "candidate": None, "candidate_version": 0}
+    latest_progress = {"text": "正在准备搜索…", "candidate": None, "candidate_version": 0, "telemetry": {}}
 
+    latest_progress = {
+        "text": latest_progress["text"],
+        "candidate": latest_progress["candidate"],
+        "candidate_version": latest_progress["candidate_version"],
+        "telemetry": latest_progress["telemetry"],
+        "runtime": copy.deepcopy(_LAST_SWITCH_RUNTIME),
+    }
     latest_progress["candidate"] = dict(search_params)
     async def _flush_progress(force: bool = False) -> None:
         send_state["flush_queued"] = False
@@ -337,6 +369,8 @@ async def _broadcast_switch_recommendation(
                         "status": "searching",
                         "progress": message,
                         "request_source": request_source,
+                        **(latest_progress["telemetry"] or {}),
+                        "runtime": latest_progress.get("runtime"),
                         **(latest_progress["candidate"] or {}),
                     })],
                 })
@@ -402,6 +436,22 @@ async def _broadcast_switch_recommendation(
         }
         latest_progress["candidate_version"] += 1
         _request_flush(force=True)
+        if stop_after_first:
+            _SWITCH_STOP_EVENT.set()
+
+    def telemetry_cb(payload: dict) -> None:
+        if send_state["finished"]:
+            return
+        if seq != _SWITCH_RECOMMENDATION_SEQ:
+            return
+        copied = dict(payload or {})
+        runtime = copied.pop("runtime", None)
+        latest_progress["telemetry"] = copied
+        if isinstance(runtime, dict):
+            latest_progress["runtime"] = runtime
+            _cache_switch_runtime(runtime)
+        latest_progress["candidate_version"] += 1
+        _request_flush(force=True)
 
     async def _progress_pump() -> None:
         try:
@@ -427,6 +477,7 @@ async def _broadcast_switch_recommendation(
         state["boss_buff"],
         progress_cb,
         candidate_cb,
+        telemetry_cb,
         _SWITCH_STOP_EVENT.is_set,
         stop_after_first,
         set(skip_signatures or []),
@@ -437,7 +488,10 @@ async def _broadcast_switch_recommendation(
         return
     if isinstance(plan, dict):
         plan = {**search_params, **plan, "request_source": request_source}
+    runtime = plan.get("runtime") if isinstance(plan, dict) else None
+    _cache_switch_runtime(runtime if isinstance(runtime, dict) else get_active_search_runtime_snapshot(searching=False))
     _cache_switch_plan(plan)
+    await broadcast_switch_runtime_status()
     send_state["finished"] = True
     send_state["flush_queued"] = False
     await broadcast({
@@ -453,6 +507,8 @@ async def start_switch_recommendation_search(
         wall_limit: int = 36,
 ) -> None:
     _SWITCH_STOP_EVENT.set()
+    _cache_switch_runtime(terminate_active_search_workers())
+    await broadcast_switch_runtime_status()
     state = _live_switch_search_state(wall_limit=wall_limit)
     if int(state.get("stage", 0) or 0) != 2:
         _cache_switch_plan({
@@ -488,6 +544,8 @@ async def start_switch_recommendation_debug_search(
         wall_limit: int = 36,
 ) -> None:
     _SWITCH_STOP_EVENT.set()
+    _cache_switch_runtime(terminate_active_search_workers())
+    await broadcast_switch_runtime_status()
     try:
         state = _normalize_switch_debug_snapshot(snapshot, wall_limit=wall_limit)
     except ValueError as exc:
@@ -604,11 +662,14 @@ async def stop_switch_recommendation_search(*, notify_client: bool = True) -> No
     _SWITCH_RECOMMENDATION_SEQ += 1
     _SWITCH_STOP_EVENT.set()
     _SWITCH_SEARCH_TASK = None
+    _cache_switch_runtime(terminate_active_search_workers())
+    await broadcast_switch_runtime_status()
     if notify_client:
         _cache_switch_plan({
             "status": "impossible",
             "reason": "stopped-by-user",
             "request_source": "live",
+            "runtime": copy.deepcopy(_LAST_SWITCH_RUNTIME),
             **_switch_search_params_from_state(_live_switch_search_state()),
         })
         await broadcast({
@@ -617,9 +678,15 @@ async def stop_switch_recommendation_search(*, notify_client: bool = True) -> No
                 "status": "impossible",
                 "reason": "stopped-by-user",
                 "request_source": "live",
+                "runtime": copy.deepcopy(_LAST_SWITCH_RUNTIME),
                 **_switch_search_params_from_state(_live_switch_search_state()),
             })],
         })
+
+
+async def kill_switch_search_workers() -> None:
+    _cache_switch_runtime(terminate_active_search_workers())
+    await broadcast_switch_runtime_status()
 
 
 def _first_src_base(row: dict) -> int:
@@ -1000,6 +1067,72 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
     .lq.Lobby.amuletActivityUpgradeShopBuff     升级增益
     .lq.Lobby.amuletActivityRefreshShop         刷新商店
     .lq.Lobby.amuletActivityEndShopping         购买结束
+
+    以下是局面封包解释：
+
+    注意：以下所有数组都具有有序性。
+
+    1. pool
+    数组 储存了牌对象 有108-109张，牌对象包含id和tile。
+    有万象（护身符id为169）时pool才会有109个元素，其他情况下都是108张。万象的牌对象id为1000，tile为bd。且万象在pool的最后一张
+
+    2. hands
+    数组 储存了牌id。
+    开局时一般取pool的前13张，有万象的时候取前12张，和pool的最后一张万象。
+
+    3. dora
+    数组 储存了牌id。
+    一般为从手牌开始后的10张。也就是从第22（有万象）或23张开始到32（有万象）或33。
+
+    4. lockedTile
+    数组 储存了牌id。
+    锁住的牌，该数组一定是牌山的牌的子集。锁住的牌虽然存在于pool，但并不会被玩家摸到。
+
+    5. used
+    数组 储存了牌id。
+    换牌使用过的牌。
+
+    6. usedDesktop
+    数组 储存了牌id。
+    牌山使用过的牌。
+
+    7. changeTileCount 和 totalChangeTileCount
+    整数。
+    前者为已替换的次数，后者为最大可替换的次数。
+
+    8. nextOperation
+    数组  储存了操作对象。
+    操作对象包含操作类型（int）和gang数组。gang数组一般情况下为空、除非操作类型为杠类型。操作类型为杠类型时gang数组保存的是可以杠的牌的id。
+
+    9. point 和 targetPoint
+    整数。
+    前者为当前已达到的分数，后者为当前关卡目标分数。
+
+    10. desktopRemain
+    整数。
+    牌山还剩下多少张牌。
+
+    11. showDesktopTiles
+    数组 储存了牌位置对象。
+    位置对象包含id和pos两个参数，id为牌的id，pos为牌的位置。
+    牌山的显示位置：
+    牌山在桌面上总共显示为4行9列。从4行9列开始到1行1列的pos为0->35
+    锁住的牌一定会被显示在最后，最后一张锁牌显示在牌山的最后。
+
+    12. lockedTileCount
+    整数。
+    表示锁住的牌的数量。
+
+    13. 牌山
+    该数据不包含在封包中，需要自己推导。
+    一般为dora后的36张。
+    一般情况下玩家第几张摸到的牌就是牌山中第几张的牌。
+    当玩家拥有221护身符的时候，摸到的牌的顺序改为一万->九万->一筒->九筒->一条->九条->东南西北白发中。但是pool的顺序不会改变、需要自己根据牌面调整实际上牌山的顺序。
+
+    14. 换牌堆
+    该数据不包含在封包中，需要自己推导。
+    一般为牌山后的全部（万象除外，万象在玩家的手牌中，也可也视为把万象移动到了pool的第一张）。
+    一般情况下玩家第几张换到的牌就是换牌堆中第几张的牌。
     """
     if dict(view["data"]).get("error", None) is not None:
         logger.error(f"error occurred: {dict(view['data'])['error']}")

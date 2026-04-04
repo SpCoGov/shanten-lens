@@ -517,6 +517,12 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     await stop_switch_recommendation_search(
                         notify_client=bool((data or {}).get("notify", True))
                     )
+                elif action == "kill_workers":
+                    from backend.mitm.hooks import kill_switch_search_workers
+                    await kill_switch_search_workers()
+                elif action == "runtime_status":
+                    from backend.mitm.hooks import broadcast_switch_runtime_status
+                    await broadcast_switch_runtime_status()
                 elif action == "list_quads":
                     from backend.mitm.hooks import broadcast_switch_quad_catalog
                     opts = (data or {}).get("options") or {}

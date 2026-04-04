@@ -2,9 +2,9 @@ import React from "react";
 import Tile from "../components/Tile";
 import {pushToast} from "../lib/toast";
 import type {GameStateData} from "../lib/gamestate";
-import type {PlanData} from "../lib/planTypes";
+import type {PlanData, SearchRuntimeData} from "../lib/planTypes";
 import {ws} from "../lib/ws";
-import {BlackHoleStrategyCard} from "./BlackHolePage";
+import {BlackHoleStrategyCard, SouzuRuntimePanel} from "./BlackHolePage";
 
 export type DebugSnapshot = {
     stage?: number;
@@ -38,6 +38,8 @@ type ManualStructureKey = "meld1" | "meld2" | "pair";
 type ManualStructureState = Record<ManualStructureKey, number[]>;
 
 const DEFAULT_WALL_LIMIT = 36;
+const WALL_LIMIT_MIN = 2;
+const WALL_LIMIT_MAX = 36;
 const RED_MAP: Record<string, string> = {"0m": "5m", "0p": "5p", "0s": "5s"};
 const STRUCTURE_LIMITS: Record<ManualStructureKey, number> = {
     meld1: 3,
@@ -48,6 +50,17 @@ const STRUCTURE_LIMITS: Record<ManualStructureKey, number> = {
 function normFace(face: string | null | undefined) {
     if (!face) return "?";
     return RED_MAP[face] || face;
+}
+
+function parseWallLimitInput(raw: string) {
+    const value = Number(raw);
+    if (!Number.isFinite(value) || !Number.isInteger(value)) {
+        return {ok: false as const, message: "牌山读取上限必须是 2 到 36 的整数"};
+    }
+    if (value < WALL_LIMIT_MIN || value > WALL_LIMIT_MAX) {
+        return {ok: false as const, message: "牌山读取上限必须在 2 到 36 之间"};
+    }
+    return {ok: true as const, value};
 }
 
 export function buildDebugSnapshotFromState(state: GameStateData): DebugSnapshot {
@@ -183,15 +196,18 @@ function buildQuadOptions(entries: PoolEntry[]): QuadOption[] {
 export default function SouzuSwitchDebugPage({
     currentState,
     data,
+    runtime,
     onClear,
 }: {
     currentState: GameStateData | null;
     data: PlanData | null;
+    runtime?: SearchRuntimeData | null;
     onClear?: () => void;
 }) {
     const [snapshotText, setSnapshotText] = React.useState("");
     const [activeSnapshot, setActiveSnapshot] = React.useState<DebugSnapshot | null>(null);
     const [wallLimit, setWallLimit] = React.useState(DEFAULT_WALL_LIMIT);
+    const [wallLimitInput, setWallLimitInput] = React.useState(String(DEFAULT_WALL_LIMIT));
     const [autoStopFirst, setAutoStopFirst] = React.useState(true);
     const [selectedQuadKeys, setSelectedQuadKeys] = React.useState<string[]>(["", ""]);
     const [activeBucket, setActiveBucket] = React.useState<ManualStructureKey>("meld1");
@@ -258,6 +274,17 @@ export default function SouzuSwitchDebugPage({
         }
     }, [currentState, resetManualBuilder]);
 
+    const resolveWallLimit = React.useCallback(() => {
+        const parsed = parseWallLimitInput(wallLimitInput.trim());
+        if (!parsed.ok) {
+            pushToast(parsed.message, "error", 2200);
+            return null;
+        }
+        setWallLimit(parsed.value);
+        setWallLimitInput(String(parsed.value));
+        return parsed.value;
+    }, [wallLimitInput]);
+
     const runImportedSnapshot = React.useCallback(() => {
         let snapshot: DebugSnapshot;
         try {
@@ -266,6 +293,8 @@ export default function SouzuSwitchDebugPage({
             pushToast(error instanceof Error ? error.message : "导入内容无效", "error", 2200);
             return;
         }
+        const nextWallLimit = resolveWallLimit();
+        if (nextWallLimit == null) return;
         setActiveSnapshot(snapshot);
         ws.send({
             type: "souzu_switch_control",
@@ -275,11 +304,11 @@ export default function SouzuSwitchDebugPage({
                 options: {
                     stop_after_first: autoStopFirst,
                     skip_signatures: [],
-                    wall_limit: wallLimit,
+                    wall_limit: nextWallLimit,
                 },
             },
         } as any);
-    }, [autoStopFirst, snapshotText, wallLimit]);
+    }, [autoStopFirst, resolveWallLimit, snapshotText]);
 
     const validateManualPlan = React.useCallback(() => {
         let snapshot: DebugSnapshot;
@@ -302,6 +331,8 @@ export default function SouzuSwitchDebugPage({
             pushToast("听牌前目标一共需要 7 张牌", "error", 1800);
             return;
         }
+        const nextWallLimit = resolveWallLimit();
+        if (nextWallLimit == null) return;
         ws.send({
             type: "souzu_switch_control",
             data: {
@@ -309,10 +340,10 @@ export default function SouzuSwitchDebugPage({
                 snapshot,
                 quad_groups: [selectedQuads[0].ids, selectedQuads[1].ids],
                 structure_groups: manualStructure,
-                options: {wall_limit: wallLimit},
+                options: {wall_limit: nextWallLimit},
             },
         } as any);
-    }, [activeSnapshot, manualStructure, selectedQuads, snapshotText, wallLimit]);
+    }, [activeSnapshot, manualStructure, resolveWallLimit, selectedQuads, snapshotText]);
 
     const clearDebugState = React.useCallback(() => {
         setSnapshotText("");
@@ -320,6 +351,16 @@ export default function SouzuSwitchDebugPage({
         resetManualBuilder();
         onClear?.();
     }, [onClear, resetManualBuilder]);
+    const stopSearch = React.useCallback(() => {
+        ws.send({type: "souzu_switch_control", data: {action: "stop"}} as any);
+    }, []);
+    const refreshRuntime = React.useCallback(() => {
+        ws.send({type: "souzu_switch_control", data: {action: "runtime_status"}} as any);
+    }, []);
+    const killWorkers = React.useCallback(() => {
+        ws.send({type: "souzu_switch_control", data: {action: "kill_workers"}} as any);
+        ws.send({type: "souzu_switch_control", data: {action: "runtime_status"}} as any);
+    }, []);
 
     React.useEffect(() => {
         setManualStructure((prev) => ({
@@ -368,6 +409,9 @@ export default function SouzuSwitchDebugPage({
                     <button className="nav-btn" onClick={runImportedSnapshot}>对导入局面求解</button>
                     <button className="nav-btn" onClick={validateManualPlan}>验证手工方案</button>
                     <button className="nav-btn" onClick={clearDebugState}>清空调试数据</button>
+                    <button className="nav-btn" onClick={stopSearch}>停止搜索</button>
+                    <button className="nav-btn" onClick={killWorkers}>强制清理子进程</button>
+                    <button className="nav-btn" onClick={refreshRuntime}>刷新子进程</button>
                     <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
                         <input type="checkbox" checked={autoStopFirst} onChange={(e) => setAutoStopFirst(e.target.checked)}/>
                         <span>找到第一套方案后停止</span>
@@ -378,10 +422,8 @@ export default function SouzuSwitchDebugPage({
                             className="form-input"
                             style={{width: 88}}
                             type="number"
-                            min={2}
-                            max={36}
-                            value={wallLimit}
-                            onChange={(e) => setWallLimit(Math.min(36, Math.max(2, Number(e.target.value) || 2)))}
+                            value={wallLimitInput}
+                            onChange={(e) => setWallLimitInput(e.target.value)}
                         />
                     </label>
                 </div>
@@ -489,6 +531,7 @@ export default function SouzuSwitchDebugPage({
 
             <div className="blackhole-layout">
                 <div className="blackhole-main">
+                    <SouzuRuntimePanel runtime={runtime}/>
                     <ManualSearchabilityCard data={data}/>
                     <DebugPoolCard data={data} resolveFace={resolveFace}/>
                     <BlackHoleStrategyCard title="调试结果" data={data} resolveFace={resolveFace}/>

@@ -4,13 +4,15 @@ import {pushToast} from "../lib/toast";
 import {ws} from "../lib/ws";
 import Tile from "../components/Tile";
 import styles from "../components/AdvisorPanel.module.css";
-import type {PlanData, TileId} from "../lib/planTypes";
+import type {PlanData, SearchRuntimeData, TileId} from "../lib/planTypes";
 import type {GameStateData} from "../lib/gamestate";
 import {buildDebugSnapshotFromState} from "./SouzuSwitchDebugPage";
 
 const LS_AUTO_STOP = "sl-blackhole:auto-stop-first";
 const LS_VERBOSE = "sl-blackhole:verbose-progress";
 const LS_WALL_LIMIT = "sl-blackhole:wall-limit";
+const WALL_LIMIT_MIN = 2;
+const WALL_LIMIT_MAX = 36;
 
 function readBool(key: string, fallback: boolean) {
     const raw = localStorage.getItem(key);
@@ -22,6 +24,17 @@ function readWallLimit() {
     const raw = Number(localStorage.getItem(LS_WALL_LIMIT) || "36");
     if (!Number.isFinite(raw)) return 36;
     return Math.min(36, Math.max(2, Math.trunc(raw)));
+}
+
+function parseWallLimitInput(raw: string) {
+    const value = Number(raw);
+    if (!Number.isFinite(value) || !Number.isInteger(value)) {
+        return {ok: false as const, message: "牌山读取上限必须是 2 到 36 的整数"};
+    }
+    if (value < WALL_LIMIT_MIN || value > WALL_LIMIT_MAX) {
+        return {ok: false as const, message: "牌山读取上限必须在 2 到 36 之间"};
+    }
+    return {ok: true as const, value};
 }
 
 function summarizeProgress(progress?: string) {
@@ -62,6 +75,7 @@ export default function BlackHolePage({
                                           replacementIds,
                                           wallIds,
                                           currentState,
+                                          runtime,
                                           onClear,
                                       }: {
     stage: number;
@@ -71,12 +85,14 @@ export default function BlackHolePage({
     replacementIds: TileId[];
     wallIds: TileId[];
     currentState: GameStateData | null;
+    runtime?: SearchRuntimeData | null;
     onClear?: () => void;
 }) {
     const {t} = useTranslation();
     const [autoStopFirst, setAutoStopFirst] = React.useState<boolean>(() => readBool(LS_AUTO_STOP, true));
     const [verboseProgress, setVerboseProgress] = React.useState<boolean>(() => readBool(LS_VERBOSE, false));
     const [wallLimit, setWallLimit] = React.useState<number>(() => readWallLimit());
+    const [wallLimitInput, setWallLimitInput] = React.useState<string>(() => String(readWallLimit()));
     const [seenSignatures, setSeenSignatures] = React.useState<string[]>([]);
     const [mainData, setMainData] = React.useState<PlanData | null>(null);
     const [quadCatalogData, setQuadCatalogData] = React.useState<PlanData | null>(null);
@@ -122,11 +138,24 @@ export default function BlackHolePage({
         mainData.switch_discards.length > 0
     );
 
+    const resolveWallLimit = React.useCallback(() => {
+        const parsed = parseWallLimitInput(wallLimitInput.trim());
+        if (!parsed.ok) {
+            pushToast(parsed.message, "error", 2200);
+            return null;
+        }
+        setWallLimit(parsed.value);
+        setWallLimitInput(String(parsed.value));
+        return parsed.value;
+    }, [wallLimitInput]);
+
     const startSearch = React.useCallback((opts?: { stopAfterFirst?: boolean; resume?: boolean }) => {
         if (!canOperate) {
             pushToast(t("blackhole.need_switch_stage"), "error", 1800);
             return;
         }
+        const nextWallLimit = resolveWallLimit();
+        if (nextWallLimit == null) return;
         const skipSignatures = opts?.resume
             ? Array.from(new Set([...seenSignatures, ...(planSignature ? [planSignature] : [])]))
             : [];
@@ -140,20 +169,29 @@ export default function BlackHolePage({
                 options: {
                     stop_after_first: opts?.stopAfterFirst ?? autoStopFirst,
                     skip_signatures: skipSignatures,
-                    wall_limit: wallLimit,
+                    wall_limit: nextWallLimit,
                 },
             },
         } as any);
-    }, [autoStopFirst, canOperate, planSignature, seenSignatures, t, wallLimit]);
+    }, [autoStopFirst, canOperate, planSignature, resolveWallLimit, seenSignatures, t]);
 
     const stopSearch = React.useCallback(() => {
         ws.send({type: "souzu_switch_control", data: {action: "stop"}} as any);
     }, []);
+    const refreshRuntime = React.useCallback(() => {
+        ws.send({type: "souzu_switch_control", data: {action: "runtime_status"}} as any);
+    }, []);
+    const killWorkers = React.useCallback(() => {
+        ws.send({type: "souzu_switch_control", data: {action: "kill_workers"}} as any);
+        ws.send({type: "souzu_switch_control", data: {action: "runtime_status"}} as any);
+    }, []);
     const listQuads = React.useCallback(() => {
+        const nextWallLimit = resolveWallLimit();
+        if (nextWallLimit == null) return;
         setDrawerMode("quad");
         setQuadDrawerOpen(true);
-        ws.send({type: "souzu_switch_control", data: {action: "list_quads", options: {wall_limit: wallLimit}}} as any);
-    }, [wallLimit]);
+        ws.send({type: "souzu_switch_control", data: {action: "list_quads", options: {wall_limit: nextWallLimit}}} as any);
+    }, [resolveWallLimit]);
     const openConsideredTiles = React.useCallback(() => {
         setDrawerMode("considered");
         setQuadDrawerOpen(true);
@@ -218,6 +256,12 @@ export default function BlackHolePage({
                     <button className="nav-btn" onClick={stopSearch} disabled={!isSearching}>
                         {t("blackhole.stop")}
                     </button>
+                    <button className="nav-btn" onClick={killWorkers}>
+                        强制清理子进程
+                    </button>
+                    <button className="nav-btn" onClick={refreshRuntime}>
+                        刷新子进程
+                    </button>
                     <button className="nav-btn" onClick={() => startSearch({stopAfterFirst: false, resume: true})} disabled={!canResume}>
                         {t("blackhole.continue")}
                     </button>
@@ -251,10 +295,8 @@ export default function BlackHolePage({
                             className="form-input"
                             style={{width: 88}}
                             type="number"
-                            min={2}
-                            max={36}
-                            value={wallLimit}
-                            onChange={(e) => setWallLimit(Math.min(36, Math.max(2, Number(e.target.value) || 2)))}
+                            value={wallLimitInput}
+                            onChange={(e) => setWallLimitInput(e.target.value)}
                         />
                     </label>
                 </div>
@@ -265,8 +307,10 @@ export default function BlackHolePage({
 
             <div className={`blackhole-layout ${quadDrawerOpen ? "with-drawer" : ""}`}>
                 <div className="blackhole-main">
+                    <SouzuRuntimePanel runtime={runtime}/>
                     <BlackHoleStrategyCard
                         data={viewData}
+                        runtime={runtime}
                         resolveFace={resolveFace}
                         onOpenConsideredTiles={openConsideredTiles}
                         title={t("blackhole.card_title")}
@@ -298,11 +342,13 @@ export default function BlackHolePage({
 export function BlackHoleStrategyCard({
     title,
     data,
+    runtime,
     resolveFace,
     onOpenConsideredTiles,
 }: {
     title: string;
     data: PlanData | null;
+    runtime?: SearchRuntimeData | null;
     resolveFace?: (id: number) => string | null;
     onOpenConsideredTiles?: () => void;
 }) {
@@ -337,11 +383,15 @@ export function BlackHoleStrategyCard({
                     <div className={styles.cardBodyMuted} style={{whiteSpace: "pre-wrap"}}>
                         {data.progress || t("advisor.searching")}
                     </div>
+                    <div style={{padding: "0 12px"}}>
+                        <WorkerStatusPanel data={data} runtime={runtime}/>
+                    </div>
                     {!hasPlanPreview ? <div style={{padding: "0 12px 12px"}}><SearchParamsBand data={data} onOpenConsideredTiles={onOpenConsideredTiles}/></div> : null}
                     {hasPlanPreview ? <PlanBody data={data} resolveFace={resolveFace} onOpenConsideredTiles={onOpenConsideredTiles}/> : null}
                 </div>
             ) : data.status === "impossible" ? (
                 <div style={{padding: 12, display: "grid", gap: 12}}>
+                    <WorkerStatusPanel data={data} runtime={runtime}/>
                     <SearchParamsBand data={data} onOpenConsideredTiles={onOpenConsideredTiles}/>
                     <div className={styles.bandSingle} style={{padding: 0}}>
                         <div className={styles.bandValue}>{t("advisor.impossible")}</div>
@@ -349,7 +399,12 @@ export function BlackHoleStrategyCard({
                     </div>
                 </div>
             ) : data.status === "plan" ? (
-                <PlanBody data={data} resolveFace={resolveFace} onOpenConsideredTiles={onOpenConsideredTiles}/>
+                <div style={{display: "grid", gap: 12}}>
+                    <div style={{padding: "12px 12px 0"}}>
+                        <WorkerStatusPanel data={data} runtime={runtime}/>
+                    </div>
+                    <PlanBody data={data} resolveFace={resolveFace} onOpenConsideredTiles={onOpenConsideredTiles}/>
+                </div>
             ) : (
                 <div className={styles.cardBodyMuted}>{t("advisor.awaiting_backend")}</div>
             )}
@@ -447,6 +502,93 @@ function SearchParamsBand({
                         {item.clickable ? (
                             <div className={styles.cardBodyMuted} style={{padding: 0}}>{"\u70b9\u51fb\u67e5\u770b\u724c\u9762"}</div>
                         ) : null}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+export function SouzuRuntimePanel({runtime}: { runtime?: SearchRuntimeData | null }) {
+    if (!runtime) return null;
+    const processes = runtime.processes || [];
+    return (
+        <section className="panel" style={{marginBottom: 12}}>
+            <div className="panel-title">搜索运行时</div>
+            <div style={{display: "grid", gap: 8}}>
+                <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
+                    <span className="badge">{`状态: ${runtime.searching ? "搜索中" : "空闲"}`}</span>
+                    <span className="badge">{`子进程: ${runtime.process_count ?? processes.length}`}</span>
+                    <span className="badge">{`更新时间: ${runtime.updated_at ? new Date(runtime.updated_at * 1000).toLocaleTimeString() : "-"}`}</span>
+                </div>
+                {processes.length > 0 ? (
+                    <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10}}>
+                        {processes.map((process, index) => (
+                            <div key={`${process.pid ?? "proc"}-${index}`} style={{border: "1px solid var(--border)", borderRadius: 10, padding: 10, display: "grid", gap: 6}}>
+                                <div style={{display: "flex", justifyContent: "space-between", gap: 8}}>
+                                    <div style={{fontWeight: 700}}>{`子进程 ${index + 1}`}</div>
+                                    <div className="hint">{process.status || "-"}</div>
+                                </div>
+                                <div className="hint">{`PID: ${process.pid ?? "-"}`}</div>
+                                <div className="hint">{`存活: ${process.alive ? "是" : "否"}`}</div>
+                                <div className="hint">{`退出码: ${process.exitcode ?? "-"}`}</div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="hint">当前没有活动中的搜索子进程。</div>
+                )}
+            </div>
+        </section>
+    );
+}
+
+export function WorkerStatusPanel({data, runtime}: { data: PlanData; runtime?: SearchRuntimeData | null }) {
+    const workers = data.worker_states || [];
+    const parallel = data.parallel_info;
+    const processes = runtime?.processes || data.runtime?.processes || [];
+    if (!workers.length && !parallel && !processes.length) return null;
+
+    const statusText = (status?: string) => {
+        if (status === "running") return "运行中";
+        if (status === "completed") return "刚完成";
+        if (status === "done") return "已结束";
+        if (status === "stopped") return "已停止";
+        if (status === "idle") return "空闲";
+        return status || "-";
+    };
+
+    return (
+        <div style={{display: "grid", gap: 8}}>
+            <div className={styles.label}>搜索 Worker</div>
+            <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
+                <span className="badge">{`模式: ${parallel?.enabled ? "多进程" : "单进程"}`}</span>
+                <span className="badge">{`并行数: ${parallel?.max_workers ?? (workers.length || 1)}`}</span>
+                <span className="badge">{`已完成: ${parallel?.completed_jobs ?? 0}/${parallel?.total_jobs ?? 0}`}</span>
+                <span className="badge">{`真实子进程: ${runtime?.process_count ?? data.runtime?.process_count ?? processes.length}`}</span>
+            </div>
+            <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10}}>
+                {workers.map((worker, index) => (
+                    <div
+                        key={`${worker.worker_id || index}-${worker.current_quad_index || 0}`}
+                        style={{
+                            border: "1px solid var(--border)",
+                            borderRadius: 10,
+                            padding: 10,
+                            display: "grid",
+                            gap: 6,
+                        }}
+                    >
+                        <div style={{display: "flex", justifyContent: "space-between", gap: 8}}>
+                            <div style={{fontWeight: 700}}>{`${worker.kind === "process" ? "进程" : "主搜索"} ${worker.worker_id ?? index + 1}`}</div>
+                            <div className="hint">{statusText(worker.status)}</div>
+                        </div>
+                        <div className="hint">{worker.current_quad_index ? `负责双杠 #${worker.current_quad_index}` : "当前未分配任务"}</div>
+                        <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{worker.current_quad_label || "-"}</div>
+                        <div className="hint">{`已完成任务: ${worker.completed_jobs ?? 0}`}</div>
+                        <div className="hint">{`耗时: ${(worker.elapsed_sec ?? 0).toFixed(2)}s`}</div>
+                        <div className="hint">{`最近结果: ${worker.last_result || "-"}`}</div>
+                        <div className="hint">{`最近摸牌数: ${worker.last_draws_needed ?? "-"}`}</div>
                     </div>
                 ))}
             </div>
