@@ -137,9 +137,14 @@ class GameState:
         self.wall_tiles = wall_tiles.copy()
 
     def refresh_wall_by_remaning(self, push_gamestate: bool = True, reason: str = ""):
+        locked = 0
+        if self.locked_tiles:
+            locked = len(self.locked_tiles)
+        # 原本剩余的牌加上锁的牌的数量、因为wall tiles已经减去了锁的牌
+        remain = self.desktop_remain + locked
         # 优先裁剪当前 wall（可能已被外部重排）
         if isinstance(self.wall_tiles, list) and self.desktop_remain is not None and len(self.wall_tiles) >= int(self.desktop_remain):
-            self.wall_tiles = self.wall_tiles[: int(self.desktop_remain)]
+            self.wall_tiles = self.wall_tiles[: int(remain)]
         else:
             # fallback：从 deck_map 推导（用于 wall 尚未建立的场景）
             temp = self.deck_map.copy()
@@ -148,9 +153,9 @@ class GameState:
                 temp.pop(hand_tile_id, None)
             ids = list(temp.keys())
             # 跳过 dora 和 已经摸牌的数量
-            cursor = 10 + 36 - int(self.desktop_remain)
+            cursor = 10 + 36 - int(remain)
             # 取后 剩余多少张 → wall
-            self.wall_tiles = ids[cursor:cursor + int(self.desktop_remain)]
+            self.wall_tiles = ids[cursor:cursor + int(remain)]
 
         self.update_reason.append(reason)
         if push_gamestate:
