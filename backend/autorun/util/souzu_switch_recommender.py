@@ -4,6 +4,7 @@ import signal
 import threading
 import traceback
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
+from concurrent.futures.process import BrokenProcessPool
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
@@ -2681,12 +2682,24 @@ def recommend_souzu_tenpai_switch(
                 "runtime": get_active_search_runtime_snapshot(searching=False),
             }
         except Exception as exc:
+            process_snapshot = []
+            try:
+                if executor is not None:
+                    process_snapshot = _executor_process_snapshot(executor)
+            except Exception:
+                process_snapshot = []
             try:
                 if executor is not None:
                     _terminate_executor_processes(executor)
                     executor.shutdown(wait=False, cancel_futures=True)
             except Exception:
                 pass
+            if isinstance(exc, BrokenProcessPool):
+                logger.error(
+                    "parallel search worker crashed: {} | processes={}",
+                    exc,
+                    process_snapshot,
+                )
             logger.exception("parallel search startup/execution failed")
             parallel_traceback = traceback.format_exc()
             print(parallel_traceback, flush=True)
