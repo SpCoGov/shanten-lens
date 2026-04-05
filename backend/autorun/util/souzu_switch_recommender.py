@@ -897,6 +897,154 @@ def _blocked_key(blocked_orders: Set[int]) -> frozenset[int]:
     return frozenset(blocked_orders)
 
 
+@lru_cache(maxsize=1)
+def _abstract_meld_patterns() -> tuple[tuple[str, ...], ...]:
+    patterns: List[tuple[str, ...]] = []
+    for face in ALL_TILES:
+        patterns.append((face, face, face))
+    for suit in "mps":
+        for rank in range(1, 8):
+            patterns.append((f"{rank}{suit}", f"{rank + 1}{suit}", f"{rank + 2}{suit}"))
+    return tuple(patterns)
+
+
+@lru_cache(maxsize=1)
+def _abstract_pair_patterns() -> tuple[tuple[str, ...], ...]:
+    return tuple((face, face) for face in ALL_TILES)
+
+
+@lru_cache(maxsize=1)
+def _abstract_taatsu_patterns() -> tuple[tuple[str, ...], ...]:
+    patterns: List[tuple[str, ...]] = []
+    for face in ALL_TILES:
+        patterns.append((face, face))
+    for suit in "mps":
+        for rank in range(1, 9):
+            patterns.append((f"{rank}{suit}", f"{rank + 1}{suit}"))
+        for rank in range(1, 8):
+            patterns.append((f"{rank}{suit}", f"{rank + 2}{suit}"))
+    return tuple(patterns)
+
+
+def _can_take_pattern(face_counts: Counter[str], pattern: Sequence[str]) -> bool:
+    need = Counter(pattern)
+    return all(face_counts[face] >= cnt for face, cnt in need.items())
+
+
+def _subtract_pattern(face_counts: Counter[str], pattern: Sequence[str]) -> Counter[str]:
+    nxt = face_counts.copy()
+    for face in pattern:
+        nxt[face] -= 1
+    return nxt
+
+
+def _available_face_counts(
+        pool: Sequence[PoolEntry],
+        blocked_orders: Set[int],
+        *,
+        allow_replacement: bool,
+        min_order: int,
+) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for entry in pool:
+        if entry.order in blocked_orders:
+            continue
+        if entry.order < min_order:
+            continue
+        if not allow_replacement and entry.source == "replacement":
+            continue
+        counts[entry.face] += 1
+    return counts
+
+
+def _quick_shape_feasible_from_counts(face_counts: Counter[str], shape: str) -> bool:
+    if shape == "meld+single":
+        return any(_can_take_pattern(face_counts, meld) and sum(_subtract_pattern(face_counts, meld).values()) >= 1
+                   for meld in _abstract_meld_patterns())
+
+    if shape == "pair+pair":
+        for pair1 in _abstract_pair_patterns():
+            if not _can_take_pattern(face_counts, pair1):
+                continue
+            rest = _subtract_pattern(face_counts, pair1)
+            for pair2 in _abstract_pair_patterns():
+                if _can_take_pattern(rest, pair2):
+                    return True
+        return False
+
+    if shape == "pair+taatsu":
+        for pair in _abstract_pair_patterns():
+            if not _can_take_pattern(face_counts, pair):
+                continue
+            rest = _subtract_pattern(face_counts, pair)
+            for taatsu in _abstract_taatsu_patterns():
+                if _can_take_pattern(rest, taatsu):
+                    return True
+        return False
+
+    if shape == "meld+meld+single":
+        for meld1 in _abstract_meld_patterns():
+            if not _can_take_pattern(face_counts, meld1):
+                continue
+            rest1 = _subtract_pattern(face_counts, meld1)
+            if _quick_shape_feasible_from_counts(rest1, "meld+single"):
+                return True
+        return False
+
+    if shape == "meld+pair+pair":
+        for meld in _abstract_meld_patterns():
+            if not _can_take_pattern(face_counts, meld):
+                continue
+            rest = _subtract_pattern(face_counts, meld)
+            if _quick_shape_feasible_from_counts(rest, "pair+pair"):
+                return True
+        return False
+
+    if shape == "meld+pair+taatsu":
+        for meld in _abstract_meld_patterns():
+            if not _can_take_pattern(face_counts, meld):
+                continue
+            rest = _subtract_pattern(face_counts, meld)
+            if _quick_shape_feasible_from_counts(rest, "pair+taatsu"):
+                return True
+        return False
+
+    raise ValueError(f"unknown quick shape: {shape}")
+
+
+def _quick_shape_feasible(
+        pool: Sequence[PoolEntry],
+        blocked_orders: Set[int],
+        *,
+        allow_replacement: bool,
+        min_order: int,
+        shapes: Sequence[str],
+) -> bool:
+    face_counts = _available_face_counts(
+        pool,
+        blocked_orders,
+        allow_replacement=allow_replacement,
+        min_order=min_order,
+    )
+    total = sum(face_counts.values())
+    if total < 3:
+        return False
+    for shape in shapes:
+        need_tiles = {
+            "meld+single": 4,
+            "pair+pair": 4,
+            "pair+taatsu": 4,
+            "meld+meld+single": 7,
+            "meld+pair+pair": 7,
+            "meld+pair+taatsu": 7,
+        }.get(shape, 99)
+        if total < need_tiles:
+            continue
+        if _quick_shape_feasible_from_counts(face_counts, shape):
+            return True
+    return False
+
+
 def _latest_nonquad_wall_win_id(
         prewin_ids: Sequence[int],
         win_tile_id: int,
@@ -2097,6 +2245,17 @@ def _search_remaining_tenpai_plan(
         quad_pair["quad_ids"], [], None, by_id, wall_start_order
     ) > 13 else 0
 
+    if not _quick_shape_feasible(
+        pool,
+        quad_orders,
+        allow_replacement=base_allow_replacement,
+        min_order=base_min_order,
+        shapes=("meld+meld+single", "meld+pair+pair", "meld+pair+taatsu"),
+    ):
+        stats["speed_prunes"] += 1
+        stats["latest_result"] = "快速形状剪枝: 双杠后已无法凑出 7 张听牌骨架"
+        return best_plan
+
     melds0 = get_melds(quad_orders, allow_replacement=base_allow_replacement, min_order=base_min_order)
     stats["node_total"] = len(melds0)
 
@@ -2116,6 +2275,16 @@ def _search_remaining_tenpai_plan(
         min_after_meld1 = wall_start_order if _occupied_prefix_count(
             quad_pair["quad_ids"], list(meld1["ids"]), None, by_id, wall_start_order
         ) > 13 else 0
+
+        if not _quick_shape_feasible(
+            pool,
+            blocked1,
+            allow_replacement=allow_after_meld1,
+            min_order=min_after_meld1,
+            shapes=("meld+single", "pair+pair", "pair+taatsu"),
+        ):
+            stats["speed_prunes"] += 1
+            continue
 
         melds1 = get_melds(blocked1, allow_replacement=allow_after_meld1, min_order=min_after_meld1)
         for meld2 in melds1:
