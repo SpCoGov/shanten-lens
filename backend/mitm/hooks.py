@@ -294,6 +294,7 @@ def _wrap_entry(yaku_key: str, plan: dict) -> dict:
             "debug_pool",
             "worker_states",
             "parallel_info",
+            "parallel_fallback_reason",
             "runtime",
     ):
         if key in plan:
@@ -747,6 +748,9 @@ async def stop_switch_recommendation_search(*, notify_client: bool = True) -> No
 
 
 async def kill_switch_search_workers() -> None:
+    global _SWITCH_SEARCH_TASK
+    _SWITCH_STOP_EVENT.set()
+    _SWITCH_SEARCH_TASK = None
     _cache_switch_runtime(terminate_active_search_workers())
     await broadcast_switch_runtime_status()
 

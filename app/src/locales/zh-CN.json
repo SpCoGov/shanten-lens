@@ -17,7 +17,7 @@
   },
   "nav": {
     "home": "主页",
-    "blackhole": "黑洞指导",
+    "blackhole": "花火指导",
     "fuse": "熔断",
     "autorun": "自动化",
     "refreshGame": "刷新对局",
@@ -309,8 +309,8 @@
     "reason_unknown": "暂时没有可用结果。"
   },
   "blackhole": {
-    "title": "黑洞指导",
-    "card_title": "黑洞指导方案",
+    "title": "花火指导",
+    "card_title": "花火指导方案",
     "start": "启动搜索",
     "stop": "停止搜索",
     "continue": "继续搜索",
@@ -324,7 +324,7 @@
     "wall_limit_hint": "设为 2 时最多只读取牌山前 2 张；设为 36 时视为不限制。",
     "stage_ready": "当前在换牌阶段，可以手动启动搜索。",
     "stage_not_ready": "当前不在换牌阶段，启动前会先拦下。",
-    "need_switch_stage": "当前不在换牌阶段，无法启动黑洞指导。"
+    "need_switch_stage": "当前不在换牌阶段，无法启动花火指导。"
   },
   "amulet_card": {
     "title_unknown": "未知护身符 ID={{regId}} (raw={{rawId}})",

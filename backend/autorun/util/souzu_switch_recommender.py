@@ -1,13 +1,15 @@
-import time
+﻿import time
 import os
 import signal
 import threading
+import traceback
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
 from itertools import combinations
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from loguru import logger
 
 RED_MAP = {"0m": "5m", "0p": "5p", "0s": "5s"}
 ALL_TILES = [f"{n}{s}" for s in "mps" for n in range(1, 10)] + [f"{n}z" for n in range(1, 8)]
@@ -245,8 +247,8 @@ def _non_souzu_pair_wait_shape_reason(hand7: Sequence[str]) -> Optional[str]:
             if not face_b.endswith("s") or not face_c.endswith("s"):
                 shape = "".join(sorted(leftover, key=lambda tile: TILE_INDEX[tile]))
                 return (
-                    f"去杠后7张呈现 1 面子 + 2 对子形，且对子含非条子: "
-                    f"面子={shape}, 对子={face_b}/{face_c}"
+                    f"鍘绘潬鍚?寮犲憟鐜?1 闈㈠瓙 + 2 瀵瑰瓙褰紝涓斿瀛愬惈闈炴潯瀛? "
+                    f"闈㈠瓙={shape}, 瀵瑰瓙={face_b}/{face_c}"
                 )
     return None
 
@@ -584,7 +586,7 @@ def _explain_switch_batch_failure(
         ops_left -= 1
         step += 1
 
-    return "换牌可达性失败，但未定位到更具体的死点"
+    return "换牌可达性验证失败，但暂时没有定位到更具体的阻塞原因"
 
 
 def _materialize_switch_plan(
@@ -1221,7 +1223,7 @@ def _manual_bucket_faces(ids: Sequence[int], deck_map: Dict[int, str]) -> List[s
 
 def _manual_meld_searchable(faces: Sequence[str]) -> tuple[bool, str]:
     if len(faces) != 3:
-        return False, "面子必须是 3 张"
+        return False, "面子必须正好是 3 张"
     if not _is_exact_meld3(faces):
         return False, "完整面子不是合法的顺子或刻子"
     return True, ""
@@ -1242,7 +1244,7 @@ def _analyze_manual_searchability(
     }
     short_keys = [key for key, miss in deficits.items() if miss == 1]
     if len(short_keys) != 1 or any(miss < 0 or miss > 1 for miss in deficits.values()):
-        return False, "搜索器只支持恰好一个分组少 1 张的听牌形"
+        return False, "搜索器只支持恰好有一个分组少 1 张牌的听牌形"
 
     short_key = short_keys[0]
     if short_key == "pair":
@@ -1252,7 +1254,7 @@ def _analyze_manual_searchability(
         ok2, reason2 = _manual_meld_searchable(meld2_faces)
         if not ok2:
             return False, f"面子 B 无法被搜索器按完整面子枚举: {reason2}"
-        return True, "该形状符合搜索器的“单骑雀头 + 两个完整面子”枚举规则"
+        return True, "该形状符合搜索器的“单骑雀头加两个完整面子”枚举规则"
 
     short_faces = meld1_faces if short_key == "meld1" else meld2_faces
     other_faces = meld2_faces if short_key == "meld1" else meld1_faces
@@ -1264,7 +1266,7 @@ def _analyze_manual_searchability(
     if not ok_other:
         which = "面子 B" if short_key == "meld1" else "面子 A"
         return False, f"{which} 无法被搜索器按完整面子枚举: {reason_other}"
-    return True, "该形状符合搜索器的“一个完整面子 + 一个缺一张面子”枚举规则"
+    return True, "该形状符合搜索器的“一个完整面子加一个缺一张的面子”枚举规则"
 
 
 def validate_manual_souzu_switch_plan(
@@ -1418,7 +1420,7 @@ def _evaluate_candidate(
     concealed_hand7 = [_norm(deck_map[tile_id]) for tile_id in prewin_ids]
     if len(concealed_hand7) != 7:
         return None, (
-            f"去掉双杠后的待听手牌需要是 7 张，但当前为 {len(concealed_hand7)} 张。"
+            f"去掉双杠后的待听手牌必须是 7 张，但当前为 {len(concealed_hand7)} 张。"
             f"当前候选总物理牌数为 {len(prewin_physical_ids)} 张。"
         )
 
@@ -1445,7 +1447,7 @@ def _evaluate_candidate(
     essential_nonwall_ids = {tile_id for tile_id in prewin_physical_ids if by_id[tile_id].source != "wall"}
     if len(essential_nonwall_ids) > 13:
         return None, (
-            f"去掉双杠后，必须预先占住的非牌山牌已有 {len(essential_nonwall_ids)} 张，"
+            f"去掉双杠后，必须预先占位的非牌山牌已有 {len(essential_nonwall_ids)} 张，"
             "超过了 13 张的可行上限。"
         )
     kong_slot_gain = len(quad_ids) // 4
@@ -1816,7 +1818,7 @@ def _search_remaining_plan(
                         emit_progress(
                             "开始验证听牌方案\n"
                             f"搜索次数: {stats['branch_attempts']}\n"
-                            f"当前节点类型: 雀头+面子验证\n"
+                            f"当前节点类型: 雀头面子验证\n"
                             f"当前双杠1: {_quad_label(quad_pair['quad_ids'][:4], by_id)}\n"
                             f"当前双杠2: {_quad_label(quad_pair['quad_ids'][4:], by_id)}\n"
                             f"当前组合: {_component_text(component_descs)}",
@@ -1845,7 +1847,7 @@ def _search_remaining_plan(
                             if best_plan is None or plan["draws_needed"] < best_plan["draws_needed"]:
                                 best_plan = plan
                                 local_best_draws = plan["draws_needed"]
-                                stats["latest_result"] = f"已找到更快方案: waits={','.join(plan['waits'])}"
+                                stats["latest_result"] = f"已找到更优方案 waits={','.join(plan['waits'])}"
                                 if emit_candidate is not None:
                                     emit_candidate(plan)
                                 emit_progress("方案验证成功\n" + _plan_summary(plan, deck_map), force=True)
@@ -2084,7 +2086,7 @@ def _search_remaining_tenpai_plan(
 
     emit_progress(
         "开始搜索目标 13 张听牌形\n"
-        "说明: 固定双杠后，直接搜索能形成条子听牌的 7 张暗手\n"
+        "说明: 固定双杠后，直接搜索能形成索子听牌的 7 张暗手\n"
         f"当前双杠: {_quad_label(quad_pair['quad_ids'][:4], by_id)} | {_quad_label(quad_pair['quad_ids'][4:], by_id)}",
         force=True,
     )
@@ -2183,6 +2185,30 @@ def _search_quad_pair_worker(
         "nonwall_prunes": 0,
         "reachability_upper_prunes": 0,
     }
+    plan = _search_remaining_plan(
+        pool,
+        by_id,
+        quad_pair,
+        deck_map,
+        hand_ids,
+        replacement_ids,
+        remaining_changes,
+        per_change_limit,
+        stats,
+        lambda *_args, **_kwargs: None,
+        None,
+        lambda: False,
+        best_draws_limit,
+        stop_after_first,
+        skip_signatures,
+    )
+    if plan is not None:
+        plan["quad_faces"] = list(quad_pair["faces"])
+    return {
+        "quad_pair": quad_pair,
+        "plan": plan,
+        "stats": stats,
+    }
 
 
 def _register_active_executor(executor: ProcessPoolExecutor) -> None:
@@ -2220,11 +2246,12 @@ def _process_snapshot(process: object) -> dict:
 
 
 def _executor_process_snapshot(executor: ProcessPoolExecutor) -> List[dict]:
+    process_map = getattr(executor, "_processes", None) or {}
     return [
         snapshot
         for snapshot in (
             _process_snapshot(process)
-            for process in list(getattr(executor, "_processes", {}).values())
+            for process in list(process_map.values())
         )
         if snapshot.get("pid") is not None
     ]
@@ -2253,39 +2280,14 @@ def terminate_active_search_workers() -> dict:
         executors = list(_ACTIVE_EXECUTORS)
     for executor in executors:
         try:
-            executor.shutdown(wait=False, cancel_futures=True)
-        except Exception:
-            pass
-        try:
             _terminate_executor_processes(executor)
         except Exception:
             pass
+        try:
+            executor.shutdown(wait=False, cancel_futures=True)
+        except Exception:
+            pass
     return get_active_search_runtime_snapshot(searching=False)
-
-    plan = _search_remaining_plan(
-        pool,
-        by_id,
-        quad_pair,
-        deck_map,
-        hand_ids,
-        replacement_ids,
-        remaining_changes,
-        per_change_limit,
-        stats,
-        lambda *_args, **_kwargs: None,
-        None,
-        lambda: False,
-        best_draws_limit,
-        stop_after_first,
-        skip_signatures,
-    )
-    if plan is not None:
-        plan["quad_faces"] = list(quad_pair["faces"])
-    return {
-        "quad_pair": quad_pair,
-        "plan": plan,
-        "stats": stats,
-    }
 
 
 def _worker_quad_label(quad_pair: dict, by_id: Dict[int, PoolEntry]) -> str:
@@ -2303,7 +2305,8 @@ def _init_search_worker() -> None:
 
 
 def _terminate_executor_processes(executor: ProcessPoolExecutor, *, wait_timeout: float = 2.0) -> None:
-    processes = list(getattr(executor, "_processes", {}).values())
+    process_map = getattr(executor, "_processes", None) or {}
+    processes = list(process_map.values())
     for proc in processes:
         try:
             if proc is not None and proc.is_alive():
@@ -2382,6 +2385,11 @@ def recommend_souzu_tenpai_switch(
     last_progress_emit_at = 0.0
     worker_states: List[dict] = []
     parallel_info: dict = {"mode": "single", "enabled": False, "max_workers": 1, "total_jobs": 0, "completed_jobs": 0}
+    parallel_fallback_reason: Optional[str] = None
+    cpu_count = os.cpu_count() or 1
+    parallel_attempted = False
+    parallel_disabled_reason: Optional[str] = None
+    parallel_start_error: Optional[str] = None
 
     def stop_requested() -> bool:
         return bool(should_stop and should_stop())
@@ -2399,7 +2407,16 @@ def recommend_souzu_tenpai_switch(
             snapshot.append(copied)
         telemetry_cb({
             "worker_states": snapshot,
-            "parallel_info": dict(parallel_info),
+            "parallel_info": {
+                **dict(parallel_info),
+                "cpu_count": cpu_count,
+                "quad_pair_count": len(quad_pairs),
+                "parallel_ok": parallel_ok,
+                "attempted": parallel_attempted,
+                **({"disabled_reason": parallel_disabled_reason} if parallel_disabled_reason else {}),
+                **({"start_error": parallel_start_error} if parallel_start_error else {}),
+                **({"fallback_reason": parallel_fallback_reason} if parallel_fallback_reason else {}),
+            },
             "runtime": get_active_search_runtime_snapshot(searching=True),
         })
 
@@ -2416,25 +2433,25 @@ def recommend_souzu_tenpai_switch(
         progress_cb(
             "\n".join([
                 text,
-                f"已耗时: {elapsed:.1f}s",
+                f"已耗时: {elapsed:.1f} 秒",
                 f"剩余换牌次数: {remaining_changes}",
                 f"已完成搜索次数: {stats['reachability_checks']}",
                 f"搜索速度: {speed:.1f} 次/秒",
                 f"可成杠数量: {stats['quads']}",
                 f"双杠候选数: {stats['quad_pairs']}",
                 f"当前双杠序号: {stats['current_quad_pair']}",
-                f"目标14搜索节点: {stats['dfs_nodes']}",
+                f"目标 14 搜索节点: {stats['dfs_nodes']}",
                 f"分支搜索次数: {stats['branch_attempts']}",
                 f"当前节点可搜牌数: {stats['node_searchable']}",
                 f"当前节点进度: {stats['node_index']} / {stats['node_total']}",
                 f"已找到候选方案: {stats['candidate_hands']}",
                 f"重复分支剪枝: {stats['duplicate_prunes']}",
                 f"状态缓存命中: {stats['state_cache_hits']}",
-                f"目标13下界剪枝: {stats['target13_prunes']}",
+                f"目标 13 下界剪枝: {stats['target13_prunes']}",
                 f"非牌山超限剪枝: {stats['nonwall_prunes']}",
-                f"吞牌上界剪枝: {stats['reachability_upper_prunes']}",
+                f"换牌上界剪枝: {stats['reachability_upper_prunes']}",
                 f"速度劣化剪枝: {stats['speed_prunes']}",
-                f"最后节点非条剪枝: {stats['last_node_souzu_prunes']}",
+                f"最后节点非索剪枝: {stats['last_node_souzu_prunes']}",
                 f"换牌可达性校验: {stats['reachability_checks']}",
                 f"当前最新结果: {stats['latest_result']}",
             ])
@@ -2482,9 +2499,14 @@ def recommend_souzu_tenpai_switch(
 
     best_plan: Optional[dict] = None
     best_draws_limit: Optional[int] = None
-    parallel_ok = len(quad_pairs) >= 2 and (os.cpu_count() or 1) > 1
+    parallel_ok = len(quad_pairs) >= 2 and cpu_count > 1
+    if len(quad_pairs) < 2:
+        parallel_disabled_reason = "候选双杠不足，至少需要 2 组候选双杠才会启用并行搜索"
+    elif cpu_count <= 1:
+        parallel_disabled_reason = f"os.cpu_count() 返回 {cpu_count}，未达到并行搜索所需的最小值 2"
     if parallel_ok:
-        max_workers = max(1, min(len(quad_pairs), max(1, (os.cpu_count() or 1) - 1), 4))
+        parallel_attempted = True
+        max_workers = max(1, min(len(quad_pairs), max(1, cpu_count - 1), 4))
         completed = 0
         parallel_info = {"mode": "process", "enabled": True, "max_workers": max_workers, "total_jobs": len(quad_pairs), "completed_jobs": 0}
         worker_states = [
@@ -2547,8 +2569,8 @@ def recommend_souzu_tenpai_switch(
             pending = set(future_map.keys())
             while pending:
                 if stop_requested():
-                    executor.shutdown(wait=False, cancel_futures=True)
                     _terminate_executor_processes(executor)
+                    executor.shutdown(wait=False, cancel_futures=True)
                     for worker in worker_states:
                         if worker["status"] == "running":
                             worker["status"] = "stopped"
@@ -2603,14 +2625,14 @@ def recommend_souzu_tenpai_switch(
                         if best_plan is None or plan["draws_needed"] < best_plan["draws_needed"]:
                             best_plan = plan
                             best_draws_limit = plan["draws_needed"]
-                            stats["latest_result"] = f"已更新当前最快方案: 需要摸 {best_draws_limit}"
+                            stats["latest_result"] = f"已更新当前最优方案，需要摸 {best_draws_limit}"
                             if candidate_cb is not None:
                                 candidate_cb(plan)
-                            emit_progress("已更新当前最快方案", force=True)
+                            emit_progress("已更新当前最优方案", force=True)
                             emit_telemetry()
                         if stop_after_first:
-                            executor.shutdown(wait=False, cancel_futures=True)
                             _terminate_executor_processes(executor)
+                            executor.shutdown(wait=False, cancel_futures=True)
                             for item in worker_states:
                                 if item["status"] == "running":
                                     item["status"] = "stopped"
@@ -2621,8 +2643,8 @@ def recommend_souzu_tenpai_switch(
                             best_plan["runtime"] = get_active_search_runtime_snapshot(searching=False)
                             return best_plan
                         if best_draws_limit is not None and best_draws_limit <= 1:
-                            executor.shutdown(wait=False, cancel_futures=True)
                             _terminate_executor_processes(executor)
+                            executor.shutdown(wait=False, cancel_futures=True)
                             for item in worker_states:
                                 if item["status"] == "running":
                                     item["status"] = "stopped"
@@ -2661,17 +2683,38 @@ def recommend_souzu_tenpai_switch(
         except Exception as exc:
             try:
                 if executor is not None:
-                    executor.shutdown(wait=False, cancel_futures=True)
                     _terminate_executor_processes(executor)
+                    executor.shutdown(wait=False, cancel_futures=True)
             except Exception:
                 pass
+            logger.exception("parallel search startup/execution failed")
+            parallel_traceback = traceback.format_exc()
+            print(parallel_traceback, flush=True)
+            parallel_start_error = str(exc)
+            parallel_fallback_reason = str(exc)
             emit_progress(f"并行搜索不可用，回退为单进程搜索: {exc}", force=True)
 
         finally:
             if executor is not None:
                 _unregister_active_executor(executor)
 
-    parallel_info = {"mode": "single", "enabled": False, "max_workers": 1, "total_jobs": len(quad_pairs), "completed_jobs": 0}
+    parallel_info = {
+        "mode": "single",
+        "enabled": False,
+        "max_workers": 1,
+        "total_jobs": len(quad_pairs),
+        "completed_jobs": 0,
+        "cpu_count": cpu_count,
+        "quad_pair_count": len(quad_pairs),
+        "parallel_ok": parallel_ok,
+        "attempted": parallel_attempted,
+    }
+    if parallel_disabled_reason:
+        parallel_info["disabled_reason"] = parallel_disabled_reason
+    if parallel_start_error:
+        parallel_info["start_error"] = parallel_start_error
+    if parallel_fallback_reason:
+        parallel_info["fallback_reason"] = parallel_fallback_reason
     worker_states = [{
         "worker_id": 1,
         "kind": "main",
@@ -2695,6 +2738,7 @@ def recommend_souzu_tenpai_switch(
                 "debug_pool": debug_pool,
                 "worker_states": [{k: v for k, v in worker_states[0].items() if k != "started_at"}],
                 "parallel_info": parallel_info,
+                "parallel_fallback_reason": parallel_fallback_reason,
                 "runtime": get_active_search_runtime_snapshot(searching=False),
             }
         stats["current_quad_pair"] = quad_index
@@ -2732,8 +2776,8 @@ def recommend_souzu_tenpai_switch(
             if best_plan is None or plan["draws_needed"] < best_plan["draws_needed"]:
                 best_plan = plan
                 best_draws_limit = plan["draws_needed"]
-                stats["latest_result"] = f"已更新当前最快方案: 需要摸 {best_draws_limit}"
-                emit_progress("已更新当前最快方案", force=True)
+                stats["latest_result"] = f"已更新当前最优方案，需要摸 {best_draws_limit}"
+                emit_progress("已更新当前最优方案", force=True)
                 if best_draws_limit <= 1:
                     worker_states[0]["status"] = "done"
                     worker_states[0]["completed_jobs"] = quad_index
@@ -2742,6 +2786,7 @@ def recommend_souzu_tenpai_switch(
                     parallel_info["completed_jobs"] = quad_index
                     best_plan["worker_states"] = [{k: v for k, v in worker_states[0].items() if k != "started_at"}]
                     best_plan["parallel_info"] = parallel_info
+                    best_plan["parallel_fallback_reason"] = parallel_fallback_reason
                     best_plan["debug_pool"] = debug_pool
                     best_plan["runtime"] = get_active_search_runtime_snapshot(searching=False)
                     return best_plan
@@ -2753,6 +2798,7 @@ def recommend_souzu_tenpai_switch(
                 parallel_info["completed_jobs"] = quad_index
                 best_plan["worker_states"] = [{k: v for k, v in worker_states[0].items() if k != "started_at"}]
                 best_plan["parallel_info"] = parallel_info
+                best_plan["parallel_fallback_reason"] = parallel_fallback_reason
                 best_plan["debug_pool"] = debug_pool
                 best_plan["runtime"] = get_active_search_runtime_snapshot(searching=False)
                 return best_plan
@@ -2771,12 +2817,14 @@ def recommend_souzu_tenpai_switch(
             "debug_pool": debug_pool,
             "worker_states": [{k: v for k, v in worker_states[0].items() if k != "started_at"}],
             "parallel_info": parallel_info,
+            "parallel_fallback_reason": parallel_fallback_reason,
             "runtime": get_active_search_runtime_snapshot(searching=False),
         }
     if best_plan is not None:
         worker_states[0]["status"] = "done"
         best_plan["worker_states"] = [{k: v for k, v in worker_states[0].items() if k != "started_at"}]
         best_plan["parallel_info"] = parallel_info
+        best_plan["parallel_fallback_reason"] = parallel_fallback_reason
         best_plan["debug_pool"] = debug_pool
         best_plan["runtime"] = get_active_search_runtime_snapshot(searching=False)
         return best_plan
@@ -2788,5 +2836,6 @@ def recommend_souzu_tenpai_switch(
         "debug_pool": debug_pool,
         "worker_states": [{k: v for k, v in worker_states[0].items() if k != "started_at"}],
         "parallel_info": parallel_info,
+        "parallel_fallback_reason": parallel_fallback_reason,
         "runtime": get_active_search_runtime_snapshot(searching=False),
     }

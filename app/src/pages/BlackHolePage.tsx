@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {useTranslation} from "react-i18next";
 import {pushToast} from "../lib/toast";
 import {ws} from "../lib/ws";
@@ -42,7 +42,7 @@ function summarizeProgress(progress?: string) {
     const lines = progress
         .split("\n")
         .map((line) => line.trim())
-        .filter((line) => line && !line.includes("剩余换牌") && !line.includes("鍓╀綑鎹㈢墝"));
+        .filter((line) => line && !line.includes("剩余换牌") && !line.includes("当前阶段"));
     const keepPrefixes = [
         "已耗时",
         "已完成搜索次数",
@@ -63,7 +63,7 @@ function visibleProgress(progress?: string) {
     return progress
         .split("\n")
         .map((line) => line.trim())
-        .filter((line) => line && !line.includes("剩余换牌") && !line.includes("鍓╀綑鎹㈢墝"))
+        .filter((line) => line && !line.includes("剩余换牌") && !line.includes("当前阶段"))
         .join("\n");
 }
 
@@ -240,9 +240,9 @@ export default function BlackHolePage({
         [wallIds, wallLimit],
     );
     const consideredSections = React.useMemo(() => ([
-        {key: "hand", title: "\u624b\u724c", ids: handIds},
-        {key: "replacement", title: "\u6362\u724c\u5806", ids: replacementIds},
-        {key: "wall", title: "\u724c\u5c71", ids: consideredWallIds},
+        {key: "hand", title: "手牌", ids: handIds},
+        {key: "replacement", title: "换牌堆", ids: replacementIds},
+        {key: "wall", title: "牌山", ids: consideredWallIds},
     ]), [consideredWallIds, handIds, replacementIds]);
 
     return (
@@ -257,10 +257,10 @@ export default function BlackHolePage({
                         {t("blackhole.stop")}
                     </button>
                     <button className="nav-btn" onClick={killWorkers}>
-                        强制清理子进程
+                        {"强制清理子进程"}
                     </button>
                     <button className="nav-btn" onClick={refreshRuntime}>
-                        刷新子进程
+                        {"刷新子进程"}
                     </button>
                     <button className="nav-btn" onClick={() => startSearch({stopAfterFirst: false, resume: true})} disabled={!canResume}>
                         {t("blackhole.continue")}
@@ -275,7 +275,7 @@ export default function BlackHolePage({
                         {t("blackhole.execute_plan")}
                     </button>
                     <button className="nav-btn" onClick={exportCurrentSnapshot}>
-                        导出当前局面
+                        {"导出当前局面"}
                     </button>
                     <button className="nav-btn" onClick={clearCache}>
                         {t("blackhole.clear_cache")}
@@ -321,7 +321,7 @@ export default function BlackHolePage({
                     <aside className="blackhole-drawer panel">
                         <div className="blackhole-drawer-head">
                             <div className="panel-title" style={{marginBottom: 0}}>
-                                {drawerMode === "quad" ? "\u6240\u6709\u53ef\u89c1\u6760" : "\u53ef\u4f7f\u7528\u7684\u724c"}
+                                {drawerMode === "quad" ? "所有可见杠" : "可使用的牌"}
                             </div>
                             <button className="nav-btn" onClick={() => setQuadDrawerOpen(false)}>
                                 {t("modal.close")}
@@ -428,7 +428,7 @@ function PlanBody({
             <SearchParamsBand data={data} onOpenConsideredTiles={onOpenConsideredTiles}/>
             <div className={styles.band}>
                 <div className={styles.bandLeft} style={{gridColumn: "1 / -1"}}>
-                    <div className={styles.bandActionLabel}>{"\u7b2c\u51e0\u5f20\u542c\u724c"}</div>
+                    <div className={styles.bandActionLabel}>{"第几张听牌"}</div>
                     <div className={styles.bandValue}>{String(data.draws_needed ?? "-")}</div>
                 </div>
             </div>
@@ -465,13 +465,13 @@ function SearchParamsBand({
         return null;
     }
     const perChangeLimit = typeof data.per_change_limit === "number"
-        ? (data.per_change_limit === 13 ? "\u65e0\u9650\u5236" : String(data.per_change_limit))
+        ? (data.per_change_limit === 13 ? "无限制" : String(data.per_change_limit))
         : "-";
     const items = [
-        {label: "\u6700\u5927\u6362\u724c\u6b21\u6570", value: String(data.max_change_count ?? "-"), clickable: false},
-        {label: "\u6362\u724c\u9650\u5236", value: perChangeLimit, clickable: false},
+        {label: "最大换牌次数", value: String(data.max_change_count ?? "-"), clickable: false},
+        {label: "换牌限制", value: perChangeLimit, clickable: false},
         {
-            label: "\u53ef\u4f7f\u7528\u7684\u724c\u6570",
+            label: "可使用的牌数",
             value: String(data.considered_tile_count ?? "-"),
             clickable: typeof data.considered_tile_count === "number" && !!onOpenConsideredTiles,
         },
@@ -479,7 +479,7 @@ function SearchParamsBand({
 
     return (
         <div style={{display: "grid", gap: 8}}>
-            <div className={styles.label}>{"\u5f53\u524d\u53c2\u6570"}</div>
+            <div className={styles.label}>{"当前参数"}</div>
             <div style={{display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10}}>
                 {items.map((item) => (
                     <div
@@ -500,7 +500,7 @@ function SearchParamsBand({
                             {item.value}
                         </div>
                         {item.clickable ? (
-                            <div className={styles.cardBodyMuted} style={{padding: 0}}>{"\u70b9\u51fb\u67e5\u770b\u724c\u9762"}</div>
+                            <div className={styles.cardBodyMuted} style={{padding: 0}}>{"点击查看牌面"}</div>
                         ) : null}
                     </div>
                 ))}
@@ -536,7 +536,7 @@ export function SouzuRuntimePanel({runtime}: { runtime?: SearchRuntimeData | nul
                         ))}
                     </div>
                 ) : (
-                    <div className="hint">当前没有活动中的搜索子进程。</div>
+                    <div className="hint">{"当前没有活动中的搜索子进程。"}</div>
                 )}
             </div>
         </section>
@@ -548,6 +548,9 @@ export function WorkerStatusPanel({data, runtime}: { data: PlanData; runtime?: S
     const parallel = data.parallel_info;
     const processes = runtime?.processes || data.runtime?.processes || [];
     if (!workers.length && !parallel && !processes.length) return null;
+    const fallbackReason = parallel?.fallback_reason?.trim();
+    const disabledReason = parallel?.disabled_reason?.trim();
+    const startError = parallel?.start_error?.trim();
 
     const statusText = (status?: string) => {
         if (status === "running") return "运行中";
@@ -558,15 +561,45 @@ export function WorkerStatusPanel({data, runtime}: { data: PlanData; runtime?: S
         return status || "-";
     };
 
+    const describeParallelError = (message?: string | null) => {
+        const text = (message || "").trim();
+        if (!text) return "";
+        if (text.includes("'NoneType' object has no attribute 'get'")) {
+            return "子进程返回了空结果，主进程读取结果字段时失败，详细堆栈已输出到后端控制台。";
+        }
+        return "子进程启动或执行过程中出现异常，详细堆栈已输出到后端控制台。";
+    };
+
+    const startErrorText = describeParallelError(startError);
+    const fallbackText = describeParallelError(fallbackReason);
+
     return (
         <div style={{display: "grid", gap: 8}}>
-            <div className={styles.label}>搜索 Worker</div>
+            <div className={styles.label}>{"搜索进程"}</div>
             <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
                 <span className="badge">{`模式: ${parallel?.enabled ? "多进程" : "单进程"}`}</span>
                 <span className="badge">{`并行数: ${parallel?.max_workers ?? (workers.length || 1)}`}</span>
                 <span className="badge">{`已完成: ${parallel?.completed_jobs ?? 0}/${parallel?.total_jobs ?? 0}`}</span>
                 <span className="badge">{`真实子进程: ${runtime?.process_count ?? data.runtime?.process_count ?? processes.length}`}</span>
             </div>
+            <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
+                {`并行判定: CPU核心数=${parallel?.cpu_count ?? "-"}，双杠候选=${parallel?.quad_pair_count ?? "-"}，满足并行条件=${parallel?.parallel_ok ? "是" : "否"}，已尝试启动子进程=${parallel?.attempted ? "是" : "否"}`}
+            </div>
+            {disabledReason ? (
+                <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
+                    {`未启动子进程原因: ${disabledReason}`}
+                </div>
+            ) : null}
+            {startErrorText ? (
+                <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
+                    {`子进程启动失败: ${startErrorText}`}
+                </div>
+            ) : null}
+            {fallbackText ? (
+                <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
+                    {`已回退为单进程搜索: ${fallbackText}`}
+                </div>
+            ) : null}
             <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10}}>
                 {workers.map((worker, index) => (
                     <div
@@ -586,7 +619,7 @@ export function WorkerStatusPanel({data, runtime}: { data: PlanData; runtime?: S
                         <div className="hint">{worker.current_quad_index ? `负责双杠 #${worker.current_quad_index}` : "当前未分配任务"}</div>
                         <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{worker.current_quad_label || "-"}</div>
                         <div className="hint">{`已完成任务: ${worker.completed_jobs ?? 0}`}</div>
-                        <div className="hint">{`耗时: ${(worker.elapsed_sec ?? 0).toFixed(2)}s`}</div>
+                        <div className="hint">{`耗时: ${(worker.elapsed_sec ?? 0).toFixed(2)} 秒`}</div>
                         <div className="hint">{`最近结果: ${worker.last_result || "-"}`}</div>
                         <div className="hint">{`最近摸牌数: ${worker.last_draws_needed ?? "-"}`}</div>
                     </div>
@@ -618,7 +651,7 @@ function ConsideredTilesBody({
                 >
                     <div style={{display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline"}}>
                         <div style={{fontWeight: 600}}>{section.title}</div>
-                        <div className={styles.bandLabel}>{section.ids.length} {"\u5f20"}</div>
+                        <div className={styles.bandLabel}>{section.ids.length} {"张"}</div>
                     </div>
                     {section.ids.length > 0 ? (
                         <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
@@ -691,9 +724,9 @@ function normalizeQuadPositions(item: {
 }
 
 function mapLegacySource(source: string) {
-    if (source.includes("hand") || source.includes("\u624b\u724c")) return "hand";
-    if (source.includes("replacement") || source.includes("\u6362\u724c")) return "replacement";
-    if (source.includes("wall") || source.includes("\u724c\u5c71")) return "wall";
+    if (source.includes("hand") || source.includes("手牌")) return "hand";
+    if (source.includes("replacement") || source.includes("换牌")) return "replacement";
+    if (source.includes("wall") || source.includes("牌山")) return "wall";
     return "unknown";
 }
 
@@ -705,10 +738,10 @@ function QuadTilePositions({
     resolveFace?: (id: number) => string | null;
 }) {
     const sourceLabel = (source: string) => {
-        if (source === "hand") return "\u624b\u724c";
-        if (source === "replacement") return "\u6362\u724c\u5806";
-        if (source === "wall") return "\u724c\u5c71";
-        return "\u672a\u77e5\u6765\u6e90";
+        if (source === "hand") return "手牌";
+        if (source === "replacement") return "换牌堆";
+        if (source === "wall") return "牌山";
+        return "未知来源";
     };
 
     if (!positions.length) {
@@ -779,7 +812,7 @@ function FinalShapeGroup({quadFaces, tenpaiFaces}: { quadFaces: string[]; tenpai
 
     return (
         <div style={{display: "grid", gap: 6}}>
-            <div className={styles.label}>{"\u6700\u7ec8\u724c\u578b"}</div>
+            <div className={styles.label}>{"最终牌型"}</div>
             <div
                 style={{
                     border: "1px solid var(--color-divider)",

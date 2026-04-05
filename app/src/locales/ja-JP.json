@@ -17,7 +17,7 @@
   },
   "nav": {
     "home": "ホーム",
-    "blackhole": "ブラックホールガイド",
+    "blackhole": "花火ガイド",
     "fuse": "ヒューズ",
     "autorun": "自動化",
     "refreshGame": "更新",
@@ -309,8 +309,8 @@
     "reason_unknown": "利用できる結果がまだありません。"
   },
   "blackhole": {
-    "title": "ブラックホールガイド",
-    "card_title": "ブラックホールガイド案",
+    "title": "花火ガイド",
+    "card_title": "花火ガイド案",
     "start": "検索開始",
     "stop": "検索停止",
     "continue": "続けて検索",
@@ -324,7 +324,7 @@
     "wall_limit_hint": "2 にすると牌山の先頭から最大 2 枚まで読み取ります。36 にすると無制限として扱います。",
     "stage_ready": "現在は交換段階なので、手動で検索を始められます。",
     "stage_not_ready": "現在は交換段階ではありません。開始前に止めます。",
-    "need_switch_stage": "現在は交換段階ではないため、ブラックホールガイドを開始できません。"
+    "need_switch_stage": "現在は交換段階ではないため、花火ガイドを開始できません。"
   },
   "amulet_card": {
     "title_unknown": "未知のお守り ID={{regId}}（raw={{rawId}}）",

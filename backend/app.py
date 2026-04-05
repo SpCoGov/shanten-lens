@@ -159,7 +159,7 @@ async def _ui_services_main(host: str, ws_port: int):
     watcher_cfg = asyncio.create_task(_watch_configs())
     watcher_reg = asyncio.create_task(_watch_data_tables())
 
-    api_port = int(MANAGER.get("api_port", 8788))
+    api_port = int(MANAGER.get("backend.api_port", 8788))
     api_task = asyncio.create_task(run_http_server(host, api_port))
 
     async with serve(

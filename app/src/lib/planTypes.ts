@@ -61,6 +61,13 @@ export type ParallelInfo = {
     max_workers?: number;
     total_jobs?: number;
     completed_jobs?: number;
+    fallback_reason?: string;
+    cpu_count?: number;
+    quad_pair_count?: number;
+    parallel_ok?: boolean;
+    attempted?: boolean;
+    disabled_reason?: string;
+    start_error?: string;
 };
 
 export type SearchRuntimeProcess = {

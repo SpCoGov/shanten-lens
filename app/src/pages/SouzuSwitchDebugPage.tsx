@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import Tile from "../components/Tile";
 import {pushToast} from "../lib/toast";
 import type {GameStateData} from "../lib/gamestate";
@@ -402,7 +402,7 @@ export default function SouzuSwitchDebugPage({
     return (
         <div className="settings-wrap wide-page" style={{paddingBlock: 16}}>
             <div className="panel">
-                <div className="panel-title">Souzu Switch 调试工具</div>
+                <div className="panel-title">花火指导调试工具</div>
                 <div style={{display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center"}}>
                     <button className="nav-btn" onClick={exportCurrent}>导出当前局面</button>
                     <button className="nav-btn" onClick={importSnapshot}>导入文本局面</button>
@@ -428,13 +428,13 @@ export default function SouzuSwitchDebugPage({
                     </label>
                 </div>
                 <div style={{marginTop: 10, color: "var(--muted)", fontSize: 13}}>
-                    手工验证模式按你指定的两组杠和 7 张目标牌做验证，并额外说明搜索器能否自己枚举到该方案。
+                    {"手工验证模式会按你指定的两组杠和 7 张目标牌做验证，并额外说明搜索器能否自己枚举到该方案。"}
                 </div>
             </div>
 
             <div className="responsive-two-col">
                 <section className="panel" style={{minWidth: 0}}>
-                    <div className="panel-title">局面 JSON</div>
+                    <div className="panel-title">局面数据</div>
                     <textarea
                         className="form-input"
                         style={{minHeight: 300, maxWidth: "none", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"}}
@@ -452,14 +452,14 @@ export default function SouzuSwitchDebugPage({
                             <SnapshotTileRow title="换牌堆" ids={activeSnapshot.replacement_tiles ?? []} resolveFace={resolveFace}/>
                             <SnapshotTileRow title="牌山" ids={(activeSnapshot.wall_tiles ?? []).slice(0, wallLimit)} resolveFace={resolveFace}/>
                             <div style={{display: "flex", flexWrap: "wrap", gap: 10}}>
-                                <span className="badge">阶段: {String(activeSnapshot.stage ?? "-")}</span>
-                                <span className="badge">已换: {String(activeSnapshot.change_tile_count ?? 0)}</span>
-                                <span className="badge">总换牌次数: {String(activeSnapshot.total_change_tile_count ?? 0)}</span>
+                                <span className="badge">{`阶段: ${String(activeSnapshot.stage ?? "-")}`}</span>
+                                <span className="badge">{`已换: ${String(activeSnapshot.change_tile_count ?? 0)}`}</span>
+                                <span className="badge">{`总换牌次数: ${String(activeSnapshot.total_change_tile_count ?? 0)}`}</span>
                                 <span className="badge">Boss Buff: {(activeSnapshot.boss_buff ?? []).join(", ") || "-"}</span>
                             </div>
                         </div>
                     ) : (
-                        <div className="hint">还没有导入局面。可以先导出当前局面，或直接粘贴 JSON。</div>
+                        <div className="hint">{"还没有导入局面。可以先导出当前局面，或直接粘贴局面数据。"}</div>
                     )}
                 </section>
             </div>
@@ -534,7 +534,7 @@ export default function SouzuSwitchDebugPage({
                     <SouzuRuntimePanel runtime={runtime}/>
                     <ManualSearchabilityCard data={data}/>
                     <DebugPoolCard data={data} resolveFace={resolveFace}/>
-                    <BlackHoleStrategyCard title="调试结果" data={data} resolveFace={resolveFace}/>
+                    <BlackHoleStrategyCard title="调试结果" data={data} runtime={runtime} resolveFace={resolveFace}/>
                 </div>
             </div>
         </div>
@@ -605,7 +605,7 @@ function DebugPoolCard({
                     {focusEntries.length > 0 ? (
                         <DebugTilePositions positions={focusEntries} resolveFace={resolveFace}/>
                     ) : (
-                        <div className="hint">当前搜索池里没有归一到 {focusFace} 的牌。</div>
+                        <div className="hint">{`当前搜索池里没有归一到 ${focusFace} 的牌。`}</div>
                     )}
                 </div>
 
@@ -718,7 +718,7 @@ function DebugTilePositions({
                     <div className="hint" style={{fontSize: 11}}>{`ID ${item.tile_id}`}</div>
                     <div className="hint" style={{fontSize: 11}}>{`${sourceLabel(item.source)} #${item.source_index}`}</div>
                     {"raw_face" in item ? (
-                        <div className="hint" style={{fontSize: 11}}>{`${item.raw_face || "-"} → ${item.norm_face || "-"}`}</div>
+                        <div className="hint" style={{fontSize: 11}}>{`${item.raw_face || "-"} -> ${item.norm_face || "-"}`}</div>
                     ) : null}
                 </div>
             ))}
@@ -741,7 +741,7 @@ function ManualQuadSelect({
         <label style={{display: "grid", gap: 8}}>
             <span>{title}</span>
             <select value={value} onChange={(e) => onChange(e.target.value)}>
-                <option value="">请选择</option>
+                <option value="">{"请选择"}</option>
                 {options.map((option) => (
                     <option key={option.key} value={option.key}>{option.label}</option>
                 ))}
@@ -786,7 +786,7 @@ function ManualBucket({
                     ))}
                 </div>
             ) : (
-                <div className="hint">点击下方牌加入当前分组</div>
+                <div className="hint">{"点击下方牌加入当前分组"}</div>
             )}
         </div>
     );
@@ -809,7 +809,7 @@ function PoolSection({
         <div style={{display: "grid", gap: 8}}>
             <div style={{display: "flex", justifyContent: "space-between", alignItems: "baseline"}}>
                 <div style={{fontWeight: 600}}>{title}</div>
-                <div className="hint">{entries.length} 张</div>
+                <div className="hint">{`${entries.length} 张`}</div>
             </div>
             {entries.length > 0 ? (
                 <div
@@ -886,7 +886,7 @@ function SnapshotTileRow({
         <div style={{display: "grid", gap: 8}}>
             <div style={{display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline"}}>
                 <div style={{fontWeight: 600}}>{title}</div>
-                <div className="hint">{ids.length} 张</div>
+                <div className="hint">{`${ids.length} 张`}</div>
             </div>
             {ids.length > 0 ? (
                 <div style={{display: "flex", flexWrap: "wrap", gap: 6}}>

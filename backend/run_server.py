@@ -34,7 +34,7 @@ async def main():
 
     start_ui_services(
         host="127.0.0.1",
-        ws_port=int(MANAGER.get("ws_port", 8787)),
+        ws_port=int(MANAGER.get("backend.port", 8787)),
     )
     logger.info("UI services started (ws/http/watchers on UI loop).")
 
