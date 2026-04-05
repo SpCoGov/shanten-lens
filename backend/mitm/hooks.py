@@ -196,13 +196,9 @@ async def execute_current_switch_plan() -> tuple[bool, str]:
         prefer_keep = [tid for tid in current_hand if tid not in discard_ids]
         buffs = set(getattr(GAME_STATE, "boss_buff", None) or [])
         if 901 in buffs:
-            keep_target = max(0, len(current_hand) - 3)
-            if len(prefer_keep) >= keep_target:
-                filtered_ids = prefer_keep[:keep_target]
-            else:
-                rest = [tid for tid in current_hand if tid not in prefer_keep]
-                take_more = rest[: max(0, keep_target - len(prefer_keep))]
-                filtered_ids = prefer_keep + take_more
+            if len(discard_ids) > 3:
+                return False, f"第{index}步方案要求换出 {len(discard_ids)} 张，超过 901 的单次上限 3 张。"
+            filtered_ids = prefer_keep
         else:
             filtered_ids = prefer_keep
 

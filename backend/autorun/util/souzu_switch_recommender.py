@@ -15,6 +15,8 @@ from loguru import logger
 RED_MAP = {"0m": "5m", "0p": "5p", "0s": "5s"}
 ALL_TILES = [f"{n}{s}" for s in "mps" for n in range(1, 10)] + [f"{n}z" for n in range(1, 8)]
 TILE_INDEX = {tile: idx for idx, tile in enumerate(ALL_TILES)}
+ABSTRACT_COMPONENT_LIMIT = 2
+QUAD_REPRESENTATIVE_LIMIT = 2
 _ACTIVE_EXECUTORS: set[ProcessPoolExecutor] = set()
 _ACTIVE_EXECUTORS_LOCK = threading.Lock()
 
@@ -85,6 +87,22 @@ def _quad_score_text(time_key: tuple[int, int, int]) -> str:
 
 def _component_text(parts: Sequence[str]) -> str:
     return " | ".join(parts) if parts else "尚未选定组合"
+
+
+def _component_sort_prefix(item: dict) -> tuple:
+    return tuple(item.get("sort_key", ()))
+
+
+def _trim_components(result: List[dict], abstract_key_fn: Callable[[dict], tuple], limit: int = ABSTRACT_COMPONENT_LIMIT) -> List[dict]:
+    grouped: Dict[tuple, List[dict]] = defaultdict(list)
+    for item in result:
+        grouped[abstract_key_fn(item)].append(item)
+    trimmed: List[dict] = []
+    for key in sorted(grouped.keys()):
+        items = sorted(grouped[key], key=_component_sort_prefix)
+        trimmed.extend(items[:limit])
+    trimmed.sort(key=_component_sort_prefix)
+    return trimmed
 
 
 def _chiitoi_win(tiles: List[str]) -> bool:
@@ -305,13 +323,16 @@ def _enumerate_quads(pool: Sequence[PoolEntry], by_id: Dict[int, PoolEntry]) -> 
     for face, ids in face_map.items():
         if len(ids) < 4:
             continue
+        face_quads: List[dict] = []
         for combo in combinations(ids, 4):
             ids4 = tuple(sorted(combo))
-            quads.append({
+            face_quads.append({
                 "face": face,
                 "ids": ids4,
                 "time_key": _quad_time(ids4, by_id),
             })
+        face_quads.sort(key=lambda item: (item["time_key"], item["ids"]))
+        quads.extend(face_quads[:QUAD_REPRESENTATIVE_LIMIT])
     quads.sort(key=lambda item: (item["time_key"], TILE_INDEX.get(item["face"], 99), item["ids"]))
     return quads
 
@@ -715,8 +736,7 @@ def _pair_components(
                 "desc": f"雀头[{face}] <- {_entry_label(a)} / {_entry_label(b)}",
                 "sort_key": (max(a.order, b.order), TILE_INDEX.get(face, 99), a.tile_id, b.tile_id),
             })
-    result.sort(key=lambda item: item["sort_key"])
-    return result
+    return _trim_components(result, lambda item: ("pair", item["face"]))
 
 
 def _meld_components(
@@ -781,9 +801,7 @@ def _meld_components(
                         "desc": f"面子[顺子 {seq}] <- {_entry_label(a)} / {_entry_label(b)} / {_entry_label(c)}",
                         "sort_key": (max(a.order, b.order, c.order), 1, TILE_INDEX.get(face, 99), ids),
                     })
-
-    result.sort(key=lambda item: item["sort_key"])
-    return result
+    return _trim_components(result, lambda item: ("meld", item["kind"], item["face"]))
 
 
 def _win_components_for_wall_tile(
@@ -813,6 +831,7 @@ def _win_components_for_wall_tile(
             "ids": (entry.tile_id,),
             "orders": (entry.order,),
             "face": win_entry.face,
+            "pattern": (win_entry.face, win_entry.face),
             "kind": "pair",
             "desc": f"雀头[{win_entry.face}] <- {_entry_label(entry)} + 胡牌 {_entry_label(win_entry)}",
             "sort_key": (entry.order, 0, TILE_INDEX.get(win_entry.face, 99), entry.tile_id),
@@ -825,6 +844,7 @@ def _win_components_for_wall_tile(
                 "ids": (a.tile_id, b.tile_id),
                 "orders": tuple(sorted((a.order, b.order))),
                 "face": win_entry.face,
+                "pattern": (win_entry.face, win_entry.face, win_entry.face),
                 "kind": "triplet",
                 "desc": f"面子[刻子 {win_entry.face}] <- {_entry_label(a)} / {_entry_label(b)} / 胡牌 {_entry_label(win_entry)}",
                 "sort_key": (max(a.order, b.order), 1, TILE_INDEX.get(win_entry.face, 99), a.tile_id, b.tile_id),
@@ -849,13 +869,15 @@ def _win_components_for_wall_tile(
                         "ids": ids,
                         "orders": tuple(sorted((a.order, b.order))),
                         "face": win_entry.face,
+                        "pattern": tuple(sorted((fa, fb, win_entry.face), key=lambda tile: TILE_INDEX.get(tile, 99))),
                         "kind": "sequence",
                         "desc": f"面子[顺子 {seq}] <- {_entry_label(a)} / {_entry_label(b)} / 胡牌 {_entry_label(win_entry)}",
                         "sort_key": (max(a.order, b.order), 2, TILE_INDEX.get(win_entry.face, 99), ids),
                     })
-
-    result.sort(key=lambda item: item["sort_key"])
-    return result
+    return _trim_components(
+        result,
+        lambda item: ("wall-win", item["face"], item["role"], item["kind"], tuple(item.get("pattern", ()))),
+    )
 
 
 def _plan_summary(plan: dict, deck_map: Dict[int, str]) -> str:
@@ -958,9 +980,21 @@ def _available_face_counts(
 
 
 def _quick_shape_feasible_from_counts(face_counts: Counter[str], shape: str) -> bool:
+    if shape == "meld":
+        return any(_can_take_pattern(face_counts, meld) for meld in _abstract_meld_patterns())
+
     if shape == "meld+single":
         return any(_can_take_pattern(face_counts, meld) and sum(_subtract_pattern(face_counts, meld).values()) >= 1
                    for meld in _abstract_meld_patterns())
+
+    if shape == "meld+meld":
+        for meld1 in _abstract_meld_patterns():
+            if not _can_take_pattern(face_counts, meld1):
+                continue
+            rest = _subtract_pattern(face_counts, meld1)
+            if _quick_shape_feasible_from_counts(rest, "meld"):
+                return True
+        return False
 
     if shape == "pair+pair":
         for pair1 in _abstract_pair_patterns():
@@ -980,6 +1014,15 @@ def _quick_shape_feasible_from_counts(face_counts: Counter[str], shape: str) -> 
             for taatsu in _abstract_taatsu_patterns():
                 if _can_take_pattern(rest, taatsu):
                     return True
+        return False
+
+    if shape == "pair+meld":
+        for pair in _abstract_pair_patterns():
+            if not _can_take_pattern(face_counts, pair):
+                continue
+            rest = _subtract_pattern(face_counts, pair)
+            if _quick_shape_feasible_from_counts(rest, "meld"):
+                return True
         return False
 
     if shape == "meld+meld+single":
@@ -1031,8 +1074,11 @@ def _quick_shape_feasible(
         return False
     for shape in shapes:
         need_tiles = {
+            "meld": 3,
             "meld+single": 4,
+            "meld+meld": 6,
             "pair+pair": 4,
+            "pair+meld": 5,
             "pair+taatsu": 4,
             "meld+meld+single": 7,
             "meld+pair+pair": 7,
@@ -1129,8 +1175,7 @@ def _single_components(
             "desc": f"单骑[{entry.face}] <- {_entry_label(entry)}",
             "sort_key": (entry.order, TILE_INDEX.get(entry.face, 99), entry.tile_id),
         })
-    result.sort(key=lambda item: item["sort_key"])
-    return result
+    return _trim_components(result, lambda item: ("single", item["face"]))
 
 
 def _wait_components_for_face(
@@ -1160,6 +1205,7 @@ def _wait_components_for_face(
             "ids": (entry.tile_id,),
             "orders": (entry.order,),
             "face": wait_face,
+            "pattern": (wait_face, wait_face),
             "kind": "pair",
             "desc": f"雀头[{wait_face}] <- {_entry_label(entry)} + 听牌 {wait_face}",
             "sort_key": (entry.order, 0, TILE_INDEX.get(wait_face, 99), entry.tile_id),
@@ -1172,6 +1218,7 @@ def _wait_components_for_face(
                 "ids": (a.tile_id, b.tile_id),
                 "orders": tuple(sorted((a.order, b.order))),
                 "face": wait_face,
+                "pattern": (wait_face, wait_face, wait_face),
                 "kind": "triplet",
                 "desc": f"面子[刻子 {wait_face}] <- {_entry_label(a)} / {_entry_label(b)} / 听牌 {wait_face}",
                 "sort_key": (max(a.order, b.order), 1, TILE_INDEX.get(wait_face, 99), a.tile_id, b.tile_id),
@@ -1196,13 +1243,12 @@ def _wait_components_for_face(
                         "ids": ids,
                         "orders": tuple(sorted((a.order, b.order))),
                         "face": wait_face,
+                        "pattern": tuple(sorted((fa, fb, wait_face), key=lambda tile: TILE_INDEX.get(tile, 99))),
                         "kind": "sequence",
                         "desc": f"面子[顺子 {seq}] <- {_entry_label(a)} / {_entry_label(b)} / 听牌 {wait_face}",
                         "sort_key": (max(a.order, b.order), 2, TILE_INDEX.get(wait_face, 99), ids),
                     })
-
-    result.sort(key=lambda item: item["sort_key"])
-    return result
+    return _trim_components(result, lambda item: ("wait", wait_face, item["role"], item["kind"], tuple(item.get("pattern", ()))))
 
 
 def _taatsu_components(
@@ -1266,9 +1312,7 @@ def _taatsu_components(
                         "desc": f"搭子[{label} {seq}] <- {_entry_label(a)} / {_entry_label(b)}",
                         "sort_key": (max(a.order, b.order), 1 if delta == 1 else 2, TILE_INDEX.get(face, 99), ids),
                     })
-
-    result.sort(key=lambda item: item["sort_key"])
-    return result
+    return _trim_components(result, lambda item: ("taatsu", item["kind"], item["face"]))
 
 
 def list_reachable_quads_for_switch(
@@ -1774,6 +1818,15 @@ def _search_remaining_plan(
         min_order_after_quad = wall_start_order if _occupied_prefix_count(
             quad_pair["quad_ids"], [], None, by_id, wall_start_order
         ) > 13 else 0
+        if not _quick_shape_feasible(
+            pool,
+            quad_orders,
+            allow_replacement=allow_replacement_after_quad,
+            min_order=min_order_after_quad,
+            shapes=("meld+meld", "pair+meld"),
+        ):
+            stats["speed_prunes"] += 1
+            continue
         win_components = get_wait_components(
             wait_face,
             quad_orders,
@@ -1809,6 +1862,15 @@ def _search_remaining_plan(
                 min_order_after_win = wall_start_order if _occupied_prefix_count(
                     quad_pair["quad_ids"], list(win_component["ids"]), None, by_id, wall_start_order
                 ) > 13 else 0
+                if not _quick_shape_feasible(
+                    pool,
+                    blocked,
+                    allow_replacement=allow_replacement_after_win,
+                    min_order=min_order_after_win,
+                    shapes=("meld+meld",),
+                ):
+                    stats["speed_prunes"] += 1
+                    continue
                 melds = get_melds(blocked, allow_replacement=allow_replacement_after_win, min_order=min_order_after_win)
                 for meld1_index, meld1 in enumerate(melds, start=1):
                     blocked1 = blocked | {by_id[tile_id].order for tile_id in meld1["ids"]}
@@ -1831,6 +1893,15 @@ def _search_remaining_plan(
                         by_id,
                         wall_start_order,
                     ) > 13 else 0
+                    if not _quick_shape_feasible(
+                        pool,
+                        blocked1,
+                        allow_replacement=allow_replacement_after_meld1,
+                        min_order=min_order_after_meld1,
+                        shapes=("meld",),
+                    ):
+                        stats["speed_prunes"] += 1
+                        continue
                     meld2_list = get_melds(
                         blocked1,
                         allow_replacement=allow_replacement_after_meld1,
@@ -1920,6 +1991,15 @@ def _search_remaining_plan(
                 min_order_after_win = wall_start_order if _occupied_prefix_count(
                     quad_pair["quad_ids"], list(win_component["ids"]), None, by_id, wall_start_order
                 ) > 13 else 0
+                if not _quick_shape_feasible(
+                    pool,
+                    blocked,
+                    allow_replacement=allow_replacement_after_win,
+                    min_order=min_order_after_win,
+                    shapes=("pair+meld",),
+                ):
+                    stats["speed_prunes"] += 1
+                    continue
                 pairs = get_pairs(blocked, allow_replacement=allow_replacement_after_win, min_order=min_order_after_win)
                 melds = get_melds(blocked, allow_replacement=allow_replacement_after_win, min_order=min_order_after_win)
                 for pair_index, pair in enumerate(pairs, start=1):
