@@ -5,11 +5,6 @@ import multiprocessing
 from pathlib import Path
 from loguru import logger
 
-from backend.app import set_data_root, MANAGER, GAME_STATE, start_ui_services
-from backend.bot.drivers.packet.packet_bot import PacketBot
-from backend.mitm import MitmBridge, hooks
-
-
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--host", type=str, default="127.0.0.1")
@@ -19,6 +14,10 @@ def parse_args():
 
 
 async def main():
+    from backend.app import set_data_root, MANAGER, GAME_STATE, start_ui_services
+    from backend.bot.drivers.packet.packet_bot import PacketBot
+    from backend.mitm import MitmBridge, hooks
+
     args = parse_args()
     if args.data_root:
         set_data_root(Path(args.data_root))

@@ -59,29 +59,40 @@ def setup_logging():
     # stdout_level = "DEBUG" if MANAGER.get("general.debug", False) else "INFO"
     console_sink = sys.stdout if sys.stdout is not None else sys.stderr
     if console_sink is not None:
+        try:
+            logger.add(
+                console_sink,
+                level="INFO",
+                backtrace=True,
+                diagnose=False,
+                enqueue=True,
+            )
+        except TypeError:
+            console_sink = None
+        except Exception:
+            console_sink = None
+
+    if console_sink is not None:
+        pass
+
+    try:
         logger.add(
-            console_sink,
-            level="INFO",
+            str(log_file),
+            level="DEBUG",
+            rotation="20 MB",
+            retention="14 days",
+            compression="zip",
+            encoding="utf-8",
             backtrace=True,
             diagnose=False,
             enqueue=True,
+            format=(
+                "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | "
+                "{process.name}:{thread.name} | {name}:{function}:{line} - {message}"
+            ),
         )
-
-    logger.add(
-        str(log_file),
-        level="DEBUG",
-        rotation="20 MB",
-        retention="14 days",
-        compression="zip",
-        encoding="utf-8",
-        backtrace=True,
-        diagnose=False,
-        enqueue=True,
-        format=(
-            "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | "
-            "{process.name}:{thread.name} | {name}:{function}:{line} - {message}"
-        ),
-    )
+    except Exception:
+        pass
 
 
 DATA_ROOT: Path = default_data_root()
