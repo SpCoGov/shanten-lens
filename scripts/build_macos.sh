@@ -3,56 +3,69 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+pushd "${SCRIPT_DIR}/.." >/dev/null
+PROJECT_ROOT="$(pwd)"
+
+echo
+echo "==========================="
+echo " Shanten Lens - Build Start"
+echo "==========================="
+echo "Project root: ${PROJECT_ROOT}"
+echo
+
+PYTHON="${PROJECT_ROOT}/.venv/bin/python3"
 APP_DIR="${PROJECT_ROOT}/app"
-PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python3"
 BACKEND_ENTRY="${PROJECT_ROOT}/backend/run_server.py"
-DIST_DIR="${PROJECT_ROOT}/dist"
-BUILD_DIR="${PROJECT_ROOT}/build"
-BACKEND_DIST="${DIST_DIR}/shanten-backend"
+DIST_BIN="${PROJECT_ROOT}/dist/shanten-backend"
+BUILD_WORK_DIR="${PROJECT_ROOT}/build/shanten-backend"
 SIDECAR_DIR="${APP_DIR}/src-tauri/bin"
 SIDECAR_BIN="${SIDECAR_DIR}/shanten-backend"
 SIDECAR_BIN_EXE="${SIDECAR_DIR}/shanten-backend.exe"
 TAURI_CONFIG="src-tauri/tauri.macos.conf.json"
-
-log() {
-  printf '\n[%s] %s\n' "$1" "$2"
-}
+BUNDLE_DIR="${APP_DIR}/src-tauri/target/release/bundle"
+APP_BUNDLE="${BUNDLE_DIR}/macos/Shanten Lens.app"
+DMG_DIR="${BUNDLE_DIR}/dmg"
 
 fail() {
-  printf '\n[ERROR] %s\n' "$1" >&2
+  echo "[ERROR] $1" >&2
+  popd >/dev/null
   exit 1
 }
 
 require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
+  command -v "$1" >/dev/null 2>&1 || fail "$2"
 }
 
-log "INIT" "Project root: ${PROJECT_ROOT}"
-
-require_cmd python3
-require_cmd npm
-require_cmd rustc
-require_cmd cargo
-require_cmd xcode-select
+if [[ ! -x "${PYTHON}" ]]; then
+  fail "venv Python not found: ${PYTHON}"
+fi
+require_cmd npm "Node.js/npm is not installed or not in PATH"
+require_cmd rustc "Rust is not installed or not in PATH (install via rustup)"
+require_cmd cargo "cargo is not installed or not in PATH"
+require_cmd xcode-select "xcode-select is not available"
 
 if ! xcode-select -p >/dev/null 2>&1; then
   fail "Xcode Command Line Tools are required. Run: xcode-select --install"
 fi
 
-if [[ ! -x "${PYTHON_BIN}" ]]; then
-  fail "Missing virtualenv python at ${PYTHON_BIN}. Create it with: python3 -m venv .venv"
-fi
+echo
+echo "[1/6] Checking/fixing pip..."
+"${PYTHON}" -m ensurepip --upgrade >/dev/null 2>&1 || true
+"${PYTHON}" -m pip --version >/dev/null || fail "pip is not available"
+"${PYTHON}" -m pip install --upgrade pip wheel || echo "[WARN] Failed to upgrade pip/wheel, continuing..."
+echo "[INFO] Pinning setuptools to avoid pkg_resources issues..."
+"${PYTHON}" -m pip install --upgrade --force-reinstall setuptools==80.9.0 || fail "Failed to install setuptools==80.9.0"
+echo "[INFO] setuptools pin complete"
 
-log "1/5" "Installing Python build dependencies"
-"${PYTHON_BIN}" -m ensurepip --upgrade >/dev/null 2>&1 || true
-"${PYTHON_BIN}" -m pip install --upgrade pip wheel setuptools==80.9.0
-"${PYTHON_BIN}" -m pip install -r "${PROJECT_ROOT}/requirements.txt"
-"${PYTHON_BIN}" -m pip install pyinstaller
+echo
+echo "[2/6] Installing backend dependencies (python -m pip)..."
+"${PYTHON}" -m pip install -r "${PROJECT_ROOT}/requirements.txt" || fail "pip install -r requirements.txt failed"
+"${PYTHON}" -m pip install pyinstaller || fail "Installing pyinstaller failed"
 
-log "2/5" "Packaging Python backend with PyInstaller"
-rm -rf "${BUILD_DIR}/shanten-backend" "${BACKEND_DIST}"
-"${PYTHON_BIN}" -m PyInstaller \
+echo
+echo "[3/6] Packaging backend (PyInstaller)..."
+rm -rf "${BUILD_WORK_DIR}" "${DIST_BIN}"
+"${PYTHON}" -m PyInstaller \
   --noconfirm \
   --onefile \
   --name shanten-backend \
@@ -61,28 +74,43 @@ rm -rf "${BUILD_DIR}/shanten-backend" "${BACKEND_DIST}"
   --hidden-import pydantic \
   --collect-all backend.data.assets \
   --add-data "${PROJECT_ROOT}/proto:proto" \
-  "${BACKEND_ENTRY}"
+  "${BACKEND_ENTRY}" || fail "PyInstaller build failed"
 
-[[ -f "${BACKEND_DIST}" ]] || fail "PyInstaller did not produce ${BACKEND_DIST}"
+[[ -f "${DIST_BIN}" ]] || fail "Generated backend binary not found: ${DIST_BIN}"
+echo "Packaging complete: ${DIST_BIN}"
 
-log "3/5" "Preparing Tauri sidecar"
+echo
+echo "[4/6] Deploying sidecar to Tauri..."
 mkdir -p "${SIDECAR_DIR}"
-cp "${BACKEND_DIST}" "${SIDECAR_BIN}"
-cp "${BACKEND_DIST}" "${SIDECAR_BIN_EXE}"
+cp "${DIST_BIN}" "${SIDECAR_BIN}" || fail "Copying sidecar failed"
+cp "${DIST_BIN}" "${SIDECAR_BIN_EXE}" || fail "Copying compatibility sidecar failed"
 chmod +x "${SIDECAR_BIN}"
 chmod +x "${SIDECAR_BIN_EXE}"
+echo "Prepared: ${SIDECAR_BIN}"
 
-log "4/5" "Installing frontend dependencies and building app"
+echo
+echo "[5/6] Building frontend and Tauri..."
 pushd "${APP_DIR}" >/dev/null
 if [[ -f package-lock.json ]]; then
-  npm ci
+  npm ci || { popd >/dev/null; fail "npm ci failed"; }
 else
-  npm install
+  npm install || { popd >/dev/null; fail "npm install failed"; }
 fi
-npm run build
-npx tauri build --config "${TAURI_CONFIG}" --bundles app,dmg
+npm run build || { popd >/dev/null; fail "Frontend vite build failed"; }
+npx tauri build --config "${TAURI_CONFIG}" --bundles app,dmg || { popd >/dev/null; fail "tauri build failed"; }
 popd >/dev/null
 
-log "5/5" "Build finished"
-printf 'App bundle: %s\n' "${APP_DIR}/src-tauri/target/release/bundle/macos/Shanten Lens.app"
-printf 'DMG: %s\n' "${APP_DIR}/src-tauri/target/release/bundle/dmg/"
+echo
+echo "[6/6] Checking macOS bundle outputs..."
+[[ -d "${APP_BUNDLE}" ]] || fail "App bundle not found: ${APP_BUNDLE}"
+[[ -d "${DMG_DIR}" ]] || echo "[WARN] DMG output directory not found yet: ${DMG_DIR}"
+
+echo
+echo "==========================="
+echo " Build Finished"
+echo "==========================="
+echo "App bundle: ${APP_BUNDLE}"
+echo "DMG directory: ${DMG_DIR}"
+echo
+
+popd >/dev/null
