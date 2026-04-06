@@ -143,9 +143,14 @@ fn spawn_log_pump(
 
 struct BackendState(pub Arc<Mutex<BackendProcState>>);
 
+#[cfg(windows)]
+const BACKEND_BIN_NAME: &str = "shanten-backend.exe";
+#[cfg(not(windows))]
+const BACKEND_BIN_NAME: &str = "shanten-backend";
+
 fn resolve_backend_path(app: &AppHandle) -> Option<PathBuf> {
   if let Ok(res_dir) = app.path().resource_dir() {
-    let p = res_dir.join("bin").join("shanten-backend.exe");
+    let p = res_dir.join("bin").join(BACKEND_BIN_NAME);
     if p.exists() {
       return Some(p);
     }
@@ -153,21 +158,21 @@ fn resolve_backend_path(app: &AppHandle) -> Option<PathBuf> {
   let dev = Path::new("src-tauri")
     .join("resources")
     .join("bin")
-    .join("shanten-backend.exe");
+    .join(BACKEND_BIN_NAME);
   if dev.exists() {
     return Some(dev);
   }
-  let dev2 = Path::new("src-tauri").join("bin").join("shanten-backend.exe");
+  let dev2 = Path::new("src-tauri").join("bin").join(BACKEND_BIN_NAME);
   if dev2.exists() {
     return Some(dev2);
   }
   if let Ok(exe) = env::current_exe() {
     if let Some(dir) = exe.parent() {
-      let p = dir.join("resources").join("bin").join("shanten-backend.exe");
+      let p = dir.join("resources").join("bin").join(BACKEND_BIN_NAME);
       if p.exists() {
         return Some(p);
       }
-      let p2 = dir.join("bin").join("shanten-backend.exe");
+      let p2 = dir.join("bin").join(BACKEND_BIN_NAME);
       if p2.exists() {
         return Some(p2);
       }
