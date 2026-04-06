@@ -15,8 +15,8 @@ from loguru import logger
 RED_MAP = {"0m": "5m", "0p": "5p", "0s": "5s"}
 ALL_TILES = [f"{n}{s}" for s in "mps" for n in range(1, 10)] + [f"{n}z" for n in range(1, 8)]
 TILE_INDEX = {tile: idx for idx, tile in enumerate(ALL_TILES)}
-ABSTRACT_COMPONENT_LIMIT = 2
-QUAD_REPRESENTATIVE_LIMIT = 2
+ABSTRACT_COMPONENT_LIMIT = 0
+QUAD_REPRESENTATIVE_LIMIT = 0
 _ACTIVE_EXECUTORS: set[ProcessPoolExecutor] = set()
 _ACTIVE_EXECUTORS_LOCK = threading.Lock()
 
@@ -94,6 +94,8 @@ def _component_sort_prefix(item: dict) -> tuple:
 
 
 def _trim_components(result: List[dict], abstract_key_fn: Callable[[dict], tuple], limit: int = ABSTRACT_COMPONENT_LIMIT) -> List[dict]:
+    if limit <= 0:
+        return sorted(result, key=_component_sort_prefix)
     grouped: Dict[tuple, List[dict]] = defaultdict(list)
     for item in result:
         grouped[abstract_key_fn(item)].append(item)
@@ -266,8 +268,8 @@ def _non_souzu_pair_wait_shape_reason(hand7: Sequence[str]) -> Optional[str]:
             if not face_b.endswith("s") or not face_c.endswith("s"):
                 shape = "".join(sorted(leftover, key=lambda tile: TILE_INDEX[tile]))
                 return (
-                    f"鍘绘潬鍚?寮犲憟鐜?1 闈㈠瓙 + 2 瀵瑰瓙褰紝涓斿瀛愬惈闈炴潯瀛? "
-                    f"闈㈠瓙={shape}, 瀵瑰瓙={face_b}/{face_c}"
+                    f"去掉双杠后的 7 张手牌呈现 1 面子 + 2 对子形，且对子含非索子。"
+                    f"面子={shape}, 对子={face_b}/{face_c}"
                 )
     return None
 
@@ -332,7 +334,10 @@ def _enumerate_quads(pool: Sequence[PoolEntry], by_id: Dict[int, PoolEntry]) -> 
                 "time_key": _quad_time(ids4, by_id),
             })
         face_quads.sort(key=lambda item: (item["time_key"], item["ids"]))
-        quads.extend(face_quads[:QUAD_REPRESENTATIVE_LIMIT])
+        if QUAD_REPRESENTATIVE_LIMIT > 0:
+            quads.extend(face_quads[:QUAD_REPRESENTATIVE_LIMIT])
+        else:
+            quads.extend(face_quads)
     quads.sort(key=lambda item: (item["time_key"], TILE_INDEX.get(item["face"], 99), item["ids"]))
     return quads
 
@@ -1447,7 +1452,7 @@ def _analyze_manual_searchability(
         ok2, reason2 = _manual_meld_searchable(meld2_faces)
         if not ok2:
             return False, f"面子 B 无法被搜索器按完整面子枚举: {reason2}"
-        return True, "该形状符合搜索器的“单骑雀头加两个完整面子”枚举规则"
+        return True, "该形状在结构上符合搜索器的“单骑雀头加两个完整面子”枚举规则，但不保证当前搜索一定能枚举到"
 
     short_faces = meld1_faces if short_key == "meld1" else meld2_faces
     other_faces = meld2_faces if short_key == "meld1" else meld1_faces
@@ -1459,7 +1464,7 @@ def _analyze_manual_searchability(
     if not ok_other:
         which = "面子 B" if short_key == "meld1" else "面子 A"
         return False, f"{which} 无法被搜索器按完整面子枚举: {reason_other}"
-    return True, "该形状符合搜索器的“一个完整面子加一个缺一张的面子”枚举规则"
+    return True, "该形状在结构上符合搜索器的“一个完整面子加一个缺一张的面子”枚举规则，但不保证当前搜索一定能枚举到"
 
 
 def validate_manual_souzu_switch_plan(
