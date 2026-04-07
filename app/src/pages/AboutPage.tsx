@@ -5,7 +5,7 @@ import {useTranslation, Trans} from "react-i18next";
 import AmuletCard from "../components/AmuletCard";
 import {type EffectItem} from "../lib/gamestate";
 
-export default function AboutPage() {
+export default function AboutPage({onSecretClick}: { onSecretClick: () => void }) {
     const {t} = useTranslation();
 
     const amulet225: EffectItem = {id: 2250, uid: 0, volume: 1, store: [], tags: []};
@@ -13,7 +13,7 @@ export default function AboutPage() {
 
     return (
         <div className={styles.wrap}>
-            <h1>{t("app.title")} <span className={styles.sub}>{t("app.subtitle")}</span></h1>
+            <h1 className={styles.secretTitle} onClick={onSecretClick}>{t("app.title")} <span className={styles.sub}>{t("app.subtitle")}</span></h1>
 
             <div className={styles.meta}>
                 <span className={styles.author}>{t("app.author")}</span>

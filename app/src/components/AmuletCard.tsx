@@ -17,6 +17,7 @@ function pad4(n: number) {
 
 export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; scale?: number }) {
     const reg = getRegistry();
+    const currentTheme = typeof document !== "undefined" ? document.documentElement.getAttribute("data-theme") : null;
 
     const rawId = item.id;
     const plus = rawId % 10 === 1;
@@ -27,7 +28,11 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
     const bad = amu && item.badge ? reg.badgeById.get(item.badge.id) || null : null;
 
     let bgIndex = 4;
-    if (amu && amu.rarity && RAR_BG_INDEX[amu.rarity]) bgIndex = RAR_BG_INDEX[amu.rarity];
+    if (currentTheme === "dark-purple") {
+        bgIndex = 1;
+    } else if (amu && amu.rarity && RAR_BG_INDEX[amu.rarity]) {
+        bgIndex = RAR_BG_INDEX[amu.rarity];
+    }
 
     const isWide = item.volume === 2;
     const bgPath = isWide ? `/assets/amulet/fu_widen_bg${bgIndex}.jpg` : `/assets/amulet/fu_bg${bgIndex}.jpg`;

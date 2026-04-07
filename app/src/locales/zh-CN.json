@@ -7,7 +7,12 @@
       "auto": "默认",
       "dark": "暗色",
       "dark-green": "绿",
+      "dark-purple": "神秘版",
       "toggle": "切换主题（当前：{{name}}）"
+    },
+    "hidden_theme": {
+      "title": "恭喜你解锁了隐藏版向听镜",
+      "message": "向听镜已帮你把所有护身符升级到顶级。"
     }
   },
   "window": {

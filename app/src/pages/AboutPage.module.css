@@ -18,6 +18,10 @@ h1 {
     gap: 8px;
 }
 
+.secretTitle {
+    cursor: pointer;
+}
+
 .sub {
     font-size: 14px;
     color: var(--muted);

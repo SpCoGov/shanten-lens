@@ -88,6 +88,7 @@ input, textarea, select, code, pre, .selectable {
     line-height: 1.2;
     user-select: none;
     margin: 0;
+    cursor: pointer;
 }
 
 .app-header {
@@ -734,6 +735,10 @@ input, textarea, select, code, pre, .selectable {
 }
 
 :root[data-theme="dark-green"] {
+    color-scheme: dark;
+}
+
+:root[data-theme="dark-purple"] {
     color-scheme: dark;
 }
 

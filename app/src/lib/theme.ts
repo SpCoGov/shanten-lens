@@ -1,9 +1,9 @@
-export type ThemeMode = "auto" | "dark" | "dark-green";
+export type ThemeMode = "auto" | "dark" | "dark-green" | "dark-purple";
 const THEME_KEY = "sl-theme";
 
 export function readTheme(): ThemeMode {
     const saved = localStorage.getItem(THEME_KEY) as ThemeMode | null;
-    if (saved === "auto" || saved === "dark" || saved === "dark-green") return saved;
+    if (saved === "auto" || saved === "dark" || saved === "dark-green" || saved === "dark-purple") return saved;
     return "auto";
 }
 

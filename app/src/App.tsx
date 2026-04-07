@@ -91,7 +91,7 @@ const MAIN_GAP = 12;
 
 const appWindow = getCurrentWindow();
 
-function Topbar() {
+function Topbar({onSecretClick}: { onSecretClick: () => void }) {
     const {t} = useTranslation();
     const onMin = async () => {
         try {
@@ -118,7 +118,7 @@ function Topbar() {
     return (
         <header className="topbar">
             <div className="drag" data-tauri-drag-region>
-                <span className="title">{t("app.title")}</span>
+                <span className="title" onClick={onSecretClick}>{t("app.title")}</span>
             </div>
 
             <div className="win" data-tauri-drag-region="false">
@@ -172,9 +172,12 @@ export default function App() {
     const [goods, setGoods] = React.useState<GoodsItem[]>([]);
     const [candidates, setCandidates] = React.useState<CandidateEffectRef[]>([]);
 
-    type ThemeMode = "auto" | "dark" | "dark-green";
+    type ThemeMode = "auto" | "dark" | "dark-green" | "dark-purple";
     const THEME_ORDER: ThemeMode[] = ["auto", "dark", "dark-green"];
     const THEME_KEY = "sl-theme";
+    const HIDDEN_THEME_CHANCE = 0.001;
+    const hiddenThemeClicksRef = React.useRef(0);
+    const hiddenThemeClickTimerRef = React.useRef<number | null>(null);
 
     function applyTheme(t: ThemeMode) {
         const root = document.documentElement;
@@ -189,14 +192,14 @@ export default function App() {
             return;
         }
 
-        if (t === "dark" || t === "dark-green") {
+        if (t === "dark" || t === "dark-green" || t === "dark-purple") {
             root.setAttribute("data-theme", t);
         }
     }
 
     const [theme, setTheme] = React.useState<ThemeMode>(() => {
         const saved = localStorage.getItem(THEME_KEY) as ThemeMode | null;
-        if (saved === "auto" || saved === "dark" || saved === "dark-green") {
+        if (saved === "auto" || saved === "dark" || saved === "dark-green" || saved === "dark-purple") {
             return saved;
         }
         if (saved === "dark") return "dark";
@@ -208,6 +211,52 @@ export default function App() {
         localStorage.setItem(THEME_KEY, theme);
     }, [theme]);
 
+    const activateHiddenTheme = React.useCallback(() => {
+        if (theme === "dark-purple") return;
+        localStorage.setItem(THEME_KEY, "dark-purple");
+        setTheme("dark-purple");
+        void openMsgBoxWindow({
+            id: `hidden-theme-${Date.now()}`,
+            title: "app.hidden_theme.title",
+            message: "app.hidden_theme.message",
+            okText: "common.ok",
+            cancelText: undefined,
+        });
+    }, [theme]);
+
+    React.useEffect(() => {
+        if (Math.random() >= HIDDEN_THEME_CHANCE) return;
+        activateHiddenTheme();
+    }, [activateHiddenTheme]);
+
+    React.useEffect(() => {
+        return () => {
+            if (hiddenThemeClickTimerRef.current != null) {
+                window.clearTimeout(hiddenThemeClickTimerRef.current);
+            }
+        };
+    }, []);
+
+    const onSecretClick = React.useCallback(() => {
+        hiddenThemeClicksRef.current += 1;
+        if (hiddenThemeClickTimerRef.current != null) {
+            window.clearTimeout(hiddenThemeClickTimerRef.current);
+        }
+        hiddenThemeClickTimerRef.current = window.setTimeout(() => {
+            hiddenThemeClicksRef.current = 0;
+            hiddenThemeClickTimerRef.current = null;
+        }, 1600);
+
+        if (hiddenThemeClicksRef.current < 5) return;
+
+        hiddenThemeClicksRef.current = 0;
+        if (hiddenThemeClickTimerRef.current != null) {
+            window.clearTimeout(hiddenThemeClickTimerRef.current);
+            hiddenThemeClickTimerRef.current = null;
+        }
+        activateHiddenTheme();
+    }, [activateHiddenTheme]);
+
     const themeIcon = (() => {
         switch (theme) {
             case "auto":
@@ -216,6 +265,8 @@ export default function App() {
                 return "dark_mode";
             case "dark-green":
                 return "forest";
+            case "dark-purple":
+                return "auto_awesome";
             default:
                 return "light_mode";
         }
@@ -227,6 +278,7 @@ export default function App() {
 
     const nextTheme = React.useCallback((t: ThemeMode): ThemeMode => {
         const i = THEME_ORDER.indexOf(t);
+        if (i < 0) return THEME_ORDER[0];
         return THEME_ORDER[(i + 1) % THEME_ORDER.length];
     }, []);
 
@@ -463,7 +515,7 @@ export default function App() {
         <div className="app">
             <div className={`toast ${toastVisible ? "visible" : ""} ${toast?.kind || "info"}`}>{toast?.msg}</div>
 
-            <Topbar/>
+            <Topbar onSecretClick={onSecretClick}/>
 
             <div className="shell">
                 <aside className="sidebar">
@@ -603,7 +655,7 @@ export default function App() {
                         {route === "autorun" && <AutoRunnerPage/>}
                         {route === "settings" && <SettingsPage/>}
                         {route === "diagnostics" && <DiagnosticsPage/>}
-                        {route === "about" && <AboutPage/>}
+                        {route === "about" && <AboutPage onSecretClick={onSecretClick}/>}
                     </div>
                 </main>
             </div>

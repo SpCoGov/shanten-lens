@@ -296,3 +296,102 @@
     --sold-pill-bg: color-mix(in srgb, var(--state-ok) 88%, transparent);
     --sold-pill-border: color-mix(in srgb, var(--state-ok) 55%, transparent);
 }
+
+:root[data-theme="dark-purple"] {
+    --color-bg: #110d18;
+    --color-text: #efe7fb;
+    --color-muted: #b3a4cc;
+    --color-hint: #8f81ab;
+
+    --color-border: #372a4f;
+    --color-cutline: #1c1428;
+    --color-divider: #241935;
+
+    --color-ring: #a855f7;
+    --accent-blue: #c084fc;
+    --accent-green: #a855f7;
+    --link-fg: #d8b4fe;
+
+    --panel-bg: #171022;
+    --panel-border: 1px solid var(--color-border);
+    --panel-shadow: 0 2px 12px rgba(46, 16, 76, .46);
+
+    --list-item-bg: #150f20;
+    --list-item-hover: #1b1328;
+
+    --badge-ok-fg: #d9c2ff;
+    --badge-ok-bg: #221334;
+    --badge-ok-border: #5d3a8c;
+    --badge-down-fg: #fecaca;
+    --badge-down-bg: #30151f;
+    --badge-down-border: #6b2538;
+
+    --tilecard-bg: #120d1b;
+    --tilecard-fg: #e8def7;
+    --tilecard-border: rgba(255, 255, 255, .08);
+    --tilecard-shadow: 0 6px 20px rgba(8, 0, 20, .62);
+
+    --overlay-scrim: rgba(9, 4, 18, .60);
+    --elev-bg: #15101f;
+    --elev-shadow: 0 12px 40px rgba(33, 10, 58, .62);
+
+    --scrollbar-thumb: rgba(168, 85, 247, .32);
+    --scrollbar-thumb-alt: rgba(192, 132, 252, .48);
+
+    --log-bg: #100b18;
+    --log-fg: #ddd2f1;
+
+    --hover-bg: #20172f;
+    --input-border: #4c3a69;
+    --input-disabled-bg: #1a1327;
+
+    --input-bg: #140f1f;
+    --input-hover-bg: #191225;
+    --input-active-bg: #110c1a;
+    --input-hover-border: #6a4d96;
+    --input-focus-ring: 0 0 0 3px rgba(168, 85, 247, .28);
+    --input-selected-bg: #231735;
+    --input-selected-fg: var(--color-text);
+
+    --toast-info-border: #45355d;
+    --toast-success-border: #a855f7;
+    --toast-error-border: #fb7185;
+
+    --notice-border: #8a63d2;
+    --notice-bg: #211432;
+    --notice-fg: #e9ddff;
+
+    --danger-weak-bg: #30151f;
+    --danger-weak-border: #6b2538;
+
+    --state-ok: #c084fc;
+    --state-warn: #f59e0b;
+    --state-down: #fb7185;
+    --state-muted: #85759f;
+
+    --btn-bg: var(--list-item-bg);
+    --btn-hover-bg: var(--list-item-hover);
+    --btn-border: var(--input-border);
+
+    --text: var(--color-text);
+    --muted: var(--color-muted);
+    --border: var(--color-border);
+    --panel: var(--panel-bg);
+    --link: var(--link-fg, var(--accent-blue));
+
+    --tile-bg: #181122;
+    --tile-shadow: 0 1px 3px rgba(0, 0, 0, .60);
+    --tile-outline: 2px solid color-mix(in srgb, var(--color-ring) 80%, transparent);
+    --tile-dim-scrim: rgba(0, 0, 0, .45);
+
+    --on-strong: #ffffff;
+
+    --glass-bg: color-mix(in srgb, var(--panel) 80%, transparent);
+    --shadow-sm: 0 2px 8px rgba(33, 10, 58, .36);
+    --shadow-md: 0 2px 10px rgba(33, 10, 58, .46);
+    --shadow-text: 0 1px 1px rgba(0, 0, 0, .50);
+
+    --sold-scrim: color-mix(in srgb, var(--state-ok) 38%, transparent);
+    --sold-pill-bg: color-mix(in srgb, var(--state-ok) 88%, transparent);
+    --sold-pill-border: color-mix(in srgb, var(--state-ok) 55%, transparent);
+}
