@@ -17,6 +17,7 @@ ALL_TILES = [f"{n}{s}" for s in "mps" for n in range(1, 10)] + [f"{n}z" for n in
 TILE_INDEX = {tile: idx for idx, tile in enumerate(ALL_TILES)}
 ABSTRACT_COMPONENT_LIMIT = 0
 QUAD_REPRESENTATIVE_LIMIT = 0
+PARALLEL_WORKER_CAP = 8
 _ACTIVE_EXECUTORS: set[ProcessPoolExecutor] = set()
 _ACTIVE_EXECUTORS_LOCK = threading.Lock()
 
@@ -1723,6 +1724,7 @@ def _search_remaining_plan(
         best_draws_limit: Optional[int] = None,
         stop_after_first: bool = False,
         skip_signatures: Optional[Set[str]] = None,
+        win_candidates: Optional[Sequence[str]] = None,
 ) -> Optional[dict]:
     quad_orders = {by_id[tile_id].order for tile_id in quad_pair["quad_ids"]}
     seen_candidate_signatures: Set[tuple[int, tuple[int, ...]]] = set()
@@ -1791,7 +1793,7 @@ def _search_remaining_plan(
         win_component_cache[key] = built
         return built
 
-    win_candidates = [f"{n}s" for n in range(1, 10)]
+    win_candidates = list(win_candidates) if win_candidates is not None else [f"{n}s" for n in range(1, 10)]
 
     emit_progress(
         "开始搜索听牌方案\n"
@@ -2466,6 +2468,61 @@ def _search_quad_pair_worker(
     }
 
 
+def _search_quad_pair_wait_worker(
+        pool: Sequence[PoolEntry],
+        by_id: Dict[int, PoolEntry],
+        quad_pair: dict,
+        deck_map: Dict[int, str],
+        hand_ids: Sequence[int],
+        replacement_ids: Sequence[int],
+        remaining_changes: int,
+        per_change_limit: int,
+        best_draws_limit: Optional[int],
+        stop_after_first: bool,
+        skip_signatures: Optional[Set[str]],
+        wait_face: str,
+) -> dict:
+    stats = {
+        "dfs_nodes": 0,
+        "branch_attempts": 0,
+        "candidate_hands": 0,
+        "reachability_checks": 0,
+        "duplicate_prunes": 0,
+        "state_cache_hits": 0,
+        "target13_prunes": 0,
+        "nonwall_prunes": 0,
+        "reachability_upper_prunes": 0,
+        "speed_prunes": 0,
+        "last_node_souzu_prunes": 0,
+    }
+    plan = _search_remaining_plan(
+        pool,
+        by_id,
+        quad_pair,
+        deck_map,
+        hand_ids,
+        replacement_ids,
+        remaining_changes,
+        per_change_limit,
+        stats,
+        lambda *_args, **_kwargs: None,
+        None,
+        lambda: False,
+        best_draws_limit,
+        stop_after_first,
+        skip_signatures,
+        [wait_face],
+    )
+    if plan is not None:
+        plan["quad_faces"] = list(quad_pair["faces"])
+    return {
+        "quad_pair": quad_pair,
+        "wait_face": wait_face,
+        "plan": plan,
+        "stats": stats,
+    }
+
+
 def _register_active_executor(executor: ProcessPoolExecutor) -> None:
     with _ACTIVE_EXECUTORS_LOCK:
         _ACTIVE_EXECUTORS.add(executor)
@@ -2755,15 +2812,31 @@ def recommend_souzu_tenpai_switch(
     best_plan: Optional[dict] = None
     best_draws_limit: Optional[int] = None
     parallel_ok = len(quad_pairs) >= 2 and cpu_count > 1
+    wait_parallel_ok = len(quad_pairs) == 1 and cpu_count > 1
     if len(quad_pairs) < 2:
         parallel_disabled_reason = "候选双杠不足，至少需要 2 组候选双杠才会启用并行搜索"
     elif cpu_count <= 1:
         parallel_disabled_reason = f"os.cpu_count() 返回 {cpu_count}，未达到并行搜索所需的最小值 2"
-    if parallel_ok:
+    if parallel_ok or wait_parallel_ok:
         parallel_attempted = True
-        max_workers = max(1, min(len(quad_pairs), max(1, cpu_count - 1), 4))
+        wait_faces = [f"{n}s" for n in range(1, 10)]
+        branch_jobs = [
+            (quad_index, quad_pair, wait_face)
+            for quad_index, quad_pair in enumerate(quad_pairs)
+            for wait_face in wait_faces
+        ]
+        max_workers = max(1, min(len(branch_jobs), max(1, cpu_count - 1), PARALLEL_WORKER_CAP))
         completed = 0
-        parallel_info = {"mode": "process", "enabled": True, "max_workers": max_workers, "total_jobs": len(quad_pairs), "completed_jobs": 0}
+        parallel_info = {
+            "mode": "process-quad-wait",
+            "enabled": True,
+            "max_workers": max_workers,
+            "total_jobs": len(branch_jobs),
+            "completed_jobs": 0,
+            "quad_pair_count": len(quad_pairs),
+            "parallel_ok": parallel_ok,
+            "wait_parallel_ok": wait_parallel_ok,
+        }
         worker_states = [
             {
                 "worker_id": idx + 1,
@@ -2771,6 +2844,7 @@ def recommend_souzu_tenpai_switch(
                 "status": "idle",
                 "current_quad_index": None,
                 "current_quad_label": "",
+                "current_wait_face": None,
                 "completed_jobs": 0,
                 "last_result": "",
                 "last_draws_needed": None,
@@ -2779,29 +2853,32 @@ def recommend_souzu_tenpai_switch(
             for idx in range(max_workers)
         ]
         emit_telemetry()
-        emit_progress(f"正在并行验证双杠组合\n候选数: {len(quad_pairs)}\n并行进程数: {max_workers}", force=True)
+        emit_progress(
+            f"正在并行验证双杠与听牌分支\n双杠候选数: {len(quad_pairs)}\n听牌分支数: {len(wait_faces)}\n并行进程数: {max_workers}",
+            force=True,
+        )
         executor: Optional[ProcessPoolExecutor] = None
         try:
             executor = ProcessPoolExecutor(max_workers=max_workers, initializer=_init_search_worker)
             _register_active_executor(executor)
-            future_map: Dict[Any, tuple[int, int, dict]] = {}
-            next_quad_index = 0
+            future_map: Dict[Any, tuple[int, int, dict, str]] = {}
+            next_job_index = 0
 
             def submit_one(worker_slot: int) -> bool:
-                nonlocal next_quad_index
-                if next_quad_index >= len(quad_pairs):
+                nonlocal next_job_index
+                if next_job_index >= len(branch_jobs):
                     return False
-                quad_index = next_quad_index
-                quad_pair = quad_pairs[quad_index]
-                next_quad_index += 1
+                quad_index, quad_pair, wait_face = branch_jobs[next_job_index]
+                next_job_index += 1
                 worker_states[worker_slot].update({
                     "status": "running",
                     "current_quad_index": quad_index + 1,
                     "current_quad_label": _worker_quad_label(quad_pair, by_id),
+                    "current_wait_face": wait_face,
                     "started_at": time.monotonic(),
                 })
                 future = executor.submit(
-                    _search_quad_pair_worker,
+                    _search_quad_pair_wait_worker,
                     pool,
                     by_id,
                     quad_pair,
@@ -2813,8 +2890,9 @@ def recommend_souzu_tenpai_switch(
                     best_draws_limit,
                     stop_after_first,
                     set(skip_signatures or []),
+                    wait_face,
                 )
-                future_map[future] = (worker_slot, quad_index, quad_pair)
+                future_map[future] = (worker_slot, quad_index, quad_pair, wait_face)
                 return True
 
             for worker_slot in range(max_workers):
@@ -2845,14 +2923,14 @@ def recommend_souzu_tenpai_switch(
                 for future in done:
                     result = future.result()
                     completed += 1
-                    worker_slot, quad_index, quad_pair = future_map.pop(future)
+                    worker_slot, quad_index, quad_pair, wait_face = future_map.pop(future)
                     worker = worker_states[worker_slot]
                     worker["completed_jobs"] = int(worker.get("completed_jobs", 0)) + 1
                     worker["status"] = "completed"
-                    worker["last_result"] = "found-plan" if result.get("plan") is not None else "no-plan"
+                    worker["last_result"] = "found-plan" if result.get("plan") is not None else f"no-plan:{wait_face}"
                     worker["last_draws_needed"] = result.get("plan", {}).get("draws_needed") if result.get("plan") is not None else None
                     worker_stats = result.get("stats") or {}
-                    stats["current_quad_pair"] = completed
+                    stats["current_quad_pair"] = quad_index + 1
                     parallel_info["completed_jobs"] = completed
                     for key in (
                             "dfs_nodes",
@@ -2864,14 +2942,17 @@ def recommend_souzu_tenpai_switch(
                             "target13_prunes",
                             "nonwall_prunes",
                             "reachability_upper_prunes",
+                            "speed_prunes",
+                            "last_node_souzu_prunes",
                     ):
                         stats[key] += int(worker_stats.get(key, 0) or 0)
-                    stats["latest_result"] = f"已完成双杠 {completed}/{len(quad_pairs)}"
+                    stats["latest_result"] = f"已完成分支 {completed}/{len(branch_jobs)}"
                     emit_progress(
-                        "并行验证双杠组合\n"
-                        f"已完成: {completed}/{len(quad_pairs)}\n"
+                        "并行验证双杠与听牌分支\n"
+                        f"已完成: {completed}/{len(branch_jobs)}\n"
                         f"当前双杠1: {_quad_label(quad_pair['quad_ids'][:4], by_id)}\n"
-                        f"当前双杠2: {_quad_label(quad_pair['quad_ids'][4:], by_id)}",
+                        f"当前双杠2: {_quad_label(quad_pair['quad_ids'][4:], by_id)}\n"
+                        f"刚完成听牌: {wait_face}",
                         force=True,
                     )
                     emit_telemetry()
@@ -2909,9 +2990,11 @@ def recommend_souzu_tenpai_switch(
                             best_plan["debug_pool"] = debug_pool
                             best_plan["runtime"] = get_active_search_runtime_snapshot(searching=False)
                             return best_plan
-                    worker["status"] = "idle" if next_quad_index < len(quad_pairs) else "done"
-                    worker["current_quad_index"] = None
-                    worker["current_quad_label"] = ""
+                    worker["status"] = "idle" if next_job_index < len(branch_jobs) else "done"
+                    if worker["status"] == "done":
+                        worker["current_quad_index"] = None
+                        worker["current_quad_label"] = ""
+                    worker["current_wait_face"] = None
                     worker["started_at"] = None
                     submit_one(worker_slot)
                     pending = set(future_map.keys())
@@ -2965,6 +3048,198 @@ def recommend_souzu_tenpai_switch(
             if executor is not None:
                 _unregister_active_executor(executor)
 
+    if wait_parallel_ok and not parallel_attempted:
+        quad_pair = quad_pairs[0]
+        wait_faces = [f"{n}s" for n in range(1, 10)]
+        max_workers = max(1, min(len(wait_faces), max(1, cpu_count - 1), PARALLEL_WORKER_CAP))
+        parallel_attempted = True
+        parallel_info = {
+            "mode": "process-wait-face",
+            "enabled": True,
+            "max_workers": max_workers,
+            "total_jobs": len(wait_faces),
+            "completed_jobs": 0,
+            "cpu_count": cpu_count,
+            "quad_pair_count": len(quad_pairs),
+            "parallel_ok": parallel_ok,
+            "wait_parallel_ok": wait_parallel_ok,
+            "quad_label": _worker_quad_label(quad_pair, by_id),
+        }
+        worker_states = [{
+            "worker_id": idx + 1,
+            "kind": "process",
+            "status": "idle",
+            "current_quad_index": 1,
+            "current_quad_label": _worker_quad_label(quad_pair, by_id),
+            "current_wait_face": None,
+            "completed_jobs": 0,
+            "last_result": "",
+            "last_draws_needed": None,
+            "started_at": None,
+        } for idx in range(max_workers)]
+        emit_telemetry()
+        emit_progress(
+            f"正在并行验证单组双杠的听牌分支\n当前双杠: {_worker_quad_label(quad_pair, by_id)}\n并行进程数: {max_workers}",
+            force=True,
+        )
+        executor: Optional[ProcessPoolExecutor] = None
+        try:
+            executor = ProcessPoolExecutor(max_workers=max_workers, initializer=_init_search_worker)
+            _register_active_executor(executor)
+            future_map: Dict[Any, tuple[int, str]] = {}
+            next_wait_index = 0
+
+            def submit_wait(worker_slot: int) -> bool:
+                nonlocal next_wait_index
+                if next_wait_index >= len(wait_faces):
+                    return False
+                wait_face = wait_faces[next_wait_index]
+                next_wait_index += 1
+                worker_states[worker_slot].update({
+                    "status": "running",
+                    "current_wait_face": wait_face,
+                    "started_at": time.monotonic(),
+                })
+                future = executor.submit(
+                    _search_quad_pair_wait_worker,
+                    pool,
+                    by_id,
+                    quad_pair,
+                    deck_map,
+                    hand_ids,
+                    remaining_replacements,
+                    remaining_changes,
+                    per_change_limit,
+                    best_draws_limit,
+                    stop_after_first,
+                    set(skip_signatures or []),
+                    wait_face,
+                )
+                future_map[future] = (worker_slot, wait_face)
+                return True
+
+            for worker_slot in range(max_workers):
+                if not submit_wait(worker_slot):
+                    break
+            emit_telemetry()
+            pending = set(future_map.keys())
+            completed = 0
+            while pending:
+                if stop_requested():
+                    _terminate_executor_processes(executor)
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    for worker in worker_states:
+                        if worker["status"] == "running":
+                            worker["status"] = "stopped"
+                    parallel_info["completed_jobs"] = completed
+                    emit_telemetry()
+                    return {
+                        "status": "impossible",
+                        "reason": "stopped-by-user",
+                        "remaining_changes": remaining_changes,
+                        "debug_pool": debug_pool,
+                        "runtime": get_active_search_runtime_snapshot(searching=False),
+                    }
+                done, pending = wait(pending, timeout=0.1, return_when=FIRST_COMPLETED)
+                if not done:
+                    emit_telemetry()
+                    continue
+                for future in done:
+                    result = future.result()
+                    completed += 1
+                    worker_slot, wait_face = future_map.pop(future)
+                    worker = worker_states[worker_slot]
+                    worker["completed_jobs"] = int(worker.get("completed_jobs", 0)) + 1
+                    worker["status"] = "completed"
+                    worker["last_result"] = "found-plan" if result.get("plan") is not None else f"no-plan:{wait_face}"
+                    worker["last_draws_needed"] = result.get("plan", {}).get("draws_needed") if result.get("plan") is not None else None
+                    worker_stats = result.get("stats") or {}
+                    parallel_info["completed_jobs"] = completed
+                    for key in (
+                            "dfs_nodes",
+                            "branch_attempts",
+                            "candidate_hands",
+                            "reachability_checks",
+                            "duplicate_prunes",
+                            "state_cache_hits",
+                            "target13_prunes",
+                            "nonwall_prunes",
+                            "reachability_upper_prunes",
+                            "speed_prunes",
+                            "last_node_souzu_prunes",
+                    ):
+                        stats[key] += int(worker_stats.get(key, 0) or 0)
+                    stats["latest_result"] = f"已完成听牌分支 {completed}/{len(wait_faces)}"
+                    emit_progress(
+                        "并行验证单组双杠的听牌分支\n"
+                        f"已完成: {completed}/{len(wait_faces)}\n"
+                        f"当前双杠: {_worker_quad_label(quad_pair, by_id)}\n"
+                        f"刚完成听牌: {wait_face}",
+                        force=True,
+                    )
+                    emit_telemetry()
+                    plan = result.get("plan")
+                    if plan is not None:
+                        if best_plan is None or plan["draws_needed"] < best_plan["draws_needed"]:
+                            best_plan = plan
+                            best_draws_limit = plan["draws_needed"]
+                            stats["latest_result"] = f"已更新当前最优方案，需要摸 {best_draws_limit}"
+                            if candidate_cb is not None:
+                                candidate_cb(plan)
+                            emit_progress("已更新当前最优方案", force=True)
+                            emit_telemetry()
+                        if stop_after_first or (best_draws_limit is not None and best_draws_limit <= 1):
+                            _terminate_executor_processes(executor)
+                            executor.shutdown(wait=False, cancel_futures=True)
+                            for item in worker_states:
+                                if item["status"] == "running":
+                                    item["status"] = "stopped"
+                            parallel_info["completed_jobs"] = completed
+                            best_plan["worker_states"] = [{k: v for k, v in item.items() if k != "started_at"} for item in worker_states]
+                            best_plan["parallel_info"] = parallel_info
+                            best_plan["debug_pool"] = debug_pool
+                            best_plan["runtime"] = get_active_search_runtime_snapshot(searching=False)
+                            return best_plan
+                    worker["status"] = "idle" if next_wait_index < len(wait_faces) else "done"
+                    worker["current_wait_face"] = None
+                    worker["started_at"] = None
+                    submit_wait(worker_slot)
+                    pending = set(future_map.keys())
+                    emit_telemetry()
+            for item in worker_states:
+                if item["status"] not in ("stopped", "done"):
+                    item["status"] = "done"
+            if best_plan is not None:
+                parallel_info["completed_jobs"] = completed
+                best_plan["worker_states"] = [{k: v for k, v in item.items() if k != "started_at"} for item in worker_states]
+                best_plan["parallel_info"] = parallel_info
+                best_plan["debug_pool"] = debug_pool
+                best_plan["runtime"] = get_active_search_runtime_snapshot(searching=False)
+                return best_plan
+            return {
+                "status": "impossible",
+                "reason": "no-reliable-plan-found",
+                "remaining_changes": remaining_changes,
+                "debug_pool": debug_pool,
+                "worker_states": [{k: v for k, v in item.items() if k != "started_at"} for item in worker_states],
+                "parallel_info": parallel_info,
+                "runtime": get_active_search_runtime_snapshot(searching=False),
+            }
+        except Exception as exc:
+            try:
+                if executor is not None:
+                    _terminate_executor_processes(executor)
+                    executor.shutdown(wait=False, cancel_futures=True)
+            except Exception:
+                pass
+            logger.exception("single quad wait-face parallel search failed")
+            parallel_start_error = str(exc)
+            parallel_fallback_reason = str(exc)
+            emit_progress(f"单组双杠并行搜索不可用，回退为单进程搜索: {exc}", force=True)
+        finally:
+            if executor is not None:
+                _unregister_active_executor(executor)
+
     parallel_info = {
         "mode": "single",
         "enabled": False,
@@ -2974,6 +3249,7 @@ def recommend_souzu_tenpai_switch(
         "cpu_count": cpu_count,
         "quad_pair_count": len(quad_pairs),
         "parallel_ok": parallel_ok,
+        "wait_parallel_ok": wait_parallel_ok,
         "attempted": parallel_attempted,
     }
     if parallel_disabled_reason:
