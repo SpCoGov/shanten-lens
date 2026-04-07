@@ -245,9 +245,7 @@
         "port": "后端端口",
         "port_desc": "后端端口",
         "mitm_port": "MITM端口",
-        "port_port": "MITM服务器端口",
-        "api_port": "接口端口",
-        "api_port_desc": "接口端口"
+        "port_port": "MITM服务器端口"
       }
     },
     "title": "设置",

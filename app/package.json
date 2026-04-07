@@ -9,8 +9,8 @@
     "preview": "vite preview",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "backend:dev-win": "cd .. && .venv\\Scripts\\python.exe -m uvicorn backend.app:app --host 127.0.0.1 --port 8787 --reload",
-    "tauri:dev-all": "concurrently -k -n UI,API -c \"auto\" \"tauri dev\" \"npm run backend:dev-win\""
+    "backend:dev-win": "cd .. && .venv\\Scripts\\python.exe backend\\run_server.py",
+    "tauri:dev-all": "concurrently -k -n UI,Backend -c \"auto\" \"tauri dev\" \"npm run backend:dev-win\""
   },
   "dependencies": {
     "@fontsource/material-symbols-rounded": "^5.2.28",

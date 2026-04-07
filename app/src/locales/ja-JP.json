@@ -245,9 +245,7 @@
         "port": "バックエンドポート",
         "port_desc": "バックエンドポート",
         "mitm_port": "MITM ポート",
-        "port_port": "MITM サーバーポート",
-        "api_port": "API ポート",
-        "api_port_desc": "API ポート"
+        "port_port": "MITM サーバーポート"
       }
     },
     "title": "設定",

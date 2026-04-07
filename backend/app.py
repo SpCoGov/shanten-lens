@@ -12,8 +12,6 @@ from pathlib import Path
 from time import monotonic
 from typing import Dict, Set, Any
 
-import uvicorn
-from fastapi import FastAPI, Query
 from loguru import logger
 from platformdirs import user_data_dir
 from watchfiles import awatch
@@ -159,9 +157,6 @@ async def _ui_services_main(host: str, ws_port: int):
     watcher_cfg = asyncio.create_task(_watch_configs())
     watcher_reg = asyncio.create_task(_watch_data_tables())
 
-    api_port = int(MANAGER.get("backend.api_port", 8788))
-    api_task = asyncio.create_task(run_http_server(host, api_port))
-
     async with serve(
             ws_handler,
             host,
@@ -176,9 +171,9 @@ async def _ui_services_main(host: str, ws_port: int):
         except asyncio.CancelledError:
             pass
         finally:
-            for t in (watcher_cfg, watcher_reg, api_task):
+            for t in (watcher_cfg, watcher_reg):
                 t.cancel()
-            await asyncio.gather(watcher_cfg, watcher_reg, api_task, return_exceptions=True)
+            await asyncio.gather(watcher_cfg, watcher_reg, return_exceptions=True)
 
 
 _UI_TASK_FUT = None
@@ -241,54 +236,6 @@ def _open_dir(path: str):
 
 recent_writes: dict[str, float] = {}
 SELF_WIN_MS = 500  # 毫秒
-
-api_app = FastAPI(title="Shanten Lens API", version="1.0.0")
-
-
-@api_app.get("/api/gamestate/record")
-def api_record():
-    return {"type": "request_gamestate", "data": GAME_STATE.record}
-
-
-@api_app.get("/api/gamestate/effect_list")
-def api_effect_list():
-    return {"type": "request_effect_list", "data": GAME_STATE.effect_list}
-
-
-@api_app.get("/api/gamestate/level")
-def api_level():
-    return {"type": "request_level", "data": GAME_STATE.level}
-
-
-@api_app.get("/api/buy")
-def api_buy(good_id: int = Query(...)):
-    try:
-        ok, reason, resp = PACKET_BOT.buy_pack(good_id)
-        return {"type": "give_up", "data": {"ok": ok, "reason": reason, "resp": resp or {}}}
-    except Exception as e:
-        logger.error(f"reload give_up failed: {e}")
-
-
-@api_app.get("/api/start")
-def api_start():
-    try:
-        return {"type": "start", "data": {"ok": PACKET_BOT.start_game()}}
-    except Exception as e:
-        logger.error(f"reload start failed: {e}")
-
-
-@api_app.get("/api/fetch_amulet_activity_data")
-def api_fetch_amulet_activity_data():
-    try:
-        return {"type": "fetch_amulet_activity_data", "data": {"ok": PACKET_BOT.fetch_amulet_activity_data(delay_sec=3)}}
-    except Exception as e:
-        logger.error(f"reload start failed: {e}")
-
-
-async def run_http_server(host: str, port: int):
-    config = uvicorn.Config(api_app, host=host, port=port, log_level="info")
-    server = uvicorn.Server(config)
-    await server.serve()
 
 
 async def ws_handler(ws: WebSocketServerProtocol):

@@ -69,9 +69,6 @@ rm -rf "${BUILD_WORK_DIR}" "${DIST_BIN}"
   --noconfirm \
   --onefile \
   --name shanten-backend \
-  --hidden-import uvicorn \
-  --hidden-import fastapi \
-  --hidden-import pydantic \
   --collect-all backend.data.assets \
   --add-data "${PROJECT_ROOT}/proto:proto" \
   "${BACKEND_ENTRY}" || fail "PyInstaller build failed"

@@ -23,7 +23,6 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         .add("host", "127.0.0.1", kind="string")
         .add("port", 8787, kind="number")
         .add("mitm_port", 10999, kind="number")
-        .add("api_port", 8788, kind="number")
     )
     mgr.add_table(
         ConfigTable("fuse", file=conf_dir / "fuse.json")
