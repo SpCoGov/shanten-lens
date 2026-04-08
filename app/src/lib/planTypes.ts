@@ -49,6 +49,7 @@ export type WorkerState = {
     status?: string;
     current_quad_index?: number | null;
     current_quad_label?: string;
+    current_wait_face?: string | null;
     completed_jobs?: number;
     last_result?: string;
     last_draws_needed?: number | null;
@@ -59,6 +60,7 @@ export type ParallelInfo = {
     mode?: string;
     enabled?: boolean;
     max_workers?: number;
+    configured_max_workers?: number;
     total_jobs?: number;
     completed_jobs?: number;
     fallback_reason?: string;
@@ -87,6 +89,8 @@ export type SearchRuntimeData = {
 export type PlanData = {
     status?: "win_now" | "plan" | "impossible" | "searching" | "catalog";
     draws_needed?: number | null;
+    search_algorithm?: string;
+    search_algorithm_label?: string;
     target14?: string[];
     target13?: string[];
     discards?: TileId[];

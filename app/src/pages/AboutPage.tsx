@@ -44,7 +44,7 @@ export default function AboutPage({onSecretClick}: { onSecretClick: () => void }
             <div className={styles.meta}>
                 <span className={styles.author}>{t("app.author")}</span>
                 <span className={styles.sep} aria-hidden>|</span>
-                <span className={styles.version}>v1.3.0</span>
+                <span className={styles.version}>v1.3.1</span>
                 <span className={styles.build}>(build&nbsp;1)</span>
             </div>
 

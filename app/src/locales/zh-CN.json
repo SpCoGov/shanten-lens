@@ -348,6 +348,9 @@
     "verbose_progress": "显示详细调试进度",
     "wall_limit": "牌山读取上限",
     "wall_limit_hint": "设为 2 时最多只读取牌山前 2 张；设为 36 时视为不限制。",
+    "search_algorithm": "搜索算法",
+    "algorithm_constraint_dfs": "约束分解深度优先搜索",
+    "algorithm_target_enum": "目标牌型枚举搜索",
     "stage_ready": "当前在换牌阶段，可以手动启动搜索。",
     "stage_not_ready": "当前不在换牌阶段，启动前会先拦下。",
     "need_switch_stage": "当前不在换牌阶段，无法启动花火指导。"

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from backend.config.manager import ConfigManager
@@ -23,6 +24,7 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         .add("host", "127.0.0.1", kind="string")
         .add("port", 8787, kind="number")
         .add("mitm_port", 10999, kind="number")
+        .add("souzu_max_parallel_workers", max(1, os.cpu_count() or 1), kind="int")
     )
     mgr.add_table(
         ConfigTable("fuse", file=conf_dir / "fuse.json")

@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
-title Shanten Lens - One-Key Build (fixed pip)
+    title Shanten Lens - One-Key Build
 
 pushd "%~dp0\.." || exit /b 1
 set "PROJECT_ROOT=%CD%"
@@ -27,112 +27,112 @@ set "SIDECAR_SRC=%APP_DIR%\src-tauri\bin\shanten-backend.exe"
 set "PORTABLE_OUT=%APP_DIR%\src-tauri\target\release\portable\%PRODUCT_NAME%"
 
 if not exist "%PYTHON%" (
-  echo [ERROR] venv Python 未找到: %PYTHON%
+  echo [ERROR] venv python not found: %PYTHON%
   popd
   exit /b 1
 )
 
 where npm >nul 2>nul || (
-  echo [ERROR] Node.js/npm 未安装或未在 PATH 中
+  echo [ERROR] Node.js/npm not found in PATH.
   popd
   exit /b 1
 )
 
 where rustc >nul 2>nul || (
-  echo [ERROR] Rust 未安装或未在 PATH 中（需要 rustup）
+  echo [ERROR] rustc not found in PATH.
   popd
   exit /b 1
 )
 
 where powershell >nul 2>nul || (
-  echo [ERROR] 需要 PowerShell（用于 ZIP）
+  echo [ERROR] powershell is required.
   popd
   exit /b 1
 )
 
 echo.
-echo [1/6] 檢查/修復 pip...
+echo [1/6] Checking pip...
 "%PYTHON%" -m ensurepip --upgrade >nul 2>nul
 "%PYTHON%" -m pip --version >nul || (
-  echo [ERROR] pip 不可用
+  echo [ERROR] pip is not available.
   popd
   exit /b 1
 )
-"%PYTHON%" -m pip install --upgrade pip wheel || echo [WARN] 升級 pip/wheel 失敗，繼續嘗試
+"%PYTHON%" -m pip install --upgrade pip wheel || echo [WARN] pip/wheel upgrade failed, continue...
 "%PYTHON%" -m pip install --upgrade --force-reinstall setuptools==80.9.0 || (
-  echo [ERROR] 安裝 setuptools==80.9.0 失敗
+  echo [ERROR] setuptools install failed.
   popd
   exit /b 1
 )
 
 echo.
-echo [2/6] 安裝後端依賴（python -m pip）...
+echo [2/6] Installing backend dependencies...
 "%PYTHON%" -m pip install -r requirements.txt || (
-  echo [ERROR] pip install 失敗
+  echo [ERROR] pip install -r requirements.txt failed.
   popd
   exit /b 1
 )
 "%PYTHON%" -m pip install pyinstaller || (
-  echo [ERROR] 安裝 pyinstaller 失敗
+  echo [ERROR] pip install pyinstaller failed.
   popd
   exit /b 1
 )
 
 echo.
-echo [3/6] 打包後端（PyInstaller）...
+echo [3/6] Building backend with PyInstaller...
 if exist "%DIST_EXE%" del /q "%DIST_EXE%" >nul 2>nul
 "%PYTHON%" -m PyInstaller --noconfirm --onefile --noconsole --name shanten-backend --collect-all backend.data.assets --add-data "proto;proto" "%BACKEND_ENTRY%" || (
-  echo [ERROR] PyInstaller 打包失敗
+  echo [ERROR] PyInstaller build failed.
   popd
   exit /b 1
 )
 if not exist "%DIST_EXE%" (
-  echo [ERROR] 未找到生成的後端 EXE: %DIST_EXE%
+  echo [ERROR] Backend exe not found: %DIST_EXE%
   popd
   exit /b 1
 )
-echo 打包完成: %DIST_EXE%
+echo Built: %DIST_EXE%
 
 echo.
-echo [4/6] 部署 sidecar 到 Tauri...
+echo [4/6] Copying sidecar to Tauri...
 if not exist "%SIDECAR_DIR%" mkdir "%SIDECAR_DIR%"
 copy /y "%DIST_EXE%" "%SIDECAR_EXE%" >nul || (
-  echo [ERROR] 複製 sidecar 失敗
+  echo [ERROR] Failed to copy sidecar.
   popd
   exit /b 1
 )
-echo 已複製: %SIDECAR_EXE%
+echo Copied: %SIDECAR_EXE%
 
 echo.
-echo [5/6] 構建前端與 Tauri...
+echo [5/6] Building frontend and Tauri...
 pushd "%APP_DIR%" || (
-  echo [ERROR] 無法進入 app 目錄
+  echo [ERROR] Cannot enter app directory.
   popd
   exit /b 1
 )
 if exist package-lock.json (
   call npm ci || (
-    echo [ERROR] npm ci 失敗
+    echo [ERROR] npm ci failed.
     popd
     popd
     exit /b 1
   )
 ) else (
   call npm install || (
-    echo [ERROR] npm install 失敗
+    echo [ERROR] npm install failed.
     popd
     popd
     exit /b 1
   )
 )
 call npm run build || (
-  echo [ERROR] 前端 vite 構建失敗
+  echo [ERROR] frontend build failed.
   popd
   popd
   exit /b 1
 )
 call npm run tauri:build || (
-  echo [ERROR] tauri 打包失敗
+  echo [ERROR] tauri build failed.
   popd
   popd
   exit /b 1
@@ -140,13 +140,13 @@ call npm run tauri:build || (
 popd
 
 echo.
-echo [6/6] 生成綠色版 ZIP...
+echo [6/6] Creating portable ZIP...
 if not exist "%RELEASE_EXE%" (
-  echo [ERROR] 未找到 release exe: %RELEASE_EXE%
+  echo [ERROR] Release exe not found: %RELEASE_EXE%
   goto :SHOWPATHS
 )
 if not exist "%SIDECAR_SRC%" (
-  echo [ERROR] 未找到 sidecar: %SIDECAR_SRC%
+  echo [ERROR] Sidecar exe not found: %SIDECAR_SRC%
   goto :SHOWPATHS
 )
 
@@ -154,11 +154,11 @@ if exist "%PORTABLE_OUT%" rmdir /s /q "%PORTABLE_OUT%"
 mkdir "%PORTABLE_OUT%\resources\bin" 2>nul
 
 copy /y "%RELEASE_EXE%" "%PORTABLE_OUT%\shanten-lens.exe" >nul || (
-  echo [ERROR] 複製主程序失敗
+  echo [ERROR] Failed to copy main exe.
   goto :SHOWPATHS
 )
 copy /y "%SIDECAR_SRC%" "%PORTABLE_OUT%\resources\bin\shanten-backend.exe" >nul || (
-  echo [ERROR] 複製 sidecar 失敗
+  echo [ERROR] Failed to copy sidecar exe.
   goto :SHOWPATHS
 )
 
@@ -168,20 +168,20 @@ if exist "%PORTABLE_ZIP%" del /q "%PORTABLE_ZIP%" >nul 2>nul
 powershell -NoProfile -Command "Compress-Archive -Path '%PORTABLE_OUT%\*' -DestinationPath '%PORTABLE_ZIP%' -Force"
 
 if exist "%PORTABLE_ZIP%" (
-  echo 已生成綠色版: %PORTABLE_ZIP%
+  echo Portable ZIP created: %PORTABLE_ZIP%
 ) else (
-  echo [WARN] PowerShell 壓縮失敗，嘗試 tar.exe...
+  echo [WARN] PowerShell zip failed. Trying tar.exe...
   where tar >nul 2>nul
   if errorlevel 1 (
-    echo [ERROR] 沒有 tar.exe，請手動用 7-Zip 壓縮: %PORTABLE_OUT%
+    echo [ERROR] tar.exe not found. Please zip manually: %PORTABLE_OUT%
   ) else (
     pushd "%PORTABLE_OUT%"
     tar.exe -a -c -f "%PORTABLE_ZIP%" *
     popd
     if exist "%PORTABLE_ZIP%" (
-      echo 已生成綠色版（tar）：%PORTABLE_ZIP%
+      echo Portable ZIP created with tar: %PORTABLE_ZIP%
     ) else (
-      echo [ERROR] ZIP 壓縮失敗（PowerShell 與 tar 均失敗）
+      echo [ERROR] ZIP creation failed ^(PowerShell and tar both failed^).
     )
   )
 )
@@ -191,8 +191,8 @@ echo.
 echo ===========================
 echo  Build Finished
 echo ===========================
-echo 綠色版目錄: "%PORTABLE_OUT%"
-echo 安裝包目錄: "%BUNDLE_DIR%"
+echo Portable dir: "%PORTABLE_OUT%"
+echo Bundle dir:   "%BUNDLE_DIR%"
 echo.
 
 popd

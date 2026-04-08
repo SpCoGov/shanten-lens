@@ -11,8 +11,15 @@ import {buildDebugSnapshotFromState} from "./SouzuSwitchDebugPage";
 const LS_AUTO_STOP = "sl-blackhole:auto-stop-first";
 const LS_VERBOSE = "sl-blackhole:verbose-progress";
 const LS_WALL_LIMIT = "sl-blackhole:wall-limit";
+const LS_SEARCH_ALGORITHM = "sl-blackhole:search-algorithm";
 const WALL_LIMIT_MIN = 2;
 const WALL_LIMIT_MAX = 36;
+const DEFAULT_SEARCH_ALGORITHM = "constraint_decomposition_dfs";
+
+function readSearchAlgorithm() {
+    const raw = localStorage.getItem(LS_SEARCH_ALGORITHM) || DEFAULT_SEARCH_ALGORITHM;
+    return raw === "target_enumeration_search" ? "target_enumeration_search" : DEFAULT_SEARCH_ALGORITHM;
+}
 
 function readBool(key: string, fallback: boolean) {
     const raw = localStorage.getItem(key);
@@ -93,6 +100,7 @@ export default function BlackHolePage({
     const [verboseProgress, setVerboseProgress] = React.useState<boolean>(() => readBool(LS_VERBOSE, false));
     const [wallLimit, setWallLimit] = React.useState<number>(() => readWallLimit());
     const [wallLimitInput, setWallLimitInput] = React.useState<string>(() => String(readWallLimit()));
+    const [searchAlgorithm, setSearchAlgorithm] = React.useState<string>(() => readSearchAlgorithm());
     const [seenSignatures, setSeenSignatures] = React.useState<string[]>([]);
     const [mainData, setMainData] = React.useState<PlanData | null>(null);
     const [quadCatalogData, setQuadCatalogData] = React.useState<PlanData | null>(null);
@@ -102,6 +110,7 @@ export default function BlackHolePage({
     React.useEffect(() => localStorage.setItem(LS_AUTO_STOP, autoStopFirst ? "1" : "0"), [autoStopFirst]);
     React.useEffect(() => localStorage.setItem(LS_VERBOSE, verboseProgress ? "1" : "0"), [verboseProgress]);
     React.useEffect(() => localStorage.setItem(LS_WALL_LIMIT, String(wallLimit)), [wallLimit]);
+    React.useEffect(() => localStorage.setItem(LS_SEARCH_ALGORITHM, searchAlgorithm), [searchAlgorithm]);
     React.useEffect(() => {
         if (!data) return;
         if ((data as any).status === "catalog") {
@@ -170,10 +179,11 @@ export default function BlackHolePage({
                     stop_after_first: opts?.stopAfterFirst ?? autoStopFirst,
                     skip_signatures: skipSignatures,
                     wall_limit: nextWallLimit,
+                    search_algorithm: searchAlgorithm,
                 },
             },
         } as any);
-    }, [autoStopFirst, canOperate, planSignature, resolveWallLimit, seenSignatures, t]);
+    }, [autoStopFirst, canOperate, planSignature, resolveWallLimit, searchAlgorithm, seenSignatures, t]);
 
     const stopSearch = React.useCallback(() => {
         ws.send({type: "souzu_switch_control", data: {action: "stop"}} as any);
@@ -190,8 +200,11 @@ export default function BlackHolePage({
         if (nextWallLimit == null) return;
         setDrawerMode("quad");
         setQuadDrawerOpen(true);
-        ws.send({type: "souzu_switch_control", data: {action: "list_quads", options: {wall_limit: nextWallLimit}}} as any);
-    }, [resolveWallLimit]);
+        ws.send({
+            type: "souzu_switch_control",
+            data: {action: "list_quads", options: {wall_limit: nextWallLimit, search_algorithm: searchAlgorithm}},
+        } as any);
+    }, [resolveWallLimit, searchAlgorithm]);
     const openConsideredTiles = React.useCallback(() => {
         setDrawerMode("considered");
         setQuadDrawerOpen(true);
@@ -298,6 +311,21 @@ export default function BlackHolePage({
                             value={wallLimitInput}
                             onChange={(e) => setWallLimitInput(e.target.value)}
                         />
+                    </label>
+                    <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
+                        <span>{t("blackhole.search_algorithm")}</span>
+                        <select
+                            className="form-input"
+                            value={searchAlgorithm}
+                            onChange={(e) => setSearchAlgorithm(e.target.value)}
+                        >
+                            <option value="constraint_decomposition_dfs">
+                                {t("blackhole.algorithm_constraint_dfs")}
+                            </option>
+                            <option value="target_enumeration_search">
+                                {t("blackhole.algorithm_target_enum")}
+                            </option>
+                        </select>
                     </label>
                 </div>
                 <div style={{marginTop: 10, color: "var(--muted)", fontSize: 13}}>
@@ -583,7 +611,7 @@ export function WorkerStatusPanel({data, runtime}: { data: PlanData; runtime?: S
                 <span className="badge">{`真实子进程: ${runtime?.process_count ?? data.runtime?.process_count ?? processes.length}`}</span>
             </div>
             <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
-                {`并行判定: CPU核心数=${parallel?.cpu_count ?? "-"}，双杠候选=${parallel?.quad_pair_count ?? "-"}，满足并行条件=${parallel?.parallel_ok ? "是" : "否"}，已尝试启动子进程=${parallel?.attempted ? "是" : "否"}`}
+                {`并行判定: CPU核心数=${parallel?.cpu_count ?? "-"}，配置上限=${parallel?.configured_max_workers ?? "-"}，双杠候选=${parallel?.quad_pair_count ?? "-"}，满足并行条件=${parallel?.parallel_ok ? "是" : "否"}，已尝试启动子进程=${parallel?.attempted ? "是" : "否"}`}
             </div>
             {disabledReason ? (
                 <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>

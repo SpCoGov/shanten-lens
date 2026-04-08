@@ -3,6 +3,7 @@ import os
 import signal
 import threading
 import traceback
+import itertools
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from concurrent.futures.process import BrokenProcessPool
 from collections import Counter, defaultdict
@@ -15,9 +16,10 @@ from loguru import logger
 RED_MAP = {"0m": "5m", "0p": "5p", "0s": "5s"}
 ALL_TILES = [f"{n}{s}" for s in "mps" for n in range(1, 10)] + [f"{n}z" for n in range(1, 8)]
 TILE_INDEX = {tile: idx for idx, tile in enumerate(ALL_TILES)}
+SEARCH_ALGO_CONSTRAINT_DFS = "constraint_decomposition_dfs"
+SEARCH_ALGO_TARGET_ENUM = "target_enumeration_search"
 ABSTRACT_COMPONENT_LIMIT = 0
 QUAD_REPRESENTATIVE_LIMIT = 0
-PARALLEL_WORKER_CAP = 8
 _ACTIVE_EXECUTORS: set[ProcessPoolExecutor] = set()
 _ACTIVE_EXECUTORS_LOCK = threading.Lock()
 
@@ -185,11 +187,8 @@ def _is_win_14(tiles: List[str]) -> bool:
 
 
 def _waits_for_hand13_faces(hand13: List[str]) -> List[str]:
-    cnt = Counter(t for t in hand13 if t != "bd")
     waits: List[str] = []
     for face in ALL_TILES:
-        if cnt[face] >= 4:
-            continue
         if _is_win_14(hand13 + [face]):
             waits.append(face)
     return waits
@@ -227,12 +226,8 @@ def _is_open_two_melds_pair_win(tiles8: List[str]) -> bool:
 def _waits_for_open_two_melds_faces(hand7: List[str], used_face_cnt: Optional[Counter[str]] = None) -> List[str]:
     if len(hand7) != 7:
         return []
-    used_face_cnt = used_face_cnt or Counter()
-    hand_cnt = Counter(t for t in hand7 if t != "bd")
     waits: List[str] = []
     for face in ALL_TILES:
-        if hand_cnt[face] + used_face_cnt[face] >= 4:
-            continue
         if _is_open_two_melds_pair_win(hand7 + [face]):
             waits.append(face)
     return waits
@@ -1158,6 +1153,430 @@ def _hand13_debug_text(faces: Sequence[str]) -> str:
     return ", ".join(faces) if faces else "-"
 
 
+def _normalize_search_algorithm(value: Optional[str]) -> str:
+    if value == SEARCH_ALGO_TARGET_ENUM:
+        return SEARCH_ALGO_TARGET_ENUM
+    return SEARCH_ALGO_CONSTRAINT_DFS
+
+
+def _tes_parse_tile(tile: str) -> tuple[int, str]:
+    return int(tile[0]), tile[1]
+
+
+def _tes_is_s(tile: str) -> bool:
+    return tile.endswith("s")
+
+
+def _tes_sort_tiles(tiles: Sequence[str]) -> List[str]:
+    suit_order = {'m': 1, 'p': 2, 's': 3, 'z': 4}
+    return sorted(tiles, key=lambda x: (suit_order.get(x[1], 99), int(x[0])))
+
+
+@lru_cache(maxsize=1)
+def _tes_patterns() -> tuple[int, ...]:
+    patterns = [0 for _ in range(21)]
+    for n in range(0, 7):
+        patterns[n] = 11123 + 11111 * n
+    for n in range(0, 7):
+        patterns[n + 7] = 12333 + 11111 * n
+    for n in range(0, 7):
+        patterns[n + 14] = 12223 + 11111 * n
+    return tuple(patterns)
+
+
+def _tes_check_fixed_structure(tiles: Sequence[str]) -> bool:
+    if len(tiles) != 7:
+        return False
+    first_five = list(tiles[:5])
+    last_two = list(tiles[5:])
+    is_five_p = all(t.endswith('p') for t in first_five)
+    is_non_p_pair = (not last_two[0].endswith('p')) and (last_two[0] == last_two[1])
+    return is_five_p and is_non_p_pair
+
+
+def _tes_remove_tiles_safe(src: Sequence[str], remove: Sequence[str]) -> Optional[List[str]]:
+    result = list(src)
+    for t in remove:
+        try:
+            result.remove(t)
+        except ValueError:
+            return None
+    return result
+
+
+def _tes_find_kongs(tiles: Sequence[str]) -> List[List[str]]:
+    c = Counter(tiles)
+    return [[t] * 4 for t, v in c.items() if v >= 4]
+
+
+def _tes_find_pairs(tiles: Sequence[str]) -> List[List[str]]:
+    c = Counter(tiles)
+    return [[t] * 2 for t, v in c.items() if v >= 2]
+
+
+def _tes_find_triplets(tiles: Sequence[str]) -> List[List[str]]:
+    c = Counter(tiles)
+    return [[t] * 3 for t, v in c.items() if v >= 3]
+
+
+def _tes_find_sequences(tiles: Sequence[str]) -> List[List[str]]:
+    data = {'m': [], 'p': [], 's': []}
+    for tile in tiles:
+        val = int(tile[0])
+        suite = tile[1]
+        if suite in data:
+            data[suite].append(val)
+    all_shunzis: List[List[str]] = []
+    for suite, vals in data.items():
+        if len(vals) < 3:
+            continue
+        unique_vals = sorted(set(vals))
+        for i in range(len(unique_vals) - 2):
+            if unique_vals[i] + 1 == unique_vals[i + 1] and unique_vals[i + 1] + 1 == unique_vals[i + 2]:
+                all_shunzis.append([
+                    f"{unique_vals[i]}{suite}",
+                    f"{unique_vals[i + 1]}{suite}",
+                    f"{unique_vals[i + 2]}{suite}",
+                ])
+    return all_shunzis
+
+
+def _tes_bamboo_combinations(tiles: Sequence[str]) -> List[tuple[str, str]]:
+    s_tiles = [t for t in tiles if t.endswith('s')]
+    unique_s = sorted(list(set(s_tiles)))
+    results: List[tuple[str, str]] = []
+    for i in range(len(unique_s) - 1):
+        current_val = int(unique_s[i][0])
+        next_val = int(unique_s[i + 1][0])
+        if next_val - current_val == 1:
+            results.append((unique_s[i], unique_s[i + 1]))
+    for i in range(len(unique_s) - 2):
+        current_val = int(unique_s[i][0])
+        next_val = int(unique_s[i + 2][0])
+        if next_val - current_val == 2:
+            results.append((unique_s[i], unique_s[i + 2]))
+    return results
+
+
+def _tes_generate_targets(all_tiles: Sequence[str]) -> List[List[str]]:
+    results: List[List[str]] = []
+    seen: Set[tuple[str, ...]] = set()
+    kongs = _tes_find_kongs(all_tiles)
+    if len(kongs) < 2:
+        return []
+    for kong_combo in combinations(kongs, 2):
+        remaining = list(all_tiles)
+        for k in kong_combo:
+            remaining = _tes_remove_tiles_safe(remaining, k)
+            if remaining is None:
+                break
+        if remaining is None:
+            continue
+        triplets = _tes_find_triplets(remaining)
+        sequences = _tes_find_sequences(remaining)
+        melds = triplets + sequences
+        pairs = _tes_find_pairs(remaining)
+        bamboo_combos = _tes_bamboo_combinations(remaining)
+
+        for m1, m2 in combinations(melds, 2):
+            temp = _tes_remove_tiles_safe(remaining, m1)
+            if temp is None:
+                continue
+            temp = _tes_remove_tiles_safe(temp, m2)
+            if temp is None:
+                continue
+            for t in temp:
+                if _tes_is_s(t):
+                    target = list(itertools.chain(*kong_combo, m1, m2, [t]))
+                    if len(target) == 15:
+                        key = tuple(sorted(target))
+                        if key not in seen:
+                            seen.add(key)
+                            results.append(target)
+
+        for m in melds:
+            temp = _tes_remove_tiles_safe(remaining, m)
+            if temp is None:
+                continue
+            for p in pairs:
+                temp2 = _tes_remove_tiles_safe(temp, p)
+                if temp2 is None:
+                    continue
+                for t in bamboo_combos:
+                    target = list(itertools.chain(*kong_combo, m, p, t))
+                    if len(target) == 15:
+                        key = tuple(sorted(target))
+                        if key not in seen:
+                            seen.add(key)
+                            results.append(target)
+
+        for p1, p2 in combinations(pairs, 2):
+            if not all(_tes_is_s(x) for x in p1 + p2):
+                continue
+            temp = _tes_remove_tiles_safe(remaining, p1)
+            if temp is None:
+                continue
+            temp = _tes_remove_tiles_safe(temp, p2)
+            if temp is None:
+                continue
+            for m in melds:
+                temp2 = _tes_remove_tiles_safe(temp, m)
+                if temp2 is None:
+                    continue
+                target = list(itertools.chain(*kong_combo, m, p1, p2))
+                if len(target) == 15:
+                    key = tuple(sorted(target))
+                    if key not in seen:
+                        seen.add(key)
+                        results.append(target)
+
+    return results
+
+
+def _tes_simulate_change(
+        hand: Sequence[str],
+        change_tiles: Sequence[str],
+        wall: Sequence[str],
+        target: Sequence[str],
+        rounds: int,
+        max_changes_once: int,
+) -> tuple[Optional[List[str]], List[dict]]:
+    hand = list(hand)
+    change_tiles = list(change_tiles)
+    wall = list(wall)
+    target_origin = list(target)
+    all_tiles = hand + change_tiles + wall
+
+    target_in_wall: List[str] = []
+    target_new = target_origin
+    for item in wall:
+        try:
+            target_new.remove(item)
+            target_in_wall.append(item)
+        except ValueError:
+            pass
+
+    if len(target_in_wall) < 2:
+        return None, []
+    all_tiles_origin = hand + change_tiles
+    all_tiles = list(all_tiles_origin)
+    while True:
+        indices_map: defaultdict[str, List[int]] = defaultdict(list)
+        for index, value in enumerate(all_tiles):
+            indices_map[value].append(index)
+
+        target_new_index: List[int] = []
+        for item in target_new:
+            if item in indices_map and indices_map[item]:
+                last_pos = indices_map[item].pop()
+                target_new_index.append(last_pos)
+            else:
+                return None, []
+
+        target_new_index.sort()
+        num_2 = 13
+        for _r in range(rounds):
+            num_1 = sum(x < num_2 for x in target_new_index)
+            num_2 = num_2 + min(13 - num_1, max_changes_once)
+        if len(all_tiles) <= num_2:
+            break
+        all_tiles = all_tiles_origin[:num_2]
+
+    num_1 = sum(x < num_2 for x in target_new_index)
+    if num_1 != len(target_new):
+        return None, []
+
+    num_2 = 13
+    num_3 = 0
+    to_replace_totle = [val for i, val in enumerate(all_tiles) if i not in target_new_index]
+    logs: List[dict] = []
+
+    for r in range(rounds):
+        num_1 = sum(x < num_2 for x in target_new_index)
+        temp = [num for num in target_new_index if num < num_2]
+        hand_old_keep = [all_tiles[i] for i in temp]
+        round_change_count = min(13 - num_1, max_changes_once)
+        hand_old_replace = to_replace_totle[num_3:num_3 + round_change_count]
+        num_3 = num_3 + round_change_count
+        new_from_change_tiles = [
+            all_tiles_origin[i]
+            for i in range(num_2, min(num_2 + round_change_count, len(all_tiles_origin)))
+        ]
+        hand = hand_old_keep + hand_old_replace[round_change_count:] + new_from_change_tiles[:]
+        keep = hand_old_keep + hand_old_replace[round_change_count:]
+        replace = hand_old_replace[:round_change_count]
+        num_2 = min(num_2 + round_change_count, len(all_tiles_origin))
+        logs.append({
+            "round": r + 1,
+            "hand": list(hand),
+            "keep": list(keep),
+            "replace": list(replace),
+        })
+
+    return hand, logs
+
+
+def _tes_check_success(final_hand: Sequence[str], wall: Sequence[str], target: Sequence[str], n: int) -> bool:
+    pool = list(final_hand) + list(wall[:n])
+    return Counter(pool) >= Counter(target)
+
+
+def _tes_map_faces_to_ids(face_sequence: Sequence[str], source_ids: Sequence[int], deck_map: Dict[int, str]) -> List[int]:
+    need = Counter(face_sequence)
+    out: List[int] = []
+    for tile_id in source_ids:
+        face = _norm(deck_map[int(tile_id)])
+        if need[face] > 0:
+            out.append(int(tile_id))
+            need[face] -= 1
+    return out
+
+
+def _tes_reconstruct_switch_ids(
+        hand_ids: Sequence[int],
+        replacement_ids: Sequence[int],
+        logs: Sequence[dict],
+        deck_map: Dict[int, str],
+) -> tuple[List[List[int]], List[List[int]]]:
+    current_hand_ids = [int(tile_id) for tile_id in hand_ids]
+    replacement_cursor = 0
+    switch_discards: List[List[int]] = []
+    switch_in: List[List[int]] = []
+    for log in logs:
+        keep_counter = Counter(log.get("keep") or [])
+        replace_count = len(log.get("replace") or [])
+        discard_ids: List[int] = []
+        kept_ids: List[int] = []
+        for tile_id in current_hand_ids:
+            face = _norm(deck_map[int(tile_id)])
+            if keep_counter[face] > 0:
+                keep_counter[face] -= 1
+                kept_ids.append(int(tile_id))
+            elif len(discard_ids) < replace_count:
+                discard_ids.append(int(tile_id))
+            else:
+                kept_ids.append(int(tile_id))
+        incoming_ids = [int(tile_id) for tile_id in replacement_ids[replacement_cursor:replacement_cursor + replace_count]]
+        replacement_cursor += replace_count
+        switch_discards.append(discard_ids)
+        switch_in.append(incoming_ids)
+        current_hand_ids = kept_ids + incoming_ids
+    return switch_discards, switch_in
+
+
+def _run_exact_target_enumeration_search(
+        deck_map: Dict[int, str],
+        hand_ids: Sequence[int],
+        replacement_ids: Sequence[int],
+        wall_ids: Sequence[int],
+        remaining_changes: int,
+        per_change_limit: int,
+        stats: dict,
+        emit_progress: Callable[[str], None],
+        emit_candidate: Optional[Callable[[dict], None]],
+        stop_requested: Callable[[], bool],
+) -> dict:
+    hand_origin = [_norm(deck_map[int(tile_id)]) for tile_id in hand_ids]
+    change_origin = [_norm(deck_map[int(tile_id)]) for tile_id in replacement_ids]
+    wall_origin = [_norm(deck_map[int(tile_id)]) for tile_id in wall_ids]
+    rounds = remaining_changes
+    max_changes_once = per_change_limit
+    total_try = max(0, len(wall_origin) - 2 + 1)
+    start_time = time.monotonic()
+
+    for idx, n in enumerate(range(2, len(wall_origin) + 1), start=1):
+        if stop_requested():
+            return {"status": "impossible", "reason": "stopped-by-user"}
+
+        stats["current_quad_pair"] = idx
+        stats["latest_result"] = f"正在枚举第 {idx}/{total_try} 个牌山前缀"
+        emit_progress(f"目标牌型枚举搜索\n当前进度: {idx}/{total_try}\n当前牌山上限: {n}", force=True)
+
+        hand = list(hand_origin)
+        change_tiles = list(change_origin)
+        wall = list(wall_origin)
+        all_tiles = hand + change_tiles + wall[:n]
+        targets = _tes_generate_targets(all_tiles)
+        stats["dfs_nodes"] += 1
+        stats["branch_attempts"] += len(targets)
+
+        for target in targets:
+            if stop_requested():
+                return {"status": "impossible", "reason": "stopped-by-user"}
+            stats["reachability_checks"] += 1
+            final_hand, logs = _tes_simulate_change(hand, change_tiles, wall[:n], target, rounds, max_changes_once)
+            if final_hand is None:
+                continue
+            if not _tes_check_success(final_hand, wall, target, n):
+                continue
+            if _tes_check_fixed_structure(target[8:]):
+                nums = [int(t[0]) for t in target[8:13]]
+                nums.sort()
+                pattern_value = nums[0] * 10000 + nums[1] * 1000 + nums[2] * 100 + nums[3] * 10 + nums[4]
+                if pattern_value in _tes_patterns():
+                    continue
+
+            waits = sorted(_waits_for_open_two_melds_faces(target[8:]), key=lambda tile: TILE_INDEX.get(tile, 99))
+            if not waits:
+                continue
+
+            last_hand_faces = list((logs[-1]["hand"] if logs else hand))
+            target_counter = Counter(target)
+            hand_counter = Counter(last_hand_faces)
+            draw_faces: List[str] = []
+            for t in wall[:n + 1]:
+                if target_counter[t] > hand_counter[t]:
+                    draw_faces.append(t)
+                    target_counter[t] -= 1
+
+            switch_discards, switch_in = _tes_reconstruct_switch_ids(hand_ids, replacement_ids, logs, deck_map)
+            switch_batch_sizes = [len(batch) for batch in switch_discards]
+            wall_draws = _tes_map_faces_to_ids(draw_faces, wall_ids[:n + 1], deck_map)
+            stats["candidate_hands"] += 1
+            stats["latest_result"] = f"找到方案: 第 {n + 1} 张听牌"
+
+            component_descs = [
+                f"初始手牌: {' '.join(_tes_sort_tiles(hand_origin))}",
+                *[
+                    (
+                        f"第{log['round']}轮 | 当前手牌: {' '.join(_tes_sort_tiles(log['hand']))} | "
+                        f"保留: {' '.join(_tes_sort_tiles(log['keep']))} | "
+                        f"替换: {' '.join(_tes_sort_tiles(log['replace']))}"
+                    )
+                    for log in logs
+                ],
+                f"需从牌河摸牌: {' '.join(draw_faces)}",
+                f"最终听牌型: {' '.join(_tes_sort_tiles(target))}",
+                f"本轮耗时: {time.monotonic() - start_time:.6f} 秒",
+            ]
+
+            plan = {
+                "status": "plan",
+                "mode": "target-enumeration-search",
+                "draws_needed": n + 1,
+                "switch_discards": switch_discards,
+                "switch_in": switch_in,
+                "switch_batch_sizes": switch_batch_sizes,
+                "wall_draws": wall_draws,
+                "post_draw_discards": [],
+                "waits": waits,
+                "quad_faces": [target[0], target[4]],
+                "target13": list(target[8:]),
+                "remaining_changes": remaining_changes,
+                "component_descs": component_descs,
+                "target14": list(target),
+                "plan_signature": f"target-enum|{n + 1}|{','.join(sorted(target))}",
+            }
+            if emit_candidate is not None:
+                emit_candidate(plan)
+            return plan
+
+    return {
+        "status": "impossible",
+        "reason": "no-reliable-plan-found",
+    }
+
+
 def _single_components(
         pool: Sequence[PoolEntry],
         blocked_orders: Set[int],
@@ -1631,7 +2050,7 @@ def _evaluate_candidate(
     waits = _waits_for_open_two_melds_faces(concealed_hand7, opened_face_cnt)
     waits = sorted(waits, key=lambda tile: TILE_INDEX[tile])
     if not waits:
-        return None, f"当前 7 张待听手牌无法形成有效听牌：{_hand13_debug_text(concealed_hand7)}"
+        return None, f"当前 7 张待听手牌无法形成听牌形：{_hand13_debug_text(concealed_hand7)}"
     if any(not face.endswith("s") for face in waits):
         return None, (
             f"存在非索子听牌：{','.join(waits)}。"
@@ -2417,6 +2836,158 @@ def _search_remaining_tenpai_plan(
     return best_plan
 
 
+def _search_remaining_target_enumeration_plan(
+        pool: Sequence[PoolEntry],
+        by_id: Dict[int, PoolEntry],
+        quad_pair: dict,
+        deck_map: Dict[int, str],
+        hand_ids: Sequence[int],
+        replacement_ids: Sequence[int],
+        remaining_changes: int,
+        per_change_limit: int,
+        stats: dict,
+        emit_candidate: Optional[Callable[[dict], None]],
+        timed_out: Callable[[], bool],
+        best_draws_limit: Optional[int] = None,
+        stop_after_first: bool = False,
+        skip_signatures: Optional[Set[str]] = None,
+) -> Optional[dict]:
+    quad_orders = {by_id[tile_id].order for tile_id in quad_pair["quad_ids"]}
+    wall_start_order = len(hand_ids) + len(replacement_ids)
+    skip_signatures = skip_signatures or set()
+    seen_candidate_signatures: Set[tuple[int, ...]] = set()
+    best_plan: Optional[dict] = None
+    local_best_draws = best_draws_limit
+
+    melds = _meld_components(pool, quad_orders, allow_replacement=True, min_order=0)
+    pairs = _pair_components(pool, quad_orders, allow_replacement=True, min_order=0)
+    singles = [
+        item for item in _single_components(pool, quad_orders, allow_replacement=True, min_order=0)
+        if str(item.get("face", "")).endswith("s")
+    ]
+    souzu_pairs = [item for item in pairs if str(item.get("face", "")).endswith("s")]
+    souzu_taatsus = [
+        item for item in _taatsu_components(pool, quad_orders, allow_replacement=True, min_order=0)
+        if item.get("kind") in ("ryanmen", "kanchan")
+        and all(_norm(deck_map[int(tile_id)]).endswith("s") for tile_id in item.get("ids", ()))
+    ]
+
+    stats["node_total"] = len(melds)
+    stats["node_index"] = 0
+    stats["node_searchable"] = len(melds) + len(pairs) + len(souzu_taatsus) + len(singles)
+
+    def overlaps(*groups: dict) -> bool:
+        used: Set[int] = set()
+        for group in groups:
+            ids = group.get("ids", ())
+            if any(int(tile_id) in used for tile_id in ids):
+                return True
+            used.update(int(tile_id) for tile_id in ids)
+        return False
+
+    def try_candidate(groups: Sequence[dict]) -> Optional[dict]:
+        nonlocal best_plan, local_best_draws
+        prewin_ids = tuple(
+            sorted(
+                (int(tile_id) for group in groups for tile_id in group.get("ids", ())),
+                key=lambda tile_id: (by_id[tile_id].order, tile_id),
+            )
+        )
+        if len(prewin_ids) != 7:
+            return None
+        if _occupied_prefix_count(quad_pair["quad_ids"], prewin_ids, None, by_id, wall_start_order) > 13:
+            stats["nonwall_prunes"] += 1
+            return None
+        signature = _candidate_signature(prewin_ids)
+        signature_text = _signature_to_text(signature)
+        if signature_text in skip_signatures or signature in seen_candidate_signatures:
+            stats["duplicate_prunes"] += 1
+            return None
+        seen_candidate_signatures.add(signature)
+        component_descs = [str(group.get("desc") or "") for group in groups]
+        plan, reason = _evaluate_candidate(
+            deck_map,
+            hand_ids,
+            replacement_ids,
+            by_id,
+            quad_pair["quad_ids"],
+            prewin_ids,
+            component_descs,
+            remaining_changes,
+            per_change_limit,
+        )
+        stats["reachability_checks"] += 1
+        if plan is None:
+            if isinstance(reason, str) and reason.startswith("switch-reachability-failed: 换牌可达性上界不足"):
+                stats["reachability_upper_prunes"] += 1
+            stats["latest_result"] = f"最近失败: {reason}"
+            return None
+        plan["mode"] = "target-enumeration-search"
+        plan["quad_faces"] = list(quad_pair["faces"])
+        plan["plan_signature"] = signature_text
+        stats["candidate_hands"] += 1
+        if best_plan is None or plan["draws_needed"] < best_plan["draws_needed"]:
+            best_plan = plan
+            local_best_draws = plan["draws_needed"]
+            stats["latest_result"] = f"已找到更快方案: waits={','.join(plan['waits'])}"
+            if emit_candidate is not None:
+                emit_candidate(plan)
+        return plan
+
+    quad_draws = max(
+        (by_id[int(tile_id)].source_index + 1 for tile_id in quad_pair["quad_ids"] if by_id[int(tile_id)].source == "wall"),
+        default=0,
+    )
+
+    for meld_index, meld in enumerate(melds, start=1):
+        if timed_out():
+            return best_plan
+        stats["branch_attempts"] += 1
+        stats["dfs_nodes"] += 1
+        stats["node_index"] = meld_index
+
+        if local_best_draws is not None:
+            meld_draws = max(
+                (by_id[int(tile_id)].source_index + 1 for tile_id in meld["ids"] if by_id[int(tile_id)].source == "wall"),
+                default=0,
+            )
+            if max(meld_draws, quad_draws) >= local_best_draws:
+                stats["speed_prunes"] += 1
+                continue
+
+        for other_meld in melds:
+            if overlaps(meld, other_meld):
+                continue
+            for single in singles:
+                if overlaps(meld, other_meld, single):
+                    continue
+                candidate = try_candidate((meld, other_meld, single))
+                if candidate is not None and (stop_after_first or candidate["draws_needed"] <= 1):
+                    return best_plan
+
+        for pair in pairs:
+            if overlaps(meld, pair):
+                continue
+            for taatsu in souzu_taatsus:
+                if overlaps(meld, pair, taatsu):
+                    continue
+                candidate = try_candidate((meld, pair, taatsu))
+                if candidate is not None and (stop_after_first or candidate["draws_needed"] <= 1):
+                    return best_plan
+
+        for idx, pair_a in enumerate(souzu_pairs):
+            if overlaps(meld, pair_a):
+                continue
+            for pair_b in souzu_pairs[idx + 1:]:
+                if overlaps(meld, pair_a, pair_b):
+                    continue
+                candidate = try_candidate((meld, pair_a, pair_b))
+                if candidate is not None and (stop_after_first or candidate["draws_needed"] <= 1):
+                    return best_plan
+
+    return best_plan
+
+
 def _search_quad_pair_worker(
         pool: Sequence[PoolEntry],
         by_id: Dict[int, PoolEntry],
@@ -2674,8 +3245,11 @@ def recommend_souzu_tenpai_switch(
         stop_after_first: bool = False,
         skip_signatures: Optional[Set[str]] = None,
         auto_wall_limit: bool = True,
+        max_parallel_workers: Optional[int] = None,
+        search_algorithm: Optional[str] = None,
 ) -> dict:
-    if auto_wall_limit and len(wall_ids) > 2:
+    search_algorithm = _normalize_search_algorithm(search_algorithm)
+    if search_algorithm != SEARCH_ALGO_TARGET_ENUM and auto_wall_limit and len(wall_ids) > 2:
         def stopped() -> bool:
             return bool(should_stop and should_stop())
 
@@ -2706,6 +3280,8 @@ def recommend_souzu_tenpai_switch(
                 True,
                 skip_signatures,
                 False,
+                max_parallel_workers,
+                search_algorithm,
             )
             if isinstance(plan, dict) and plan.get("status") == "plan":
                 found_limit = probe
@@ -2730,6 +3306,8 @@ def recommend_souzu_tenpai_switch(
                 stop_after_first,
                 skip_signatures,
                 False,
+                max_parallel_workers,
+                search_algorithm,
             )
             if isinstance(plan, dict):
                 plan["effective_wall_limit"] = max_wall_len
@@ -2760,6 +3338,8 @@ def recommend_souzu_tenpai_switch(
                 True,
                 skip_signatures,
                 False,
+                max_parallel_workers,
+                search_algorithm,
             )
             if isinstance(plan, dict) and plan.get("status") == "plan":
                 hi = mid
@@ -2785,6 +3365,8 @@ def recommend_souzu_tenpai_switch(
             stop_after_first,
             skip_signatures,
             False,
+            max_parallel_workers,
+            search_algorithm,
         )
         if isinstance(final_plan, dict):
             final_plan["effective_wall_limit"] = final_limit
@@ -2826,7 +3408,10 @@ def recommend_souzu_tenpai_switch(
     parallel_info: dict = {"mode": "single", "enabled": False, "max_workers": 1, "total_jobs": 0, "completed_jobs": 0}
     parallel_fallback_reason: Optional[str] = None
     cpu_count = os.cpu_count() or 1
+    configured_parallel_workers = max(1, int(max_parallel_workers or cpu_count))
     parallel_attempted = False
+    parallel_ok = False
+    wait_parallel_ok = False
     parallel_disabled_reason: Optional[str] = None
     parallel_start_error: Optional[str] = None
 
@@ -2849,6 +3434,7 @@ def recommend_souzu_tenpai_switch(
             "parallel_info": {
                 **dict(parallel_info),
                 "cpu_count": cpu_count,
+                "configured_max_workers": configured_parallel_workers,
                 "quad_pair_count": len(quad_pairs),
                 "parallel_ok": parallel_ok,
                 "attempted": parallel_attempted,
@@ -2938,6 +3524,61 @@ def recommend_souzu_tenpai_switch(
 
     best_plan: Optional[dict] = None
     best_draws_limit: Optional[int] = None
+    if search_algorithm == SEARCH_ALGO_TARGET_ENUM:
+        parallel_info = {
+            "mode": "single",
+            "enabled": False,
+            "max_workers": 1,
+            "total_jobs": len(quad_pairs),
+            "completed_jobs": 0,
+            "cpu_count": cpu_count,
+            "quad_pair_count": len(quad_pairs),
+            "parallel_ok": False,
+            "wait_parallel_ok": False,
+            "attempted": False,
+            "disabled_reason": "当前算法使用目标牌型枚举搜索，暂未启用多进程并行。",
+        }
+        worker_states = [{
+            "worker_id": 1,
+            "kind": "main",
+            "status": "running",
+            "current_quad_index": None,
+            "current_quad_label": "",
+            "completed_jobs": 0,
+            "last_result": "",
+            "last_draws_needed": None,
+            "started_at": time.monotonic(),
+        }]
+        emit_telemetry()
+        worker_states[0]["current_quad_index"] = 1
+        worker_states[0]["current_quad_label"] = "目标牌型枚举搜索"
+        worker_states[0]["started_at"] = time.monotonic()
+        emit_progress("正在使用目标牌型枚举搜索", force=True)
+        plan = _run_exact_target_enumeration_search(
+            deck_map,
+            hand_ids,
+            remaining_replacements,
+            wall_ids,
+            remaining_changes,
+            per_change_limit,
+            stats,
+            emit_progress,
+            candidate_cb,
+            stop_requested,
+        )
+        worker_states[0]["status"] = "done" if plan.get("status") == "plan" else ("stopped" if plan.get("reason") == "stopped-by-user" else "done")
+        worker_states[0]["completed_jobs"] = 1
+        worker_states[0]["last_result"] = "found-plan" if plan.get("status") == "plan" else "no-plan"
+        worker_states[0]["last_draws_needed"] = plan.get("draws_needed")
+        parallel_info["completed_jobs"] = 1
+        if isinstance(plan, dict):
+            plan["remaining_changes"] = remaining_changes
+            plan["debug_pool"] = debug_pool
+            plan["worker_states"] = [{k: v for k, v in worker_states[0].items() if k != "started_at"}]
+            plan["parallel_info"] = parallel_info
+            plan["runtime"] = get_active_search_runtime_snapshot(searching=False)
+        return plan
+
     parallel_ok = len(quad_pairs) >= 2 and cpu_count > 1
     wait_parallel_ok = len(quad_pairs) == 1 and cpu_count > 1
     if len(quad_pairs) < 2:
@@ -2952,7 +3593,7 @@ def recommend_souzu_tenpai_switch(
             for quad_index, quad_pair in enumerate(quad_pairs)
             for wait_face in wait_faces
         ]
-        max_workers = max(1, min(len(branch_jobs), max(1, cpu_count - 1), PARALLEL_WORKER_CAP))
+        max_workers = max(1, min(len(branch_jobs), configured_parallel_workers))
         completed = 0
         parallel_info = {
             "mode": "process-quad-wait",
@@ -3178,7 +3819,7 @@ def recommend_souzu_tenpai_switch(
     if wait_parallel_ok and not parallel_attempted:
         quad_pair = quad_pairs[0]
         wait_faces = [f"{n}s" for n in range(1, 10)]
-        max_workers = max(1, min(len(wait_faces), max(1, cpu_count - 1), PARALLEL_WORKER_CAP))
+        max_workers = max(1, min(len(wait_faces), configured_parallel_workers))
         parallel_attempted = True
         parallel_info = {
             "mode": "process-wait-face",

@@ -348,6 +348,9 @@
     "verbose_progress": "詳細な進捗を表示",
     "wall_limit": "牌山の読み取り上限",
     "wall_limit_hint": "2 にすると牌山の先頭から最大 2 枚まで読み取ります。36 にすると無制限として扱います。",
+    "search_algorithm": "探索アルゴリズム",
+    "algorithm_constraint_dfs": "制約分解深さ優先探索",
+    "algorithm_target_enum": "目標牌型列挙探索",
     "stage_ready": "現在は交換段階なので、手動で検索を始められます。",
     "stage_not_ready": "現在は交換段階ではありません。開始前に止めます。",
     "need_switch_stage": "現在は交換段階ではないため、花火ガイドを開始できません。"

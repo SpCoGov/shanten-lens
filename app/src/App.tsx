@@ -178,7 +178,7 @@ export default function App() {
 
     const THEME_ORDER: ThemeMode[] = ["auto", "dark", "dark-green"];
     const THEME_KEY = "sl-theme";
-    const HIDDEN_THEME_CHANCE = 0.001;
+    const HIDDEN_THEME_CHANCE = 0.01;
     const hiddenThemeClicksRef = React.useRef(0);
     const hiddenThemeClickTimerRef = React.useRef<number | null>(null);
 

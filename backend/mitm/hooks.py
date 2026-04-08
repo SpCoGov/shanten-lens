@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import os
 import threading
 from collections import OrderedDict
 from typing import Tuple, Any, Dict, List, Set, Optional, Union, Sequence
@@ -257,6 +258,12 @@ def _souzu_switch_disabled_reason(state: dict) -> str | None:
     return None
 
 
+def _souzu_search_algorithm_label(value: str) -> str:
+    if value == "target_enumeration_search":
+        return "目标牌型枚举搜索"
+    return "约束分解深度优先搜索"
+
+
 def _wrap_entry(yaku_key: str, plan: dict) -> dict:
     entry = {
         "status": plan.get("status"),
@@ -269,6 +276,8 @@ def _wrap_entry(yaku_key: str, plan: dict) -> dict:
             "mode",
             "reason",
             "progress",
+            "search_algorithm",
+            "search_algorithm_label",
             "switch_discards",
             "switch_in",
             "wall_draws",
@@ -306,6 +315,7 @@ async def _broadcast_switch_recommendation(
         stop_after_first: bool,
         skip_signatures: list[str] | None = None,
         wall_limit: int = 36,
+        search_algorithm: str = "constraint_decomposition_dfs",
         snapshot_state: dict | None = None,
         request_source: str = "live",
 ) -> None:
@@ -324,6 +334,9 @@ async def _broadcast_switch_recommendation(
     }
     state = snapshot_state or _live_switch_search_state(wall_limit=wall_limit)
     search_params = _switch_search_params_from_state(state)
+    search_algorithm = str(search_algorithm or "constraint_decomposition_dfs")
+    search_params["search_algorithm"] = search_algorithm
+    search_params["search_algorithm_label"] = _souzu_search_algorithm_label(search_algorithm)
     _cache_switch_runtime(get_active_search_runtime_snapshot(searching=True))
     await broadcast_switch_runtime_status()
 
@@ -485,6 +498,9 @@ async def _broadcast_switch_recommendation(
         _SWITCH_STOP_EVENT.is_set,
         stop_after_first,
         set(skip_signatures or []),
+        True,
+        int(MANAGER.get("backend.souzu_max_parallel_workers", os.cpu_count() or 1) or (os.cpu_count() or 1)),
+        search_algorithm,
     ))
     _SWITCH_SEARCH_TASK = search_task
     plan = await search_task
@@ -509,6 +525,7 @@ async def start_switch_recommendation_search(
         stop_after_first: bool,
         skip_signatures: list[str] | None = None,
         wall_limit: int = 36,
+        search_algorithm: str = "constraint_decomposition_dfs",
 ) -> None:
     _SWITCH_STOP_EVENT.set()
     _cache_switch_runtime(terminate_active_search_workers())
@@ -549,6 +566,7 @@ async def start_switch_recommendation_search(
         stop_after_first=stop_after_first,
         skip_signatures=skip_signatures or [],
         wall_limit=wall_limit,
+        search_algorithm=search_algorithm,
         snapshot_state=state,
         request_source="live",
     ))
@@ -560,6 +578,7 @@ async def start_switch_recommendation_debug_search(
         stop_after_first: bool,
         skip_signatures: list[str] | None = None,
         wall_limit: int = 36,
+        search_algorithm: str = "constraint_decomposition_dfs",
 ) -> None:
     _SWITCH_STOP_EVENT.set()
     _cache_switch_runtime(terminate_active_search_workers())
@@ -615,6 +634,7 @@ async def start_switch_recommendation_debug_search(
         stop_after_first=stop_after_first,
         skip_signatures=skip_signatures or [],
         wall_limit=wall_limit,
+        search_algorithm=search_algorithm,
         snapshot_state=state,
         request_source="debug",
     ))

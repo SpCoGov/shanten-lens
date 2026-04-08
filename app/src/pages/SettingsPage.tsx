@@ -16,6 +16,14 @@ function deepEqual(a: any, b: any) {
     }
 }
 
+function prettifyConfigKey(key: string) {
+    return key
+        .split("_")
+        .filter(Boolean)
+        .map(part => part.length <= 1 ? part.toUpperCase() : part)
+        .join(" ");
+}
+
 export default function SettingsPage() {
     const [serverTables, setServerTables] = useState<Tables | null>(null);
     const [draft, setDraft] = useState<Tables>({});
@@ -159,7 +167,9 @@ export default function SettingsPage() {
 
                                 return (
                                     <div className="row" key={key}>
-                                        <label htmlFor={id} title={t(descKey)}>{t(nameKey)}</label>
+                                        <label htmlFor={id} title={t(descKey, {defaultValue: ""})}>
+                                            {t(nameKey, {defaultValue: prettifyConfigKey(key)})}
+                                        </label>
                                         {input}
                                     </div>
                                 );
