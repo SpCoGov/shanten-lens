@@ -1707,7 +1707,6 @@ def _evaluate_candidate(
     }, "ok"
 
 
-
 def _search_remaining_plan(
         pool: Sequence[PoolEntry],
         by_id: Dict[int, PoolEntry],
@@ -1826,11 +1825,11 @@ def _search_remaining_plan(
             quad_pair["quad_ids"], [], None, by_id, wall_start_order
         ) > 13 else 0
         if not _quick_shape_feasible(
-            pool,
-            quad_orders,
-            allow_replacement=allow_replacement_after_quad,
-            min_order=min_order_after_quad,
-            shapes=("meld+meld", "pair+meld"),
+                pool,
+                quad_orders,
+                allow_replacement=allow_replacement_after_quad,
+                min_order=min_order_after_quad,
+                shapes=("meld+meld", "pair+meld"),
         ):
             stats["speed_prunes"] += 1
             continue
@@ -1870,11 +1869,11 @@ def _search_remaining_plan(
                     quad_pair["quad_ids"], list(win_component["ids"]), None, by_id, wall_start_order
                 ) > 13 else 0
                 if not _quick_shape_feasible(
-                    pool,
-                    blocked,
-                    allow_replacement=allow_replacement_after_win,
-                    min_order=min_order_after_win,
-                    shapes=("meld+meld",),
+                        pool,
+                        blocked,
+                        allow_replacement=allow_replacement_after_win,
+                        min_order=min_order_after_win,
+                        shapes=("meld+meld",),
                 ):
                     stats["speed_prunes"] += 1
                     continue
@@ -1901,11 +1900,11 @@ def _search_remaining_plan(
                         wall_start_order,
                     ) > 13 else 0
                     if not _quick_shape_feasible(
-                        pool,
-                        blocked1,
-                        allow_replacement=allow_replacement_after_meld1,
-                        min_order=min_order_after_meld1,
-                        shapes=("meld",),
+                            pool,
+                            blocked1,
+                            allow_replacement=allow_replacement_after_meld1,
+                            min_order=min_order_after_meld1,
+                            shapes=("meld",),
                     ):
                         stats["speed_prunes"] += 1
                         continue
@@ -1999,11 +1998,11 @@ def _search_remaining_plan(
                     quad_pair["quad_ids"], list(win_component["ids"]), None, by_id, wall_start_order
                 ) > 13 else 0
                 if not _quick_shape_feasible(
-                    pool,
-                    blocked,
-                    allow_replacement=allow_replacement_after_win,
-                    min_order=min_order_after_win,
-                    shapes=("pair+meld",),
+                        pool,
+                        blocked,
+                        allow_replacement=allow_replacement_after_win,
+                        min_order=min_order_after_win,
+                        shapes=("pair+meld",),
                 ):
                     stats["speed_prunes"] += 1
                     continue
@@ -2333,11 +2332,11 @@ def _search_remaining_tenpai_plan(
     ) > 13 else 0
 
     if not _quick_shape_feasible(
-        pool,
-        quad_orders,
-        allow_replacement=base_allow_replacement,
-        min_order=base_min_order,
-        shapes=("meld+meld+single", "meld+pair+pair", "meld+pair+taatsu"),
+            pool,
+            quad_orders,
+            allow_replacement=base_allow_replacement,
+            min_order=base_min_order,
+            shapes=("meld+meld+single", "meld+pair+pair", "meld+pair+taatsu"),
     ):
         stats["speed_prunes"] += 1
         stats["latest_result"] = "快速形状剪枝: 双杠后已无法凑出 7 张听牌骨架"
@@ -2364,11 +2363,11 @@ def _search_remaining_tenpai_plan(
         ) > 13 else 0
 
         if not _quick_shape_feasible(
-            pool,
-            blocked1,
-            allow_replacement=allow_after_meld1,
-            min_order=min_after_meld1,
-            shapes=("meld+single", "pair+pair", "pair+taatsu"),
+                pool,
+                blocked1,
+                allow_replacement=allow_after_meld1,
+                min_order=min_after_meld1,
+                shapes=("meld+single", "pair+pair", "pair+taatsu"),
         ):
             stats["speed_prunes"] += 1
             continue
@@ -2647,6 +2646,18 @@ def _terminate_executor_processes(executor: ProcessPoolExecutor, *, wait_timeout
             pass
 
 
+def _wall_limit_probe_sequence(max_len: int, *, min_len: int = 2) -> List[int]:
+    max_len = max(min_len, int(max_len or 0))
+    seq: List[int] = []
+    cur = min_len
+    while cur < max_len:
+        seq.append(cur)
+        cur *= 2
+    if not seq or seq[-1] != max_len:
+        seq.append(max_len)
+    return seq
+
+
 def recommend_souzu_tenpai_switch(
         deck_map: Dict[int, str],
         hand_ids: List[int],
@@ -2662,7 +2673,123 @@ def recommend_souzu_tenpai_switch(
         should_stop: Optional[Callable[[], bool]] = None,
         stop_after_first: bool = False,
         skip_signatures: Optional[Set[str]] = None,
+        auto_wall_limit: bool = True,
 ) -> dict:
+    if auto_wall_limit and len(wall_ids) > 2:
+        def stopped() -> bool:
+            return bool(should_stop and should_stop())
+
+        max_wall_len = len(wall_ids)
+        probe_limits = _wall_limit_probe_sequence(max_wall_len, min_len=2)
+        found_limit: Optional[int] = None
+        found_plan: Optional[dict] = None
+        low = 2
+
+        for probe in probe_limits:
+            if stopped():
+                return {"status": "impossible", "reason": "stopped-by-user"}
+            if progress_cb is not None:
+                progress_cb(f"正在自动收缩牌山上限\n阶段: 探测可行区间\n当前上限: {probe}/{max_wall_len}")
+            plan = recommend_souzu_tenpai_switch(
+                deck_map,
+                hand_ids,
+                replacement_ids,
+                wall_ids[:probe],
+                switch_used_tiles,
+                total_change_tile_count,
+                change_tile_count,
+                boss_buff,
+                progress_cb,
+                None,
+                telemetry_cb,
+                should_stop,
+                True,
+                skip_signatures,
+                False,
+            )
+            if isinstance(plan, dict) and plan.get("status") == "plan":
+                found_limit = probe
+                found_plan = plan
+                break
+            low = probe + 1
+
+        if found_limit is None:
+            plan = recommend_souzu_tenpai_switch(
+                deck_map,
+                hand_ids,
+                replacement_ids,
+                wall_ids,
+                switch_used_tiles,
+                total_change_tile_count,
+                change_tile_count,
+                boss_buff,
+                progress_cb,
+                candidate_cb,
+                telemetry_cb,
+                should_stop,
+                stop_after_first,
+                skip_signatures,
+                False,
+            )
+            if isinstance(plan, dict):
+                plan["effective_wall_limit"] = max_wall_len
+            return plan
+
+        hi = found_limit
+        while low < hi:
+            if stopped():
+                return {"status": "impossible", "reason": "stopped-by-user"}
+            mid = (low + hi) // 2
+            if progress_cb is not None:
+                progress_cb(
+                    f"正在自动收缩牌山上限\n阶段: 二分最早可行点\n搜索区间: {low}-{hi}\n当前上限: {mid}/{max_wall_len}"
+                )
+            plan = recommend_souzu_tenpai_switch(
+                deck_map,
+                hand_ids,
+                replacement_ids,
+                wall_ids[:mid],
+                switch_used_tiles,
+                total_change_tile_count,
+                change_tile_count,
+                boss_buff,
+                progress_cb,
+                None,
+                telemetry_cb,
+                should_stop,
+                True,
+                skip_signatures,
+                False,
+            )
+            if isinstance(plan, dict) and plan.get("status") == "plan":
+                hi = mid
+                found_limit = mid
+                found_plan = plan
+            else:
+                low = mid + 1
+
+        final_limit = found_limit if found_limit is not None else max_wall_len
+        final_plan = recommend_souzu_tenpai_switch(
+            deck_map,
+            hand_ids,
+            replacement_ids,
+            wall_ids[:final_limit],
+            switch_used_tiles,
+            total_change_tile_count,
+            change_tile_count,
+            boss_buff,
+            progress_cb,
+            candidate_cb,
+            telemetry_cb,
+            should_stop,
+            stop_after_first,
+            skip_signatures,
+            False,
+        )
+        if isinstance(final_plan, dict):
+            final_plan["effective_wall_limit"] = final_limit
+        return final_plan
+
     started_at = time.monotonic()
     remaining_changes = max(0, int(total_change_tile_count or 0) - int(change_tile_count or 0))
     # 换三张debuff
