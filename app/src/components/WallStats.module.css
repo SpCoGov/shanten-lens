@@ -7,6 +7,8 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    position: relative;
+    overflow: hidden;
 }
 
 .header {
@@ -43,10 +45,15 @@
     border-radius: 10px;
     padding: 8px;
     background: var(--list-item-bg);
+    transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+    animation: statItemEnter .38s ease both;
 }
 
 .item:hover {
     background: var(--list-item-hover);
+    transform: translateX(4px);
+    border-color: color-mix(in srgb, var(--color-ring) 24%, var(--border));
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--color-ring) 10%, transparent);
 }
 
 .tileBox {
@@ -72,10 +79,33 @@
 
 .count {
     font-weight: 700;
+    min-width: 2.5ch;
+    text-align: right;
+    color: color-mix(in srgb, var(--text) 92%, var(--color-ring));
 }
 
 .empty {
     color: var(--color-muted);
     font-size: 13px;
     padding: 10px 6px;
+}
+
+.item:nth-child(1) { animation-delay: .03s; }
+.item:nth-child(2) { animation-delay: .06s; }
+.item:nth-child(3) { animation-delay: .09s; }
+.item:nth-child(4) { animation-delay: .12s; }
+.item:nth-child(5) { animation-delay: .15s; }
+.item:nth-child(6) { animation-delay: .18s; }
+.item:nth-child(7) { animation-delay: .21s; }
+.item:nth-child(8) { animation-delay: .24s; }
+
+@keyframes statItemEnter {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

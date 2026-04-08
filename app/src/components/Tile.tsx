@@ -1,11 +1,11 @@
 import React from "react";
 import "../styles/theme.css";
-import {TILE_ATLAS_DEFAULT, TileCode} from "./useCroppedAtlasDefault";
+import {TILE_ATLAS_DEFAULT, type TileCode} from "./useCroppedAtlasDefault";
+import {useTileSkin} from "../lib/tileSkin";
 
-const ATLAS_SRC = "/assets/mjp_default.png";
-const LAIZI_SRC = "/assets/mjp_laizi.png";
+const ATLAS_CLASSIC_SRC = "/assets/mjp_default.png";
+const LAIZI_CLASSIC_SRC = "/assets/mjp_laizi.png";
 
-/** 规范化到项目内合法编码；不含 'bd'，因此癞子要单独判定 */
 function normalize(code: string): TileCode {
     const s = code.trim();
     const ok = [
@@ -17,24 +17,21 @@ function normalize(code: string): TileCode {
     return (ok as readonly string[]).includes(s) ? (s as TileCode) : "5m";
 }
 
-/** 把原始字符串标准化到项目编码体系（含把中文字牌映射为 z1..z7） */
 function normalizeLoose(raw: string): string {
     const s = raw?.trim() ?? "";
-    const honor: Record<string, string> = {东: "z1", 南: "z2", 西: "z3", 北: "z4", 白: "z5", 发: "z6", 中: "z7"};
-    if (honor[s]) return honor[s];
-    if (/^[mps][0-9]$/.test(s)) return s;               // m0..m9 / p0..p9 / s0..s9
-    if (/^[0-9][mps]$/.test(s)) return `${s[1]}${s[0]}`; // 1m..9m / 0p..9p
-    if (/^z[1-7]$/.test(s)) return s;
+    if (/^[0-9][mps]$/.test(s)) return s;
+    if (/^[mps][0-9]$/.test(s)) return `${s[1]}${s[0]}`;
+    if (/^[1-7]z$/.test(s)) return s;
+    if (/^z[1-7]$/.test(s)) return `${s[1]}z`;
     return s;
 }
 
 function parseSuitVal(n: string): { suit: string | null; val: number | null } {
-    if (/^[mps][0-9]$/.test(n)) return {suit: n[0], val: Number(n[1])};
-    if (/^z[1-7]$/.test(n)) return {suit: "z", val: Number(n[1])};
+    if (/^[0-9][mps]$/.test(n)) return {suit: n[1], val: Number(n[0])};
+    if (/^[1-7]z$/.test(n)) return {suit: "z", val: Number(n[0])};
     return {suit: null, val: null};
 }
 
-/** 等价判定：同花色 && (同值 || 0↔5)；字牌需完全一致 */
 function isEquivalent(aRaw: string, bRaw: string): boolean {
     const a = normalizeLoose(aRaw);
     const b = normalizeLoose(bRaw);
@@ -44,40 +41,47 @@ function isEquivalent(aRaw: string, bRaw: string): boolean {
     const pb = parseSuitVal(b);
     if (!pa.suit || !pb.suit) return false;
     if (pa.suit !== pb.suit) return false;
-
-    if (pa.suit === "z") return a === b; // 字牌必须完全一致
+    if (pa.suit === "z") return a === b;
     if (pa.val === pb.val) return true;
     return new Set([pa.val, pb.val]).has(0) && new Set([pa.val, pb.val]).has(5);
 }
 
-const atlasCache: { img?: HTMLImageElement; ready: boolean; cbs: Array<() => void> } = {
-    img: undefined,
-    ready: false,
-    cbs: [],
-};
+type AtlasCache = { img?: HTMLImageElement; ready: boolean; cbs: Array<() => void> };
 
-function loadAtlas(onReady: () => void) {
-    if (atlasCache.ready) return onReady();
-    atlasCache.cbs.push(onReady);
-    if (!atlasCache.img) {
+const atlasCache = new Map<string, AtlasCache>();
+
+function getCache(src: string): AtlasCache {
+    let cache = atlasCache.get(src);
+    if (!cache) {
+        cache = {img: undefined, ready: false, cbs: []};
+        atlasCache.set(src, cache);
+    }
+    return cache;
+}
+
+function loadAtlas(src: string, onReady: () => void) {
+    const cache = getCache(src);
+    if (cache.ready) return onReady();
+    cache.cbs.push(onReady);
+    if (!cache.img) {
         const img = new Image();
-        img.src = ATLAS_SRC;
+        img.src = src;
         img.onload = () => {
-            atlasCache.ready = true;
-            atlasCache.cbs.splice(0).forEach((fn) => fn());
+            cache.ready = true;
+            cache.cbs.splice(0).forEach((fn) => fn());
         };
-        atlasCache.img = img;
+        cache.img = img;
     }
 }
 
 export default function Tile({
-                                 tile,
-                                 hoveredTile,
-                                 setHoveredTile,
-                                 width = 64,
-                                 height = 84,
-                                 dim = false,
-                             }: {
+    tile,
+    hoveredTile,
+    setHoveredTile,
+    width = 64,
+    height = 84,
+    dim = false,
+}: {
     tile: string;
     hoveredTile?: string | null;
     setHoveredTile?: (t: string | null) => void;
@@ -85,42 +89,50 @@ export default function Tile({
     height?: number;
     dim?: boolean;
 }) {
+    const tileSkin = useTileSkin();
     const raw = tile?.trim() ?? "";
-    const isLaizi = raw === "bd";                  // 先对原始值判断癞子
-    const norm = isLaizi ? "5m" : normalize(raw);  // 癞子不参与 atlas 映射时的等价判断
+    const isLaizi = raw === "bd";
+    const norm = isLaizi ? "5m" : normalize(raw);
     const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
+    const atlas = TILE_ATLAS_DEFAULT;
+    const atlasSrc = ATLAS_CLASSIC_SRC;
+    const tempaiTileSrc = `/assets/mahjong/tempai-svg/${norm}.svg`;
     const active = hoveredTile ? isEquivalent(hoveredTile, raw) : false;
+    const tileBoxShadow = tileSkin === "tempai-svg"
+        ? "var(--tile-shadow), inset -8px 0 0 rgba(204, 204, 204, .82), inset -1px 0 0 rgba(115, 115, 115, .34)"
+        : "var(--tile-shadow)";
 
     React.useEffect(() => {
-        if (isLaizi) return;
-        const crop = TILE_ATLAS_DEFAULT[norm] || TILE_ATLAS_DEFAULT["5m"];
+        if (isLaizi || tileSkin === "tempai-svg") return;
+        const crop = atlas[norm] || atlas["5m"];
         const draw = () => {
             const cvs = canvasRef.current;
-            const img = atlasCache.img!;
+            const img = getCache(atlasSrc).img;
             if (!cvs || !img) return;
             cvs.width = width;
             cvs.height = height;
-            const ctx = cvs.getContext("2d")!;
+            const ctx = cvs.getContext("2d");
+            if (!ctx) return;
             ctx.clearRect(0, 0, width, height);
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = "high";
             ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, width, height);
         };
-        loadAtlas(draw);
-        if (atlasCache.ready) draw();
-    }, [norm, width, height, isLaizi]);
+        loadAtlas(atlasSrc, draw);
+        if (getCache(atlasSrc).ready) draw();
+    }, [atlas, atlasSrc, height, isLaizi, norm, tileSkin, width]);
 
     return (
         <div
-            className={`mj-tile ${active ? "mj-tile--highlight" : ""}`}
+            className={`mj-tile ${active ? "mj-tile--highlight" : ""} ${isLaizi ? "mj-tile--laizi" : ""}`}
             style={{
                 position: "relative",
                 width,
                 height,
                 borderRadius: 8,
-                background: "var(--tile-bg)",
-                boxShadow: "var(--tile-shadow)",
+                background: tileSkin === "tempai-svg" ? "#f4f4f4" : "var(--tile-bg)",
+                boxShadow: tileBoxShadow,
                 display: "grid",
                 placeItems: "center",
                 outline: active ? "var(--tile-outline)" : "none",
@@ -131,20 +143,31 @@ export default function Tile({
             onMouseEnter={() => setHoveredTile?.(raw)}
             onMouseLeave={() => setHoveredTile?.(null)}
             onClick={() => setHoveredTile?.(raw)}
-            title={norm}
+            title={raw || norm}
         >
             {isLaizi ? (
+                tileSkin === "tempai-svg" ? (
+                    <div className="mj-tile__laizi-gradient" />
+                ) : (
+                    <img
+                        src={LAIZI_CLASSIC_SRC}
+                        alt="bd"
+                        draggable={false}
+                        style={{width: "100%", height: "100%", objectFit: "contain", display: "block"}}
+                    />
+                )
+            ) : tileSkin === "tempai-svg" ? (
                 <img
-                    src={LAIZI_SRC}
-                    alt="bd"
+                    src={tempaiTileSrc}
+                    alt={raw || norm}
                     draggable={false}
-                    style={{width: "100%", height: "100%", objectFit: "contain", display: "block"}}
+                    style={{width: "100%", height: "100%", objectFit: "fill", display: "block"}}
                 />
             ) : (
-                <canvas ref={canvasRef}/>
+                <canvas ref={canvasRef} />
             )}
 
-            {dim && (
+            {dim ? (
                 <div
                     style={{
                         position: "absolute",
@@ -152,7 +175,7 @@ export default function Tile({
                         background: "var(--tile-dim-scrim)",
                     }}
                 />
-            )}
+            ) : null}
         </div>
     );
 }

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg version="1.0" viewBox="0 0 500 700" width="500" height="700" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+  <defs id="defs10506">
+    <linearGradient id="tileblack">
+      <stop style="stop-color:#000000" id="stop5614" />
+    </linearGradient>
+    <linearGradient id="tileblue">
+      <stop style="stop-color:#000040" id="stop5608" />
+    </linearGradient>
+    <linearGradient id="tilered">
+      <stop style="stop-color:#800000" id="stop17363" />
+    </linearGradient>
+    <linearGradient id="tilebrred">
+      <stop style="stop-color:#C00000" id="stop17373" />
+    </linearGradient>
+    <linearGradient id="tilegreen">
+      <stop style="stop-color:#004000" id="stop17331" />
+    </linearGradient>
+    <linearGradient id="tileface">
+      <stop style="stop-color:#ffffff" id="stop12" />
+    </linearGradient>
+    <linearGradient id="tileframe">
+      <stop style="stop-color:#000000" id="stop15" />
+    </linearGradient>
+    <linearGradient id="tileback">
+      <stop style="stop-color:#f4f4f4" id="stop16" />
+    </linearGradient>
+  </defs>
+  <g id="haku">
+    <path d="m 23.599329,1.510984 427.984091,-0.0209 c 0,0 8.10046,3.070197 14.35081,9.322597 6.25035,6.250401 9.03751,14.285915 9.03751,14.285915 l 0.017,619.999724 c 0,0 -2.90016,8.20052 -9.10051,14.50093 -6.23035,6.3404 -14.38082,9.04057 -14.38082,9.04057 l -427.854078,-0.017 c 0,0 -8.447476,-2.91619 -14.5208183,-8.99058 C 3.0581717,653.55885 -0.0080009,645.0113 -0.011001,645.0073 L 0,25.1595 c 0,0 3.4191924,-8.950573 9.2705219,-14.711942 C 15.120851,4.688189 23.599329,1.510986 23.599329,1.510986 Z" style="fill:url(#tileface);stroke:none" id="frame-63" />
+  </g>
+</svg>

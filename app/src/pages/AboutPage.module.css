@@ -128,3 +128,71 @@ summary {
     opacity: 0.92;
     line-height: 1.5;
 }
+
+.actionRow {
+    margin-top: 12px;
+}
+
+.assetList {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.assetItem {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--input-bg);
+    padding: 10px 12px;
+    display: grid;
+    gap: 4px;
+}
+
+.assetName {
+    font-weight: 700;
+    color: var(--text);
+}
+
+.assetNote {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.tileGallery {
+    display: grid;
+    gap: 14px;
+}
+
+.tileSection {
+    margin: 0;
+    padding: 12px 14px;
+}
+
+.tileSectionTitle {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.tileGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 12px 10px;
+}
+
+.tileItem {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    padding: 10px 8px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--input-bg);
+}
+
+.tileCode {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

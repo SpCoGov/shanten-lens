@@ -65,7 +65,28 @@
     "known_issue_225_html": "拥有<strong>ニャセウスの船</strong>护身符时，重新进入已开始的关卡界面时牌山顺序错误。",
     "known_issue_218_html": "拥有<strong>ランプの猫神</strong>护身符时，换牌顺序会出现错误。",
     "section_repo_title": "仓库地址",
-    "repo_link_text": "GitHub"
+    "repo_link_text": "GitHub",
+    "assets_intro": "牌面与相关素材来源如下：",
+    "open_link": "打开链接",
+    "view_all_tiles": "查看全部麻将牌面",
+    "tile_gallery_title": "麻将牌面总览",
+    "tile_groups": {
+      "manzu": "万子",
+      "pinzu": "筒子",
+      "souzu": "索子",
+      "honors": "字牌",
+      "others": "其他"
+    },
+    "asset_sources": {
+      "mahjong_soul": {
+        "name": "Mahjong Soul",
+        "note": "图标素材来源"
+      },
+      "tempai_svg": {
+        "name": "riichi-mahjong-tiles-svg（Tempai）",
+        "note": "当前 SVG 牌面资源"
+      }
+    }
   },
   "autorun": {
     "title": "自动化",
@@ -251,6 +272,9 @@
     "title": "设置",
     "loading": "加载配置...",
     "language_label": "语言",
+    "tile_skin_label": "牌面",
+    "tile_skin_classic": "雀魂",
+    "tile_skin_tempai_svg": "Tempai SVG",
     "btn_manual_sync": "手动同步",
     "btn_open_config_dir": "打开配置目录",
     "notice_server_update_dirty": "服务器有新配置推送，但你有未保存修改。你可以保存或放弃更改再同步。",
@@ -296,7 +320,6 @@
     "post_draw_discards": "额外占位牌需求",
     "waits": "听牌列表",
     "final_waits": "最终听牌",
-    "quad_catalog_title": "?????",
     "quad_catalog_item": "杠 {{index}}：{{face}}",
     "quad_catalog_empty": "当前没有可列出的杠。",
     "reason_switch-hand-must-be-13": "当前不是 13 张换牌手牌，暂时无法计算这条指导。",

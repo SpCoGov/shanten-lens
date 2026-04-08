@@ -35,6 +35,20 @@
     gap: 8px;
 }
 
+.tileSkinWrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.tileSkinWrap select {
+    width: 150px;
+    max-width: 150px;
+    min-width: 150px;
+}
+
 .hright {
     display: flex;
     align-items: center;

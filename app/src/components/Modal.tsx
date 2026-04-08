@@ -1,7 +1,10 @@
 import React from "react";
+import {createPortal} from "react-dom";
 import "../styles/theme.css";
 import styles from "./Modal.module.css";
 import {t} from "i18next";
+
+let openModalCount = 0;
 
 export default function Modal({
                                   open,
@@ -18,9 +21,46 @@ export default function Modal({
     width?: number;
     actions?: React.ReactNode;
 }) {
+    React.useEffect(() => {
+        if (!open) return;
+
+        openModalCount += 1;
+        const html = document.documentElement;
+        const body = document.body;
+        const prevHtmlOverflow = html.style.overflow;
+        const prevBodyOverflow = body.style.overflow;
+
+        html.style.overflow = "hidden";
+        body.style.overflow = "hidden";
+        body.classList.add("modal-open");
+
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", onKeyDown);
+
+        return () => {
+            window.removeEventListener("keydown", onKeyDown);
+            openModalCount = Math.max(0, openModalCount - 1);
+            if (openModalCount === 0) {
+                html.style.overflow = prevHtmlOverflow;
+                body.style.overflow = prevBodyOverflow;
+                body.classList.remove("modal-open");
+            }
+        };
+    }, [open, onClose]);
+
     if (!open) return null;
-    return (
-        <div className={styles.overlay} onClick={onClose}>
+    return createPortal(
+        <div
+            className={styles.overlay}
+            onClick={onClose}
+            onWheelCapture={(e) => {
+                if (e.target === e.currentTarget) {
+                    e.preventDefault();
+                }
+            }}
+        >
             <div
                 className={styles.card}
                 style={{width}}
@@ -38,6 +78,7 @@ export default function Modal({
                     {children}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

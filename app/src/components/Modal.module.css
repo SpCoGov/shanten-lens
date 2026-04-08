@@ -2,11 +2,13 @@
     position: fixed;
     inset: 0;
     background: var(--overlay-scrim);
-    z-index: 999;
+    z-index: 5000;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 16px;
+    overscroll-behavior: contain;
+    backdrop-filter: blur(6px) saturate(0.95);
 }
 
 .card {
@@ -17,6 +19,7 @@
     border-radius: 12px;
     border: 1px solid var(--border);
     box-shadow: var(--elev-shadow);
+    animation: modalEnter .18s ease-out;
 }
 
 .header {
@@ -52,6 +55,7 @@
     border-bottom-right-radius: 12px;
     scrollbar-gutter: stable both-edges;
     box-sizing: border-box;
+    overscroll-behavior: contain;
 }
 
 .body::-webkit-scrollbar {
@@ -74,4 +78,15 @@
 .body {
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-thumb-alt) transparent;
+}
+
+@keyframes modalEnter {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }

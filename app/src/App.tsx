@@ -138,8 +138,12 @@ function Topbar({onSecretClick}: { onSecretClick: () => void }) {
 
 export default function App() {
     const {t} = useTranslation();
+    type ThemeMode = "auto" | "dark" | "dark-green" | "dark-purple";
     const {toast, visible: toastVisible} = useGlobalToast();
     const [route, setRoute] = React.useState<Route>("home");
+    const sidebarRef = React.useRef<HTMLDivElement | null>(null);
+    const navRefs = React.useRef<Partial<Record<Route, HTMLButtonElement | null>>>({});
+    const themeButtonRef = React.useRef<HTMLButtonElement | null>(null);
     const [connected, setConnected] = React.useState(false);
 
     const [cells, setCells] = React.useState<Cell[]>([]);
@@ -172,7 +176,6 @@ export default function App() {
     const [goods, setGoods] = React.useState<GoodsItem[]>([]);
     const [candidates, setCandidates] = React.useState<CandidateEffectRef[]>([]);
 
-    type ThemeMode = "auto" | "dark" | "dark-green" | "dark-purple";
     const THEME_ORDER: ThemeMode[] = ["auto", "dark", "dark-green"];
     const THEME_KEY = "sl-theme";
     const HIDDEN_THEME_CHANCE = 0.001;
@@ -282,7 +285,33 @@ export default function App() {
         return THEME_ORDER[(i + 1) % THEME_ORDER.length];
     }, []);
 
-    const toggleTheme = () => setTheme((prev) => nextTheme(prev));
+    const toggleTheme = React.useCallback((event?: React.MouseEvent<HTMLButtonElement>) => {
+        const source = event?.currentTarget ?? themeButtonRef.current;
+        const nextModeValue = nextTheme(theme);
+        const root = document.documentElement;
+
+        if (source) {
+            const rect = source.getBoundingClientRect();
+            root.style.setProperty("--theme-wave-x", `${rect.left + rect.width / 2}px`);
+            root.style.setProperty("--theme-wave-y", `${rect.top + rect.height / 2}px`);
+
+            const docWithTransition = document as Document & {
+                startViewTransition?: (update: () => void) => { finished: Promise<void> };
+            };
+
+            if (docWithTransition.startViewTransition) {
+                root.classList.add("theme-transition-active");
+                const transition = docWithTransition.startViewTransition(() => {
+                    setTheme(nextModeValue);
+                });
+                transition.finished.finally(() => {
+                    root.classList.remove("theme-transition-active");
+                });
+                return;
+            }
+        }
+        setTheme(nextModeValue);
+    }, [nextTheme, theme]);
 
     React.useEffect(() => {
         const update = (sel: HTMLSelectElement) => {
@@ -511,33 +540,68 @@ export default function App() {
         </div>
     ) : undefined;
 
+    React.useEffect(() => {
+        const updateSidebarIndicator = () => {
+            const sidebar = sidebarRef.current;
+            const activeBtn = navRefs.current[route];
+            if (!sidebar || !activeBtn) return;
+
+            // Use layout offsets so entrance transforms don't skew initial indicator position.
+            const top = activeBtn.offsetTop;
+            const height = activeBtn.offsetHeight;
+
+            sidebar.style.setProperty("--nav-indicator-top", `${top}px`);
+            sidebar.style.setProperty("--nav-indicator-height", `${height}px`);
+        };
+
+        updateSidebarIndicator();
+
+        const ro = new ResizeObserver(() => updateSidebarIndicator());
+        if (sidebarRef.current) ro.observe(sidebarRef.current);
+        Object.values(navRefs.current).forEach((el) => {
+            if (el) ro.observe(el);
+        });
+
+        window.addEventListener("resize", updateSidebarIndicator);
+        return () => {
+            ro.disconnect();
+            window.removeEventListener("resize", updateSidebarIndicator);
+        };
+    }, [route]);
+
     return (
         <div className="app">
+            <div className="app-ambient" aria-hidden="true">
+                <span className="ambient-orb ambient-orb-a"/>
+                <span className="ambient-orb ambient-orb-b"/>
+                <span className="ambient-grid"/>
+            </div>
             <div className={`toast ${toastVisible ? "visible" : ""} ${toast?.kind || "info"}`}>{toast?.msg}</div>
 
             <Topbar onSecretClick={onSecretClick}/>
 
             <div className="shell">
-                <aside className="sidebar">
-                    <button className={`nav-icon ${route === "home" ? "active" : ""}`} title={t("nav.home")} onClick={() => setRoute("home")}>
+                <aside className="sidebar" ref={sidebarRef}>
+                    <div className="sidebar-active-indicator" aria-hidden="true"/>
+                    <button ref={(el) => { navRefs.current.home = el; }} className={`nav-icon ${route === "home" ? "active" : ""}`} title={t("nav.home")} onClick={() => setRoute("home")}>
                         <span className="ms">home</span>
                     </button>
-                    <button className={`nav-icon ${route === "fuse" ? "active" : ""}`} title={t("nav.fuse")} onClick={() => setRoute("fuse")}>
+                    <button ref={(el) => { navRefs.current.fuse = el; }} className={`nav-icon ${route === "fuse" ? "active" : ""}`} title={t("nav.fuse")} onClick={() => setRoute("fuse")}>
                         <span className="ms">gpp_maybe</span>
                     </button>
-                    <button className={`nav-icon ${route === "blackhole" ? "active" : ""}`} title={t("nav.blackhole")} onClick={() => setRoute("blackhole")}>
+                    <button ref={(el) => { navRefs.current.blackhole = el; }} className={`nav-icon ${route === "blackhole" ? "active" : ""}`} title={t("nav.blackhole")} onClick={() => setRoute("blackhole")}>
                         <span className="ms">deblur</span>
                     </button>
-                    <button className={`nav-icon ${route === "souzu-debug" ? "active" : ""}`} title="Souzu Debug" onClick={() => setRoute("souzu-debug")}>
+                    <button ref={(el) => { navRefs.current["souzu-debug"] = el; }} className={`nav-icon ${route === "souzu-debug" ? "active" : ""}`} title="Souzu Debug" onClick={() => setRoute("souzu-debug")}>
                         <span className="ms">science</span>
                     </button>
-                    <button className={`nav-icon ${route === "autorun" ? "active" : ""}`} title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
+                    <button ref={(el) => { navRefs.current.autorun = el; }} className={`nav-icon ${route === "autorun" ? "active" : ""}`} title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
                         <span className="ms">autoplay</span>
                     </button>
-                    <button className={`nav-icon ${route === "diagnostics" ? "active" : ""}`} title={t("nav.diagnostics")} onClick={() => setRoute("diagnostics")}>
+                    <button ref={(el) => { navRefs.current.diagnostics = el; }} className={`nav-icon ${route === "diagnostics" ? "active" : ""}`} title={t("nav.diagnostics")} onClick={() => setRoute("diagnostics")}>
                         <span className="ms">article</span>
                     </button>
-                    <button className={`nav-icon ${route === "about" ? "active" : ""}`} title={t("nav.about")} onClick={() => setRoute("about")}>
+                    <button ref={(el) => { navRefs.current.about = el; }} className={`nav-icon ${route === "about" ? "active" : ""}`} title={t("nav.about")} onClick={() => setRoute("about")}>
                         <span className="ms">help</span>
                     </button>
 
@@ -561,6 +625,7 @@ export default function App() {
                         </button>
 
                         <button
+                            ref={themeButtonRef}
                             className="nav-icon"
                             title={t("app.theme.toggle", {name: themeLabel})}
                             onClick={toggleTheme}
@@ -572,7 +637,7 @@ export default function App() {
 
                 <main className="main-pane">
                     <div
-                        className="app-main"
+                        className={`app-main route-${route}`}
                         style={{padding: `${OUTER_PADDING}px ${OUTER_PADDING}px 0 ${OUTER_PADDING}px`, boxSizing: "border-box"}}
                     >
                         {route === "home" && (

@@ -84,7 +84,7 @@
     --link: var(--link-fg, var(--accent-blue));
 
     --tile-bg: #ffffff;
-    --tile-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+    --tile-shadow: 0 4px 10px rgba(0, 0, 0, .22);
     --tile-outline: 2px solid color-mix(in srgb, var(--color-ring) 70%, transparent);
     --tile-dim-scrim: rgba(0, 0, 0, .35);
 
@@ -181,7 +181,7 @@
     --link: var(--link-fg, var(--accent-blue));
 
     --tile-bg: #f2f5f8;
-    --tile-shadow: 0 1px 3px rgba(0, 0, 0, .6);
+    --tile-shadow: 0 4px 10px rgba(0, 0, 0, .62);
     --tile-outline: 2px solid color-mix(in srgb, var(--color-ring) 80%, transparent);
     --tile-dim-scrim: rgba(0, 0, 0, .45);
 
@@ -281,7 +281,7 @@
     --link: var(--link-fg, var(--accent-blue));
 
     --tile-bg: #0f1815;
-    --tile-shadow: 0 1px 3px rgba(0, 0, 0, .60);
+    --tile-shadow: 0 4px 10px rgba(0, 0, 0, .62);
     --tile-outline: 2px solid color-mix(in srgb, var(--color-ring) 80%, transparent);
     --tile-dim-scrim: rgba(0, 0, 0, .45);
 
@@ -380,7 +380,7 @@
     --link: var(--link-fg, var(--accent-blue));
 
     --tile-bg: #181122;
-    --tile-shadow: 0 1px 3px rgba(0, 0, 0, .60);
+    --tile-shadow: 0 4px 10px rgba(0, 0, 0, .62);
     --tile-outline: 2px solid color-mix(in srgb, var(--color-ring) 80%, transparent);
     --tile-dim-scrim: rgba(0, 0, 0, .45);
 

@@ -1,10 +1,11 @@
 import "../styles/theme.css";
-import React, {useEffect, useRef, useState, useMemo} from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {ws} from "../lib/ws";
 import styles from "./SettingsWindow.module.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import {useTranslation} from "react-i18next";
+import {readTileSkin, setTileSkin, type TileSkin} from "../lib/tileSkin";
 
 type Tables = Record<string, Record<string, any>>;
 
@@ -22,7 +23,8 @@ export default function SettingsWindow() {
 
     const [serverTables, setServerTables] = useState<Tables | null>(null);
     const [draft, setDraft] = useState<Tables>({});
-    const [active, setActive] = useState<string | null>(null); // 当前选中的表
+    const [active, setActive] = useState<string | null>(null);
+    const [tileSkinState, setTileSkinState] = useState<TileSkin>(readTileSkin());
 
     const lastInputRef = useRef(0);
     const awaitingSyncRef = useRef(false);
@@ -34,21 +36,19 @@ export default function SettingsWindow() {
     useEffect(() => {
         ws.connect();
         const off = ws.on((pkt: any) => {
-            if (pkt.type === "update_config") {
-                const incoming: Tables = pkt.data || {};
-                setServerTables(incoming);
+            if (pkt.type !== "update_config") return;
+            const incoming: Tables = pkt.data || {};
+            setServerTables(incoming);
 
-                const now = Date.now();
-                const idle = now - lastInputRef.current > IDLE_MS;
-                const notWaiting = !awaitingSyncRef.current;
+            const now = Date.now();
+            const idle = now - lastInputRef.current > IDLE_MS;
+            const notWaiting = !awaitingSyncRef.current;
+            if (idle && notWaiting) setDraft(incoming);
+            awaitingSyncRef.current = false;
 
-                if (idle && notWaiting) setDraft(incoming);
-                awaitingSyncRef.current = false;
-
-                if (!active) {
-                    const first = Object.keys(incoming)[0];
-                    if (first) setActive(first);
-                }
+            if (!active) {
+                const first = Object.keys(incoming)[0];
+                if (first) setActive(first);
             }
         });
         const timer = window.setTimeout(() => ws.send({type: "request_update", data: {}} as any), 100);
@@ -62,34 +62,39 @@ export default function SettingsWindow() {
         if (!serverTables) return;
         if (saveTimer.current) window.clearTimeout(saveTimer.current);
         saveTimer.current = window.setTimeout(() => {
-            if (!deepEqual(draft, serverTables)) {
-                awaitingSyncRef.current = true;
-                ws.send({type: "edit_config", data: draft} as any);
-            }
+            if (deepEqual(draft, serverTables)) return;
+            awaitingSyncRef.current = true;
+            ws.send({type: "edit_config", data: draft} as any);
         }, SAVE_DEBOUNCE) as unknown as number;
         return () => {
             if (saveTimer.current) window.clearTimeout(saveTimer.current);
         };
     }, [draft, serverTables]);
 
+    useEffect(() => {
+        const sync = () => setTileSkinState(readTileSkin());
+        window.addEventListener("storage", sync);
+        window.addEventListener("sl:tile-skin-change", sync as EventListener);
+        return () => {
+            window.removeEventListener("storage", sync);
+            window.removeEventListener("sl:tile-skin-change", sync as EventListener);
+        };
+    }, []);
+
     const onChange = (tname: string, key: string, val: any) => {
         lastInputRef.current = Date.now();
-        setDraft(prev => ({...prev, [tname]: {...(prev[tname] ?? {}), [key]: val}}));
+        setDraft((prev) => ({...prev, [tname]: {...(prev[tname] ?? {}), [key]: val}}));
     };
 
     const tables = useMemo(() => {
-        const src: Tables = Object.keys(draft).length ? draft : (serverTables ?? {});
-        return src;
+        return Object.keys(draft).length ? draft : (serverTables ?? {});
     }, [draft, serverTables]);
 
     const sidebarItems = useMemo(() => {
-        const items = Object.keys(tables);
-        return items.map(name => {
-            const changed =
-                !!serverTables &&
-                !deepEqual(tables[name], (serverTables[name] ?? {}));
-            return {name, changed};
-        });
+        return Object.keys(tables).map((name) => ({
+            name,
+            changed: !!serverTables && !deepEqual(tables[name], (serverTables[name] ?? {})),
+        }));
     }, [tables, serverTables]);
 
     const trKey = (table: string, key: string) => ({
@@ -113,24 +118,41 @@ export default function SettingsWindow() {
                 <div className={styles.kvRows}>
                     {entries.map(([key, val]) => {
                         const id = `${active}.${key}`;
-                        const { nameKey, descKey } = trKey(active, key);
+                        const {nameKey, descKey} = trKey(active, key);
                         const label = t(nameKey);
                         const title = t(descKey);
 
                         const control = typeof val === "boolean"
-                            ? (<input id={id} type="checkbox" className="form-checkbox"
-                                      checked={!!val}
-                                      onChange={e => onChange(active, key, e.target.checked)}
-                                      title={title} />)
+                            ? (
+                                <input
+                                    id={id}
+                                    type="checkbox"
+                                    className="form-checkbox"
+                                    checked={!!val}
+                                    onChange={(e) => onChange(active, key, e.target.checked)}
+                                    title={title}
+                                />
+                            )
                             : typeof val === "number"
-                                ? (<input id={id} type="number" className="form-input"
-                                          value={val}
-                                          onChange={e => onChange(active, key, Number(e.target.value))}
-                                          title={title} />)
-                                : (<input id={id} className="form-input"
-                                          value={val ?? ""}
-                                          onChange={e => onChange(active, key, e.target.value)}
-                                          title={title} />);
+                                ? (
+                                    <input
+                                        id={id}
+                                        type="number"
+                                        className="form-input"
+                                        value={val}
+                                        onChange={(e) => onChange(active, key, Number(e.target.value))}
+                                        title={title}
+                                    />
+                                )
+                                : (
+                                    <input
+                                        id={id}
+                                        className="form-input"
+                                        value={val ?? ""}
+                                        onChange={(e) => onChange(active, key, e.target.value)}
+                                        title={title}
+                                    />
+                                );
 
                         return (
                             <div className={styles.kvRow} key={key}>
@@ -150,8 +172,22 @@ export default function SettingsWindow() {
                 <div className={styles.hleft} data-tauri-drag-region>
                     <div className={styles.title}>{t("settings.title")}</div>
                     <div className={styles.langWrap}>
-                        <LanguageSwitcher/>
+                        <LanguageSwitcher />
                     </div>
+                    <label className={styles.tileSkinWrap}>
+                        <span>{t("settings.tile_skin_label")}</span>
+                        <select
+                            value={tileSkinState}
+                            onChange={(e) => {
+                                const next = e.target.value as TileSkin;
+                                setTileSkin(next);
+                                setTileSkinState(next);
+                            }}
+                        >
+                            <option value="classic">{t("settings.tile_skin_classic")}</option>
+                            <option value="tempai-svg">{t("settings.tile_skin_tempai_svg")}</option>
+                        </select>
+                    </label>
                 </div>
                 <div className={styles.hright}>
                     <button className={styles.iconBtn} onClick={onSync} title={t("settings.btn_manual_sync") as string}>
@@ -165,17 +201,17 @@ export default function SettingsWindow() {
 
             <div className={styles.main}>
                 <aside className={styles.sidebar}>
-                    {sidebarItems.map(it => (
+                    {sidebarItems.map((it) => (
                         <button
                             key={it.name}
                             className={`${styles.sideItem} ${active === it.name ? styles.active : ""}`}
                             onClick={() => setActive(it.name)}
                             title={t(`settings.table.${it.name}`, {defaultValue: it.name})}
                         >
-              <span className={styles.sideText}>
-                {t(`settings.table.${it.name}`, {defaultValue: it.name})}
-              </span>
-                            {it.changed && <i className={styles.badgeDot}/>}
+                            <span className={styles.sideText}>
+                                {t(`settings.table.${it.name}`, {defaultValue: it.name})}
+                            </span>
+                            {it.changed ? <i className={styles.badgeDot} /> : null}
                         </button>
                     ))}
                 </aside>
