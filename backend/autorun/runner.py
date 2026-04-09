@@ -711,7 +711,12 @@ class AutoRunner:
             if game_state.stage == 3:
                 self.current_step = f"game.discard({game_state.level})"
                 await self._broadcast_status(safe=True)
-                suuannkou = plan_pure_pinzu_suu_ankou_v2(game_state.hand_tiles, game_state.wall_tiles, game_state.deck_map)
+                suuannkou = await asyncio.to_thread(
+                    plan_pure_pinzu_suu_ankou_v2,
+                    game_state.hand_tiles,
+                    game_state.wall_tiles,
+                    game_state.deck_map,
+                )
                 if suuannkou["status"] == "impossible":
                     self.current_step = "game.remake"
                     await self._broadcast_status(safe=True)

@@ -37,6 +37,7 @@ _SWITCH_STOP_EVENT = threading.Event()
 _SWITCH_SEARCH_TASK: asyncio.Task | None = None
 _LAST_SWITCH_PLAN: dict | None = None
 _LAST_SWITCH_RUNTIME: dict = get_active_search_runtime_snapshot(searching=False)
+_DISCARD_RECOMMENDATION_SEQ = 0
 
 
 def _coerce_int_list(values: Any) -> list[int]:
@@ -119,6 +120,88 @@ def _live_switch_search_state(*, wall_limit: int = 36) -> dict:
 def _cache_switch_plan(plan: dict | None) -> None:
     global _LAST_SWITCH_PLAN
     _LAST_SWITCH_PLAN = copy.deepcopy(plan) if isinstance(plan, dict) else None
+
+
+def _current_discard_from_plan(plan: dict) -> int | None:
+    if not isinstance(plan, dict):
+        return None
+    if plan.get("status") != "plan":
+        return None
+    d = plan.get("discards") or []
+    return int(d[0]) if d else None
+
+
+def _wrap_discard_recommendation_entry(yaku_key: str, plan: dict) -> dict:
+    entry = {
+        "status": plan.get("status"),
+        "draws_needed": plan.get("draws_needed"),
+        "target14": plan.get("target14") or [],
+        "discards": plan.get("discards") or [],
+    }
+    if "pair_hint" in plan:
+        entry["pair_hint"] = plan["pair_hint"]
+    if "mode" in plan:
+        entry["mode"] = plan["mode"]
+    if "reason" in plan:
+        entry["reason"] = plan["reason"]
+    cur = _current_discard_from_plan(plan)
+    if cur is not None:
+        entry["discard"] = cur
+    return {"yaku": yaku_key, "data": entry}
+
+
+async def _compute_and_broadcast_discard_recommendations(
+        *,
+        seq: int,
+        deck_map: Dict[int, str],
+        hand_tiles: List[int],
+        wall_tiles: List[int],
+) -> None:
+    global _DISCARD_RECOMMENDATION_SEQ
+
+    chiitoi, suuannkou = await asyncio.gather(
+        asyncio.to_thread(chiitoi_recommendation_json, deck_map, hand_tiles, wall_tiles),
+        asyncio.to_thread(plan_pure_pinzu_suu_ankou_v2, hand_tiles, wall_tiles, deck_map),
+    )
+
+    if seq != _DISCARD_RECOMMENDATION_SEQ:
+        return
+
+    await broadcast(chiitoi)
+
+    payload = {
+        "type": "discard_recommendation",
+        "data": [
+            _wrap_discard_recommendation_entry("chiitoi", chiitoi),
+            _wrap_discard_recommendation_entry("suuannkou", suuannkou),
+        ],
+    }
+    await broadcast(payload)
+
+    win_entries = [e for e in payload["data"] if e["data"].get("status") == "win_now"]
+    if not win_entries or not MANAGER.get("game.auto_tsumo"):
+        return
+
+    peer_key = None
+    addon_now = _addon.WS_ADDON_INSTANCE
+    if addon_now and addon_now.last_flow:
+        f = addon_now.last_flow
+        peer_key = f"{f.client_conn.address[0]}|{f.server_conn.address[0]}"
+
+    def _do_inject():
+        addon = _addon.WS_ADDON_INSTANCE
+        if not addon:
+            logger.warning("WS_ADDON_INSTANCE not ready; skip inject")
+            return
+        ok, reason, _ = addon.inject_now(
+            method=".lq.Lobby.amuletActivityOperate",
+            data={"activityId": 250811, "type": 8, "tileList": []},
+            t="Req",
+            peer_key=peer_key,
+        )
+        logger.info(f"success: {ok}, reason: {reason}")
+
+    ctx.master.event_loop.call_later(0.3, _do_inject)
 
 
 def _cache_switch_runtime(runtime: dict | None) -> None:
@@ -1353,82 +1436,18 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
 
             GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, effect_list=effect_list, ting_list=ting_list, next_operation=next_operation, reason=".lq.Lobby.amuletActivityOperate:6")
 
-            def ids_to_tiles(id_list: List[int], deck_map: "OrderedDict[int, str]") -> List[str]:
-                """
-                把 [id] 按顺序转换成 [tile]（不做任何规范化，0p 仍是 '0p'）
-                """
-                try:
-                    return [deck_map[i] for i in id_list]
-                except KeyError as e:
-                    raise ValueError(f"deck_map 缺少 id={e.args[0]} 的映射") from None
-
-            chiitoi = chiitoi_recommendation_json(GAME_STATE.deck_map, GAME_STATE.hand_tiles, GAME_STATE.wall_tiles)
-            suuannkou = plan_pure_pinzu_suu_ankou_v2(GAME_STATE.hand_tiles, GAME_STATE.wall_tiles, GAME_STATE.deck_map)
-
             loop = asyncio.get_running_loop()
-            loop.create_task(broadcast(chiitoi))
-
-            def _current_discard(plan: dict) -> int | None:
-                if not isinstance(plan, dict):
-                    return None
-                if plan.get("status") != "plan":
-                    return None
-                d = plan.get("discards") or []
-                return int(d[0]) if d else None
-
-            def _wrap_entry(yaku_key: str, plan: dict) -> dict:
-                entry = {
-                    "status": plan.get("status"),
-                    "draws_needed": plan.get("draws_needed"),
-                    "target14": plan.get("target14") or [],
-                    "discards": plan.get("discards") or [],
-                }
-                # 可选字段（仅存在时写入）
-                if "pair_hint" in plan: entry["pair_hint"] = plan["pair_hint"]
-                if "mode" in plan: entry["mode"] = plan["mode"]
-                if "reason" in plan: entry["reason"] = plan["reason"]
-                # 附带当前一步要打的牌（方便前端直接取）
-                cur = _current_discard(plan)
-                if cur is not None:
-                    entry["discard"] = cur
-                return {"yaku": yaku_key, "data": entry}
-
-            payload = {
-                "type": "discard_recommendation",
-                "data": [
-                    _wrap_entry("chiitoi", chiitoi),
-                    _wrap_entry("suuannkou", suuannkou),
-                ],
-            }
-
-            # 广播一次即可
-            loop = asyncio.get_running_loop()
-            loop.create_task(broadcast(payload))
-
-            win_entries = [e for e in payload["data"] if e["data"].get("status") == "win_now"]
-
-            if win_entries:
-                if MANAGER.get("game.auto_tsumo"):
-                    peer_key = None
-                    addon_now = _addon.WS_ADDON_INSTANCE
-                    if addon_now and addon_now.last_flow:
-                        f = addon_now.last_flow
-                        peer_key = f"{f.client_conn.address[0]}|{f.server_conn.address[0]}"
-
-                    def _do_inject():
-                        addon = _addon.WS_ADDON_INSTANCE
-                        if not addon:
-                            logger.warning("WS_ADDON_INSTANCE not ready; skip inject")
-                            return
-                        ok, reason, _ = addon.inject_now(
-                            method=".lq.Lobby.amuletActivityOperate",
-                            data={"activityId": 250811, "type": 8, "tileList": []},
-                            t="Req",
-                            peer_key=peer_key,
-                        )
-                        logger.info(f"success: {ok}, reason: {reason}")
-
-                    ctx.master.event_loop.call_later(0.3, _do_inject)
+            global _DISCARD_RECOMMENDATION_SEQ
+            _DISCARD_RECOMMENDATION_SEQ += 1
+            rec_seq = _DISCARD_RECOMMENDATION_SEQ
+            loop.create_task(
+                _compute_and_broadcast_discard_recommendations(
+                    seq=rec_seq,
+                    deck_map=dict(GAME_STATE.deck_map),
+                    hand_tiles=list(GAME_STATE.hand_tiles),
+                    wall_tiles=list(GAME_STATE.wall_tiles),
+                )
+            )
 
         coin_event = next((e for e in events if e.get("type") == 11), None)
         if coin_event:
