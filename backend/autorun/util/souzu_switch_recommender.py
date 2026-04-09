@@ -1303,7 +1303,7 @@ def _tes_generate_targets(all_tiles: Sequence[str]) -> List[List[str]]:
                 if temp2 is None:
                     continue
                 for t in bamboo_combos:
-                    target = list(itertools.chain(*kong_combo, m, p, t))
+                    target = list(itertools.chain(*kong_combo, m, t, p))
                     if len(target) == 15:
                         key = tuple(sorted(target))
                         if key not in seen:
