@@ -542,6 +542,57 @@ class AutoRunner:
         await self.run_tick()
         await self._broadcast_status(safe=True)
 
+    async def _sell_new_useless_amulets_from_resp(
+            self,
+            bot: PacketBot,
+            resp: Optional[dict],
+            effect_list_before_select: List[Dict[str, Any]],
+    ) -> bool:
+        new_items = _extract_new_amulets_from_select_resp(resp)
+        if not new_items:
+            return True
+
+        for item in new_items:
+            value = _selected_effect_value(item, effect_list_before_select, self.targets)
+            if value > 0:
+                continue
+
+            uid = item.get("uid")
+            try:
+                uid = int(uid) if uid is not None else None
+            except Exception:
+                uid = None
+
+            logger.info(
+                "[autorun] auto-sell valueless selected amulet: raw_id={} uid={} badge={}",
+                item.get("id"),
+                uid,
+                (item.get("badge") or {}).get("id") if isinstance(item.get("badge"), dict) else None,
+            )
+
+            if uid is None:
+                continue
+
+            self.current_step = "game.sell_new_useless_effect"
+            await self._broadcast_status(safe=True)
+            ok, reason, _sell_resp = await call_with_1004_retry_async(
+                bot.sell_effect,
+                uid=uid,
+                delay_sec=3,
+                interval=3,
+                timeout=3000,
+                to_thread=True,
+            )
+            if ok:
+                continue
+            if reason == "error code: 2699":
+                bot.fetch_amulet_activity_data()
+                return True
+            self.last_error = reason
+            await self.abort(f"fatal: {reason}")
+            return False
+        return True
+
     async def run_tick(self) -> None:
         try:
             await asyncio.sleep(0.1)
@@ -937,6 +988,7 @@ class AutoRunner:
                 free_space = game_state.max_effect_volume - used_space
                 # 如果空间充足、直接选择
                 if free_space >= need_space:
+                    effect_list_before_select = [dict(it) for it in (game_state.effect_list or [])]
                     if game_state.stage == 5:
                         ok, reason, resp = await call_with_1004_retry_async(
                             bot.select_effect,
@@ -956,6 +1008,8 @@ class AutoRunner:
                             to_thread=True,
                         )
                     if ok:
+                        if not await self._sell_new_useless_amulets_from_resp(bot, resp, effect_list_before_select):
+                            return
                         if value == 0:
                             reg_id = _reg_id_of_raw(best_raw)
                             if reg_id == 146:
@@ -1382,6 +1436,102 @@ def _candidate_value(raw_id: int, badge_id: Optional[int]) -> int:
     if badge_id == 600050:
         base *= 3
     return base
+
+
+def _selected_effect_value(
+        effect_item: Dict[str, Any],
+        effect_list_before_select: List[Dict[str, Any]],
+        targets: List[Dict[str, Any]],
+) -> int:
+    raw_id = int(effect_item.get("id", 0) or 0)
+    if raw_id <= 0:
+        return 0
+
+    reg_id = _reg_id_of_raw(raw_id)
+    _reg, _is_plus, badge_id = _extract_amulet_signature(effect_item)
+
+    want_badges = set()
+    want_amulet_regs = set()
+    for t in targets or []:
+        k = t.get("kind")
+        if k == "badge":
+            try:
+                want_badges.add(int(t.get("id")))
+            except Exception:
+                pass
+        elif k == "amulet":
+            try:
+                want_amulet_regs.add(int(t.get("id")))
+            except Exception:
+                pass
+
+    if badge_id is not None and badge_id in want_badges:
+        return 99
+
+    if reg_id in want_amulet_regs:
+        required_badges = _required_nonplus_badges_for_reg(targets, reg_id)
+        if required_badges:
+            return 99 if badge_id in required_badges else 0
+        return 99
+
+    if _owned_count_with_badge(effect_list_before_select, 600070) < NEED_PIONNER_BADGE_COUNT and badge_id == 600070:
+        return 2
+
+    if badge_id == 600110:
+        return 1
+
+    return _candidate_value(raw_id, badge_id)
+
+
+def _extract_new_amulets_from_select_resp(resp: Optional[dict]) -> List[Dict[str, Any]]:
+    result: List[Dict[str, Any]] = []
+    if not isinstance(resp, dict):
+        return result
+
+    events = resp.get("event")
+    if not isinstance(events, list):
+        return result
+
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        try:
+            event_type = int(event.get("type", -1))
+        except Exception:
+            continue
+        if event_type != 14:
+            continue
+
+        hooks = event.get("effectedHooks")
+        if not isinstance(hooks, list):
+            continue
+
+        for hook in hooks:
+            if not isinstance(hook, dict):
+                continue
+            try:
+                hook_id = int(hook.get("id", -1))
+            except Exception:
+                continue
+            if hook_id != 1631:
+                continue
+
+            hook_result = hook.get("result")
+            if not isinstance(hook_result, dict):
+                continue
+
+            transform_effects = hook_result.get("transformEffect")
+            if not isinstance(transform_effects, list):
+                continue
+
+            for transform in transform_effects:
+                if not isinstance(transform, dict):
+                    continue
+                add_result = transform.get("addResult")
+                if isinstance(add_result, dict):
+                    result.append(add_result)
+
+    return result
 
 
 def _required_nonplus_badges_for_reg(targets: List[Dict[str, Any]], reg_id: int) -> set[int]:
