@@ -38,6 +38,15 @@ body {
     background-attachment: fixed;
 }
 
+:root[data-theme="dark"] body,
+:root[data-theme="dark-green"] body,
+:root[data-theme="dark-purple"] body {
+    background-image:
+        radial-gradient(circle at top left, color-mix(in srgb, var(--color-ring) 7%, transparent), transparent 30%),
+        radial-gradient(circle at 85% 16%, color-mix(in srgb, var(--accent-green) 5%, transparent), transparent 26%),
+        linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 90%, var(--bg)) 0%, var(--bg) 100%);
+}
+
 html, body, #root, .app {
     -webkit-user-select: none;
     user-select: none;
@@ -240,17 +249,79 @@ input, textarea, select, code, pre, .selectable {
     --nav-indicator-height: 44px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--panel-bg);
-    box-shadow: var(--panel-shadow);
+    box-shadow: 0 18px 42px color-mix(in srgb, var(--color-ring) 8%, transparent), var(--panel-shadow);
     padding: 8px;
     display: flex;
     flex-direction: column;
     gap: 8px;
     align-items: center;
-    backdrop-filter: blur(18px) saturate(1.1);
-    background: color-mix(in srgb, var(--panel-bg) 84%, transparent);
+    backdrop-filter: blur(24px) saturate(1.18);
+    background:
+        linear-gradient(180deg,
+            color-mix(in srgb, white 22%, var(--panel-bg)) 0%,
+            color-mix(in srgb, var(--panel-bg) 72%, transparent) 16%,
+            color-mix(in srgb, var(--panel-bg) 82%, transparent) 100%);
     animation: panelEnter .55s ease both;
     position: relative;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+:root[data-theme="dark"] .sidebar,
+:root[data-theme="dark-green"] .sidebar,
+:root[data-theme="dark-purple"] .sidebar {
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .24), var(--panel-shadow);
+    backdrop-filter: blur(18px) saturate(1.04);
+    background:
+        linear-gradient(180deg,
+            color-mix(in srgb, white 6%, var(--panel-bg)) 0%,
+            color-mix(in srgb, var(--panel-bg) 92%, transparent) 100%);
+}
+
+.sidebar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 18% 10%, color-mix(in srgb, var(--color-ring) 18%, transparent), transparent 32%),
+        radial-gradient(circle at 82% 88%, color-mix(in srgb, var(--accent-green) 12%, transparent), transparent 30%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.03) 28%, transparent 70%);
+    opacity: .92;
+    z-index: 0;
+}
+
+:root[data-theme="dark"] .sidebar::before,
+:root[data-theme="dark-green"] .sidebar::before,
+:root[data-theme="dark-purple"] .sidebar::before {
+    background:
+        radial-gradient(circle at 18% 10%, color-mix(in srgb, var(--color-ring) 8%, transparent), transparent 28%),
+        radial-gradient(circle at 82% 88%, color-mix(in srgb, var(--accent-green) 6%, transparent), transparent 26%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 34%);
+    opacity: .55;
+}
+
+.sidebar::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: calc(var(--radius) - 1px);
+    pointer-events: none;
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 28%),
+        linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.06));
+    opacity: .9;
+    z-index: 0;
+}
+
+:root[data-theme="dark"] .sidebar::after,
+:root[data-theme="dark-green"] .sidebar::after,
+:root[data-theme="dark-purple"] .sidebar::after {
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 26%),
+        linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.02));
+    opacity: .55;
 }
 
 .sidebar-active-indicator {
@@ -272,7 +343,7 @@ input, textarea, select, code, pre, .selectable {
         height .24s ease,
         opacity .2s ease;
     pointer-events: none;
-    z-index: 0;
+    z-index: 1;
 }
 
 .sidebar-active-indicator::after {
@@ -339,7 +410,7 @@ input, textarea, select, code, pre, .selectable {
     transition: background .2s ease, border-color .2s ease, transform .2s ease, box-shadow .2s ease;
     position: relative;
     overflow: hidden;
-    z-index: 1;
+    z-index: 2;
 }
 
 .nav-icon:hover {
@@ -389,18 +460,79 @@ input, textarea, select, code, pre, .selectable {
 .main-pane {
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--panel-bg);
-    box-shadow: var(--panel-shadow);
+    box-shadow: 0 22px 54px color-mix(in srgb, var(--color-ring) 10%, transparent), var(--panel-shadow);
     min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     position: relative;
-    backdrop-filter: blur(20px) saturate(1.05);
+    backdrop-filter: blur(28px) saturate(1.15);
     background:
-        linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 86%, transparent), color-mix(in srgb, var(--panel-bg) 96%, transparent)),
-        var(--panel-bg);
+        linear-gradient(180deg,
+            color-mix(in srgb, white 16%, var(--panel-bg)) 0%,
+            color-mix(in srgb, var(--panel-bg) 68%, transparent) 12%,
+            color-mix(in srgb, var(--panel-bg) 88%, transparent) 100%);
     animation: panelEnter .6s ease .08s both;
+    isolation: isolate;
+}
+
+:root[data-theme="dark"] .main-pane,
+:root[data-theme="dark-green"] .main-pane,
+:root[data-theme="dark-purple"] .main-pane {
+    box-shadow: 0 18px 40px rgba(0, 0, 0, .24), var(--panel-shadow);
+    backdrop-filter: blur(20px) saturate(1.04);
+    background:
+        linear-gradient(180deg,
+            color-mix(in srgb, white 5%, var(--panel-bg)) 0%,
+            color-mix(in srgb, var(--panel-bg) 94%, transparent) 100%);
+}
+
+.main-pane::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--color-ring) 15%, transparent), transparent 26%),
+        radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--accent-green) 10%, transparent), transparent 22%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.03) 22%, transparent 64%);
+    opacity: .94;
+    z-index: 0;
+}
+
+:root[data-theme="dark"] .main-pane::before,
+:root[data-theme="dark-green"] .main-pane::before,
+:root[data-theme="dark-purple"] .main-pane::before {
+    background:
+        radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--color-ring) 7%, transparent), transparent 24%),
+        radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--accent-green) 5%, transparent), transparent 20%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 30%);
+    opacity: .5;
+}
+
+.main-pane::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: calc(var(--radius) - 1px);
+    pointer-events: none;
+    background-image:
+        linear-gradient(color-mix(in srgb, white 8%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, white 8%, transparent) 1px, transparent 1px);
+    background-size: 24px 24px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.3), transparent 72%);
+    opacity: .25;
+    z-index: 0;
+}
+
+:root[data-theme="dark"] .main-pane::after,
+:root[data-theme="dark-green"] .main-pane::after,
+:root[data-theme="dark-purple"] .main-pane::after {
+    background-image:
+        linear-gradient(color-mix(in srgb, white 4%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, white 4%, transparent) 1px, transparent 1px);
+    opacity: .12;
 }
 
 .card {
