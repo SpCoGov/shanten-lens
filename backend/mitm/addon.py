@@ -9,6 +9,7 @@ from mitmproxy import http, ctx
 
 import backend.app
 from backend.mitm.codec import LiqiCodec
+from backend.packet_monitor import PACKET_MONITOR
 
 HookFn = Callable[[Dict], Tuple[str, Any]]
 
@@ -42,7 +43,7 @@ class WsAddon:
     def __init__(self, codec: LiqiCodec):
         self.codec = codec
         self.on_outbound: Optional[HookFn] = None
-        self.   on_inbound: Optional[HookFn] = None
+        self.on_inbound: Optional[HookFn] = None
         self.subscribers: List[Callable[[Dict], None]] = []
         self._flows: Dict[str, http.HTTPFlow] = {}  # peer_key -> flow
         self.last_flow: Optional[http.HTTPFlow] = None  # 最近一次触达的 flow
@@ -168,6 +169,14 @@ class WsAddon:
                 cb(view)
             except Exception as e:
                 logger.error(f"subscriber error: {e}")
+
+        try:
+            method = str(view.get("method") or "")
+            if backend.app.should_emit_packet_monitor(method):
+                packet = PACKET_MONITOR.append(view)
+                backend.app.post_broadcast({"type": "packet_monitor_event", "data": packet})
+        except Exception as e:
+            logger.error(f"packet monitor append failed: {e}")
 
         try:
             if backend.app.MANAGER.get("general.debug"):

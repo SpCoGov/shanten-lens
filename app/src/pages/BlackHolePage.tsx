@@ -368,12 +368,12 @@ export default function BlackHolePage({
 }
 
 export function BlackHoleStrategyCard({
-    title,
-    data,
-    runtime,
-    resolveFace,
-    onOpenConsideredTiles,
-}: {
+                                          title,
+                                          data,
+                                          runtime,
+                                          resolveFace,
+                                          onOpenConsideredTiles,
+                                      }: {
     title: string;
     data: PlanData | null;
     runtime?: SearchRuntimeData | null;
@@ -441,10 +441,10 @@ export function BlackHoleStrategyCard({
 }
 
 function PlanBody({
-    data,
-    resolveFace,
-    onOpenConsideredTiles,
-}: {
+                      data,
+                      resolveFace,
+                      onOpenConsideredTiles,
+                  }: {
     data: PlanData;
     resolveFace?: (id: number) => string | null;
     onOpenConsideredTiles?: () => void;
@@ -479,9 +479,9 @@ function PlanBody({
 }
 
 function SearchParamsBand({
-    data,
-    onOpenConsideredTiles,
-}: {
+                              data,
+                              onOpenConsideredTiles,
+                          }: {
     data: PlanData;
     onOpenConsideredTiles?: () => void;
 }) {
@@ -658,9 +658,9 @@ export function WorkerStatusPanel({data, runtime}: { data: PlanData; runtime?: S
 }
 
 function ConsideredTilesBody({
-    sections,
-    resolveFace,
-}: {
+                                 sections,
+                                 resolveFace,
+                             }: {
     sections: Array<{ key: string; title: string; ids: TileId[] }>;
     resolveFace?: (id: number) => string | null;
 }) {
@@ -759,9 +759,9 @@ function mapLegacySource(source: string) {
 }
 
 function QuadTilePositions({
-    positions,
-    resolveFace,
-}: {
+                               positions,
+                               resolveFace,
+                           }: {
     positions: Array<{ tile_id: TileId; source: string; source_index: number }>;
     resolveFace?: (id: number) => string | null;
 }) {
@@ -802,10 +802,10 @@ function QuadTilePositions({
 }
 
 function TileGroup({
-    title,
-    ids,
-    resolveFace,
-}: {
+                       title,
+                       ids,
+                       resolveFace,
+                   }: {
     title: string;
     ids: TileId[];
     resolveFace?: (id: number) => string | null;

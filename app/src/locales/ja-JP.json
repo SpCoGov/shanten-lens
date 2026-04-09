@@ -28,6 +28,7 @@
     "refreshGame": "更新",
     "settings": "設定",
     "diagnostics": "ログ",
+    "packetTest": "パケットテスト",
     "about": "情報"
   },
   "amulet_editor": {

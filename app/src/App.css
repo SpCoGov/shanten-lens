@@ -31,20 +31,18 @@ body {
     color: var(--text);
     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
     -webkit-font-smoothing: antialiased;
-    background-image:
-        radial-gradient(circle at top left, color-mix(in srgb, var(--color-ring) 14%, transparent), transparent 28%),
-        radial-gradient(circle at 85% 16%, color-mix(in srgb, var(--accent-green) 10%, transparent), transparent 24%),
-        linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 78%, var(--bg)) 0%, var(--bg) 100%);
+    background-image: radial-gradient(circle at top left, color-mix(in srgb, var(--color-ring) 14%, transparent), transparent 28%),
+    radial-gradient(circle at 85% 16%, color-mix(in srgb, var(--accent-green) 10%, transparent), transparent 24%),
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 78%, var(--bg)) 0%, var(--bg) 100%);
     background-attachment: fixed;
 }
 
 :root[data-theme="dark"] body,
 :root[data-theme="dark-green"] body,
 :root[data-theme="dark-purple"] body {
-    background-image:
-        radial-gradient(circle at top left, color-mix(in srgb, var(--color-ring) 7%, transparent), transparent 30%),
-        radial-gradient(circle at 85% 16%, color-mix(in srgb, var(--accent-green) 5%, transparent), transparent 26%),
-        linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 90%, var(--bg)) 0%, var(--bg) 100%);
+    background-image: radial-gradient(circle at top left, color-mix(in srgb, var(--color-ring) 7%, transparent), transparent 30%),
+    radial-gradient(circle at 85% 16%, color-mix(in srgb, var(--accent-green) 5%, transparent), transparent 26%),
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 90%, var(--bg)) 0%, var(--bg) 100%);
 }
 
 html, body, #root, .app {
@@ -121,9 +119,8 @@ input, textarea, select, code, pre, .selectable {
     position: absolute;
     inset: 0;
     opacity: .22;
-    background-image:
-        linear-gradient(color-mix(in srgb, var(--color-border) 55%, transparent) 1px, transparent 1px),
-        linear-gradient(90deg, color-mix(in srgb, var(--color-border) 55%, transparent) 1px, transparent 1px);
+    background-image: linear-gradient(color-mix(in srgb, var(--color-border) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-border) 55%, transparent) 1px, transparent 1px);
     background-size: 28px 28px;
     mask-image: linear-gradient(180deg, rgba(0, 0, 0, .32), transparent 72%);
 }
@@ -164,13 +161,12 @@ input, textarea, select, code, pre, .selectable {
     box-shadow: var(--panel-shadow);
     z-index: 1000;
     backdrop-filter: blur(14px) saturate(1.08);
-    background:
-        linear-gradient(90deg,
-            color-mix(in srgb, var(--color-ring) 10%, var(--panel-bg)) 0%,
-            color-mix(in srgb, var(--panel-bg) 92%, transparent) 22%,
-            color-mix(in srgb, var(--accent-green) 8%, var(--panel-bg)) 52%,
-            color-mix(in srgb, var(--panel-bg) 92%, transparent) 78%,
-            color-mix(in srgb, var(--color-ring) 6%, var(--panel-bg)) 100%);
+    background: linear-gradient(90deg,
+    color-mix(in srgb, var(--color-ring) 10%, var(--panel-bg)) 0%,
+    color-mix(in srgb, var(--panel-bg) 92%, transparent) 22%,
+    color-mix(in srgb, var(--accent-green) 8%, var(--panel-bg)) 52%,
+    color-mix(in srgb, var(--panel-bg) 92%, transparent) 78%,
+    color-mix(in srgb, var(--color-ring) 6%, var(--panel-bg)) 100%);
 }
 
 .topbar .drag {
@@ -256,11 +252,10 @@ input, textarea, select, code, pre, .selectable {
     gap: 8px;
     align-items: center;
     backdrop-filter: blur(24px) saturate(1.18);
-    background:
-        linear-gradient(180deg,
-            color-mix(in srgb, white 22%, var(--panel-bg)) 0%,
-            color-mix(in srgb, var(--panel-bg) 72%, transparent) 16%,
-            color-mix(in srgb, var(--panel-bg) 82%, transparent) 100%);
+    background: linear-gradient(180deg,
+    color-mix(in srgb, white 22%, var(--panel-bg)) 0%,
+    color-mix(in srgb, var(--panel-bg) 72%, transparent) 16%,
+    color-mix(in srgb, var(--panel-bg) 82%, transparent) 100%);
     animation: panelEnter .55s ease both;
     position: relative;
     isolation: isolate;
@@ -272,10 +267,9 @@ input, textarea, select, code, pre, .selectable {
 :root[data-theme="dark-purple"] .sidebar {
     box-shadow: 0 12px 30px rgba(0, 0, 0, .24), var(--panel-shadow);
     backdrop-filter: blur(18px) saturate(1.04);
-    background:
-        linear-gradient(180deg,
-            color-mix(in srgb, white 6%, var(--panel-bg)) 0%,
-            color-mix(in srgb, var(--panel-bg) 92%, transparent) 100%);
+    background: linear-gradient(180deg,
+    color-mix(in srgb, white 6%, var(--panel-bg)) 0%,
+    color-mix(in srgb, var(--panel-bg) 92%, transparent) 100%);
 }
 
 .sidebar::before {
@@ -284,10 +278,9 @@ input, textarea, select, code, pre, .selectable {
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    background:
-        radial-gradient(circle at 18% 10%, color-mix(in srgb, var(--color-ring) 18%, transparent), transparent 32%),
-        radial-gradient(circle at 82% 88%, color-mix(in srgb, var(--accent-green) 12%, transparent), transparent 30%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.03) 28%, transparent 70%);
+    background: radial-gradient(circle at 18% 10%, color-mix(in srgb, var(--color-ring) 18%, transparent), transparent 32%),
+    radial-gradient(circle at 82% 88%, color-mix(in srgb, var(--accent-green) 12%, transparent), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.03) 28%, transparent 70%);
     opacity: .92;
     z-index: 0;
 }
@@ -295,10 +288,9 @@ input, textarea, select, code, pre, .selectable {
 :root[data-theme="dark"] .sidebar::before,
 :root[data-theme="dark-green"] .sidebar::before,
 :root[data-theme="dark-purple"] .sidebar::before {
-    background:
-        radial-gradient(circle at 18% 10%, color-mix(in srgb, var(--color-ring) 8%, transparent), transparent 28%),
-        radial-gradient(circle at 82% 88%, color-mix(in srgb, var(--accent-green) 6%, transparent), transparent 26%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 34%);
+    background: radial-gradient(circle at 18% 10%, color-mix(in srgb, var(--color-ring) 8%, transparent), transparent 28%),
+    radial-gradient(circle at 82% 88%, color-mix(in srgb, var(--accent-green) 6%, transparent), transparent 26%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 34%);
     opacity: .55;
 }
 
@@ -308,9 +300,8 @@ input, textarea, select, code, pre, .selectable {
     inset: 1px;
     border-radius: calc(var(--radius) - 1px);
     pointer-events: none;
-    background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 28%),
-        linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.06));
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 28%),
+    linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.06));
     opacity: .9;
     z-index: 0;
 }
@@ -318,9 +309,8 @@ input, textarea, select, code, pre, .selectable {
 :root[data-theme="dark"] .sidebar::after,
 :root[data-theme="dark-green"] .sidebar::after,
 :root[data-theme="dark-purple"] .sidebar::after {
-    background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 26%),
-        linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.02));
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 26%),
+    linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.02));
     opacity: .55;
 }
 
@@ -331,17 +321,14 @@ input, textarea, select, code, pre, .selectable {
     width: 4px;
     height: var(--nav-indicator-height);
     border-radius: 999px;
-    background:
-        linear-gradient(180deg, color-mix(in srgb, white 30%, var(--color-ring)), var(--color-ring));
-    box-shadow:
-        0 0 0 1px color-mix(in srgb, var(--color-ring) 22%, transparent),
-        0 0 16px color-mix(in srgb, var(--color-ring) 35%, transparent),
-        0 0 28px color-mix(in srgb, var(--color-ring) 20%, transparent);
+    background: linear-gradient(180deg, color-mix(in srgb, white 30%, var(--color-ring)), var(--color-ring));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-ring) 22%, transparent),
+    0 0 16px color-mix(in srgb, var(--color-ring) 35%, transparent),
+    0 0 28px color-mix(in srgb, var(--color-ring) 20%, transparent);
     transform: translateY(0);
-    transition:
-        top .34s cubic-bezier(.22, .9, .2, 1),
-        height .24s ease,
-        opacity .2s ease;
+    transition: top .34s cubic-bezier(.22, .9, .2, 1),
+    height .24s ease,
+    opacity .2s ease;
     pointer-events: none;
     z-index: 1;
 }
@@ -467,11 +454,10 @@ input, textarea, select, code, pre, .selectable {
     overflow: hidden;
     position: relative;
     backdrop-filter: blur(28px) saturate(1.15);
-    background:
-        linear-gradient(180deg,
-            color-mix(in srgb, white 16%, var(--panel-bg)) 0%,
-            color-mix(in srgb, var(--panel-bg) 68%, transparent) 12%,
-            color-mix(in srgb, var(--panel-bg) 88%, transparent) 100%);
+    background: linear-gradient(180deg,
+    color-mix(in srgb, white 16%, var(--panel-bg)) 0%,
+    color-mix(in srgb, var(--panel-bg) 68%, transparent) 12%,
+    color-mix(in srgb, var(--panel-bg) 88%, transparent) 100%);
     animation: panelEnter .6s ease .08s both;
     isolation: isolate;
 }
@@ -481,10 +467,9 @@ input, textarea, select, code, pre, .selectable {
 :root[data-theme="dark-purple"] .main-pane {
     box-shadow: 0 18px 40px rgba(0, 0, 0, .24), var(--panel-shadow);
     backdrop-filter: blur(20px) saturate(1.04);
-    background:
-        linear-gradient(180deg,
-            color-mix(in srgb, white 5%, var(--panel-bg)) 0%,
-            color-mix(in srgb, var(--panel-bg) 94%, transparent) 100%);
+    background: linear-gradient(180deg,
+    color-mix(in srgb, white 5%, var(--panel-bg)) 0%,
+    color-mix(in srgb, var(--panel-bg) 94%, transparent) 100%);
 }
 
 .main-pane::before {
@@ -493,10 +478,9 @@ input, textarea, select, code, pre, .selectable {
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    background:
-        radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--color-ring) 15%, transparent), transparent 26%),
-        radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--accent-green) 10%, transparent), transparent 22%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.03) 22%, transparent 64%);
+    background: radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--color-ring) 15%, transparent), transparent 26%),
+    radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--accent-green) 10%, transparent), transparent 22%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.03) 22%, transparent 64%);
     opacity: .94;
     z-index: 0;
 }
@@ -504,10 +488,9 @@ input, textarea, select, code, pre, .selectable {
 :root[data-theme="dark"] .main-pane::before,
 :root[data-theme="dark-green"] .main-pane::before,
 :root[data-theme="dark-purple"] .main-pane::before {
-    background:
-        radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--color-ring) 7%, transparent), transparent 24%),
-        radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--accent-green) 5%, transparent), transparent 20%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 30%);
+    background: radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--color-ring) 7%, transparent), transparent 24%),
+    radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--accent-green) 5%, transparent), transparent 20%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 30%);
     opacity: .5;
 }
 
@@ -517,9 +500,8 @@ input, textarea, select, code, pre, .selectable {
     inset: 1px;
     border-radius: calc(var(--radius) - 1px);
     pointer-events: none;
-    background-image:
-        linear-gradient(color-mix(in srgb, white 8%, transparent) 1px, transparent 1px),
-        linear-gradient(90deg, color-mix(in srgb, white 8%, transparent) 1px, transparent 1px);
+    background-image: linear-gradient(color-mix(in srgb, white 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, white 8%, transparent) 1px, transparent 1px);
     background-size: 24px 24px;
     mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.3), transparent 72%);
     opacity: .25;
@@ -529,9 +511,8 @@ input, textarea, select, code, pre, .selectable {
 :root[data-theme="dark"] .main-pane::after,
 :root[data-theme="dark-green"] .main-pane::after,
 :root[data-theme="dark-purple"] .main-pane::after {
-    background-image:
-        linear-gradient(color-mix(in srgb, white 4%, transparent) 1px, transparent 1px),
-        linear-gradient(90deg, color-mix(in srgb, white 4%, transparent) 1px, transparent 1px);
+    background-image: linear-gradient(color-mix(in srgb, white 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, white 4%, transparent) 1px, transparent 1px);
     opacity: .12;
 }
 
@@ -1166,12 +1147,12 @@ input:invalid, textarea:invalid, select:invalid {
     inset: 0;
     border-radius: 8px;
     background: linear-gradient(
-        135deg,
-        #38bdf8 0%,
-        #818cf8 24%,
-        #a855f7 48%,
-        #22c55e 72%,
-        #38bdf8 100%
+            135deg,
+            #38bdf8 0%,
+            #818cf8 24%,
+            #a855f7 48%,
+            #22c55e 72%,
+            #38bdf8 100%
     );
     background-size: 220% 220%;
     animation: laiziLinearShift 2.4s ease-in-out infinite alternate;
@@ -1301,13 +1282,33 @@ input:invalid, textarea:invalid, select:invalid {
     box-shadow: 0 14px 28px color-mix(in srgb, var(--color-ring) 8%, transparent);
 }
 
-.sidebar .nav-icon:nth-child(1) { animation: navEnter .42s ease .02s both; }
-.sidebar .nav-icon:nth-child(2) { animation: navEnter .42s ease .06s both; }
-.sidebar .nav-icon:nth-child(3) { animation: navEnter .42s ease .1s both; }
-.sidebar .nav-icon:nth-child(4) { animation: navEnter .42s ease .14s both; }
-.sidebar .nav-icon:nth-child(5) { animation: navEnter .42s ease .18s both; }
-.sidebar .nav-icon:nth-child(6) { animation: navEnter .42s ease .22s both; }
-.sidebar .nav-icon:nth-child(7) { animation: navEnter .42s ease .26s both; }
+.sidebar .nav-icon:nth-child(1) {
+    animation: navEnter .42s ease .02s both;
+}
+
+.sidebar .nav-icon:nth-child(2) {
+    animation: navEnter .42s ease .06s both;
+}
+
+.sidebar .nav-icon:nth-child(3) {
+    animation: navEnter .42s ease .1s both;
+}
+
+.sidebar .nav-icon:nth-child(4) {
+    animation: navEnter .42s ease .14s both;
+}
+
+.sidebar .nav-icon:nth-child(5) {
+    animation: navEnter .42s ease .18s both;
+}
+
+.sidebar .nav-icon:nth-child(6) {
+    animation: navEnter .42s ease .22s both;
+}
+
+.sidebar .nav-icon:nth-child(7) {
+    animation: navEnter .42s ease .26s both;
+}
 
 .route-home > *,
 .route-fuse > *,
@@ -1320,19 +1321,38 @@ input:invalid, textarea:invalid, select:invalid {
     animation: pageFade .45s ease both;
 }
 
-.app-main .panel:nth-of-type(1) { animation-delay: .02s; }
-.app-main .panel:nth-of-type(2) { animation-delay: .08s; }
-.app-main .panel:nth-of-type(3) { animation-delay: .14s; }
-.app-main .panel:nth-of-type(4) { animation-delay: .2s; }
+.app-main .panel:nth-of-type(1) {
+    animation-delay: .02s;
+}
+
+.app-main .panel:nth-of-type(2) {
+    animation-delay: .08s;
+}
+
+.app-main .panel:nth-of-type(3) {
+    animation-delay: .14s;
+}
+
+.app-main .panel:nth-of-type(4) {
+    animation-delay: .2s;
+}
 
 @keyframes ambientFloatA {
-    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-    50% { transform: translate3d(32px, 18px, 0) scale(1.05); }
+    0%, 100% {
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+        transform: translate3d(32px, 18px, 0) scale(1.05);
+    }
 }
 
 @keyframes ambientFloatB {
-    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-    50% { transform: translate3d(-28px, -22px, 0) scale(1.08); }
+    0%, 100% {
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+        transform: translate3d(-28px, -22px, 0) scale(1.08);
+    }
 }
 
 @keyframes pageFade {

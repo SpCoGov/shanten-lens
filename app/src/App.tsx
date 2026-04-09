@@ -5,6 +5,7 @@ import {listen} from "@tauri-apps/api/event";
 import {invoke} from "@tauri-apps/api/core";
 import SettingsPage from "./pages/SettingsPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
+import PacketTestPage from "./pages/PacketTestPage";
 import AutoRunnerPage from "./pages/AutoRunnerPage";
 import FusePage from "./pages/FusePage";
 import AboutPage from "./pages/AboutPage";
@@ -84,7 +85,7 @@ async function openSettingsWindow() {
     }
 }
 
-type Route = "home" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "diagnostics" | "about";
+type Route = "home" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "diagnostics" | "packet-test" | "about";
 
 const OUTER_PADDING = 16;
 const SIDEBAR_WIDTH = 320;
@@ -146,6 +147,7 @@ export default function App() {
     const navRefs = React.useRef<Partial<Record<Route, HTMLButtonElement | null>>>({});
     const themeButtonRef = React.useRef<HTMLButtonElement | null>(null);
     const [connected, setConnected] = React.useState(false);
+    const [debugEnabled, setDebugEnabled] = React.useState(false);
 
     const [cells, setCells] = React.useState<Cell[]>([]);
     const [stage, setStage] = React.useState<number>(0);
@@ -404,7 +406,10 @@ export default function App() {
         const offClose = ws.onClose(() => setConnected(false));
 
         const offPkt = ws.onPacket((pkt: WsEnvelope) => {
-            if (pkt.type === "update_gamestate") {
+            if (pkt.type === "update_config") {
+                const debug = !!(pkt.data as any)?.general?.debug;
+                setDebugEnabled(debug);
+            } else if (pkt.type === "update_gamestate") {
                 const d = pkt.data as GameStateData;
                 setLatestGameState(d);
                 const deck = toDeckMap(d.deck_map);
@@ -537,6 +542,12 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
+        if (!debugEnabled && route === "packet-test") {
+            setRoute("diagnostics");
+        }
+    }, [debugEnabled, route]);
+
+    React.useEffect(() => {
         let un = () => {
         };
         (async () => {
@@ -616,25 +627,46 @@ export default function App() {
             <div className="shell">
                 <aside className="sidebar" ref={sidebarRef}>
                     <div className="sidebar-active-indicator" aria-hidden="true"/>
-                    <button ref={(el) => { navRefs.current.home = el; }} className={`nav-icon ${route === "home" ? "active" : ""}`} title={t("nav.home")} onClick={() => setRoute("home")}>
+                    <button ref={(el) => {
+                        navRefs.current.home = el;
+                    }} className={`nav-icon ${route === "home" ? "active" : ""}`} title={t("nav.home")} onClick={() => setRoute("home")}>
                         <span className="ms">home</span>
                     </button>
-                    <button ref={(el) => { navRefs.current.fuse = el; }} className={`nav-icon ${route === "fuse" ? "active" : ""}`} title={t("nav.fuse")} onClick={() => setRoute("fuse")}>
+                    <button ref={(el) => {
+                        navRefs.current.fuse = el;
+                    }} className={`nav-icon ${route === "fuse" ? "active" : ""}`} title={t("nav.fuse")} onClick={() => setRoute("fuse")}>
                         <span className="ms">gpp_maybe</span>
                     </button>
-                    <button ref={(el) => { navRefs.current.blackhole = el; }} className={`nav-icon ${route === "blackhole" ? "active" : ""}`} title={t("nav.blackhole")} onClick={() => setRoute("blackhole")}>
+                    <button ref={(el) => {
+                        navRefs.current.blackhole = el;
+                    }} className={`nav-icon ${route === "blackhole" ? "active" : ""}`} title={t("nav.blackhole")} onClick={() => setRoute("blackhole")}>
                         <span className="ms">deblur</span>
                     </button>
-                    <button ref={(el) => { navRefs.current["souzu-debug"] = el; }} className={`nav-icon ${route === "souzu-debug" ? "active" : ""}`} title="Souzu Debug" onClick={() => setRoute("souzu-debug")}>
+                    <button ref={(el) => {
+                        navRefs.current["souzu-debug"] = el;
+                    }} className={`nav-icon ${route === "souzu-debug" ? "active" : ""}`} title="Souzu Debug" onClick={() => setRoute("souzu-debug")}>
                         <span className="ms">science</span>
                     </button>
-                    <button ref={(el) => { navRefs.current.autorun = el; }} className={`nav-icon ${route === "autorun" ? "active" : ""}`} title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
+                    <button ref={(el) => {
+                        navRefs.current.autorun = el;
+                    }} className={`nav-icon ${route === "autorun" ? "active" : ""}`} title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
                         <span className="ms">autoplay</span>
                     </button>
-                    <button ref={(el) => { navRefs.current.diagnostics = el; }} className={`nav-icon ${route === "diagnostics" ? "active" : ""}`} title={t("nav.diagnostics")} onClick={() => setRoute("diagnostics")}>
+                    <button ref={(el) => {
+                        navRefs.current.diagnostics = el;
+                    }} className={`nav-icon ${route === "diagnostics" ? "active" : ""}`} title={t("nav.diagnostics")} onClick={() => setRoute("diagnostics")}>
                         <span className="ms">article</span>
                     </button>
-                    <button ref={(el) => { navRefs.current.about = el; }} className={`nav-icon ${route === "about" ? "active" : ""}`} title={t("nav.about")} onClick={() => setRoute("about")}>
+                    {debugEnabled && (
+                        <button ref={(el) => {
+                            navRefs.current["packet-test"] = el;
+                        }} className={`nav-icon ${route === "packet-test" ? "active" : ""}`} title={t("nav.packetTest")} onClick={() => setRoute("packet-test")}>
+                            <span className="ms">send_and_archive</span>
+                        </button>
+                    )}
+                    <button ref={(el) => {
+                        navRefs.current.about = el;
+                    }} className={`nav-icon ${route === "about" ? "active" : ""}`} title={t("nav.about")} onClick={() => setRoute("about")}>
                         <span className="ms">help</span>
                     </button>
 
@@ -753,6 +785,7 @@ export default function App() {
                         {route === "autorun" && <AutoRunnerPage/>}
                         {route === "settings" && <SettingsPage/>}
                         {route === "diagnostics" && <DiagnosticsPage/>}
+                        {route === "packet-test" && debugEnabled && <PacketTestPage/>}
                         {route === "about" && <AboutPage onSecretClick={onSecretClick}/>}
                     </div>
                 </main>

@@ -38,7 +38,7 @@ export default function AboutPage({onSecretClick}: { onSecretClick: () => void }
     return (
         <div className={styles.wrap}>
             <div className={styles.hero}>
-                <img className={styles.logo} src="/logo.svg" alt="Shanten Lens logo" />
+                <img className={styles.logo} src="/logo.svg" alt="Shanten Lens logo"/>
                 <h1 className={styles.secretTitle} onClick={onSecretClick}>
                     {t("app.title")} <span className={styles.sub}>{t("app.subtitle")}</span>
                 </h1>
@@ -47,14 +47,14 @@ export default function AboutPage({onSecretClick}: { onSecretClick: () => void }
             <div className={styles.meta}>
                 <span className={styles.author}>{t("app.author")}</span>
                 <span className={styles.sep} aria-hidden>|</span>
-                <span className={styles.version}>v1.3.2</span>
+                <span className={styles.version}>v1.3.3</span>
                 <span className={styles.build}>(build&nbsp;1)</span>
             </div>
 
             <section>
                 <h2>{t("about.section_license_title")}</h2>
                 <p>
-                    <Trans i18nKey="about.license_copyright_html" values={{year: new Date().getFullYear()}} />
+                    <Trans i18nKey="about.license_copyright_html" values={{year: new Date().getFullYear()}}/>
                 </p>
                 <details>
                     <summary>{t("about.license_toggle_summary")}</summary>
@@ -96,7 +96,7 @@ Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
             <section>
                 <h2>{t("about.section_usage_title")}</h2>
                 <p>
-                    <Trans i18nKey="about.section_usage_body_html" values={{year: new Date().getFullYear()}} />
+                    <Trans i18nKey="about.section_usage_body_html" values={{year: new Date().getFullYear()}}/>
                 </p>
             </section>
 
@@ -104,16 +104,16 @@ Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
                 <h2>{t("about.section_known_issues_title")}</h2>
 
                 <div className={styles.knownIssueRow}>
-                    <AmuletCard item={amulet225} scale={0.42} />
+                    <AmuletCard item={amulet225} scale={0.42}/>
                     <div className={styles.knownIssueText}>
-                        <Trans i18nKey="about.known_issue_225_html" />
+                        <Trans i18nKey="about.known_issue_225_html"/>
                     </div>
                 </div>
 
                 <div className={styles.knownIssueRow}>
-                    <AmuletCard item={amulet218} scale={0.42} />
+                    <AmuletCard item={amulet218} scale={0.42}/>
                     <div className={styles.knownIssueText}>
-                        <Trans i18nKey="about.known_issue_218_html" />
+                        <Trans i18nKey="about.known_issue_218_html"/>
                     </div>
                 </div>
             </section>
@@ -131,7 +131,7 @@ Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
                             <div className={styles.tileGrid}>
                                 {group.tiles.map((tile) => (
                                     <div key={tile} className={styles.tileItem}>
-                                        <Tile tile={tile} width={54} height={72} />
+                                        <Tile tile={tile} width={54} height={72}/>
                                         <span className={styles.tileCode}>{tile}</span>
                                     </div>
                                 ))}

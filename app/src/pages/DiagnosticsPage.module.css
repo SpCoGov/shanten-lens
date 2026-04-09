@@ -4,16 +4,29 @@
 }
 
 .line {
-    overflow-wrap: anywhere;
-    word-break: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 28px;
+    height: 28px;
+    padding-right: 8px;
 }
 
 .log {
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
+    position: relative;
+}
 
-    overflow-wrap: anywhere;
-    word-break: break-word;
+.virtualSpacer {
+    position: relative;
+    min-height: 100%;
+}
+
+.virtualRow {
+    position: absolute;
+    left: 0;
+    right: 0;
 }
 
 .ts {

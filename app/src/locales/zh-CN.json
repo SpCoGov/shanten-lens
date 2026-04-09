@@ -28,6 +28,7 @@
     "refreshGame": "刷新对局",
     "settings": "设置",
     "diagnostics": "日志",
+    "packetTest": "封包测试",
     "about": "关于"
   },
   "amulet_editor": {

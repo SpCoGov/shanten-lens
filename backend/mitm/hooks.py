@@ -444,6 +444,7 @@ async def _broadcast_switch_recommendation(
         "runtime": copy.deepcopy(_LAST_SWITCH_RUNTIME),
     }
     latest_progress["candidate"] = dict(search_params)
+
     async def _flush_progress(force: bool = False) -> None:
         send_state["flush_queued"] = False
         if send_state["finished"]:

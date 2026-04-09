@@ -25,6 +25,7 @@ from backend.config import build_manager
 from backend.data.registry_loader import load_registry_list
 from backend.model.game_state import GameState
 from backend.model.items import AmuletRegistry, BadgeRegistry
+from backend.packet_monitor import PACKET_MONITOR
 from backend.ui_runtime import start_ui_loop_once, get_ui_loop, post_coro, mark_ui_services_started
 
 GAME_STATE = GameState()
@@ -137,6 +138,29 @@ def set_data_root(path: str | Path) -> None:
 _load_registries()
 
 CLIENTS: Set[WebSocketServerProtocol] = set()
+PACKET_MONITOR_ENABLED = False
+PACKET_MONITOR_BLOCKED_METHODS: Set[str] = {".lq.Route.heartbeat"}
+
+
+def packet_monitor_settings_payload() -> Dict[str, Any]:
+    return {
+        "enabled": PACKET_MONITOR_ENABLED,
+        "blockedMethods": sorted(PACKET_MONITOR_BLOCKED_METHODS),
+    }
+
+
+def should_emit_packet_monitor(method: str) -> bool:
+    if not PACKET_MONITOR_ENABLED:
+        return False
+    return method not in PACKET_MONITOR_BLOCKED_METHODS
+
+
+def packet_monitor_snapshot_payload() -> Dict[str, Any]:
+    if not PACKET_MONITOR_ENABLED:
+        return {"packets": []}
+    blocked = PACKET_MONITOR_BLOCKED_METHODS
+    packets = [pkt for pkt in PACKET_MONITOR.snapshot() if str(pkt.get("method") or "") not in blocked]
+    return {"packets": packets}
 
 
 async def _broadcast_on_ui_loop(pkt: Dict[str, Any]) -> None:
@@ -247,6 +271,8 @@ async def ws_handler(ws: WebSocketServerProtocol):
     await ws_send(ws, {"type": "update_config", "data": MANAGER.to_payload()})
     await ws_send(ws, {"type": "update_gamestate", "data": GAME_STATE.to_dict()})
     await ws_send(ws, {"type": "autorun_status", "data": await AUTORUNNER.status_payload_async()})
+    await ws_send(ws, {"type": "packet_monitor_settings", "data": packet_monitor_settings_payload()})
+    await ws_send(ws, {"type": "packet_monitor_snapshot", "data": packet_monitor_snapshot_payload()})
 
     try:
         async for raw in ws:
@@ -309,6 +335,62 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     await ws_send(ws, {"type": "open_result", "data": {"ok": True}})
                 except Exception as e:
                     await ws_send(ws, {"type": "open_result", "data": {"ok": False, "error": str(e)}})
+
+            elif t == "packet_monitor_request_snapshot":
+                await ws_send(ws, {"type": "packet_monitor_snapshot", "data": packet_monitor_snapshot_payload()})
+
+            elif t == "packet_monitor_update_settings":
+                enabled = bool((data or {}).get("enabled", False))
+                blocked_methods_raw = (data or {}).get("blockedMethods") or []
+                blocked_methods = {
+                    str(item).strip()
+                    for item in blocked_methods_raw
+                    if str(item).strip()
+                }
+
+                global PACKET_MONITOR_ENABLED, PACKET_MONITOR_BLOCKED_METHODS
+                PACKET_MONITOR_ENABLED = enabled
+                PACKET_MONITOR_BLOCKED_METHODS = blocked_methods
+                if not PACKET_MONITOR_ENABLED:
+                    PACKET_MONITOR.clear()
+
+                await ws_send(ws, {"type": "packet_monitor_settings", "data": packet_monitor_settings_payload()})
+                await ws_send(ws, {"type": "packet_monitor_snapshot", "data": packet_monitor_snapshot_payload()})
+
+            elif t == "packet_monitor_replay":
+                method = str((data or {}).get("method") or "")
+                payload = (data or {}).get("payload")
+                if not method or not isinstance(payload, dict):
+                    await ws_send(ws, {
+                        "type": "packet_monitor_replay_result",
+                        "data": {"ok": False, "reason": "invalid-payload"},
+                    })
+                    continue
+
+                addon = PACKET_BOT.get_addon()
+                if not addon:
+                    await ws_send(ws, {
+                        "type": "packet_monitor_replay_result",
+                        "data": {"ok": False, "reason": "addon-not-ready"},
+                    })
+                    await ws_send(ws, {
+                        "type": "ui_toast",
+                        "data": {"kind": "error", "msg": "重放失败：addon 未就绪"},
+                    })
+                    continue
+
+                ok, reason, msg_id = addon.inject_now(method=method, data=payload, t="Req")
+                await ws_send(ws, {
+                    "type": "packet_monitor_replay_result",
+                    "data": {"ok": ok, "reason": reason, "msg_id": msg_id, "method": method},
+                })
+                await ws_send(ws, {
+                    "type": "ui_toast",
+                    "data": {
+                        "kind": "success" if ok else "error",
+                        "msg": f"重放成功：{method}（msg_id={msg_id}）" if ok else f"重放失败：{reason}",
+                    },
+                })
 
             elif t == "autorun_control":
                 action = (data or {}).get("action")

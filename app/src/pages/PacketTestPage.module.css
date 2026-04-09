@@ -1,0 +1,199 @@
+.page {
+    display: grid;
+    grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+    gap: 16px;
+    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    align-items: stretch;
+}
+
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.panel {
+    min-height: 0;
+}
+
+.listPanel {
+    flex: 1;
+    overflow: hidden;
+}
+
+.controls {
+    display: grid;
+    gap: 10px;
+}
+
+.field {
+    display: grid;
+    gap: 6px;
+}
+
+.hint {
+    color: var(--text-dim, rgba(255, 255, 255, 0.68));
+    font-size: 12px;
+}
+
+.methodEditor {
+    resize: vertical;
+    min-height: 132px;
+    max-height: 220px;
+}
+
+.toggleRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.list {
+    display: grid;
+    gap: 8px;
+    height: 100%;
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.item {
+    width: 100%;
+    text-align: left;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 14px;
+    padding: 12px;
+    color: inherit;
+    cursor: pointer;
+}
+
+.itemActive {
+    border-color: rgba(109, 208, 255, 0.45);
+    background: rgba(109, 208, 255, 0.12);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+.itemTitle {
+    font-weight: 600;
+    word-break: break-all;
+}
+
+.itemMeta {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim, rgba(255, 255, 255, 0.68));
+}
+
+.badge {
+    border-radius: 999px;
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.empty {
+    padding: 24px;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    color: var(--text-dim, rgba(255, 255, 255, 0.68));
+}
+
+.detail {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 12px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.detailHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.detailTitle {
+    display: grid;
+    gap: 6px;
+}
+
+.jsonGrid {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.92fr) minmax(320px, 1.28fr);
+    gap: 12px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.jsonCard {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.jsonHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.jsonBody {
+    margin: 0;
+    padding: 14px;
+    overflow: auto;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: "Cascadia Code", "Consolas", monospace;
+}
+
+.editor {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: inherit;
+    resize: none;
+}
+
+@media (max-width: 1100px) {
+    .page {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow: visible;
+    }
+
+    .list {
+        max-height: 320px;
+        height: auto;
+    }
+
+    .jsonGrid {
+        grid-template-columns: 1fr;
+        min-height: auto;
+        overflow: visible;
+    }
+
+    .detail {
+        overflow: visible;
+    }
+}

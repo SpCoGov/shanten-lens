@@ -1553,7 +1553,7 @@ def _run_exact_target_enumeration_search(
             plan = {
                 "status": "plan",
                 "mode": "target-enumeration-search",
-                "draws_needed": n + 1,
+                "draws_needed": n,
                 "switch_discards": switch_discards,
                 "switch_in": switch_in,
                 "switch_batch_sizes": switch_batch_sizes,
@@ -2869,7 +2869,7 @@ def _search_remaining_target_enumeration_plan(
     souzu_taatsus = [
         item for item in _taatsu_components(pool, quad_orders, allow_replacement=True, min_order=0)
         if item.get("kind") in ("ryanmen", "kanchan")
-        and all(_norm(deck_map[int(tile_id)]).endswith("s") for tile_id in item.get("ids", ()))
+           and all(_norm(deck_map[int(tile_id)]).endswith("s") for tile_id in item.get("ids", ()))
     ]
 
     stats["node_total"] = len(melds)
