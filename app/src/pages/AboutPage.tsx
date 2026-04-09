@@ -37,9 +37,12 @@ export default function AboutPage({onSecretClick}: { onSecretClick: () => void }
 
     return (
         <div className={styles.wrap}>
-            <h1 className={styles.secretTitle} onClick={onSecretClick}>
-                {t("app.title")} <span className={styles.sub}>{t("app.subtitle")}</span>
-            </h1>
+            <div className={styles.hero}>
+                <img className={styles.logo} src="/logo.svg" alt="Shanten Lens logo" />
+                <h1 className={styles.secretTitle} onClick={onSecretClick}>
+                    {t("app.title")} <span className={styles.sub}>{t("app.subtitle")}</span>
+                </h1>
+            </div>
 
             <div className={styles.meta}>
                 <span className={styles.author}>{t("app.author")}</span>

@@ -4,12 +4,38 @@ import {invoke} from "@tauri-apps/api/core";
 import App from "./App";
 import { ensureI18nReady } from "./lib/i18n";
 
-invoke("frontend_ready").catch(() => {
-});
-ensureI18nReady().then(() => {
+async function reportStartupProgress(
+    phase: string,
+    label: string,
+    progress: number,
+    detail?: string,
+    etaSeconds?: number,
+    indeterminate?: boolean
+) {
+    try {
+        await invoke("update_startup_progress", {
+            phase,
+            label,
+            detail,
+            progress,
+            etaSeconds,
+            indeterminate,
+        });
+    } catch {
+    }
+}
+
+async function bootstrap() {
+    await reportStartupProgress("i18n", "正在加载语言与配置", 0.82, "检测系统语言并初始化界面文案", 2, false);
+    await ensureI18nReady();
+    await reportStartupProgress("render", "正在构建主界面", 0.92, "挂载首屏组件并连接事件", 1, false);
+
     ReactDOM.createRoot(document.getElementById("root")!).render(
         <React.StrictMode>
             <App />
         </React.StrictMode>
     );
+}
+
+bootstrap().catch(() => {
 });

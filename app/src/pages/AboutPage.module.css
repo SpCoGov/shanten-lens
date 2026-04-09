@@ -2,6 +2,20 @@
     color: var(--text);
 }
 
+.hero {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 0 0 12px;
+}
+
+.logo {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 auto;
+    display: block;
+}
+
 section {
     background: var(--panel);
     border: 1px solid var(--border);
@@ -12,7 +26,7 @@ section {
 
 h1 {
     font-size: 24px;
-    margin: 0 0 12px;
+    margin: 0;
     display: flex;
     align-items: baseline;
     gap: 8px;

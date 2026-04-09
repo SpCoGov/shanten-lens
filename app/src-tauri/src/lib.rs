@@ -18,6 +18,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 const LOG_BATCH_MAX_LINES: usize = 64;
 const LOG_BATCH_MAX_BYTES: usize = 64 * 1024;
 const LOG_CHUNK_MAX_BYTES: usize = 16 * 1024;
+const STARTUP_PROGRESS_EVENT: &str = "startup:progress";
 
 #[derive(Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -39,6 +40,44 @@ struct GateState {
 }
 
 struct SharedGate(pub Arc<GateState>);
+
+#[derive(Clone, Serialize)]
+struct StartupProgressPayload {
+  phase: String,
+  label: String,
+  detail: Option<String>,
+  progress: f64,
+  eta_seconds: Option<u64>,
+  indeterminate: bool,
+}
+
+struct StartupProgressState(pub Arc<Mutex<StartupProgressPayload>>);
+
+fn default_startup_progress() -> StartupProgressPayload {
+  StartupProgressPayload {
+    phase: "bootstrap".into(),
+    label: "正在准备启动".into(),
+    detail: Some("初始化窗口与运行环境".into()),
+    progress: 0.08,
+    eta_seconds: Some(8),
+    indeterminate: false,
+  }
+}
+
+fn emit_startup_progress(app: &AppHandle, payload: &StartupProgressPayload) {
+  let _ = app.emit(STARTUP_PROGRESS_EVENT, payload.clone());
+}
+
+fn set_startup_progress(
+  app: &AppHandle,
+  state: &StartupProgressState,
+  payload: StartupProgressPayload,
+) {
+  if let Ok(mut guard) = state.0.lock() {
+    *guard = payload.clone();
+  }
+  emit_startup_progress(app, &payload);
+}
 
 fn split_utf8_chunks(s: &str, max_bytes: usize) -> Vec<String> {
   if s.len() <= max_bytes {
@@ -69,6 +108,20 @@ fn maybe_switch(app: &AppHandle, gate: &GateState) {
   if gate.switched.load(Ordering::SeqCst) { return; }
   if gate.backend_ready.load(Ordering::SeqCst) && gate.frontend_ready.load(Ordering::SeqCst) {
     if gate.switched.swap(true, Ordering::SeqCst) == false {
+      if let Some(progress_state) = app.try_state::<StartupProgressState>() {
+        set_startup_progress(
+          app,
+          &progress_state,
+          StartupProgressPayload {
+            phase: "ready".into(),
+            label: "启动完成".into(),
+            detail: Some("正在进入主界面".into()),
+            progress: 1.0,
+            eta_seconds: Some(0),
+            indeterminate: false,
+          },
+        );
+      }
       if let Some(s) = app.get_webview_window("splash") { let _ = s.close(); }
       if let Some(m) = app.get_webview_window("main") {
         let _ = m.show();
@@ -106,6 +159,30 @@ fn spawn_log_pump(
 
     for line in reader.lines().flatten() {
       if line.contains("SL_BACKEND_READY") {
+        if let Some(progress_state) = app.try_state::<StartupProgressState>() {
+          let label = if ready_gate.as_ref().map(|g| g.frontend_ready.load(Ordering::SeqCst)).unwrap_or(false) {
+            "后台服务已就绪"
+          } else {
+            "后台服务已启动"
+          };
+          let detail = if ready_gate.as_ref().map(|g| g.frontend_ready.load(Ordering::SeqCst)).unwrap_or(false) {
+            "正在打开主界面"
+          } else {
+            "正在等待界面完成渲染"
+          };
+          set_startup_progress(
+            &app,
+            &progress_state,
+            StartupProgressPayload {
+              phase: "backend_ready".into(),
+              label: label.into(),
+              detail: Some(detail.into()),
+              progress: if ready_gate.as_ref().map(|g| g.frontend_ready.load(Ordering::SeqCst)).unwrap_or(false) { 0.98 } else { 0.74 },
+              eta_seconds: Some(1),
+              indeterminate: false,
+            },
+          );
+        }
         if let Some(gate2) = ready_gate.as_ref() {
           gate2.backend_ready.store(true, Ordering::SeqCst);
           maybe_switch(&app, gate2);
@@ -193,6 +270,23 @@ fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Resul
 
   let exe = resolve_backend_path(&app).ok_or_else(|| "backend exe not found".to_string())?;
   let gate = app.state::<SharedGate>().0.clone();
+  let progress_state = app.state::<StartupProgressState>();
+
+  set_startup_progress(
+    &app,
+    &progress_state,
+    StartupProgressPayload {
+      phase: "starting_backend".into(),
+      label: "正在启动后台服务".into(),
+      detail: Some(format!(
+        "加载 {}",
+        exe.file_name().and_then(|s| s.to_str()).unwrap_or(BACKEND_BIN_NAME)
+      )),
+      progress: 0.22,
+      eta_seconds: Some(6),
+      indeterminate: false,
+    },
+  );
 
   let mut cmd = Command::new(&exe);
   cmd.args([
@@ -210,6 +304,19 @@ fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Resul
   }
 
   let mut child = cmd.spawn().map_err(|e| format!("spawn failed: {e}"))?;
+
+  set_startup_progress(
+    &app,
+    &progress_state,
+    StartupProgressPayload {
+      phase: "waiting_backend".into(),
+      label: "正在连接后台服务".into(),
+      detail: Some("等待本地分析服务返回就绪信号".into()),
+      progress: 0.46,
+      eta_seconds: Some(4),
+      indeterminate: true,
+    },
+  );
 
   if let Some(out) = child.stdout.take() {
     let app2 = app.clone();
@@ -255,8 +362,57 @@ fn stop_backend(state: State<BackendState>) -> Result<String, String> {
 
 #[tauri::command]
 fn frontend_ready(app: AppHandle, gate: State<SharedGate>) {
+  if let Some(progress_state) = app.try_state::<StartupProgressState>() {
+    let backend_ready = gate.0.backend_ready.load(Ordering::SeqCst);
+    set_startup_progress(
+      &app,
+      &progress_state,
+      StartupProgressPayload {
+        phase: if backend_ready { "ready".into() } else { "render_wait_backend".into() },
+        label: if backend_ready { "启动完成".into() } else { "界面已准备好".into() },
+        detail: if backend_ready {
+          Some("正在进入主界面".into())
+        } else {
+          Some("正在等待后台服务连接".into())
+        },
+        progress: if backend_ready { 1.0 } else { 0.9 },
+        eta_seconds: if backend_ready { Some(0) } else { None },
+        indeterminate: !backend_ready,
+      },
+    );
+  }
   gate.0.frontend_ready.store(true, Ordering::SeqCst);
   maybe_switch(&app, &gate.0);
+}
+
+#[tauri::command]
+fn update_startup_progress(
+  app: AppHandle,
+  state: State<StartupProgressState>,
+  phase: String,
+  label: String,
+  detail: Option<String>,
+  progress: f64,
+  eta_seconds: Option<u64>,
+  indeterminate: Option<bool>,
+) {
+  set_startup_progress(
+    &app,
+    &state,
+    StartupProgressPayload {
+      phase,
+      label,
+      detail,
+      progress: progress.clamp(0.0, 1.0),
+      eta_seconds,
+      indeterminate: indeterminate.unwrap_or(false),
+    },
+  );
+}
+
+#[tauri::command]
+fn get_startup_progress(state: State<StartupProgressState>) -> Result<StartupProgressPayload, String> {
+  state.0.lock().map(|guard| guard.clone()).map_err(|_| "mutex poisoned".to_string())
 }
 
 // Windows 下兜底强杀所有同名后端进程（静默）
@@ -280,11 +436,32 @@ pub fn run() {
     .plugin(tauri_plugin_os::init())
     .manage(BackendState(Arc::new(Mutex::new(BackendProcState::default()))))
     .manage(SharedGate(Arc::new(GateState::default())))
-    .invoke_handler(tauri::generate_handler![start_backend, stop_backend, frontend_ready])
+    .manage(StartupProgressState(Arc::new(Mutex::new(default_startup_progress()))))
+    .invoke_handler(tauri::generate_handler![
+      start_backend,
+      stop_backend,
+      frontend_ready,
+      update_startup_progress,
+      get_startup_progress
+    ])
     .setup(|app| {
       let ah = app.handle().clone();
       let st = app.state::<BackendState>().0.clone();
       let gate = app.state::<SharedGate>().0.clone();
+      let startup_progress = app.state::<StartupProgressState>();
+
+      set_startup_progress(
+        &ah,
+        &startup_progress,
+        StartupProgressPayload {
+          phase: "bootstrap".into(),
+          label: "正在初始化应用".into(),
+          detail: Some("创建窗口并准备启动流程".into()),
+          progress: 0.1,
+          eta_seconds: Some(8),
+          indeterminate: false,
+        },
+      );
 
       let force_autostart = std::env::var("FORCE_AUTOSTART_BACKEND")
         .map(|v| v == "1")
@@ -317,6 +494,20 @@ pub fn run() {
         tauri::async_runtime::spawn(async move {
           std::thread::sleep(std::time::Duration::from_secs(20));
           if !gate2.switched.load(Ordering::SeqCst) {
+            if let Some(progress_state) = ah2.try_state::<StartupProgressState>() {
+              set_startup_progress(
+                &ah2,
+                &progress_state,
+                StartupProgressPayload {
+                  phase: "fallback".into(),
+                  label: "主界面已打开".into(),
+                  detail: Some("启动超时，已直接进入主界面，可稍后继续连接后台".into()),
+                  progress: 0.96,
+                  eta_seconds: Some(0),
+                  indeterminate: false,
+                },
+              );
+            }
             if let Some(s) = ah2.get_webview_window("splash") { let _ = s.close(); }
             if let Some(m) = ah2.get_webview_window("main") {
               let _ = m.show();

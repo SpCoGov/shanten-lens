@@ -2,6 +2,7 @@ import React from "react";
 import "./styles/theme.css";
 import "./App.css";
 import {listen} from "@tauri-apps/api/event";
+import {invoke} from "@tauri-apps/api/core";
 import SettingsPage from "./pages/SettingsPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
 import AutoRunnerPage from "./pages/AutoRunnerPage";
@@ -362,6 +363,38 @@ export default function App() {
         }
         setRightPanelMode("replacementStats");
     }, [stage]);
+
+    React.useEffect(() => {
+        let cancelled = false;
+
+        const finalizeStartup = async () => {
+            try {
+                await invoke("update_startup_progress", {
+                    phase: "render",
+                    label: "正在完成界面初始化",
+                    detail: "准备显示主窗口",
+                    progress: 0.97,
+                    etaSeconds: 1,
+                    indeterminate: false,
+                });
+            } catch {
+            }
+
+            await new Promise((resolve) => window.setTimeout(resolve, 120));
+            if (cancelled) return;
+
+            try {
+                await invoke("frontend_ready");
+            } catch {
+            }
+        };
+
+        void finalizeStartup();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     React.useEffect(() => {
         ensureWsStartedOnce();
