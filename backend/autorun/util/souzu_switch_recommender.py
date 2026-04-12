@@ -4,6 +4,7 @@ import signal
 import threading
 import traceback
 import itertools
+import bisect
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from concurrent.futures.process import BrokenProcessPool
 from collections import Counter, defaultdict
@@ -1159,6 +1160,10 @@ def _normalize_search_algorithm(value: Optional[str]) -> str:
     return SEARCH_ALGO_CONSTRAINT_DFS
 
 
+# ======================
+# 基础工具
+# ======================
+
 def _tes_parse_tile(tile: str) -> tuple[int, str]:
     return int(tile[0]), tile[1]
 
@@ -1168,12 +1173,16 @@ def _tes_is_s(tile: str) -> bool:
 
 
 def _tes_sort_tiles(tiles: Sequence[str]) -> List[str]:
+    # 1. 定义字母（花色）的权重顺序
     suit_order = {'m': 1, 'p': 2, 's': 3, 'z': 4}
+    # 2. 使用 key 参数进行多维度排序
+    # 元组 (花色权重, 数字) 会先比较第一个元素，相同后再比较第二个元素
     return sorted(tiles, key=lambda x: (suit_order.get(x[1], 99), int(x[0])))
 
 
 @lru_cache(maxsize=1)
 def _tes_patterns() -> tuple[int, ...]:
+    # 打表生成需要排除的牌型的 map
     patterns = [0 for _ in range(21)]
     for n in range(0, 7):
         patterns[n] = 11123 + 11111 * n
@@ -1185,14 +1194,25 @@ def _tes_patterns() -> tuple[int, ...]:
 
 
 def _tes_check_fixed_structure(tiles: Sequence[str]) -> bool:
+    # 1. 安全校验：确保长度为 7
     if len(tiles) != 7:
         return False
+    # 2. 取前 5 个元素（切片 0 到 4）
     first_five = list(tiles[:5])
+    # 3. 取最后 2 个元素（切片 5 到 6）
     last_two = list(tiles[5:])
-    is_five_p = all(t.endswith('p') for t in first_five)
-    is_non_p_pair = (not last_two[0].endswith('p')) and (last_two[0] == last_two[1])
-    return is_five_p and is_non_p_pair
+    # 4. 判断前 5 个是否全是索子 (s)
+    # all() 函数配合生成器表达式非常高效
+    is_five_s = all(t.endswith('s') for t in first_five)
+    # 5. 判断最后 2 个是否为非索子的对子
+    # a. 必须不是索子；b. 两张牌必须完全相同
+    is_non_s_pair = (not last_two[0].endswith('s')) and (last_two[0] == last_two[1])
+    return is_five_s and is_non_s_pair
 
+
+# ======================
+# 安全移除
+# ======================
 
 def _tes_remove_tiles_safe(src: Sequence[str], remove: Sequence[str]) -> Optional[List[str]]:
     result = list(src)
@@ -1203,6 +1223,10 @@ def _tes_remove_tiles_safe(src: Sequence[str], remove: Sequence[str]) -> Optiona
             return None
     return result
 
+
+# ======================
+# 组合识别
+# ======================
 
 def _tes_find_kongs(tiles: Sequence[str]) -> List[List[str]]:
     c = Counter(tiles)
@@ -1220,17 +1244,22 @@ def _tes_find_triplets(tiles: Sequence[str]) -> List[List[str]]:
 
 
 def _tes_find_sequences(tiles: Sequence[str]) -> List[List[str]]:
+    # 1. 按照花色分类存储数字（仅包含 m, p, s，自动过滤 z）
     data = {'m': [], 'p': [], 's': []}
     for tile in tiles:
         val = int(tile[0])
         suite = tile[1]
+        # 只有当花色在字典键中（m, p, s）时才记录，z 会被跳过
         if suite in data:
             data[suite].append(val)
     all_shunzis: List[List[str]] = []
+    # 2. 遍历每个花色寻找顺子
     for suite, vals in data.items():
         if len(vals) < 3:
             continue
+        # 去重并排序
         unique_vals = sorted(set(vals))
+        # 3. 滑动窗口检测连续性
         for i in range(len(unique_vals) - 2):
             if unique_vals[i] + 1 == unique_vals[i + 1] and unique_vals[i + 1] + 1 == unique_vals[i + 2]:
                 all_shunzis.append([
@@ -1242,42 +1271,107 @@ def _tes_find_sequences(tiles: Sequence[str]) -> List[List[str]]:
 
 
 def _tes_bamboo_combinations(tiles: Sequence[str]) -> List[tuple[str, str]]:
+    # 1. 筛选出所有的索子 (s)
     s_tiles = [t for t in tiles if t.endswith('s')]
+    # 2. 提取数字并排序（保留原始字符串以便输出）
+    # 使用 set 去重可以避免把 [1s, 1s, 2s] 识别为两组 (1s, 2s)
     unique_s = sorted(list(set(s_tiles)))
     results: List[tuple[str, str]] = []
+    # 3. 遍历搜索顺子、边
     for i in range(len(unique_s) - 1):
         current_val = int(unique_s[i][0])
         next_val = int(unique_s[i + 1][0])
+        # 判断数字是否连续
         if next_val - current_val == 1:
             results.append((unique_s[i], unique_s[i + 1]))
-    for i in range(len(unique_s) - 2):
-        current_val = int(unique_s[i][0])
-        next_val = int(unique_s[i + 2][0])
-        if next_val - current_val == 2:
-            results.append((unique_s[i], unique_s[i + 2]))
+    # 4. 遍历搜索坎
+    for i in range(len(unique_s) - 1):
+        for j in range(i + 1, len(unique_s)):
+            diff = int(unique_s[j][0]) - int(unique_s[i][0])
+            if diff == 2:
+                results.append((unique_s[i], unique_s[j]))
+            elif diff > 2:
+                break
     return results
 
 
-def _tes_generate_targets(all_tiles: Sequence[str]) -> List[List[str]]:
+# ======================
+# 检查能否换出2杠
+# 不能换成2杠输出true，否则输出false
+# ======================
+
+def _tes_is_double_kong_impossible(
+        all_tiles: Sequence[str],
+        target: Sequence[Sequence[str]],
+        rounds: int,
+        max_changes_once: int,
+        n: int,
+) -> bool:
+    # 1. 建立索引映射：{字符串: [索引1, 索引2, ...]}
+    indices_map: defaultdict[str, List[int]] = defaultdict(list)
+    for index, value in enumerate(all_tiles):
+        indices_map[value].append(index)
+
+    target_new_index: List[int] = []
+    target_new = list(target[0]) + list(target[1])
+    # 2. 遍历 target_new，依次从映射表中获取最靠后的索引
+    for item in target_new:
+        if item in indices_map and indices_map[item]:
+            # pop() 默认弹出列表最后一个元素，即最靠后的位置
+            last_pos = indices_map[item].pop()
+            target_new_index.append(last_pos)
+        else:
+            return True
+
+    target_new_index.sort()
+    num_2 = 13
+    for _r in range(rounds):
+        num_1 = sum(x < num_2 for x in target_new_index)
+        num_2 = num_2 + min(13 - num_1, max_changes_once)
+    idx = bisect.bisect_right(target_new_index, len(all_tiles) - n - 1)
+    if idx == 0:
+        idx = len(target_new_index)
+    return target_new_index[idx - 1] > num_2
+
+
+# ======================
+# 目标组合生成
+# ======================
+
+def _tes_generate_targets(
+        all_tiles: Sequence[str],
+        rounds: int,
+        max_changes_once: int,
+        n: int,
+) -> List[List[str]]:
     results: List[List[str]] = []
     seen: Set[tuple[str, ...]] = set()
     kongs = _tes_find_kongs(all_tiles)
+    # print(f"{kongs}")
     if len(kongs) < 2:
         return []
     for kong_combo in combinations(kongs, 2):
         remaining = list(all_tiles)
+        if _tes_is_double_kong_impossible(remaining, kong_combo, rounds, max_changes_once, n):
+            continue
         for k in kong_combo:
             remaining = _tes_remove_tiles_safe(remaining, k)
             if remaining is None:
                 break
         if remaining is None:
             continue
+        # print(f"{remaining}")
         triplets = _tes_find_triplets(remaining)
         sequences = _tes_find_sequences(remaining)
         melds = triplets + sequences
         pairs = _tes_find_pairs(remaining)
         bamboo_combos = _tes_bamboo_combinations(remaining)
+        # print(f"{triplets}")
+        # print(f"{sequences}")
+        # print(f"{pairs}")
+        # print(f"{bamboo_combos}")
 
+        # 情况1
         for m1, m2 in combinations(melds, 2):
             temp = _tes_remove_tiles_safe(remaining, m1)
             if temp is None:
@@ -1294,6 +1388,7 @@ def _tes_generate_targets(all_tiles: Sequence[str]) -> List[List[str]]:
                             seen.add(key)
                             results.append(target)
 
+        # 情况2
         for m in melds:
             temp = _tes_remove_tiles_safe(remaining, m)
             if temp is None:
@@ -1304,12 +1399,14 @@ def _tes_generate_targets(all_tiles: Sequence[str]) -> List[List[str]]:
                     continue
                 for t in bamboo_combos:
                     target = list(itertools.chain(*kong_combo, m, t, p))
+                    # print(f"{target}")
                     if len(target) == 15:
                         key = tuple(sorted(target))
                         if key not in seen:
                             seen.add(key)
                             results.append(target)
 
+        # 情况3
         for p1, p2 in combinations(pairs, 2):
             if not all(_tes_is_s(x) for x in p1 + p2):
                 continue
@@ -1333,6 +1430,10 @@ def _tes_generate_targets(all_tiles: Sequence[str]) -> List[List[str]]:
     return results
 
 
+# ======================
+# 换牌模拟
+# ======================
+
 def _tes_simulate_change(
         hand: Sequence[str],
         change_tiles: Sequence[str],
@@ -1348,7 +1449,7 @@ def _tes_simulate_change(
     all_tiles = hand + change_tiles + wall
 
     target_in_wall: List[str] = []
-    target_new = target_origin
+    target_new = target_origin  # 存放剩余的元素
     for item in wall:
         try:
             target_new.remove(item)
@@ -1361,13 +1462,16 @@ def _tes_simulate_change(
     all_tiles_origin = hand + change_tiles
     all_tiles = list(all_tiles_origin)
     while True:
+        # 1. 建立索引映射：{字符串: [索引1, 索引2, ...]}
         indices_map: defaultdict[str, List[int]] = defaultdict(list)
         for index, value in enumerate(all_tiles):
             indices_map[value].append(index)
 
         target_new_index: List[int] = []
+        # 2. 遍历 target_new，依次从映射表中获取最靠后的索引
         for item in target_new:
             if item in indices_map and indices_map[item]:
+                # pop() 默认弹出列表最后一个元素，即最靠后的位置
                 last_pos = indices_map[item].pop()
                 target_new_index.append(last_pos)
             else:
@@ -1379,11 +1483,13 @@ def _tes_simulate_change(
             num_1 = sum(x < num_2 for x in target_new_index)
             num_2 = num_2 + min(13 - num_1, max_changes_once)
         if len(all_tiles) <= num_2:
+            # print(f"{target_new_index}/{num_1}/{num_2}")
             break
         all_tiles = all_tiles_origin[:num_2]
 
     num_1 = sum(x < num_2 for x in target_new_index)
     if num_1 != len(target_new):
+        # print(f"{target_new_index}/{num_1}/{num_2}")
         return None, []
 
     num_2 = 13
@@ -1404,7 +1510,7 @@ def _tes_simulate_change(
         ]
         hand = hand_old_keep + hand_old_replace[round_change_count:] + new_from_change_tiles[:]
         keep = hand_old_keep + hand_old_replace[round_change_count:]
-        replace = hand_old_replace[:round_change_count]
+        replace = hand_old_replace[:min(13 - num_1, max_changes_once, 62 - num_2)]
         num_2 = min(num_2 + round_change_count, len(all_tiles_origin))
         logs.append({
             "round": r + 1,
@@ -1416,10 +1522,18 @@ def _tes_simulate_change(
     return hand, logs
 
 
+# ======================
+# 判断成功
+# ======================
+
 def _tes_check_success(final_hand: Sequence[str], wall: Sequence[str], target: Sequence[str], n: int) -> bool:
     pool = list(final_hand) + list(wall[:n])
     return Counter(pool) >= Counter(target)
 
+
+# ======================
+# 面值结果转当前系统需要的 ID / 计划结构
+# ======================
 
 def _tes_map_faces_to_ids(face_sequence: Sequence[str], source_ids: Sequence[int], deck_map: Dict[int, str]) -> List[int]:
     need = Counter(face_sequence)
@@ -1464,6 +1578,10 @@ def _tes_reconstruct_switch_ids(
     return switch_discards, switch_in
 
 
+# ======================
+# 主流程
+# ======================
+
 def _run_exact_target_enumeration_search(
         deck_map: Dict[int, str],
         hand_ids: Sequence[int],
@@ -1496,7 +1614,7 @@ def _run_exact_target_enumeration_search(
         change_tiles = list(change_origin)
         wall = list(wall_origin)
         all_tiles = hand + change_tiles + wall[:n]
-        targets = _tes_generate_targets(all_tiles)
+        targets = _tes_generate_targets(all_tiles, rounds, max_changes_once, n)
         stats["dfs_nodes"] += 1
         stats["branch_attempts"] += len(targets)
 
@@ -1553,7 +1671,7 @@ def _run_exact_target_enumeration_search(
             plan = {
                 "status": "plan",
                 "mode": "target-enumeration-search",
-                "draws_needed": n,
+                "draws_needed": n + 1,
                 "switch_discards": switch_discards,
                 "switch_in": switch_in,
                 "switch_batch_sizes": switch_batch_sizes,
