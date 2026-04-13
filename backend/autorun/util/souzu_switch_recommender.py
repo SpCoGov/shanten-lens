@@ -1671,7 +1671,7 @@ def _run_exact_target_enumeration_search(
             plan = {
                 "status": "plan",
                 "mode": "target-enumeration-search",
-                "draws_needed": n + 1,
+                "draws_needed": n,
                 "switch_discards": switch_discards,
                 "switch_in": switch_in,
                 "switch_batch_sizes": switch_batch_sizes,
