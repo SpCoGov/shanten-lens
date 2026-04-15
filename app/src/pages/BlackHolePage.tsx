@@ -463,10 +463,16 @@ function PlanBody({
 
             {batches.map((batch, index) => (
                 <div key={index} className="blackhole-section">
-                    <div className={styles.label}>{t("advisor.switch_batch_title", {index: index + 1})}</div>
-                    <div className={styles.bandLabel}>{t("advisor.batch_size", {count: batch.size})}</div>
-                    <TileGroup title={t("advisor.switch_batch_out", {index: index + 1})} ids={batch.out} resolveFace={resolveFace}/>
-                    <TileGroup title={t("advisor.switch_batch_in", {index: index + 1})} ids={batch.in} resolveFace={resolveFace}/>
+                    <details>
+                        <summary style={{cursor: "pointer", listStylePosition: "inside"}}>
+                            <span className={styles.label}>{t("advisor.switch_batch_title", {index: index + 1})}</span>
+                            <span className={styles.bandLabel} style={{marginLeft: 8}}>{t("advisor.batch_size", {count: batch.size})}</span>
+                        </summary>
+                        <div style={{display: "grid", gap: 14, marginTop: 10}}>
+                            <TileGroup title={t("advisor.switch_batch_out", {index: index + 1})} ids={batch.out} resolveFace={resolveFace}/>
+                            <TileGroup title={t("advisor.switch_batch_in", {index: index + 1})} ids={batch.in} resolveFace={resolveFace}/>
+                        </div>
+                    </details>
                 </div>
             ))}
 

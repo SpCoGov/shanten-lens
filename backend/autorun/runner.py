@@ -552,19 +552,21 @@ class AutoRunner:
         if not new_items:
             return True
 
+        current_effect_list: List[Dict[str, Any]] = [dict(it) for it in (effect_list_before_select or [])]
         for item in new_items:
+            current_effect_list.append(dict(item))
             value = _selected_effect_value(item, effect_list_before_select, self.targets)
             if value > 0:
                 continue
 
-            uid = item.get("uid")
-            try:
-                uid = int(uid) if uid is not None else None
-            except Exception:
-                uid = None
+            reg_id = _reg_id_of_raw(int(item.get("id", 0) or 0))
+            if reg_id == 146:
+                continue
+
+            uid = _pick_uid_to_sell_same_reg(current_effect_list, reg_id, self.targets)
 
             logger.info(
-                "[autorun] auto-sell valueless selected amulet: raw_id={} uid={} badge={}",
+                "[autorun] auto-sell useless selected amulet by same-reg rule: raw_id={} sell_uid={} badge={}",
                 item.get("id"),
                 uid,
                 (item.get("badge") or {}).get("id") if isinstance(item.get("badge"), dict) else None,
@@ -572,6 +574,8 @@ class AutoRunner:
 
             if uid is None:
                 continue
+
+            current_effect_list = [e for e in current_effect_list if e.get("uid") != uid]
 
             self.current_step = "game.sell_new_useless_effect"
             await self._broadcast_status(safe=True)
