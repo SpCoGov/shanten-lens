@@ -29,6 +29,7 @@ export type AutoRunnerStatus = {
     runs: number;
     elapsed_ms: number;
     best_achieved_count: number;
+    current_achieved_count?: number;
     current_step?: string;
     last_error?: string;
     started_at?: number;
@@ -64,6 +65,7 @@ const defaultStatus: AutoRunnerStatus = {
     runs: 0,
     elapsed_ms: 0,
     best_achieved_count: 0,
+    current_achieved_count: 0,
     current_step: "-",
     last_error: "",
     started_at: 0,

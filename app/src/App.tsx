@@ -31,13 +31,14 @@ import {
     type WsEnvelope,
 } from "./lib/gamestate";
 import {installWsToastBridge, useGlobalToast} from "./lib/toast";
-import {AutoRunnerStatus, setAutoStatus} from "./lib/autoRunnerStore";
+import {AutoRunnerStatus, setAutoStatus, useAutoRunner} from "./lib/autoRunnerStore";
 import GoodsBar from "./components/GoodsBar";
 import CandidateBar from "./components/CandidateBar";
 import "./fonts/material-symbols.css";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import "./lib/i18n";
 import {useTranslation} from "react-i18next";
+import {compareNumericStrings, divideNumericStrings, formatLargeNumber, normalizeNumericString} from "./lib/bigNumber";
 import {WebviewWindow, getAllWebviewWindows} from '@tauri-apps/api/webviewWindow';
 import {t} from "i18next";
 import {openMsgBoxWindow} from "./lib/msgbox";
@@ -93,8 +94,49 @@ const MAIN_GAP = 12;
 
 const appWindow = getCurrentWindow();
 
-function Topbar({onSecretClick}: { onSecretClick: () => void }) {
+function buildPointProgressMeta(pointRaw?: string, targetRaw?: string) {
+    const point = normalizeNumericString(pointRaw ?? "0");
+    const target = normalizeNumericString(targetRaw ?? "0");
+    if (target === "0") return null;
+
+    const reached = compareNumericStrings(point, target) >= 0;
+    const ratioText = divideNumericStrings(point, target, {decimals: 4});
+    const ratio = Number.parseFloat(ratioText || "0");
+    const cappedFill = reached ? 100 : Math.max(0, Math.min(100, ratio * 100));
+
+    let percentLabel: string | null = null;
+    if (reached) {
+        let percent = Math.round(Math.min(ratio, 9.99) * 100);
+        if (percent < 100) percent = 100;
+        if (percent > 999) percent = 999;
+        percentLabel = `${percent}%`;
+    }
+
+    return {
+        fillPercent: Math.max(0, Math.min(100, cappedFill)),
+        reached,
+        percentLabel,
+        centerLabel: reached
+            ? `${percentLabel} · ${formatLargeNumber(point)} / ${formatLargeNumber(target)}`
+            : `${formatLargeNumber(point)} / ${formatLargeNumber(target)}`,
+        pointText: formatLargeNumber(point),
+        targetText: formatLargeNumber(target),
+    };
+}
+
+function Topbar({
+    onSecretClick,
+    stage,
+    point,
+    targetPoint,
+}: {
+    onSecretClick: () => void;
+    stage: number;
+    point?: string;
+    targetPoint?: string;
+}) {
     const {t} = useTranslation();
+    const progressMeta = (stage === 2 || stage === 3) ? buildPointProgressMeta(point, targetPoint) : null;
     const onMin = async () => {
         try {
             await appWindow.minimize();
@@ -118,8 +160,16 @@ function Topbar({onSecretClick}: { onSecretClick: () => void }) {
     };
 
     return (
-        <header className="topbar">
-            <div className="drag" data-tauri-drag-region>
+        <header className={`topbar ${progressMeta ? "has-progress" : ""}`}>
+            {progressMeta ? (
+                <div className={`topbar-progress-band ${progressMeta.reached ? "is-over" : ""}`} data-tauri-drag-region>
+                    <div className="topbar-progress-band-track" data-tauri-drag-region>
+                        <div className="topbar-progress-band-fill" style={{width: `${progressMeta.fillPercent}%`}} />
+                    </div>
+                    <div className="topbar-progress-band-label" data-tauri-drag-region>{progressMeta.centerLabel}</div>
+                </div>
+            ) : null}
+            <div className="topbar-left drag" data-tauri-drag-region>
                 <span className="title" onClick={onSecretClick}>{t("app.title")}</span>
             </div>
 
@@ -142,6 +192,7 @@ export default function App() {
     const {t} = useTranslation();
     type ThemeMode = "auto" | "dark" | "dark-green" | "dark-purple";
     const {toast, visible: toastVisible} = useGlobalToast();
+    const {config: autoConfig, status: autoStatus} = useAutoRunner();
     const [route, setRoute] = React.useState<Route>("home");
     const sidebarRef = React.useRef<HTMLDivElement | null>(null);
     const navRefs = React.useRef<Partial<Record<Route, HTMLButtonElement | null>>>({});
@@ -151,7 +202,9 @@ export default function App() {
 
     const [cells, setCells] = React.useState<Cell[]>([]);
     const [stage, setStage] = React.useState<number>(0);
-    const [coin, setCoin] = React.useState<number>(0);
+    const [coin, setCoin] = React.useState<string>("0");
+    const [point, setPoint] = React.useState<string>("0");
+    const [targetPoint, setTargetPoint] = React.useState<string>("0");
     const [ended, setEnded] = React.useState<boolean>(false);
     const [remain, setRemain] = React.useState<number>(0);
     const [hasGame, setHasGame] = React.useState<boolean>(false);
@@ -417,7 +470,9 @@ export default function App() {
                 const list = buildCells(deck, d.locked_tiles ?? [], d.wall_tiles ?? [], 36);
                 setCells(list);
                 setStage(d.stage ?? 0);
-                setCoin(d.coin ?? 0);
+                setCoin(typeof d.coin === "string" ? d.coin : String(d.coin ?? "0"));
+                setPoint(typeof d.point === "string" ? d.point : String(d.point ?? "0"));
+                setTargetPoint(typeof d.target_point === "string" ? d.target_point : String(d.target_point ?? "0"));
                 setEnded(!!d.ended);
                 setRemain(d.desktop_remain ?? 0);
                 setHasGame(d.stage !== undefined && d.ended !== undefined && d.stage >= 0);
@@ -622,7 +677,7 @@ export default function App() {
             </div>
             <div className={`toast ${toastVisible ? "visible" : ""} ${toast?.kind || "info"}`}>{toast?.msg}</div>
 
-            <Topbar onSecretClick={onSecretClick}/>
+            <Topbar onSecretClick={onSecretClick} stage={stage} point={point} targetPoint={targetPoint}/>
 
             <div className="shell">
                 <aside className="sidebar" ref={sidebarRef}>
@@ -802,9 +857,17 @@ export default function App() {
                 <div className="sb-right">
                     {hasGame ? (
                         <>
+                            {autoStatus.running ? (
+                                <span className="badge">
+                                    {t("status.autorunTargetCount", {
+                                        current: autoStatus.current_achieved_count ?? 0,
+                                        total: autoConfig.end_count ?? 1,
+                                    })}
+                                </span>
+                            ) : null}
                             <span className="badge">{t("status.remaining", {count: remain})}</span>
                             <span className="badge">{t("status.stage", {stage: stage})}</span>
-                            <span className="badge">{t("status.coin", {coin: coin})}</span>
+                            <span className="badge">{t("status.coin", {coin})}</span>
                             {bossBuff.length > 0 ? (
                                 <span className="badge">{t("status.bossBuff", {buffs: bossBuff.join(", ")})}</span>
                             ) : null}

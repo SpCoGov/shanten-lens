@@ -1,6 +1,8 @@
 export interface GameStateData {
     stage: number;
-    coin: number;
+    coin: string;
+    point?: string;
+    target_point?: string;
     deck_map: Record<string, string>;
     hand_tiles: number[];
     dora_tiles: number[];
@@ -17,6 +19,7 @@ export interface GameStateData {
     change_tile_count?: number;
     total_change_tile_count?: number;
     max_effect_volume?: number;
+    tile_score_map?: Record<string, string>;
     update_reason?: string[];
 }
 
@@ -39,7 +42,7 @@ export interface EffectItem {
 export interface GoodsItem {
     id: number;
     goodsId: number;
-    price: number;
+    price: number | string;
     sold: boolean;
 }
 

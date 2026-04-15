@@ -2,6 +2,7 @@ import React from "react";
 import "../styles/theme.css";
 import {type GoodsItem} from "../lib/gamestate";
 import {t} from "i18next";
+import {formatLargeNumber} from "../lib/bigNumber";
 
 const GOODS_IMG: Record<number, string> = {
     101: "/assets/fx_qingyun_kabao_4.png",
@@ -25,7 +26,7 @@ export default function GoodsCard({
     const title = t("good_card.tooltip", {
         id: item.id,
         goodsId: item.goodsId,
-        price: item.price,
+        price: formatLargeNumber(item.price),
     });
     return (
         <div
@@ -76,7 +77,7 @@ export default function GoodsCard({
                 }}
             >
                 <span style={{filter: "drop-shadow(var(--shadow-text))"}}>⭐</span>
-                <span>{item.price}</span>
+                <span>{formatLargeNumber(item.price)}</span>
             </div>
 
             {item.sold && (

@@ -463,6 +463,7 @@
     "backendConnected": "バックエンド：接続済み",
     "backendDisconnected": "バックエンド：未接続",
     "noGame": "ゲームが見つかりません",
+    "autorunTargetCount": "自動: 現在の目標 {{current}}/{{total}}",
     "remaining": "残り：{{count}}",
     "stage": "段階：{{stage}}",
     "coin": "⭐ {{coin}}",

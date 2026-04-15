@@ -1166,12 +1166,17 @@ class AutoRunner:
         has_live_game = (resp or {}).get("data", {}).get("game") is not None
         await self._recompute_ready_flags_from_last_probe()
         pf_ready, pf_peer = self._preferred_flow_status()
+        try:
+            current_achieved_count = self.count_achieved_now()
+        except Exception:
+            current_achieved_count = 0
         return {
             "mode": self.mode,
             "running": self.running,
             "runs": self.runs,
             "elapsed_ms": self._calc_elapsed_ms(),
             "best_achieved_count": self.best_achieved_count,
+            "current_achieved_count": current_achieved_count,
             "current_step": self.current_step or "-",
             "last_error": self.last_error,
             "started_at": self.started_at or 0,

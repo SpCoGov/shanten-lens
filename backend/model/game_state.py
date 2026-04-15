@@ -12,7 +12,7 @@ class GameState:
     """
     表示游戏状态（可序列化为 JSON）
     """
-    stage: int = 0  # 1=选择免费卡包、2=换牌阶段、3=打牌阶段、4=卡包购买、5=卡包选择、6=关卡确认阶段、7=选择关卡奖励卡包
+    stage: int = -1  # 1=选择免费卡包、2=换牌阶段、3=打牌阶段、4=卡包购买、5=卡包选择、6=关卡确认阶段、7=选择关卡奖励卡包
     deck_map: OrderedDict[int, str] = field(default_factory=OrderedDict)  # 牌山：id→牌面
     hand_tiles: List[int] = field(default_factory=list)  # 手牌
     dora_tiles: List[int] = field(default_factory=list)  # 宝牌指示牌（包含未翻开的）
@@ -23,6 +23,8 @@ class GameState:
     desktop_remain: int = field(default_factory=int)  # 剩余可摸的牌
     locked_tiles: List[int] = field(default_factory=list)  # 被锁住的牌
     coin: int = field(default_factory=int)
+    point: int = field(default_factory=int)
+    target_point: int = field(default_factory=int)
     level: int = field(default_factory=int)
     effect_list: List[Dict] = field(default_factory=list)
     candidate_effect_list: List[Dict] = field(default_factory=list)
@@ -36,6 +38,7 @@ class GameState:
     total_change_tile_count: int = field(default_factory=int)
     max_effect_volume: int = field(default_factory=int)
     boss_buff: List[int] = field(default_factory=list)
+    tile_score_map: Dict[str, str] = field(default_factory=dict)
     opening_hand_tiles: List[int] = field(default_factory=list)
     used_desktop_tiles: List[int] = field(default_factory=list)
 
@@ -56,7 +59,9 @@ class GameState:
             "ended": self.ended,
             "desktop_remain": self.desktop_remain,
             "locked_tiles": self.locked_tiles,
-            "coin": self.coin,
+            "coin": str(self.coin),
+            "point": str(self.point),
+            "target_point": str(self.target_point),
             "level": self.level,
             "effect_list": self.effect_list,
             "candidate_effect_list": self.candidate_effect_list,
@@ -69,6 +74,7 @@ class GameState:
             "total_change_tile_count": self.total_change_tile_count,
             "max_effect_volume": self.max_effect_volume,
             "boss_buff": self.boss_buff,
+            "tile_score_map": self.tile_score_map,
 
             "update_reason": self.update_reason,
         }
@@ -213,10 +219,10 @@ class GameState:
             loop = asyncio.get_running_loop()
             loop.create_task(self.on_gamestage_change())
 
-    def update_other_info(self, desktop_remain: int = None, stage: int = None, ended: bool = None, coin: int = None, level: int = None,
+    def update_other_info(self, desktop_remain: int = None, stage: int = None, ended: bool = None, coin: int = None, point: int = None, target_point: int = None, level: int = None,
                           effect_list: List[Dict] = None, candidate_effect_list: List[Dict] = None, ting_list: List[Dict] = None, next_operation: List[Dict] = None,
                           goods: List[Dict] = None, refresh_price: int = None, change_tile_count: int = None, total_change_tile_count: int = None, max_effect_volume: int = None,
-                          boss_buff: List[int] = None,
+                          boss_buff: List[int] = None, tile_score_map: Dict[str, str] = None,
                           push_gamestate: bool = True, reason: str = ""):
         if desktop_remain is not None:
             self.desktop_remain = desktop_remain
@@ -226,6 +232,10 @@ class GameState:
             self.ended = ended
         if coin is not None:
             self.coin = coin
+        if point is not None:
+            self.point = point
+        if target_point is not None:
+            self.target_point = target_point
         if level is not None:
             self.level = level
         if effect_list is not None:
@@ -248,6 +258,8 @@ class GameState:
             self.max_effect_volume = max_effect_volume
         if boss_buff is not None:
             self.boss_buff = boss_buff
+        if tile_score_map is not None:
+            self.tile_score_map = tile_score_map.copy()
         self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()
@@ -267,6 +279,8 @@ class GameState:
         self.opening_hand_tiles.clear()
         self.used_desktop_tiles.clear()
         self.coin = 0
+        self.point = 0
+        self.target_point = 0
         self.level = 0
         self.effect_list.clear()
         self.candidate_effect_list.clear()
@@ -278,6 +292,7 @@ class GameState:
         self.next_operation.clear()
         self.ting_list.clear()
         self.boss_buff.clear()
+        self.tile_score_map.clear()
 
         self.update_reason.clear()
         self.update_reason.append(".lq.Lobby.amuletActivityGiveup")

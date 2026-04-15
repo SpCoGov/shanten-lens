@@ -466,6 +466,7 @@
     "backendConnected": "后端：已连接",
     "backendDisconnected": "后端：未连接",
     "noGame": "未找到游戏",
+    "autorunTargetCount": "自动：当前目标 {{current}}/{{total}}",
     "remaining": "剩余：{{count}}",
     "stage": "阶段：{{stage}}",
     "coin": "⭐ {{coin}}",
