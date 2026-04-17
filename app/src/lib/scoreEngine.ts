@@ -1,0 +1,738 @@
+import {formatLargeNumber, formatLargeScaledNumber, normalizeNumericString} from "./bigNumber";
+import type {EffectItem} from "./gamestate";
+import {
+    getRegisteredAmuletRule,
+    getRegisteredAmuletRuleExact,
+    registerAmuletRule,
+    unregisterAmuletRule,
+} from "./amuletRuleRegistry";
+
+export const SCALE_DECIMALS = 2;
+export const SCALE = 100n;
+
+export type EffectTarget = "none" | "score" | "fan";
+
+export type FormulaVars = {
+    data: bigint;
+    score: bigint;
+    fan: bigint;
+    level: bigint;
+    execution: bigint;
+    extra_execution: bigint;
+    activation: bigint;
+};
+
+export type AmuletRuleConfig = {
+    dataRaw: string;
+    executions: number;
+    extraExecutions: number;
+    activeOnWin: boolean;
+    effectTarget: EffectTarget;
+    effectFormula: string;
+    growthFormula: string;
+    note?: string;
+};
+
+export type ResolvedAmuletRule = AmuletRuleConfig & {
+    item: EffectItem;
+    regId: number;
+    badgeId: number | null;
+    hasExtensionSeal: boolean;
+    hasTransmissionSeal: boolean;
+    hasAngelSeal: boolean;
+};
+
+export type CurrentPointResult = {
+    baseScore: bigint;
+    finalScore: bigint;
+    baseFan: bigint;
+    finalFan: bigint;
+    finalPoint: bigint;
+    perAmulet: Array<{
+        uid: number;
+        regId: number;
+        executions: number;
+        extraExecutions: number;
+        activations: number;
+        effectApplications: number;
+        dataRaw: string;
+        scoreAfter: bigint;
+        fanAfter: bigint;
+        pointAfter: bigint;
+    }>;
+};
+
+export type FutureProjection = {
+    level: number;
+    point: bigint;
+    score: bigint;
+    fan: bigint;
+    target?: bigint | null;
+    reached: boolean | null;
+};
+
+export type AmuletRuleRuntimeState = {
+    score: bigint;
+    fan: bigint;
+};
+
+export type AmuletRuntimeContext = {
+    hasPinzuInHand?: boolean;
+};
+
+export type AmuletEffectContext = {
+    rule: ResolvedAmuletRule;
+    index: number;
+    rules: ResolvedAmuletRule[];
+    level: number;
+    executionIndex: number;
+    activationIndex: number;
+    triggerCount: number;
+    activationCount: number;
+    extraExecutionCount: number;
+    activationCounts: number[];
+    executionCounts: number[];
+    effectApplicationCounts: number[];
+    state: AmuletRuleRuntimeState;
+    runtime: AmuletRuntimeContext;
+    vars: FormulaVars;
+    applyCopiedActivation: (targetIndex: number) => void;
+};
+
+export type AmuletActivationContext = {
+    rule: ResolvedAmuletRule;
+    index: number;
+    rules: ResolvedAmuletRule[];
+    level: number;
+    runtime: AmuletRuntimeContext;
+};
+
+export type AmuletGrowthContext = {
+    rule: ResolvedAmuletRule;
+    index: number;
+    rules: ResolvedAmuletRule[];
+    level: number;
+    executionIndex: number;
+    currentResult: CurrentPointResult;
+    currentData: bigint;
+    vars: FormulaVars;
+};
+
+export type AmuletEffectResult = (Partial<Pick<AmuletRuleRuntimeState, "score" | "fan">> & {
+    transmissionTriggers?: number;
+}) | null | void;
+
+export type AmuletRuleHandler = {
+    getDefaultConfig?: (item: EffectItem) => Partial<AmuletRuleConfig> | null | undefined;
+    isActiveOnWin?: (context: AmuletActivationContext) => boolean;
+    applyEffect?: (context: AmuletEffectContext) => AmuletEffectResult;
+    growData?: (context: AmuletGrowthContext) => bigint | null | undefined;
+};
+
+const BADGE_EXTENSION_SEAL_ID = 600160;
+const BADGE_TRANSMISSION_SEAL_ID = 600170;
+const BADGE_ANGEL_SEAL_ID = 600190;
+
+const BASE_UNITS: Array<[number, string]> = [
+    [4, "万"],
+    [8, "亿"],
+    [12, "兆"],
+    [16, "京"],
+    [20, "垓"],
+    [24, "秭"],
+    [28, "穰"],
+    [32, "沟"],
+    [36, "涧"],
+    [40, "正"],
+    [44, "载"],
+    [48, "极"],
+];
+
+const UNIT_EXPONENTS = new Map<string, number>();
+for (let repeat = 0; repeat <= 6; repeat += 1) {
+    const suffix = "极".repeat(repeat);
+    for (const [exponent, label] of BASE_UNITS) {
+        UNIT_EXPONENTS.set(`${label}${suffix}`, exponent + repeat * 48);
+    }
+}
+
+export const DEFAULT_RULE_CONFIG: AmuletRuleConfig = {
+    dataRaw: "0",
+    executions: 1,
+    extraExecutions: 0,
+    activeOnWin: false,
+    effectTarget: "none",
+    effectFormula: "",
+    growthFormula: "data",
+    note: "",
+};
+
+export const PRESET_AMULET_RULES: Record<number, Partial<AmuletRuleConfig>> = {};
+export {getRegisteredAmuletRule, getRegisteredAmuletRuleExact, registerAmuletRule, unregisterAmuletRule};
+
+export function clampExecutionCount(value: number | string | null | undefined): number {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 1;
+    return Math.max(1, Math.min(99, Math.trunc(n)));
+}
+
+export function clampExtraExecutionCount(value: number | string | null | undefined): number {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(99, Math.trunc(n)));
+}
+
+export function parseStoredDataFromItem(item: EffectItem): string {
+    if (!Array.isArray(item.store)) return "0";
+    for (const entry of item.store) {
+        const text = String(entry ?? "").trim();
+        if (/^[+-]?\d+$/.test(text)) return normalizeNumericString(text);
+    }
+    return "0";
+}
+
+export function resolveAmuletRule(item: EffectItem, custom?: Partial<AmuletRuleConfig> | null): ResolvedAmuletRule {
+    const regId = item.id;
+    const badgeId = typeof item.badge?.id === "number" ? item.badge.id : null;
+    const registeredRule = getRegisteredAmuletRule(regId);
+    const codeDefaultConfig = registeredRule?.getDefaultConfig?.(item) ?? {};
+    const preset = PRESET_AMULET_RULES[regId] ?? {};
+    const rawData = String(codeDefaultConfig.dataRaw ?? preset.dataRaw ?? parseStoredDataFromItem(item)).trim();
+    const merged: AmuletRuleConfig = {
+        ...DEFAULT_RULE_CONFIG,
+        ...codeDefaultConfig,
+        ...preset,
+        ...custom,
+        dataRaw: /^[+-]?\d+$/.test(rawData) ? normalizeNumericString(rawData) : "0",
+        executions: clampExecutionCount(custom?.executions ?? preset.executions ?? codeDefaultConfig.executions ?? 1),
+        extraExecutions: clampExtraExecutionCount(custom?.extraExecutions ?? preset.extraExecutions ?? codeDefaultConfig.extraExecutions ?? 0),
+        activeOnWin: custom?.activeOnWin ?? preset.activeOnWin ?? codeDefaultConfig.activeOnWin ?? ((custom?.effectTarget ?? preset.effectTarget ?? codeDefaultConfig.effectTarget ?? "none") !== "none"),
+        effectTarget: custom?.effectTarget ?? preset.effectTarget ?? codeDefaultConfig.effectTarget ?? "none",
+        effectFormula: custom?.effectFormula ?? preset.effectFormula ?? codeDefaultConfig.effectFormula ?? "",
+        growthFormula: custom?.growthFormula ?? preset.growthFormula ?? codeDefaultConfig.growthFormula ?? "data",
+        note: custom?.note ?? preset.note ?? codeDefaultConfig.note ?? "",
+    };
+    return {
+        ...merged,
+        item,
+        regId,
+        badgeId,
+        hasExtensionSeal: badgeId === BADGE_EXTENSION_SEAL_ID,
+        hasTransmissionSeal: badgeId === BADGE_TRANSMISSION_SEAL_ID,
+        hasAngelSeal: badgeId === BADGE_ANGEL_SEAL_ID,
+    };
+}
+
+export function parseFixed2(value: string | number | bigint): bigint {
+    if (typeof value === "bigint") return value * SCALE;
+    const text = String(value ?? "").trim();
+    if (!text) return 0n;
+    const match = text.match(/^([+-]?)(\d+)(?:\.(\d+))?$/);
+    if (!match) {
+        return BigInt(normalizeNumericString(text)) * SCALE;
+    }
+    const sign = match[1] === "-" ? -1n : 1n;
+    const whole = BigInt(match[2] || "0");
+    const frac = (match[3] ?? "").padEnd(SCALE_DECIMALS, "0").slice(0, SCALE_DECIMALS);
+    const fracValue = BigInt(frac || "0");
+    return sign * (whole * SCALE + fracValue);
+}
+
+export function parseTargetPointValue(value: string | number | bigint): bigint | null {
+    const text = String(value ?? "").trim();
+    if (!text) return null;
+
+    if (/^[+-]?\d+(?:\.\d+)?$/.test(text)) {
+        return parseFixed2(text);
+    }
+
+    const sci = text.match(/^([+-]?\d+(?:\.\d+)?)[eE]([+-]?\d+)$/);
+    if (sci) {
+        const scaled = parseFixed2(sci[1]);
+        const exponent = Number.parseInt(sci[2], 10);
+        if (!Number.isFinite(exponent)) return null;
+        if (exponent >= 0) return scaled * (10n ** BigInt(exponent));
+        const divisor = 10n ** BigInt(-exponent);
+        return scaled / divisor;
+    }
+
+    const unitMatch = text.match(/^([+-]?\d+(?:\.\d+)?)(.+)$/);
+    if (!unitMatch) return null;
+    const numeric = parseFixed2(unitMatch[1]);
+    const unit = unitMatch[2].trim();
+    const exponent = UNIT_EXPONENTS.get(unit);
+    if (exponent == null) return null;
+    return numeric * (10n ** BigInt(exponent));
+}
+
+export function fixed2ToString(value: bigint, trimTrailingZeros = true): string {
+    const negative = value < 0n;
+    const abs = negative ? -value : value;
+    const whole = abs / SCALE;
+    const frac = abs % SCALE;
+    let text = `${whole.toString()}.${frac.toString().padStart(SCALE_DECIMALS, "0")}`;
+    if (trimTrailingZeros) text = text.replace(/\.?0+$/, "");
+    if (negative && text !== "0") text = `-${text}`;
+    return text;
+}
+
+export function formatFixed2(value: bigint): string {
+    return formatLargeScaledNumber(value, SCALE_DECIMALS);
+}
+
+export function multiplyFixed2(a: bigint, b: bigint): bigint {
+    return (a * b) / SCALE;
+}
+
+function powFixed2(base: bigint, exponentScaled: bigint): bigint {
+    if (exponentScaled < 0n) throw new Error("negative exponent is not supported");
+    if (exponentScaled % SCALE !== 0n) throw new Error("exponent must be an integer");
+    const exponent = exponentScaled / SCALE;
+    let result = SCALE;
+    let factor = base;
+    let power = exponent;
+    while (power > 0n) {
+        if (power % 2n === 1n) {
+            result = multiplyFixed2(result, factor);
+        }
+        power /= 2n;
+        if (power > 0n) {
+            factor = multiplyFixed2(factor, factor);
+        }
+    }
+    return result;
+}
+
+class FormulaParser {
+    private readonly text: string;
+    private index = 0;
+    private readonly vars: FormulaVars;
+
+    constructor(text: string, vars: FormulaVars) {
+        this.text = text;
+        this.vars = vars;
+    }
+
+    parse(): bigint {
+        const value = this.parseExpression();
+        this.skipWhitespace();
+        if (this.index < this.text.length) {
+            throw new Error(`Unexpected token at ${this.index + 1}`);
+        }
+        return value;
+    }
+
+    private parseExpression(): bigint {
+        let value = this.parseTerm();
+        while (true) {
+            this.skipWhitespace();
+            const ch = this.peek();
+            if (ch === "+") {
+                this.index += 1;
+                value += this.parseTerm();
+                continue;
+            }
+            if (ch === "-") {
+                this.index += 1;
+                value -= this.parseTerm();
+                continue;
+            }
+            return value;
+        }
+    }
+
+    private parseTerm(): bigint {
+        let value = this.parsePower();
+        while (true) {
+            this.skipWhitespace();
+            if (this.peek() !== "*") return value;
+            this.index += 1;
+            value = multiplyFixed2(value, this.parsePower());
+        }
+    }
+
+    private parsePower(): bigint {
+        let value = this.parseUnary();
+        this.skipWhitespace();
+        if (this.peek() === "^") {
+            this.index += 1;
+            value = powFixed2(value, this.parsePower());
+        }
+        return value;
+    }
+
+    private parseUnary(): bigint {
+        this.skipWhitespace();
+        const ch = this.peek();
+        if (ch === "+") {
+            this.index += 1;
+            return this.parseUnary();
+        }
+        if (ch === "-") {
+            this.index += 1;
+            return -this.parseUnary();
+        }
+        return this.parsePrimary();
+    }
+
+    private parsePrimary(): bigint {
+        this.skipWhitespace();
+        const ch = this.peek();
+        if (ch === "(") {
+            this.index += 1;
+            const value = this.parseExpression();
+            this.skipWhitespace();
+            if (this.peek() !== ")") throw new Error("Missing closing parenthesis");
+            this.index += 1;
+            return value;
+        }
+        if (/[0-9.]/.test(ch ?? "")) {
+            return this.parseNumber();
+        }
+        if (/[a-zA-Z_]/.test(ch ?? "")) {
+            return this.parseIdentifier();
+        }
+        throw new Error(`Unexpected token at ${this.index + 1}`);
+    }
+
+    private parseNumber(): bigint {
+        const start = this.index;
+        while (this.index < this.text.length && /[0-9.]/.test(this.text[this.index])) {
+            this.index += 1;
+        }
+        return parseFixed2(this.text.slice(start, this.index));
+    }
+
+    private parseIdentifier(): bigint {
+        const start = this.index;
+        while (this.index < this.text.length && /[a-zA-Z0-9_]/.test(this.text[this.index])) {
+            this.index += 1;
+        }
+        const name = this.text.slice(start, this.index).toLowerCase();
+        if (!(name in this.vars)) {
+            throw new Error(`Unknown variable: ${name}`);
+        }
+        return this.vars[name as keyof FormulaVars];
+    }
+
+    private skipWhitespace() {
+        while (this.index < this.text.length && /\s/.test(this.text[this.index])) {
+            this.index += 1;
+        }
+    }
+
+    private peek() {
+        return this.text[this.index];
+    }
+}
+
+export function evaluateFormula(formula: string, vars: FormulaVars): bigint {
+    const source = String(formula ?? "").trim();
+    if (!source) return vars.data;
+    return new FormulaParser(source, vars).parse();
+}
+
+export function computeBaseScore(
+    handTileIds: number[],
+    deckMap: Map<number, string>,
+    tileScoreMap?: Record<string, string> | null,
+): bigint {
+    if (!Array.isArray(handTileIds) || handTileIds.length === 0 || !tileScoreMap) return 0n;
+    return handTileIds.reduce((sum, tileId) => {
+        const face = deckMap.get(tileId);
+        if (!face) return sum;
+        return sum + parseFixed2(tileScoreMap[face] ?? "0");
+    }, 0n);
+}
+
+function computePoint(score: bigint, fan: bigint): bigint {
+    return multiplyFixed2(score, fan);
+}
+
+function getTriggerActivationCount(rule: ResolvedAmuletRule): number {
+    const extensionMultiplier = rule.hasExtensionSeal ? 2 : 1;
+    return clampExecutionCount(rule.executions) * extensionMultiplier;
+}
+
+function getExtraActivationCount(rule: ResolvedAmuletRule): number {
+    return clampExtraExecutionCount(rule.extraExecutions);
+}
+
+function getEffectiveActivationCount(rule: ResolvedAmuletRule): number {
+    return getTriggerActivationCount(rule) + getExtraActivationCount(rule);
+}
+
+function applyDefaultRuleEffect(rule: ResolvedAmuletRule, vars: FormulaVars, state: AmuletRuleRuntimeState) {
+    if (rule.effectTarget === "score" && rule.effectFormula.trim()) {
+        try {
+            state.score = evaluateFormula(rule.effectFormula, vars);
+        } catch {
+        }
+    } else if (rule.effectTarget === "fan" && rule.effectFormula.trim()) {
+        try {
+            state.fan = evaluateFormula(rule.effectFormula, vars);
+        } catch {
+        }
+    }
+}
+
+function applyRegisteredRuleEffect(context: AmuletEffectContext) {
+    const handler = getRegisteredAmuletRule(context.rule.regId);
+    if (!handler?.applyEffect) {
+        applyDefaultRuleEffect(context.rule, context.vars, context.state);
+        return undefined;
+    }
+    const result = handler.applyEffect(context);
+    if (result?.score != null) context.state.score = result.score;
+    if (result?.fan != null) context.state.fan = result.fan;
+    return result?.transmissionTriggers;
+}
+
+function applyDefaultGrowth(rule: ResolvedAmuletRule, vars: FormulaVars, currentData: bigint) {
+    try {
+        const grown = evaluateFormula(rule.growthFormula || "data", vars);
+        return rule.hasAngelSeal ? currentData + (grown - currentData) * 2n : grown;
+    } catch {
+        return currentData;
+    }
+}
+
+function applyRegisteredGrowth(context: AmuletGrowthContext) {
+    const handler = getRegisteredAmuletRule(context.rule.regId);
+    if (!handler?.growData) {
+        return applyDefaultGrowth(context.rule, context.vars, context.currentData);
+    }
+    try {
+        const result = handler.growData(context);
+        if (typeof result === "bigint") return result;
+    } catch {
+    }
+    return applyDefaultGrowth(context.rule, context.vars, context.currentData);
+}
+
+function isRuleActiveOnWin(
+    rule: ResolvedAmuletRule,
+    index: number,
+    rules: ResolvedAmuletRule[],
+    level: number,
+    runtime: AmuletRuntimeContext,
+) {
+    if (!rule.activeOnWin) return false;
+    const handler = getRegisteredAmuletRule(rule.regId);
+    if (!handler?.isActiveOnWin) return true;
+    try {
+        return !!handler.isActiveOnWin({
+            rule,
+            index,
+            rules,
+            level,
+            runtime,
+        });
+    } catch {
+        return true;
+    }
+}
+
+export function calculateCurrentPoint(
+    baseScore: bigint,
+    baseFan: bigint,
+    level: number,
+    amuletRules: ResolvedAmuletRule[],
+    runtime: AmuletRuntimeContext = {},
+): CurrentPointResult {
+    const state: AmuletRuleRuntimeState = {score: baseScore, fan: baseFan};
+    const activationCounts = amuletRules.map(() => 0);
+    const executionCounts = amuletRules.map(() => 0);
+    const effectApplicationCounts = amuletRules.map(() => 0);
+    const levelValue = BigInt(level) * SCALE;
+
+    const applyEffectApplication = (
+        index: number,
+        triggerCount: number,
+        activationCount: number,
+        extraExecutionCount: number,
+        effectSequence: number,
+        executionSequence: number,
+        allowTransmission: boolean,
+    ): number => {
+        const rule = amuletRules[index];
+        if (!rule || !isRuleActiveOnWin(rule, index, amuletRules, level, runtime)) return 0;
+
+        effectApplicationCounts[index] += 1;
+        const activationIndex = effectSequence;
+        const executionIndex = executionSequence;
+        const vars: FormulaVars = {
+            data: BigInt(rule.dataRaw || "0"),
+            score: state.score,
+            fan: state.fan,
+            level: levelValue,
+            execution: BigInt(executionIndex) * SCALE,
+            extra_execution: BigInt(extraExecutionCount) * SCALE,
+            activation: BigInt(activationIndex) * SCALE,
+        };
+        const transmissionTriggers = applyRegisteredRuleEffect({
+            rule,
+            index,
+            rules: amuletRules,
+            level,
+            executionIndex,
+            activationIndex,
+            triggerCount,
+            activationCount,
+            extraExecutionCount,
+            activationCounts,
+            executionCounts,
+            effectApplicationCounts,
+            state,
+            runtime,
+            vars,
+            applyCopiedActivation: (targetIndex: number) => {
+                const targetRule = amuletRules[targetIndex];
+                if (!targetRule) return;
+                const targetTriggerCount = getTriggerActivationCount(targetRule);
+                const targetExtraExecutionCount = getExtraActivationCount(targetRule);
+                const targetActivationCount = getEffectiveActivationCount(targetRule);
+                applyEffectApplication(
+                    targetIndex,
+                    targetTriggerCount,
+                    targetActivationCount,
+                    targetExtraExecutionCount,
+                    effectApplicationCounts[targetIndex] + 1,
+                    Math.max(1, executionCounts[targetIndex] + 1),
+                    false,
+                );
+            },
+        });
+        return allowTransmission ? Math.max(0, transmissionTriggers ?? 1) : 0;
+    };
+
+    const triggerRule = (index: number) => {
+        const rule = amuletRules[index];
+        if (!rule || !isRuleActiveOnWin(rule, index, amuletRules, level, runtime)) return;
+
+        const triggerCount = getTriggerActivationCount(rule);
+        const extraExecutionCount = getExtraActivationCount(rule);
+        const activationCount = getEffectiveActivationCount(rule);
+        for (let activation = 0; activation < activationCount; activation += 1) {
+            const countsAsExecution = activation < triggerCount;
+            if (countsAsExecution) {
+                executionCounts[index] += 1;
+            }
+            activationCounts[index] += 1;
+            const executionSequence = Math.max(1, executionCounts[index]);
+            const activationSequence = activationCounts[index];
+            const transmissionCount = applyEffectApplication(
+                index,
+                triggerCount,
+                activationCount,
+                extraExecutionCount,
+                activationSequence,
+                executionSequence,
+                countsAsExecution,
+            );
+            if (countsAsExecution && amuletRules[index + 1]?.hasTransmissionSeal) {
+                for (let transmission = 0; transmission < transmissionCount; transmission += 1) {
+                    triggerRule(index + 1);
+                }
+            }
+        }
+    };
+
+    for (let index = 0; index < amuletRules.length; index += 1) {
+        triggerRule(index);
+    }
+
+    const perAmulet: CurrentPointResult["perAmulet"] = amuletRules.map((rule, index) => ({
+        uid: rule.item.uid,
+        regId: rule.regId,
+        executions: executionCounts[index],
+        extraExecutions: Math.max(0, activationCounts[index] - executionCounts[index]),
+        activations: activationCounts[index],
+        effectApplications: effectApplicationCounts[index],
+        dataRaw: rule.dataRaw,
+        scoreAfter: state.score,
+        fanAfter: state.fan,
+        pointAfter: computePoint(state.score, state.fan),
+    }));
+
+    return {
+        baseScore,
+        finalScore: state.score,
+        baseFan,
+        finalFan: state.fan,
+        finalPoint: computePoint(state.score, state.fan),
+        perAmulet,
+    };
+}
+
+function growAmuletData(
+    rules: ResolvedAmuletRule[],
+    result: CurrentPointResult,
+    level: number,
+): ResolvedAmuletRule[] {
+    const levelValue = BigInt(level) * SCALE;
+    return rules.map((rule, index) => {
+        let nextData = BigInt(rule.dataRaw || "0");
+        const growthRepeat = rule.hasExtensionSeal ? 2 : 1;
+
+        for (let executionIndex = 1; executionIndex <= growthRepeat; executionIndex += 1) {
+            const currentData = nextData;
+            const vars: FormulaVars = {
+                data: currentData,
+                score: result.finalScore,
+                fan: result.finalFan,
+                level: levelValue,
+                execution: BigInt(executionIndex) * SCALE,
+                extra_execution: BigInt(getExtraActivationCount(rule)) * SCALE,
+                activation: BigInt(executionIndex + getExtraActivationCount(rule)) * SCALE,
+            };
+            nextData = applyRegisteredGrowth({
+                rule,
+                index,
+                rules,
+                level,
+                executionIndex,
+                currentResult: result,
+                currentData,
+                vars,
+            });
+        }
+
+        return {
+            ...rule,
+            dataRaw: nextData.toString(),
+        };
+    });
+}
+
+export function projectFuturePoints(
+    currentLevel: number,
+    futureLevels: Array<{ level: number; target?: string }>,
+    currentResult: CurrentPointResult,
+    currentRules: ResolvedAmuletRule[],
+    baseScore: bigint,
+    baseFan: bigint,
+    runtime: AmuletRuntimeContext = {},
+): FutureProjection[] {
+    const out: FutureProjection[] = [];
+    let level = currentLevel;
+    let rules = currentRules;
+    let result = currentResult;
+
+    for (const future of futureLevels) {
+        rules = growAmuletData(rules, result, level);
+        level = future.level;
+        result = calculateCurrentPoint(baseScore, baseFan, level, rules, runtime);
+        const target = parseTargetPointValue(future.target ?? "") ?? null;
+        out.push({
+            level,
+            point: result.finalPoint,
+            score: result.finalScore,
+            fan: result.finalFan,
+            target,
+            reached: target == null ? null : result.finalPoint >= target,
+        });
+    }
+
+    return out;
+}

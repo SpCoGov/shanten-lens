@@ -92,6 +92,7 @@
     { "id": 28, "icon_id": 32, "name": "資源リサイクル", "rarity": "BLUE" },
     { "id": 138, "icon_id": 126, "name": "怠慢バイト", "rarity": "BLUE" },
     { "id": 139, "icon_id": 127, "name": "二重学位", "rarity": "BLUE" },
+    { "id": 174, "icon_id": 161, "name": "四君子の約束", "rarity": "BLUE" },
 
     { "id": 229, "icon_id": 191,  "name": "スタンプ盗み", "rarity": "ORANGE" },
     { "id": 227, "icon_id": 189,  "name": "月光の加護", "rarity": "ORANGE" },

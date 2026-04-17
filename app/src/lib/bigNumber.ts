@@ -127,6 +127,23 @@ function formatFixed(value: bigint, exponent: number, decimals: number): string 
     return `${text.slice(0, -decimals)}.${text.slice(-decimals)}`;
 }
 
+function formatScaledFixed(value: bigint, exponent: number, decimals: number): string {
+    const scale = 10n ** BigInt(exponent);
+    let quotient = (value * (10n ** BigInt(decimals))) / scale;
+    const remainder = (value * (10n ** BigInt(decimals))) % scale;
+    if (remainder * 2n >= scale) {
+        quotient += 1n;
+    }
+
+    if (decimals <= 0) return quotient.toString();
+
+    let text = quotient.toString();
+    if (text.length <= decimals) {
+        text = text.padStart(decimals + 1, "0");
+    }
+    return `${text.slice(0, -decimals)}.${text.slice(-decimals)}`.replace(/\.?0+$/, "");
+}
+
 export function formatLargeNumber(
     value: string | number | bigint,
     options?: {
@@ -158,4 +175,48 @@ export function formatLargeNumber(
     }
     const [unitExponent, unitLabel] = chosen;
     return `${sign}${formatFixed(number, unitExponent, humanDecimals)}${unitLabel}`;
+}
+
+export function formatLargeScaledNumber(
+    value: bigint,
+    scaleDecimals: number,
+    options?: {
+        humanDecimals?: number;
+        scientificDecimals?: number;
+    },
+): string {
+    const scale = 10n ** BigInt(scaleDecimals);
+    const negative = value < 0n;
+    const abs = negative ? -value : value;
+    const whole = abs / scale;
+    const fraction = abs % scale;
+
+    if (abs === 0n) return "0";
+
+    if (whole === 0n || whole.toString().length - 1 < 8) {
+        let text = whole.toString();
+        if (scaleDecimals > 0 && fraction !== 0n) {
+            text = `${text}.${fraction.toString().padStart(scaleDecimals, "0")}`.replace(/\.?0+$/, "");
+        }
+        return negative && text !== "0" ? `-${text}` : text;
+    }
+
+    const humanDecimals = options?.humanDecimals ?? 2;
+    const scientificDecimals = options?.scientificDecimals ?? 5;
+    const exponent = whole.toString().length - 1;
+    const sign = negative ? "-" : "";
+
+    if (exponent >= 304) {
+        const mantissa = formatScaledFixed(abs, exponent + scaleDecimals, scientificDecimals);
+        return `${sign}${mantissa}e${exponent}`;
+    }
+
+    let chosen = HUMAN_UNITS[0];
+    for (const unit of HUMAN_UNITS) {
+        if (unit[0] > exponent) break;
+        chosen = unit;
+    }
+    const [unitExponent, unitLabel] = chosen;
+    const quotient = formatScaledFixed(abs, unitExponent + scaleDecimals, humanDecimals);
+    return `${sign}${quotient}${unitLabel}`;
 }

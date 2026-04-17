@@ -1387,6 +1387,7 @@ input:invalid, textarea:invalid, select:invalid {
 }
 
 .route-home > *,
+.route-score > *,
 .route-fuse > *,
 .route-blackhole > *,
 .route-souzu-debug > *,

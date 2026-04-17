@@ -3,6 +3,7 @@ export interface GameStateData {
     coin: string;
     point?: string;
     target_point?: string;
+    level?: number;
     deck_map: Record<string, string>;
     hand_tiles: number[];
     dora_tiles: number[];

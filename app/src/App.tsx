@@ -11,6 +11,7 @@ import FusePage from "./pages/FusePage";
 import AboutPage from "./pages/AboutPage";
 import BlackHolePage from "./pages/BlackHolePage";
 import SouzuSwitchDebugPage from "./pages/SouzuSwitchDebugPage";
+import ScorePage from "./pages/ScorePage";
 import {ws, ensureWsStartedOnce} from "./lib/ws";
 import {type LogLevel, useLogStore} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
@@ -86,7 +87,7 @@ async function openSettingsWindow() {
     }
 }
 
-type Route = "home" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "diagnostics" | "packet-test" | "about";
+type Route = "home" | "score" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "diagnostics" | "packet-test" | "about";
 
 const OUTER_PADDING = 16;
 const SIDEBAR_WIDTH = 320;
@@ -125,11 +126,11 @@ function buildPointProgressMeta(pointRaw?: string, targetRaw?: string) {
 }
 
 function Topbar({
-    onSecretClick,
-    stage,
-    point,
-    targetPoint,
-}: {
+                    onSecretClick,
+                    stage,
+                    point,
+                    targetPoint,
+                }: {
     onSecretClick: () => void;
     stage: number;
     point?: string;
@@ -164,7 +165,7 @@ function Topbar({
             {progressMeta ? (
                 <div className={`topbar-progress-band ${progressMeta.reached ? "is-over" : ""}`} data-tauri-drag-region>
                     <div className="topbar-progress-band-track" data-tauri-drag-region>
-                        <div className="topbar-progress-band-fill" style={{width: `${progressMeta.fillPercent}%`}} />
+                        <div className="topbar-progress-band-fill" style={{width: `${progressMeta.fillPercent}%`}}/>
                     </div>
                     <div className="topbar-progress-band-label" data-tauri-drag-region>{progressMeta.centerLabel}</div>
                 </div>
@@ -205,6 +206,7 @@ export default function App() {
     const [coin, setCoin] = React.useState<string>("0");
     const [point, setPoint] = React.useState<string>("0");
     const [targetPoint, setTargetPoint] = React.useState<string>("0");
+    const [level, setLevel] = React.useState<number>(0);
     const [ended, setEnded] = React.useState<boolean>(false);
     const [remain, setRemain] = React.useState<number>(0);
     const [hasGame, setHasGame] = React.useState<boolean>(false);
@@ -231,6 +233,7 @@ export default function App() {
     const [amulets, setAmulets] = React.useState<EffectItem[]>([]);
     const [goods, setGoods] = React.useState<GoodsItem[]>([]);
     const [candidates, setCandidates] = React.useState<CandidateEffectRef[]>([]);
+    const [tileScoreMap, setTileScoreMap] = React.useState<Record<string, string>>({});
 
     const THEME_ORDER: ThemeMode[] = ["auto", "dark", "dark-green"];
     const THEME_KEY = "sl-theme";
@@ -473,6 +476,7 @@ export default function App() {
                 setCoin(typeof d.coin === "string" ? d.coin : String(d.coin ?? "0"));
                 setPoint(typeof d.point === "string" ? d.point : String(d.point ?? "0"));
                 setTargetPoint(typeof d.target_point === "string" ? d.target_point : String(d.target_point ?? "0"));
+                setLevel(typeof d.level === "number" ? d.level : Number(d.level ?? 0));
                 setEnded(!!d.ended);
                 setRemain(d.desktop_remain ?? 0);
                 setHasGame(d.stage !== undefined && d.ended !== undefined && d.stage >= 0);
@@ -499,6 +503,7 @@ export default function App() {
                 setAmulets(Array.isArray(d.effect_list) ? d.effect_list : []);
                 setGoods(d.goods ?? []);
                 setCandidates(d.candidate_effect_list ?? []);
+                setTileScoreMap(d.tile_score_map ?? {});
             } else if (pkt.type === "discard_recommendation" && pkt.data) {
                 const arr = (Array.isArray(pkt.data) ? pkt.data : []) as Array<{ yaku: string; data: PlanData }>;
                 for (const item of arr) {
@@ -688,6 +693,11 @@ export default function App() {
                         <span className="ms">home</span>
                     </button>
                     <button ref={(el) => {
+                        navRefs.current.score = el;
+                    }} className={`nav-icon ${route === "score" ? "active" : ""}`} title={t("nav.score")} onClick={() => setRoute("score")}>
+                        <span className="ms">calculate</span>
+                    </button>
+                    <button ref={(el) => {
                         navRefs.current.fuse = el;
                     }} className={`nav-icon ${route === "fuse" ? "active" : ""}`} title={t("nav.fuse")} onClick={() => setRoute("fuse")}>
                         <span className="ms">gpp_maybe</span>
@@ -697,11 +707,13 @@ export default function App() {
                     }} className={`nav-icon ${route === "blackhole" ? "active" : ""}`} title={t("nav.blackhole")} onClick={() => setRoute("blackhole")}>
                         <span className="ms">deblur</span>
                     </button>
-                    <button ref={(el) => {
-                        navRefs.current["souzu-debug"] = el;
-                    }} className={`nav-icon ${route === "souzu-debug" ? "active" : ""}`} title="Souzu Debug" onClick={() => setRoute("souzu-debug")}>
-                        <span className="ms">science</span>
-                    </button>
+                    {debugEnabled && (
+                        <button ref={(el) => {
+                            navRefs.current["souzu-debug"] = el;
+                        }} className={`nav-icon ${route === "souzu-debug" ? "active" : ""}`} title="Souzu Debug" onClick={() => setRoute("souzu-debug")}>
+                            <span className="ms">science</span>
+                        </button>
+                    )}
                     <button ref={(el) => {
                         navRefs.current.autorun = el;
                     }} className={`nav-icon ${route === "autorun" ? "active" : ""}`} title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
@@ -815,6 +827,17 @@ export default function App() {
                             </div>
                         )}
 
+                        {route === "score" && (
+                            <ScorePage
+                                amulets={amulets}
+                                handTileIds={handTileIds}
+                                deckMap={deckMap}
+                                tileScoreMap={tileScoreMap}
+                                level={level}
+                                currentPoint={point}
+                                currentTargetPoint={targetPoint}
+                            />
+                        )}
                         {route === "fuse" && <FusePage/>}
                         {route === "blackhole" && (
                             <BlackHolePage
