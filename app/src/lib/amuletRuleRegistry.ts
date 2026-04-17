@@ -27,6 +27,7 @@ export function getAllRegisteredAmuletRules() {
 
 // 嵐星の影分身
 registerAmuletRule(700, {
+    affectsPoint: true,
     getDefaultConfig: () => ({
         activeOnWin: true,
         effectTarget: "none",
@@ -44,6 +45,7 @@ registerAmuletRule(700, {
 
 // 嵐星の影分身+
 registerAmuletRule(701, {
+    affectsPoint: true,
     getDefaultConfig: () => ({
         activeOnWin: true,
         effectTarget: "none",
@@ -95,4 +97,26 @@ registerAmuletRule([1640, 1641, 1660, 1661, 1690, 1691, 2000, 2001, 2240, 2241, 
         effectFormula: "",
         growthFormula: "data",
     })
+});
+
+registerAmuletRule([2270, 2271], {
+    affectsPoint: true,
+    getDefaultConfig: () => ({
+        dataRaw: "100",
+        activeOnWin: true,
+        effectTarget: "none",
+        effectFormula: "",
+        growthFormula: "data",
+    }),
+    applyEffect: ({rule, state}) => {
+        const data = BigInt(rule.dataRaw || "100");
+        return {
+            fan: (data * state.fan) / 100n,
+        };
+    },
+    growData: ({rule, currentData}) => {
+        const growthRate = rule.regId === 2271 ? 150n : 130n;
+        return (currentData * growthRate) / 100n;
+    },
+    isActiveOnWin: () => true,
 });

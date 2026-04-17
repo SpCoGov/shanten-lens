@@ -496,6 +496,8 @@
     "exec_count": "生效次数：{{count}}",
     "exec_count_label": "执行次数",
     "extra_exec_count_label": "额外生效次数",
+    "manual_extra_triggers_label": "手动额外触发次数",
+    "manual_extra_triggers_hint": "正数表示在全部护身符结算完后额外触发几次，负数表示少触发几次，最少为 0。",
     "amulet_id_label": "护身符ID",
     "code_driven": "代码驱动",
     "config_driven": "配置驱动",

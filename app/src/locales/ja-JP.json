@@ -493,6 +493,8 @@
     "exec_count": "有効回数: {{count}}",
     "exec_count_label": "実行回数",
     "extra_exec_count_label": "追加発動回数",
+    "manual_extra_triggers_label": "手動追加発動回数",
+    "manual_extra_triggers_hint": "正の数は全てのお守りの処理後に追加で発動する回数、負の数は発動回数を減らす指定で、最小は 0 です。",
     "amulet_id_label": "お守りID",
     "code_driven": "コード駆動",
     "config_driven": "設定駆動",

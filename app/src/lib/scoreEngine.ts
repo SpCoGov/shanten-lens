@@ -26,6 +26,7 @@ export type AmuletRuleConfig = {
     dataRaw: string;
     executions: number;
     extraExecutions: number;
+    manualExtraTriggers: number;
     activeOnWin: boolean;
     effectTarget: EffectTarget;
     effectFormula: string;
@@ -53,6 +54,7 @@ export type CurrentPointResult = {
         regId: number;
         executions: number;
         extraExecutions: number;
+        manualExtraTriggers: number;
         activations: number;
         effectApplications: number;
         dataRaw: string;
@@ -124,6 +126,7 @@ export type AmuletEffectResult = (Partial<Pick<AmuletRuleRuntimeState, "score" |
 
 export type AmuletRuleHandler = {
     getDefaultConfig?: (item: EffectItem) => Partial<AmuletRuleConfig> | null | undefined;
+    affectsPoint?: boolean;
     isActiveOnWin?: (context: AmuletActivationContext) => boolean;
     applyEffect?: (context: AmuletEffectContext) => AmuletEffectResult;
     growData?: (context: AmuletGrowthContext) => bigint | null | undefined;
@@ -160,6 +163,7 @@ export const DEFAULT_RULE_CONFIG: AmuletRuleConfig = {
     dataRaw: "0",
     executions: 1,
     extraExecutions: 0,
+    manualExtraTriggers: 0,
     activeOnWin: false,
     effectTarget: "none",
     effectFormula: "",
@@ -180,6 +184,12 @@ export function clampExtraExecutionCount(value: number | string | null | undefin
     const n = Number(value);
     if (!Number.isFinite(n)) return 0;
     return Math.max(0, Math.min(99, Math.trunc(n)));
+}
+
+export function clampManualExtraTriggerCount(value: number | string | null | undefined): number {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(-99, Math.min(99, Math.trunc(n)));
 }
 
 export function parseStoredDataFromItem(item: EffectItem): string {
@@ -206,6 +216,7 @@ export function resolveAmuletRule(item: EffectItem, custom?: Partial<AmuletRuleC
         dataRaw: /^[+-]?\d+$/.test(rawData) ? normalizeNumericString(rawData) : "0",
         executions: clampExecutionCount(custom?.executions ?? preset.executions ?? codeDefaultConfig.executions ?? 1),
         extraExecutions: clampExtraExecutionCount(custom?.extraExecutions ?? preset.extraExecutions ?? codeDefaultConfig.extraExecutions ?? 0),
+        manualExtraTriggers: clampManualExtraTriggerCount(custom?.manualExtraTriggers ?? preset.manualExtraTriggers ?? codeDefaultConfig.manualExtraTriggers ?? 0),
         activeOnWin: custom?.activeOnWin ?? preset.activeOnWin ?? codeDefaultConfig.activeOnWin ?? ((custom?.effectTarget ?? preset.effectTarget ?? codeDefaultConfig.effectTarget ?? "none") !== "none"),
         effectTarget: custom?.effectTarget ?? preset.effectTarget ?? codeDefaultConfig.effectTarget ?? "none",
         effectFormula: custom?.effectFormula ?? preset.effectFormula ?? codeDefaultConfig.effectFormula ?? "",
@@ -480,12 +491,15 @@ function applyRegisteredRuleEffect(context: AmuletEffectContext) {
     const handler = getRegisteredAmuletRule(context.rule.regId);
     if (!handler?.applyEffect) {
         applyDefaultRuleEffect(context.rule, context.vars, context.state);
-        return undefined;
+        return {transmissionTriggers: undefined, affectsPoint: context.rule.effectTarget !== "none"};
     }
     const result = handler.applyEffect(context);
     if (result?.score != null) context.state.score = result.score;
     if (result?.fan != null) context.state.fan = result.fan;
-    return result?.transmissionTriggers;
+    return {
+        transmissionTriggers: result?.transmissionTriggers,
+        affectsPoint: !!handler.affectsPoint,
+    };
 }
 
 function applyDefaultGrowth(rule: ResolvedAmuletRule, vars: FormulaVars, currentData: bigint) {
@@ -554,13 +568,17 @@ export function calculateCurrentPoint(
         effectSequence: number,
         executionSequence: number,
         allowTransmission: boolean,
-    ): number => {
+    ): {triggered: boolean; transmissionCount: number} => {
         const rule = amuletRules[index];
-        if (!rule || !isRuleActiveOnWin(rule, index, amuletRules, level, runtime)) return 0;
+        if (!rule || !isRuleActiveOnWin(rule, index, amuletRules, level, runtime)) {
+            return {triggered: false, transmissionCount: 0};
+        }
 
-        effectApplicationCounts[index] += 1;
         const activationIndex = effectSequence;
         const executionIndex = executionSequence;
+        const prevScore = state.score;
+        const prevFan = state.fan;
+        const prevPoint = computePoint(prevScore, prevFan);
         const vars: FormulaVars = {
             data: BigInt(rule.dataRaw || "0"),
             score: state.score,
@@ -570,7 +588,7 @@ export function calculateCurrentPoint(
             extra_execution: BigInt(extraExecutionCount) * SCALE,
             activation: BigInt(activationIndex) * SCALE,
         };
-        const transmissionTriggers = applyRegisteredRuleEffect({
+        const effectResult = applyRegisteredRuleEffect({
             rule,
             index,
             rules: amuletRules,
@@ -603,7 +621,21 @@ export function calculateCurrentPoint(
                 );
             },
         });
-        return allowTransmission ? Math.max(0, transmissionTriggers ?? 1) : 0;
+        const nextPoint = computePoint(state.score, state.fan);
+        const pointRelevant = effectResult.affectsPoint;
+        const triggered = !pointRelevant || nextPoint !== prevPoint;
+
+        if (!triggered) {
+            state.score = prevScore;
+            state.fan = prevFan;
+            return {triggered: false, transmissionCount: 0};
+        }
+
+        effectApplicationCounts[index] += 1;
+        return {
+            triggered: true,
+            transmissionCount: allowTransmission ? Math.max(0, effectResult.transmissionTriggers ?? 1) : 0,
+        };
     };
 
     const triggerRule = (index: number) => {
@@ -613,25 +645,56 @@ export function calculateCurrentPoint(
         const triggerCount = getTriggerActivationCount(rule);
         const extraExecutionCount = getExtraActivationCount(rule);
         const activationCount = getEffectiveActivationCount(rule);
-        for (let activation = 0; activation < activationCount; activation += 1) {
+        const adjustedActivationCount = Math.max(0, activationCount + rule.manualExtraTriggers);
+        const immediateActivationCount = Math.min(activationCount, adjustedActivationCount);
+        const deferredManualTriggerCount = Math.max(0, adjustedActivationCount - activationCount);
+
+        for (let activation = 0; activation < immediateActivationCount; activation += 1) {
             const countsAsExecution = activation < triggerCount;
-            if (countsAsExecution) {
-                executionCounts[index] += 1;
-            }
-            activationCounts[index] += 1;
-            const executionSequence = Math.max(1, executionCounts[index]);
-            const activationSequence = activationCounts[index];
-            const transmissionCount = applyEffectApplication(
+            const executionSequence = countsAsExecution ? executionCounts[index] + 1 : Math.max(1, executionCounts[index]);
+            const activationSequence = activationCounts[index] + 1;
+            const effectAttempt = applyEffectApplication(
                 index,
                 triggerCount,
-                activationCount,
+                adjustedActivationCount,
                 extraExecutionCount,
                 activationSequence,
                 executionSequence,
                 countsAsExecution,
             );
+            if (!effectAttempt.triggered) {
+                continue;
+            }
+            activationCounts[index] += 1;
+            if (countsAsExecution) {
+                executionCounts[index] += 1;
+            }
             if (countsAsExecution && amuletRules[index + 1]?.hasTransmissionSeal) {
-                for (let transmission = 0; transmission < transmissionCount; transmission += 1) {
+                for (let transmission = 0; transmission < effectAttempt.transmissionCount; transmission += 1) {
+                    triggerRule(index + 1);
+                }
+            }
+        }
+
+        for (let activation = 0; activation < deferredManualTriggerCount; activation += 1) {
+            const executionSequence = executionCounts[index] + 1;
+            const activationSequence = activationCounts[index] + 1;
+            const effectAttempt = applyEffectApplication(
+                index,
+                triggerCount + deferredManualTriggerCount,
+                adjustedActivationCount,
+                extraExecutionCount,
+                activationSequence,
+                executionSequence,
+                true,
+            );
+            if (!effectAttempt.triggered) {
+                continue;
+            }
+            activationCounts[index] += 1;
+            executionCounts[index] += 1;
+            if (amuletRules[index + 1]?.hasTransmissionSeal) {
+                for (let transmission = 0; transmission < effectAttempt.transmissionCount; transmission += 1) {
                     triggerRule(index + 1);
                 }
             }
@@ -647,6 +710,7 @@ export function calculateCurrentPoint(
         regId: rule.regId,
         executions: executionCounts[index],
         extraExecutions: Math.max(0, activationCounts[index] - executionCounts[index]),
+        manualExtraTriggers: rule.manualExtraTriggers,
         activations: activationCounts[index],
         effectApplications: effectApplicationCounts[index],
         dataRaw: rule.dataRaw,

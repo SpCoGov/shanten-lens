@@ -9,6 +9,7 @@ import {
     calculateCurrentPoint,
     clampExtraExecutionCount,
     clampExecutionCount,
+    clampManualExtraTriggerCount,
     computeBaseScore,
     DEFAULT_RULE_CONFIG,
     PRESET_AMULET_RULES,
@@ -217,13 +218,7 @@ export default function ScorePage({
     );
 
     const rules = React.useMemo(() => {
-        return amulets.map((item) => {
-            const regId = item.id;
-            const isCodeDriven = !!getRegisteredAmuletRuleExact(regId);
-            // 代码驱动规则不允许编辑：忽略本地自定义覆盖（只展示代码计算结果）。
-            const custom = isCodeDriven ? null : customRules[getRuleKey(item)];
-            return resolveAmuletRule(item, custom);
-        });
+        return amulets.map((item) => resolveAmuletRule(item, customRules[getRuleKey(item)]));
     }, [amulets, customRules]);
 
     const currentResult = React.useMemo(
@@ -262,12 +257,13 @@ export default function ScorePage({
         for (let index = 1; index < rules.length; index += 1) {
             const prev = rules[index - 1];
             const current = rules[index];
-            if (prev?.hasTransmissionSeal && current?.hasTransmissionSeal && !current.activeOnWin) {
+            const currentApplied = (currentResult.perAmulet[index]?.effectApplications ?? 0) > 0;
+            if (prev?.hasTransmissionSeal && current?.hasTransmissionSeal && !currentApplied) {
                 breaks.add(index);
             }
         }
         return breaks;
-    }, [rules]);
+    }, [currentResult.perAmulet, rules]);
 
     const tileScoreGroups = React.useMemo(() => {
         const grouped: Record<"m" | "p" | "s" | "z" | "other", TileScoreEntry[]> = {
@@ -342,6 +338,7 @@ export default function ScorePage({
             dataRaw: merged.dataRaw,
             executions: merged.executions,
             extraExecutions: merged.extraExecutions,
+            manualExtraTriggers: merged.manualExtraTriggers,
             activeOnWin: merged.activeOnWin,
             effectTarget: merged.effectTarget,
             effectFormula: merged.effectFormula,
@@ -352,7 +349,6 @@ export default function ScorePage({
     }, [customRules]);
 
     const saveEditor = React.useCallback(() => {
-        if (isEditingCodeDriven) return;
         if (!editingItem || !editingKey) return;
         setCustomRules((prev) => ({
             ...prev,
@@ -360,6 +356,7 @@ export default function ScorePage({
                 dataRaw: parseStoredDataFromItem(editingItem),
                 executions: clampExecutionCount(draftRule.executions),
                 extraExecutions: clampExtraExecutionCount(draftRule.extraExecutions),
+                manualExtraTriggers: clampManualExtraTriggerCount(draftRule.manualExtraTriggers),
                 activeOnWin: draftRule.activeOnWin,
                 effectTarget: draftRule.effectTarget,
                 effectFormula: draftRule.effectFormula.trim(),
@@ -368,10 +365,9 @@ export default function ScorePage({
             },
         }));
         setEditingKey(null);
-    }, [draftRule, editingItem, editingKey, isEditingCodeDriven, setCustomRules]);
+    }, [draftRule, editingItem, editingKey, setCustomRules]);
 
     const resetEditor = React.useCallback(() => {
-        if (isEditingCodeDriven) return;
         if (!editingKey) return;
         setCustomRules((prev) => {
             const next = {...prev};
@@ -379,7 +375,7 @@ export default function ScorePage({
             return next;
         });
         setEditingKey(null);
-    }, [editingKey, isEditingCodeDriven, setCustomRules]);
+    }, [editingKey, setCustomRules]);
 
     const currentReached = actualTarget > 0n ? currentResult.finalPoint >= actualTarget : null;
     const codeRuleIdSet = React.useMemo(
@@ -547,6 +543,10 @@ export default function ScorePage({
                                     currentResult.perAmulet[index]?.effectApplications ??
                                     currentResult.perAmulet[index]?.activations ??
                                     (rule.executions + (rule.extraExecutions ?? 0));
+                                const manualExtraTriggerCount =
+                                    currentResult.perAmulet[index]?.manualExtraTriggers ??
+                                    rule.manualExtraTriggers ??
+                                    0;
                                 const isCodeDriven = !!getRegisteredAmuletRuleExact(rule.regId);
                                 const hasPresetConfig = !!PRESET_AMULET_RULES[rule.regId];
                                 const hasCustomConfig = !!customRules[getRuleKey(rule.item)];
@@ -602,6 +602,23 @@ export default function ScorePage({
                                                     }}
                                                 >
                                                     {t("score.unconfigured")}
+                                                </div>
+                                            ) : null}
+                                            {manualExtraTriggerCount !== 0 ? (
+                                                <div
+                                                    className={`badge ${manualExtraTriggerCount > 0 ? "ok" : "down"}`}
+                                                    style={{
+                                                        position: "absolute",
+                                                        top: -8,
+                                                        right: -8,
+                                                        paddingInline: 8,
+                                                        minWidth: 34,
+                                                        justifyContent: "center",
+                                                        textAlign: "center",
+                                                    }}
+                                                    title={t("score.manual_extra_triggers_label")}
+                                                >
+                                                    {manualExtraTriggerCount > 0 ? `+${manualExtraTriggerCount}` : String(manualExtraTriggerCount)}
                                                 </div>
                                             ) : null}
                                         </div>
@@ -895,7 +912,7 @@ export default function ScorePage({
                 onClose={() => setEditingKey(null)}
                 title={t("score.amulet_editor_title")}
                 width={860}
-                actions={isEditingCodeDriven ? undefined : (
+                actions={(
                     <>
                         <button className="nav-btn" onClick={resetEditor}>
                             {t("score.reset_custom")}
@@ -970,6 +987,26 @@ export default function ScorePage({
                                     extraExecutions: clampExtraExecutionCount(e.target.value),
                                 }))}
                             />
+                        </div>
+
+                        <div className="row">
+                            <label>{t("score.manual_extra_triggers_label")}</label>
+                            <div>
+                                <input
+                                    className="form-input"
+                                    type="number"
+                                    min={-99}
+                                    max={99}
+                                    value={draftRule.manualExtraTriggers}
+                                    onChange={(e) => setDraftRule((prev) => ({
+                                        ...prev,
+                                        manualExtraTriggers: clampManualExtraTriggerCount(e.target.value),
+                                    }))}
+                                />
+                                <div className="hint" style={{marginTop: 6}}>
+                                    {t("score.manual_extra_triggers_hint")}
+                                </div>
+                            </div>
                         </div>
 
                         <div className="row">
