@@ -33,6 +33,7 @@ type DriverFilter = "all" | "code" | "config" | "unconfigured";
 
 const RULES_STORAGE_KEY = "shanten:point-rules:v1";
 const FAN_STORAGE_KEY = "shanten:point-fan:v1";
+const WIN_COUNT_STORAGE_KEY = "shanten:point-win-count:v1";
 
 const LEVEL_TARGETS: Record<string, string> = {
     "1-1": "200","1-2": "400","1-3": "700","2-1": "1000","2-2": "1500","2-3": "2100","3-1": "3000","3-2": "4000","3-3": "5200","4-1": "7000","4-2": "9800","4-3": "15000","5-1": "22500","5-2": "33300","5-3": "50000","Ex1": "1000000","Ex2": "12000000","Ex3": "90750000","Ex4": "8.11亿","Ex5": "84.28亿","Ex6": "1003.54亿","Ex7": "1.35兆","Ex8": "20.56兆","Ex9": "348.31兆","Ex10": "6542.41兆","Ex11": "13.55京","Ex12": "308.54京","Ex13": "7681.69京","Ex14": "20.84垓","Ex15": "664.10垓","Ex16": "2.46秭","Ex17": "105.10秭","Ex18": "5154.00秭","Ex19": "28.82穰","Ex20": "1830.00穰","Ex21": "13.14沟","Ex22": "1066.00沟","Ex23": "9.72涧","Ex24": "994.10涧","Ex25": "11.38正","Ex26": "1456.00正","Ex27": "20.79载","Ex28": "3306.0载","Ex29": "58.49极","Ex30": "1.25万极","Ex31": "300.70万极","Ex32": "8.71亿极","Ex33": "2792.00亿极","Ex34": "108.20兆极","Ex35": "4.63京极","Ex36": "2398.00京极","Ex37": "136.90垓极","Ex38": "9.41秭极","Ex39": "7147.00秭极","Ex40": "708.60穰极","Ex41": "91.69沟极","Ex42": "15.46涧极","Ex43": "3.40正极","Ex44": "9734.00正极","Ex45": "3627.00载极","Ex46": "1759.00极极","Ex47": "1109.00万极极","Ex48": "910.80亿极极","Ex49": "972.20兆极极","Ex50": "1349.00京极极","Ex51": "2811.00垓极极","Ex52": "8787.00秭极极","Ex53": "4.12沟极极","Ex54": "28.99涧极极","Ex55": "306.00正极极","Ex56": "4844.00载极极","Ex57": "11.5万极极极","Ex58": "409.9亿极极极","Ex59": "2.19京极极极","Ex60": "175.50垓极极极","Ex61": "2.11穰极极极","Ex62": "380.79沟极极极","Ex63": "10.30正极极极","Ex64": "4180.00载极极极","Ex65": "254.4万极极极极","Ex66": "23.23兆极极极极","Ex67": "3.18垓极极极极","Ex68": "6538.00秭极极极极","Ex69": "2015.00沟极极极极","Ex70": "931.40正极极极极","Ex71": "645.80极极极极极","Ex72": "671.70亿极极极极极","Ex73": "1047.00京极极极极极","Ex74": "2452.00秭极极极极极","Ex75": "8608.00沟极极极极极","Ex76": "4.53载极极极极极","Ex77": "35.79万极极极极极极","Ex78": "424.00兆极极极极极极","Ex79": "5.70E+310","Ex80": "5.70E+318","Ex81": "5.70E+326","Ex82": "5.70E+334","Ex83": "5.70E+342","Ex84": "5.70E+350","Ex85": "5.70E+359","Ex86": "5.70E+368","Ex87": "5.70E+377","Ex88": "5.70E+386","Ex89": "5.70E+395","Ex90": "5.70E+405","Ex91": "5.70E+415","Ex92": "5.70E+425","Ex93": "5.70E+435","Ex94": "5.70E+445","Ex95": "5.70E+455","Ex96": "5.70E+466","Ex97": "5.70E+477","Ex98": "5.70E+488","Ex99": "5.70E+499","Ex100": "9.99E+510","Ex101": "9.99E+522","Ex102": "9.99E+534","Ex103": "9.99E+546","Ex104": "9.99E+558","Ex105": "9.99E+571","Ex106": "9.99E+584","Ex107": "9.99E+597","Ex108": "9.99E+611","Ex109": "9.99E+625","Ex110": "9.99E+639","Ex111": "9.99E+654","Ex112": "9.99E+669","Ex113": "9.99E+684","Ex114": "9.99E+699","Ex115": "9.99E+715","Ex116": "9.99E+731","Ex117": "9.99E+748","Ex118": "9.99E+765","Ex119": "9.99E+783","Ex120": "9.99E+801"
@@ -203,6 +204,7 @@ export default function ScorePage({
 }) {
     const {t} = useTranslation();
     const [fanText, setFanText] = usePersistentState<string>(FAN_STORAGE_KEY, "1");
+    const [winCountText, setWinCountText] = usePersistentState<string>(WIN_COUNT_STORAGE_KEY, "1");
     const [customRules, setCustomRules] = usePersistentState<CustomRuleMap>(RULES_STORAGE_KEY, {});
     const [editingKey, setEditingKey] = React.useState<string | null>(null);
     const [showTileScores, setShowTileScores] = React.useState(false);
@@ -221,6 +223,12 @@ export default function ScorePage({
             return 0n;
         }
     }, [fanText]);
+
+    const winCount = React.useMemo(() => {
+        const n = Number.parseInt(String(winCountText ?? "").trim(), 10);
+        if (!Number.isFinite(n)) return 1;
+        return Math.max(1, Math.min(999, Math.trunc(n)));
+    }, [winCountText]);
 
     const baseScore = React.useMemo(() => computeBaseScore(handTileIds, deckMap, tileScoreMap), [handTileIds, deckMap, tileScoreMap]);
     const hasPinzuInHand = React.useMemo(
@@ -255,9 +263,10 @@ export default function ScorePage({
             rules,
             baseScore,
             baseFan,
+            winCount,
             {hasPinzuInHand},
         );
-    }, [level, currentResult, rules, baseScore, baseFan, hasPinzuInHand]);
+    }, [level, currentResult, rules, baseScore, baseFan, winCount, hasPinzuInHand]);
 
     const projectionMetaByLevel = React.useMemo(
         () => new Map(ORDERED_LEVEL_TARGETS.map((item) => [item.level, item] as const)),
@@ -336,6 +345,10 @@ export default function ScorePage({
             return 0n;
         }
     }, [currentTargetPoint]);
+    const totalCurrentPoint = React.useMemo(
+        () => currentResult.finalPoint * BigInt(winCount),
+        [currentResult.finalPoint, winCount],
+    );
 
     const editingItem = React.useMemo(
         () => amulets.find((item) => getRuleKey(item) === editingKey) ?? null,
@@ -400,7 +413,7 @@ export default function ScorePage({
         setEditingKey(null);
     }, [editingKey, setCustomRules]);
 
-    const currentReached = actualTarget > 0n ? currentResult.finalPoint >= actualTarget : null;
+    const currentReached = actualTarget > 0n ? totalCurrentPoint >= actualTarget : null;
     const codeRuleIdSet = React.useMemo(
         () => new Set(Object.keys(getAllRegisteredAmuletRules()).map((id) => Number(id)).filter((id) => Number.isFinite(id))),
         [],
@@ -514,6 +527,17 @@ export default function ScorePage({
                                 </div>
                             </div>
                             <div className="row">
+                                <label>{t("score.win_count")}</label>
+                                <div>
+                                    <input
+                                        className="form-input"
+                                        value={winCountText}
+                                        onChange={(e) => setWinCountText(e.target.value)}
+                                        placeholder="1"
+                                    />
+                                </div>
+                            </div>
+                            <div className="row">
                                 <label>{t("score.base_score")}</label>
                                 <div className="badge">{formatFixed2(currentResult.baseScore)}</div>
                             </div>
@@ -528,6 +552,10 @@ export default function ScorePage({
                             <div className="row">
                                 <label>{t("score.final_point")}</label>
                                 <div className="badge ok">{formatFixed2(currentResult.finalPoint)}</div>
+                            </div>
+                            <div className="row">
+                                <label>{t("score.total_point")}</label>
+                                <div className="badge ok">{formatFixed2(totalCurrentPoint)}</div>
                             </div>
                         </div>
 
@@ -700,6 +728,9 @@ export default function ScorePage({
                                                 </div>
                                                 <div className="hint">
                                                     {t("score.projected_point")}: {formatFixed2(projection.point)}
+                                                </div>
+                                                <div className="hint">
+                                                    {t("score.projected_total_point")}: {formatFixed2(projection.totalPoint)}
                                                 </div>
                                                 <div className="hint">
                                                     {t("score.projected_score")}: {formatFixed2(projection.score)} / {t("score.projected_fan")}: {formatFixed2(projection.fan)}
@@ -948,6 +979,10 @@ export default function ScorePage({
                             <div className="row">
                                 <label>{t("score.projected_point")}</label>
                                 <div className="badge">{formatFixed2(selectedFutureProjection.point)}</div>
+                            </div>
+                            <div className="row">
+                                <label>{t("score.projected_total_point")}</label>
+                                <div className="badge">{formatFixed2(selectedFutureProjection.totalPoint)}</div>
                             </div>
                             <div className="row">
                                 <label>{t("score.projected_score")}</label>

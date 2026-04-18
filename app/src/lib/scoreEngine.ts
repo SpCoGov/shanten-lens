@@ -70,6 +70,7 @@ export type CurrentPointResult = {
 export type FutureProjection = {
     level: number;
     point: bigint;
+    totalPoint: bigint;
     score: bigint;
     fan: bigint;
     target?: bigint | null;
@@ -908,6 +909,7 @@ export function projectFuturePoints(
     currentRules: ResolvedAmuletRule[],
     baseScore: bigint,
     baseFan: bigint,
+    winCount: number,
     runtime: AmuletRuntimeContext = {},
 ): FutureProjection[] {
     const out: FutureProjection[] = [];
@@ -920,13 +922,15 @@ export function projectFuturePoints(
         rules = growAmuletData(rules, result, level, false);
         result = calculateCurrentPoint(baseScore, baseFan, level, rules, runtime);
         const target = parseTargetPointValue(future.target ?? "") ?? null;
+        const totalPoint = result.finalPoint * BigInt(Math.max(1, winCount));
         out.push({
             level,
             point: result.finalPoint,
+            totalPoint,
             score: result.finalScore,
             fan: result.finalFan,
             target,
-            reached: target == null ? null : result.finalPoint >= target,
+            reached: target == null ? null : totalPoint >= target,
             amulets: rules.map((rule) => ({
                 uid: rule.item.uid,
                 regId: rule.regId,

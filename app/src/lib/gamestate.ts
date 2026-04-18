@@ -7,6 +7,7 @@ export interface GameStateData {
     deck_map: Record<string, string>;
     hand_tiles: number[];
     dora_tiles: number[];
+    tian_dora_tiles?: string[];
     replacement_tiles: number[];
     wall_tiles: number[];
     ended: boolean;
