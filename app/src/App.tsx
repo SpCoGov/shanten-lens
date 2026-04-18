@@ -833,6 +833,8 @@ export default function App() {
                                 handTileIds={handTileIds}
                                 deckMap={deckMap}
                                 tileScoreMap={tileScoreMap}
+                                doraTileIds={latestGameState?.dora_tiles ?? []}
+                                tianDoraTiles={latestGameState?.tian_dora_tiles ?? []}
                                 level={level}
                                 currentPoint={point}
                                 currentTargetPoint={targetPoint}

@@ -206,6 +206,64 @@ registerAmuletRule([2290, 2291], {
     isActiveOnWin: () => true,
 });
 
+registerAmuletRule([1580, 1581], {
+    affectsPoint: true,
+    getDefaultConfig: () => ({
+        activeOnWin: true,
+        growthAfterRound: true,
+        effectTarget: "none",
+        effectFormula: "",
+        growthFormula: "data",
+    }),
+    getPreWinActivationCount: () => 1,
+    applyEffect: ({rule, state, activationIndex, runtime}) => {
+        const data0 = (() => {
+            try {
+                return BigInt(rule.dataRawList[0] ?? "100");
+            } catch {
+                return 100n;
+            }
+        })();
+        const data1 = (() => {
+            try {
+                return BigInt(rule.dataRawList[1] ?? "0");
+            } catch {
+                return 0n;
+            }
+        })();
+        let fan = state.fan;
+        if (activationIndex === 1) {
+            fan += BigInt(runtime.soulTileCount ?? 0) * (data1 + 1n) * 100n;
+        }
+        fan = (fan * data0) / 100n;
+        return {fan};
+    },
+    applyTriggerGrowth: ({rule}) => {
+        const data0 = (() => {
+            try {
+                return BigInt(rule.dataRawList[0] ?? "0");
+            } catch {
+                return 0n;
+            }
+        })();
+        const data1 = (() => {
+            try {
+                return BigInt(rule.dataRawList[1] ?? "0");
+            } catch {
+                return 0n;
+            }
+        })();
+        const data1Growth = rule.regId === 1581 ? 2n : 1n;
+        return [
+            (data0 + 100n).toString(),
+            (data1 + data1Growth).toString(),
+            ...rule.dataRawList.slice(2),
+        ];
+    },
+    growData: ({currentData}) => currentData,
+    isActiveOnWin: () => true,
+});
+
 registerAmuletRule([110, 111], {
     affectsPoint: true,
     getDefaultConfig: () => ({
@@ -222,7 +280,7 @@ registerAmuletRule([110, 111], {
     growData: ({currentData}) => currentData,
 });
 
-registerAmuletRule([1570,1571], {
+registerAmuletRule([1570, 1571], {
     affectsPoint: true,
     getDefaultConfig: () => ({
         dataRaw: "100",

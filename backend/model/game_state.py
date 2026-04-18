@@ -94,7 +94,7 @@ class GameState:
         self.update_reason.clear()
 
     def _infer_opening_hand_tiles(
-        self, current_hand_tiles: list[int], dora_tiles: list[int] | None = None
+            self, current_hand_tiles: list[int], dora_tiles: list[int] | None = None
     ) -> List[int]:
         ids = list(self.deck_map.keys())
         if not ids:
@@ -111,9 +111,9 @@ class GameState:
                 opening_hand_tiles = ids[:dora_idx]
                 last_id = ids[-1]
                 if (
-                    self.deck_map.get(last_id) == "bd"
-                    and last_id in (current_hand_tiles or [])
-                    and last_id not in opening_hand_tiles
+                        self.deck_map.get(last_id) == "bd"
+                        and last_id in (current_hand_tiles or [])
+                        and last_id not in opening_hand_tiles
                 ):
                     opening_hand_tiles.append(last_id)
                 return opening_hand_tiles
@@ -133,15 +133,15 @@ class GameState:
         self.replacement_tiles = ids[46:]
 
     def update_pool(
-        self,
-        pool: list[dict],
-        hand_tiles: list[int],
-        locked_tiles: list[int],
-        used: list[int],
-        dora_tiles: list[int] | None = None,
-        used_desktop: list[int] | None = None,
-        push_gamestate: bool = True,
-        reason: str = "",
+            self,
+            pool: list[dict],
+            hand_tiles: list[int],
+            locked_tiles: list[int],
+            used: list[int],
+            dora_tiles: list[int] | None = None,
+            used_desktop: list[int] | None = None,
+            push_gamestate: bool = True,
+            reason: str = "",
     ):
         self.deck_map.clear()
         self.hand_tiles.clear()
@@ -228,7 +228,7 @@ class GameState:
             loop.create_task(self.on_gamestage_change())
 
     def update_hand_tiles(
-        self, hand_tiles: list[int], push_gamestate: bool = True, reason: str = ""
+            self, hand_tiles: list[int], push_gamestate: bool = True, reason: str = ""
     ):
         self.hand_tiles = hand_tiles.copy()
         self.update_reason.append(reason)
@@ -237,7 +237,7 @@ class GameState:
             loop.create_task(self.on_gamestage_change())
 
     def update_switch_used_tiles(
-        self, used: list[int], push_gamestate: bool = True, reason: str = ""
+            self, used: list[int], push_gamestate: bool = True, reason: str = ""
     ):
         if self.stage == 2:
             self.switch_used_tiles = used.copy()
@@ -248,27 +248,28 @@ class GameState:
             loop.create_task(self.on_gamestage_change())
 
     def update_other_info(
-        self,
-        desktop_remain: int = None,
-        stage: int = None,
-        ended: bool = None,
-        coin: int = None,
-        point: int = None,
-        target_point: int = None,
-        level: int = None,
-        effect_list: List[Dict] = None,
-        candidate_effect_list: List[Dict] = None,
-        ting_list: List[Dict] = None,
-        next_operation: List[Dict] = None,
-        goods: List[Dict] = None,
-        refresh_price: int = None,
-        change_tile_count: int = None,
-        total_change_tile_count: int = None,
-        max_effect_volume: int = None,
-        boss_buff: List[int] = None,
-        tile_score_map: Dict[str, str] = None,
-        push_gamestate: bool = True,
-        reason: str = "",
+            self,
+            desktop_remain: int = None,
+            stage: int = None,
+            ended: bool = None,
+            coin: int = None,
+            point: int = None,
+            target_point: int = None,
+            level: int = None,
+            effect_list: List[Dict] = None,
+            candidate_effect_list: List[Dict] = None,
+            ting_list: List[Dict] = None,
+            next_operation: List[Dict] = None,
+            goods: List[Dict] = None,
+            refresh_price: int = None,
+            change_tile_count: int = None,
+            total_change_tile_count: int = None,
+            max_effect_volume: int = None,
+            boss_buff: List[int] = None,
+            tile_score_map: Dict[str, str] = None,
+            tian_dora_tiles: List[str] = None,
+            push_gamestate: bool = True,
+            reason: str = "",
     ):
         if desktop_remain is not None:
             self.desktop_remain = desktop_remain
@@ -306,6 +307,8 @@ class GameState:
             self.boss_buff = boss_buff
         if tile_score_map is not None:
             self.tile_score_map = tile_score_map.copy()
+        if tian_dora_tiles is not None:
+            self.tian_dora_tiles = tian_dora_tiles.copy()
         self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()

@@ -91,6 +91,7 @@ export type AmuletRuleRuntimeState = {
 
 export type AmuletRuntimeContext = {
     hasPinzuInHand?: boolean;
+    soulTileCount?: number;
 };
 
 export type AmuletEffectContext = {
@@ -139,8 +140,10 @@ export type AmuletRuleHandler = {
     getDefaultConfig?: (item: EffectItem) => Partial<AmuletRuleConfig> | null | undefined;
     affectsPoint?: boolean;
     getMaxEffectApplications?: (context: AmuletActivationContext) => number | null | undefined;
+    getPreWinActivationCount?: (context: AmuletActivationContext) => number | null | undefined;
     isActiveOnWin?: (context: AmuletActivationContext) => boolean;
     applyEffect?: (context: AmuletEffectContext) => AmuletEffectResult;
+    applyTriggerGrowth?: (context: AmuletEffectContext) => string[] | null | undefined;
     getGrowthRepeat?: (context: Omit<AmuletGrowthContext, "executionIndex" | "currentData" | "vars">) => number | null | undefined;
     growData?: (context: AmuletGrowthContext) => bigint | null | undefined;
 };
@@ -654,6 +657,46 @@ function getMaxEffectApplicationCount(
     }
 }
 
+function getPreWinActivationCount(
+    rule: ResolvedAmuletRule,
+    index: number,
+    rules: ResolvedAmuletRule[],
+    level: number,
+    runtime: AmuletRuntimeContext,
+) {
+    const handler = getRegisteredAmuletRule(rule.regId);
+    if (!handler?.getPreWinActivationCount) return 0;
+    try {
+        const count = handler.getPreWinActivationCount({
+            rule,
+            index,
+            rules,
+            level,
+            runtime,
+        });
+        const normalized = Number(count);
+        if (!Number.isFinite(normalized)) return 0;
+        return Math.max(0, Math.trunc(normalized));
+    } catch {
+        return 0;
+    }
+}
+
+function applyTriggerGrowthForRule(context: AmuletEffectContext) {
+    const handler = getRegisteredAmuletRule(context.rule.regId);
+    if (!handler?.applyTriggerGrowth) return;
+    try {
+        const nextDataRawList = handler.applyTriggerGrowth(context);
+        if (!Array.isArray(nextDataRawList) || nextDataRawList.length === 0) return;
+        context.rule.dataRawList = nextDataRawList.map((value) => {
+            const text = String(value ?? "").trim();
+            return /^[+-]?\d+$/.test(text) ? normalizeNumericString(text) : "0";
+        });
+        context.rule.dataRaw = context.rule.dataRawList[0] ?? "0";
+    } catch {
+    }
+}
+
 export function calculateCurrentPoint(
     baseScore: bigint,
     baseFan: bigint,
@@ -665,6 +708,9 @@ export function calculateCurrentPoint(
     const activationCounts = amuletRules.map(() => 0);
     const executionCounts = amuletRules.map(() => 0);
     const effectApplicationCounts = amuletRules.map(() => 0);
+    const preWinActivationCounts = amuletRules.map((rule, index) =>
+        getPreWinActivationCount(rule, index, amuletRules, level, runtime),
+    );
     const levelValue = BigInt(level) * SCALE;
 
     const applyEffectApplication = (
@@ -675,7 +721,7 @@ export function calculateCurrentPoint(
         effectSequence: number,
         executionSequence: number,
         allowTransmission: boolean,
-    ): {triggered: boolean; transmissionCount: number} => {
+    ): { triggered: boolean; transmissionCount: number } => {
         const rule = amuletRules[index];
         if (!rule || !isRuleActiveOnWin(rule, index, amuletRules, level, runtime)) {
             return {triggered: false, transmissionCount: 0};
@@ -707,7 +753,7 @@ export function calculateCurrentPoint(
             extra_execution: BigInt(extraExecutionCount) * SCALE,
             activation: BigInt(activationIndex) * SCALE,
         };
-        const effectResult = applyRegisteredRuleEffect({
+        const effectContext: AmuletEffectContext = {
             rule,
             index,
             rules: amuletRules,
@@ -739,7 +785,8 @@ export function calculateCurrentPoint(
                     false,
                 );
             },
-        });
+        };
+        const effectResult = applyRegisteredRuleEffect(effectContext);
         const nextPoint = computePoint(state.score, state.fan);
         const pointRelevant = effectResult.affectsPoint;
         const triggered = !pointRelevant || nextPoint !== prevPoint;
@@ -750,6 +797,7 @@ export function calculateCurrentPoint(
             return {triggered: false, transmissionCount: 0};
         }
 
+        applyTriggerGrowthForRule(effectContext);
         effectApplicationCounts[index] += 1;
         return {
             triggered: true,
@@ -765,7 +813,8 @@ export function calculateCurrentPoint(
         const extraExecutionCount = getExtraActivationCount(rule);
         const activationCount = getEffectiveActivationCount(rule);
         const adjustedActivationCount = Math.max(0, activationCount + rule.manualExtraTriggers);
-        const immediateActivationCount = Math.min(activationCount, adjustedActivationCount);
+        const preWinActivationCount = Math.min(preWinActivationCounts[index] ?? 0, Math.min(activationCount, adjustedActivationCount));
+        const immediateActivationCount = Math.max(0, Math.min(activationCount, adjustedActivationCount) - preWinActivationCount);
         const deferredManualTriggerCount = Math.max(0, adjustedActivationCount - activationCount);
 
         for (let activation = 0; activation < immediateActivationCount; activation += 1) {
@@ -819,6 +868,41 @@ export function calculateCurrentPoint(
             }
         }
     };
+
+    for (let index = 0; index < amuletRules.length; index += 1) {
+        const rule = amuletRules[index];
+        if (!rule || !isRuleActiveOnWin(rule, index, amuletRules, level, runtime)) continue;
+        const triggerCount = getTriggerActivationCount(rule);
+        const extraExecutionCount = getExtraActivationCount(rule);
+        const activationCount = getEffectiveActivationCount(rule);
+        const adjustedActivationCount = Math.max(0, activationCount + rule.manualExtraTriggers);
+        const preCount = Math.min(preWinActivationCounts[index] ?? 0, adjustedActivationCount);
+        if (preCount <= 0) continue;
+
+        for (let activation = 0; activation < preCount; activation += 1) {
+            const executionSequence = executionCounts[index] + 1;
+            const activationSequence = activationCounts[index] + 1;
+            const effectAttempt = applyEffectApplication(
+                index,
+                triggerCount,
+                adjustedActivationCount,
+                extraExecutionCount,
+                activationSequence,
+                executionSequence,
+                true,
+            );
+            if (!effectAttempt.triggered) {
+                continue;
+            }
+            activationCounts[index] += 1;
+            executionCounts[index] += 1;
+            if (amuletRules[index + 1]?.hasTransmissionSeal) {
+                for (let transmission = 0; transmission < effectAttempt.transmissionCount; transmission += 1) {
+                    triggerRule(index + 1);
+                }
+            }
+        }
+    }
 
     for (let index = 0; index < amuletRules.length; index += 1) {
         triggerRule(index);
@@ -921,14 +1005,20 @@ export function projectFuturePoints(
         level = future.level;
         rules = growAmuletData(rules, result, level, false);
         result = calculateCurrentPoint(baseScore, baseFan, level, rules, runtime);
+        const projectedSingleWinResult = result;
+        if (winCount > 1) {
+            for (let winIndex = 1; winIndex < winCount; winIndex += 1) {
+                result = calculateCurrentPoint(baseScore, baseFan, level, rules, runtime);
+            }
+        }
         const target = parseTargetPointValue(future.target ?? "") ?? null;
-        const totalPoint = result.finalPoint * BigInt(Math.max(1, winCount));
+        const totalPoint = projectedSingleWinResult.finalPoint * BigInt(Math.max(1, winCount));
         out.push({
             level,
-            point: result.finalPoint,
+            point: projectedSingleWinResult.finalPoint,
             totalPoint,
-            score: result.finalScore,
-            fan: result.finalFan,
+            score: projectedSingleWinResult.finalScore,
+            fan: projectedSingleWinResult.finalFan,
             target,
             reached: target == null ? null : totalPoint >= target,
             amulets: rules.map((rule) => ({

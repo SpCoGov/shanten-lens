@@ -909,6 +909,53 @@ input, textarea, select, code, pre, .selectable {
     flex-wrap: wrap;
 }
 
+.future-collapsed-card {
+    padding: 14px 16px;
+    border: 1px solid rgba(74, 222, 128, 0.24);
+    border-radius: 16px;
+    background:
+        linear-gradient(180deg, rgba(240, 253, 244, 0.92), rgba(255, 255, 255, 0.86)),
+        radial-gradient(circle at top right, rgba(74, 222, 128, 0.14), transparent 42%);
+    box-shadow: 0 10px 24px rgba(16, 24, 40, 0.05);
+}
+
+.future-collapsed-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.future-collapsed-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.future-collapsed-copy {
+    display: grid;
+    gap: 4px;
+}
+
+.future-collapsed-title {
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+.future-collapsed-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 4px;
+    padding-left: 14px;
+    border-left: 2px solid rgba(74, 222, 128, 0.18);
+}
+
+.future-collapsed-item {
+    padding: 12px;
+    border-radius: 14px;
+}
+
 .target-value-box {
     display: inline-flex;
     align-items: center;

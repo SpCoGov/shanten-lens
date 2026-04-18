@@ -76,13 +76,13 @@ export function buildCells(deck: Map<number, string>, locked: number[], wall: nu
     if (Array.isArray(locked)) {
         for (let i = locked.length - 1; i >= 0; i--) {
             const id = locked[i];
-            out.push({ tile: deck.get(id) ?? "5m", dim: true });
+            out.push({tile: deck.get(id) ?? "5m", dim: true});
         }
     }
     if (Array.isArray(wall)) {
         for (let i = wall.length - 1; i >= 0; i--) {
             const id = wall[i];
-            out.push({ tile: deck.get(id) ?? "5m", dim: false });
+            out.push({tile: deck.get(id) ?? "5m", dim: false});
         }
     }
     return out.slice(0, cap);
