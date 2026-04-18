@@ -344,7 +344,7 @@ const LEVEL_LABELS_BY_ID = ORDERED_LEVEL_TARGETS.reduce<Record<number, string>>(
 
 function safeDisplayStoredData(raw: string) {
     try {
-        return fixed2ToString(BigInt(raw || "0"));
+        return formatFixed2(BigInt(raw || "0"));
     } catch {
         return "0";
     }
@@ -354,6 +354,7 @@ function safeDisplayStoredDataList(rawList: string[]) {
     return rawList.map((raw, index) => ({
         index,
         raw,
+        rawDisplay: safeDisplayStoredData(raw),
         display: safeDisplayStoredData(raw),
     }));
 }
@@ -1448,7 +1449,7 @@ export default function ScorePage({
                                                 }}
                                             >
                                                 <div style={{fontSize: 12, color: "var(--text-muted)"}}>
-                                                    {t("score.future_growth_data_raw", {index: entry.index, value: entry.raw})}
+                                                    {t("score.future_growth_data_raw", {index: entry.index, value: entry.rawDisplay})}
                                                 </div>
                                                 <div style={{fontWeight: 700}}>
                                                     {t("score.future_growth_data_value", {index: entry.index, value: entry.display})}
