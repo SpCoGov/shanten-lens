@@ -972,10 +972,22 @@ export default function ScorePage({
                                         key={`collapsed:${item.startLevel}:${item.endLevel}:${itemIndex}`}
                                         className="target-card future-collapsed-card"
                                     >
-                                        <div className="future-collapsed-head">
-                                            <span className="badge ok">
-                                                {t("score.reached")}
-                                            </span>
+                                        <div className="target-card-main" style={{gridTemplateColumns: "minmax(0, 1fr)"}}>
+                                            <div className="target-card-copy future-collapsed-copy">
+                                                <div className="future-collapsed-title">
+                                                    {t("score.future_projection_collapsed_reached", {
+                                                        count: item.hiddenCount,
+                                                        start: item.startLevel,
+                                                        end: item.endLevel,
+                                                    })}
+                                                </div>
+                                                <div className="hint future-collapsed-meta">
+                                                    {item.startLevel} - {item.endLevel}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="target-card-actions">
+                                            <span className="badge ok">{t("score.reached")}</span>
                                             <button
                                                 type="button"
                                                 className="nav-btn future-collapsed-toggle"
@@ -988,18 +1000,6 @@ export default function ScorePage({
                                                         : t("score.future_projection_expand")}
                                                 </span>
                                             </button>
-                                        </div>
-                                        <div className="future-collapsed-copy">
-                                            <div className="future-collapsed-title">
-                                                {t("score.future_projection_collapsed_reached", {
-                                                    count: item.hiddenCount,
-                                                    start: item.startLevel,
-                                                    end: item.endLevel,
-                                                })}
-                                            </div>
-                                            <div className="hint">
-                                                {item.startLevel} - {item.endLevel}
-                                            </div>
                                         </div>
                                         {item.expanded ? (
                                             <div className="future-collapsed-list">
@@ -1018,14 +1018,19 @@ export default function ScorePage({
                                                                     <div style={{fontWeight: 700}}>
                                                                         {t("score.future_level_title", {level: levelLabel})}
                                                                     </div>
-                                                                    <div className="hint">
-                                                                        {t("score.projected_point")}: {formatFixed2(projection.point)}
-                                                                    </div>
-                                                                    <div className="hint">
-                                                                        {t("score.projected_total_point")}: {formatFixed2(projection.totalPoint)}
-                                                                    </div>
-                                                                    <div className="hint">
-                                                                        {t("score.projected_score")}: {formatFixed2(projection.score)} / {t("score.projected_fan")}: {formatFixed2(projection.fan)}
+                                                                    <div className="future-projection-metrics">
+                                                                        <div className="future-projection-metric">
+                                                                            <span className="future-projection-label">{t("score.projected_point")}</span>
+                                                                            <span>{formatFixed2(projection.point)}</span>
+                                                                        </div>
+                                                                        <div className="future-projection-metric">
+                                                                            <span className="future-projection-label">{t("score.projected_total_point")}</span>
+                                                                            <span>{formatFixed2(projection.totalPoint)}</span>
+                                                                        </div>
+                                                                        <div className="future-projection-metric">
+                                                                            <span className="future-projection-label">{t("score.projected_score")} / {t("score.projected_fan")}</span>
+                                                                            <span>{formatFixed2(projection.score)} / {formatFixed2(projection.fan)}</span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -1066,14 +1071,19 @@ export default function ScorePage({
                                             <div style={{fontWeight: 700}}>
                                                 {t("score.future_level_title", {level: levelLabel})}
                                             </div>
-                                            <div className="hint">
-                                                {t("score.projected_point")}: {formatFixed2(projection.point)}
-                                            </div>
-                                            <div className="hint">
-                                                {t("score.projected_total_point")}: {formatFixed2(projection.totalPoint)}
-                                            </div>
-                                            <div className="hint">
-                                                {t("score.projected_score")}: {formatFixed2(projection.score)} / {t("score.projected_fan")}: {formatFixed2(projection.fan)}
+                                            <div className="future-projection-metrics">
+                                                <div className="future-projection-metric">
+                                                    <span className="future-projection-label">{t("score.projected_point")}</span>
+                                                    <span>{formatFixed2(projection.point)}</span>
+                                                </div>
+                                                <div className="future-projection-metric">
+                                                    <span className="future-projection-label">{t("score.projected_total_point")}</span>
+                                                    <span>{formatFixed2(projection.totalPoint)}</span>
+                                                </div>
+                                                <div className="future-projection-metric">
+                                                    <span className="future-projection-label">{t("score.projected_score")} / {t("score.projected_fan")}</span>
+                                                    <span>{formatFixed2(projection.score)} / {formatFixed2(projection.fan)}</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

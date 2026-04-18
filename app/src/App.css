@@ -901,6 +901,42 @@ input, textarea, select, code, pre, .selectable {
     overflow-wrap: anywhere;
 }
 
+.future-projection-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px 10px;
+    margin-top: 8px;
+}
+
+.future-projection-metric {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 0;
+    min-width: 0;
+    padding: 8px 9px;
+    border-radius: 10px;
+    background: rgba(148, 163, 184, 0.08);
+    line-height: 1.4;
+}
+
+.future-projection-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: start;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--color-ring) 20%, transparent);
+    background: color-mix(in srgb, var(--color-ring) 8%, white);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: color-mix(in srgb, var(--color-ring) 58%, var(--text));
+    white-space: nowrap;
+}
+
 .target-card-actions {
     display: flex;
     align-items: center;
@@ -919,14 +955,6 @@ input, textarea, select, code, pre, .selectable {
     box-shadow: 0 10px 24px rgba(16, 24, 40, 0.05);
 }
 
-.future-collapsed-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
 .future-collapsed-toggle {
     display: inline-flex;
     align-items: center;
@@ -936,11 +964,16 @@ input, textarea, select, code, pre, .selectable {
 .future-collapsed-copy {
     display: grid;
     gap: 4px;
+    min-width: 0;
 }
 
 .future-collapsed-title {
     font-weight: 700;
     line-height: 1.5;
+}
+
+.future-collapsed-meta {
+    margin-top: 2px;
 }
 
 .future-collapsed-list {
