@@ -28,6 +28,7 @@ export function getAllRegisteredAmuletRules() {
 // 嵐星の影分身
 registerAmuletRule(700, {
     affectsPoint: true,
+    getMaxEffectApplications: () => 1,
     getDefaultConfig: () => ({
         activeOnWin: true,
         effectTarget: "none",
@@ -46,6 +47,7 @@ registerAmuletRule(700, {
 // 嵐星の影分身+
 registerAmuletRule(701, {
     affectsPoint: true,
+    getMaxEffectApplications: () => 1,
     getDefaultConfig: () => ({
         activeOnWin: true,
         effectTarget: "none",
@@ -77,6 +79,62 @@ registerAmuletRule([1460, 1461], {
     growData: ({currentData}) => currentData,
     // 只有手牌有饼子的时候才可以触发
     isActiveOnWin: ({runtime}) => !!runtime.hasPinzuInHand,
+});
+
+registerAmuletRule(650, {
+    affectsPoint: true,
+    getDefaultConfig: () => ({
+        activeOnWin: true,
+        effectTarget: "none",
+        effectFormula: "",
+        growthFormula: "data",
+    }),
+    applyEffect: ({state}) => {
+        return {fan: state.fan + 600n};
+    },
+    growData: ({currentData}) => currentData,
+});
+
+registerAmuletRule(651, {
+    affectsPoint: true,
+    getDefaultConfig: () => ({
+        activeOnWin: true,
+        effectTarget: "none",
+        effectFormula: "",
+        growthFormula: "data",
+    }),
+    applyEffect: ({state}) => {
+        return {fan: state.fan + 900n};
+    },
+    growData: ({currentData}) => currentData,
+});
+
+registerAmuletRule(1270, {
+    affectsPoint: true,
+    getDefaultConfig: () => ({
+        activeOnWin: true,
+        effectTarget: "none",
+        effectFormula: "",
+        growthFormula: "data",
+    }),
+    applyEffect: ({state}) => {
+        return {fan: state.fan * 1500n};
+    },
+    growData: ({currentData}) => currentData,
+});
+
+registerAmuletRule(1271, {
+    affectsPoint: true,
+    getDefaultConfig: () => ({
+        activeOnWin: true,
+        effectTarget: "none",
+        effectFormula: "",
+        growthFormula: "data",
+    }),
+    applyEffect: ({state}) => {
+        return {fan: state.fan * 3000n};
+    },
+    growData: ({currentData}) => currentData,
 });
 
 // 能进链但是不会改变番数
@@ -116,6 +174,71 @@ registerAmuletRule([2270, 2271], {
     },
     growData: ({rule, currentData}) => {
         const growthRate = rule.regId === 2271 ? 150n : 130n;
+        return (currentData * growthRate) / 100n;
+    },
+    isActiveOnWin: () => true,
+});
+
+registerAmuletRule([2290, 2291], {
+    affectsPoint: true,
+    getDefaultConfig: () => ({
+        dataRaw: "100",
+        activeOnWin: true,
+        growthAfterRound: true,
+        effectTarget: "none",
+        effectFormula: "",
+        growthFormula: "data",
+    }),
+    applyEffect: ({vars, state}) => {
+        return {
+            fan: (vars.dataValues[0] ?? 100n) * state.fan / 100n,
+        };
+    },
+    getGrowthRepeat: ({rule, index, rules}) => {
+        if (!rule.hasExtensionSeal) return 1;
+        const previousRule = index > 0 ? rules[index - 1] : null;
+        return previousRule && (previousRule.regId === 2300 || previousRule.regId === 2301) ? 4 : 2;
+    },
+    growData: ({rule, currentData}) => {
+        const growthRate = rule.regId === 2291 ? 130n : 120n;
+        return (currentData * growthRate) / 100n;
+    },
+    isActiveOnWin: () => true,
+});
+
+registerAmuletRule([110, 111], {
+    affectsPoint: true,
+    getDefaultConfig: () => ({
+        activeOnWin: true,
+        effectTarget: "none",
+        effectFormula: "",
+        growthFormula: "data",
+    }),
+    applyEffect: ({state, vars, rule}) => {
+        const rate = rule.regId === 110 ? 8n : 12n;
+        const data = vars.dataValues[0] * 100n * rate;
+        return {score: state.score + data};
+    },
+    growData: ({currentData}) => currentData,
+});
+
+registerAmuletRule([1570,1571], {
+    affectsPoint: true,
+    getDefaultConfig: () => ({
+        dataRaw: "100",
+        activeOnWin: true,
+        effectTarget: "none",
+        effectFormula: "",
+        growthFormula: "data",
+    }),
+    applyEffect: ({rule, state}) => {
+        const data = BigInt(rule.dataRaw || "100");
+        return {
+            fan: (data * state.fan) / 100n,
+        };
+    },
+    growData: ({rule, currentData}) => {
+        const growthRate = rule.regId === 1571 ? 150n : 130n;
         return (currentData * growthRate) / 100n;
     },
     isActiveOnWin: () => true,

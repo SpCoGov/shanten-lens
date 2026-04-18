@@ -16,6 +16,7 @@ import {
     fixed2ToString,
     formatFixed2,
     parseStoredDataFromItem,
+    parseStoredDataListFromItem,
     parseFixed2,
     parseTargetPointValue,
     projectFuturePoints,
@@ -165,6 +166,14 @@ function safeDisplayStoredData(raw: string) {
     }
 }
 
+function safeDisplayStoredDataList(rawList: string[]) {
+    return rawList.map((raw, index) => ({
+        index,
+        raw,
+        display: safeDisplayStoredData(raw),
+    }));
+}
+
 function EffectTargetOptions({t}: { t: (key: string) => string }) {
     return (
         <>
@@ -198,9 +207,11 @@ export default function ScorePage({
     const [editingKey, setEditingKey] = React.useState<string | null>(null);
     const [showTileScores, setShowTileScores] = React.useState(false);
     const [showRuleOverview, setShowRuleOverview] = React.useState(false);
+    const [selectedFutureLevel, setSelectedFutureLevel] = React.useState<number | null>(null);
     const [ruleOverviewRarityFilter, setRuleOverviewRarityFilter] = React.useState<string>("all");
     const [ruleOverviewDriverFilter, setRuleOverviewDriverFilter] = React.useState<DriverFilter>("all");
     const [draftRule, setDraftRule] = React.useState<AmuletRuleConfig>(DEFAULT_RULE_CONFIG);
+    const [manualExtraTriggerInput, setManualExtraTriggerInput] = React.useState("0");
     const registry = useRegistry();
 
     const baseFan = React.useMemo(() => {
@@ -251,6 +262,10 @@ export default function ScorePage({
     const projectionMetaByLevel = React.useMemo(
         () => new Map(ORDERED_LEVEL_TARGETS.map((item) => [item.level, item] as const)),
         [],
+    );
+    const selectedFutureProjection = React.useMemo(
+        () => futureProjections.find((projection) => projection.level === selectedFutureLevel) ?? null,
+        [futureProjections, selectedFutureLevel],
     );
     const chainBreakIndices = React.useMemo(() => {
         const breaks = new Set<number>();
@@ -327,6 +342,10 @@ export default function ScorePage({
         [amulets, editingKey],
     );
     const editingRegId = React.useMemo(() => (editingItem ? editingItem.id : null), [editingItem]);
+    const editingStoredDataList = React.useMemo(
+        () => (editingItem ? safeDisplayStoredDataList(parseStoredDataListFromItem(editingItem)) : []),
+        [editingItem],
+    );
     const isEditingCodeDriven = React.useMemo(
         () => (editingRegId == null ? false : !!getRegisteredAmuletRuleExact(editingRegId)),
         [editingRegId],
@@ -340,24 +359,28 @@ export default function ScorePage({
             extraExecutions: merged.extraExecutions,
             manualExtraTriggers: merged.manualExtraTriggers,
             activeOnWin: merged.activeOnWin,
+            growthAfterRound: merged.growthAfterRound,
             effectTarget: merged.effectTarget,
             effectFormula: merged.effectFormula,
             growthFormula: merged.growthFormula,
             note: merged.note ?? "",
         });
+        setManualExtraTriggerInput(String(merged.manualExtraTriggers ?? 0));
         setEditingKey(getRuleKey(item));
     }, [customRules]);
 
     const saveEditor = React.useCallback(() => {
         if (!editingItem || !editingKey) return;
+        const manualExtraTriggers = clampManualExtraTriggerCount(manualExtraTriggerInput);
         setCustomRules((prev) => ({
             ...prev,
             [editingKey]: {
                 dataRaw: parseStoredDataFromItem(editingItem),
                 executions: clampExecutionCount(draftRule.executions),
                 extraExecutions: clampExtraExecutionCount(draftRule.extraExecutions),
-                manualExtraTriggers: clampManualExtraTriggerCount(draftRule.manualExtraTriggers),
+                manualExtraTriggers,
                 activeOnWin: draftRule.activeOnWin,
+                growthAfterRound: draftRule.growthAfterRound,
                 effectTarget: draftRule.effectTarget,
                 effectFormula: draftRule.effectFormula.trim(),
                 growthFormula: draftRule.growthFormula.trim() || "data",
@@ -365,7 +388,7 @@ export default function ScorePage({
             },
         }));
         setEditingKey(null);
-    }, [draftRule, editingItem, editingKey, setCustomRules]);
+    }, [draftRule, editingItem, editingKey, manualExtraTriggerInput, setCustomRules]);
 
     const resetEditor = React.useCallback(() => {
         if (!editingKey) return;
@@ -656,14 +679,18 @@ export default function ScorePage({
                                 const levelLabel = meta?.label ?? formatLevelIdToLabel(projection.level);
                                 const targetText = meta?.target;
                                 return (
-                                    <div
+                                    <button
                                         key={projection.level}
                                         className="target-card"
+                                        onClick={() => setSelectedFutureLevel(projection.level)}
                                         style={{
                                             padding: 12,
                                             border: "1px solid var(--border)",
                                             borderRadius: 12,
                                             background: "var(--panel-bg)",
+                                            width: "100%",
+                                            textAlign: "left",
+                                            cursor: "pointer",
                                         }}
                                     >
                                         <div className="target-card-main" style={{gridTemplateColumns: "minmax(0, 1fr)"}}>
@@ -687,7 +714,7 @@ export default function ScorePage({
                                                 {projection.reached == null ? t("score.not_set") : projection.reached ? t("score.reached") : t("score.not_reached")}
                                             </span>
                                         </div>
-                                    </div>
+                                    </button>
                                 );
                             })()
                         ))}
@@ -908,6 +935,85 @@ export default function ScorePage({
             </Modal>
 
             <Modal
+                open={!!selectedFutureProjection}
+                onClose={() => setSelectedFutureLevel(null)}
+                title={selectedFutureProjection ? t("score.future_growth_detail_title", {
+                    level: projectionMetaByLevel.get(selectedFutureProjection.level)?.label ?? formatLevelIdToLabel(selectedFutureProjection.level),
+                }) : t("score.future_growth_detail_title", {level: "-"})}
+                width={980}
+            >
+                {selectedFutureProjection ? (
+                    <div style={{display: "grid", gap: 14}}>
+                        <div className="rows">
+                            <div className="row">
+                                <label>{t("score.projected_point")}</label>
+                                <div className="badge">{formatFixed2(selectedFutureProjection.point)}</div>
+                            </div>
+                            <div className="row">
+                                <label>{t("score.projected_score")}</label>
+                                <div className="badge">{formatFixed2(selectedFutureProjection.score)}</div>
+                            </div>
+                            <div className="row">
+                                <label>{t("score.projected_fan")}</label>
+                                <div className="badge">{formatFixed2(selectedFutureProjection.fan)}</div>
+                            </div>
+                        </div>
+
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+                                gap: 12,
+                                maxHeight: "60vh",
+                                overflowY: "auto",
+                            }}
+                        >
+                            {selectedFutureProjection.amulets.map((amulet) => (
+                                <div
+                                    key={`${amulet.uid}-${amulet.regId}`}
+                                    style={{
+                                        display: "grid",
+                                        gap: 10,
+                                        justifyItems: "center",
+                                        alignContent: "start",
+                                        padding: 12,
+                                        border: "1px solid var(--border)",
+                                        borderRadius: 12,
+                                        background: "var(--panel-bg)",
+                                    }}
+                                >
+                                    <AmuletCard item={amulet.item} scale={0.44}/>
+                                    <span className="badge">{t("score.amulet_id_label")}: {amulet.regId}</span>
+                                    <div style={{display: "grid", gap: 6, width: "100%"}}>
+                                        {safeDisplayStoredDataList(amulet.dataRawList).map((entry) => (
+                                            <div
+                                                key={`${amulet.uid}-${entry.index}`}
+                                                style={{
+                                                    display: "grid",
+                                                    gap: 2,
+                                                    padding: "8px 10px",
+                                                    border: "1px solid var(--border)",
+                                                    borderRadius: 10,
+                                                    background: "rgba(255,255,255,.65)",
+                                                }}
+                                            >
+                                                <div style={{fontSize: 12, color: "var(--text-muted)"}}>
+                                                    {t("score.future_growth_data_raw", {index: entry.index, value: entry.raw})}
+                                                </div>
+                                                <div style={{fontWeight: 700}}>
+                                                    {t("score.future_growth_data_value", {index: entry.index, value: entry.display})}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+            </Modal>
+
+            <Modal
                 open={!!editingItem}
                 onClose={() => setEditingKey(null)}
                 title={t("score.amulet_editor_title")}
@@ -945,11 +1051,22 @@ export default function ScorePage({
                         <div className="row">
                             <label>{t("score.current_saved_data_raw")}</label>
                             <div>
-                                <input className="form-input" value={draftRule.dataRaw} readOnly/>
-                                <div className="hint" style={{marginTop: 6}}>
-                                    {t("score.current_saved_data_display", {
-                                        value: safeDisplayStoredData(draftRule.dataRaw),
-                                    })}
+                                <div style={{display: "grid", gap: 8}}>
+                                    {editingStoredDataList.map((entry) => (
+                                        <div key={entry.index} style={{display: "grid", gap: 4}}>
+                                            <input
+                                                className="form-input"
+                                                value={entry.raw}
+                                                readOnly
+                                            />
+                                            <div className="hint">
+                                                {t("score.current_saved_data_display_indexed", {
+                                                    index: entry.index,
+                                                    value: entry.display,
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                                 <div className="hint" style={{marginTop: 6}}>
                                     {t("score.current_saved_data_locked")}
@@ -994,14 +1111,10 @@ export default function ScorePage({
                             <div>
                                 <input
                                     className="form-input"
-                                    type="number"
-                                    min={-99}
-                                    max={99}
-                                    value={draftRule.manualExtraTriggers}
-                                    onChange={(e) => setDraftRule((prev) => ({
-                                        ...prev,
-                                        manualExtraTriggers: clampManualExtraTriggerCount(e.target.value),
-                                    }))}
+                                    type="text"
+                                    inputMode="text"
+                                    value={manualExtraTriggerInput}
+                                    onChange={(e) => setManualExtraTriggerInput(e.target.value)}
                                 />
                                 <div className="hint" style={{marginTop: 6}}>
                                     {t("score.manual_extra_triggers_hint")}
@@ -1022,6 +1135,22 @@ export default function ScorePage({
                                     }))}
                                 />
                                 <span>{draftRule.activeOnWin ? t("score.active_on_win_yes") : t("score.active_on_win_no")}</span>
+                            </label>
+                        </div>
+
+                        <div className="row">
+                            <label>{t("score.growth_after_round_label")}</label>
+                            <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
+                                <input
+                                    type="checkbox"
+                                    checked={draftRule.growthAfterRound}
+                                    disabled={isEditingCodeDriven}
+                                    onChange={(e) => setDraftRule((prev) => ({
+                                        ...prev,
+                                        growthAfterRound: e.target.checked,
+                                    }))}
+                                />
+                                <span>{draftRule.growthAfterRound ? t("score.growth_after_round_yes") : t("score.growth_after_round_no")}</span>
                             </label>
                         </div>
 

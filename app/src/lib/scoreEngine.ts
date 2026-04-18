@@ -14,6 +14,7 @@ export type EffectTarget = "none" | "score" | "fan";
 
 export type FormulaVars = {
     data: bigint;
+    dataValues: bigint[];
     score: bigint;
     fan: bigint;
     level: bigint;
@@ -28,6 +29,7 @@ export type AmuletRuleConfig = {
     extraExecutions: number;
     manualExtraTriggers: number;
     activeOnWin: boolean;
+    growthAfterRound: boolean;
     effectTarget: EffectTarget;
     effectFormula: string;
     growthFormula: string;
@@ -37,6 +39,7 @@ export type AmuletRuleConfig = {
 export type ResolvedAmuletRule = AmuletRuleConfig & {
     item: EffectItem;
     regId: number;
+    dataRawList: string[];
     badgeId: number | null;
     hasExtensionSeal: boolean;
     hasTransmissionSeal: boolean;
@@ -71,6 +74,13 @@ export type FutureProjection = {
     fan: bigint;
     target?: bigint | null;
     reached: boolean | null;
+    amulets: Array<{
+        uid: number;
+        regId: number;
+        item: EffectItem;
+        dataRaw: string;
+        dataRawList: string[];
+    }>;
 };
 
 export type AmuletRuleRuntimeState = {
@@ -127,8 +137,10 @@ export type AmuletEffectResult = (Partial<Pick<AmuletRuleRuntimeState, "score" |
 export type AmuletRuleHandler = {
     getDefaultConfig?: (item: EffectItem) => Partial<AmuletRuleConfig> | null | undefined;
     affectsPoint?: boolean;
+    getMaxEffectApplications?: (context: AmuletActivationContext) => number | null | undefined;
     isActiveOnWin?: (context: AmuletActivationContext) => boolean;
     applyEffect?: (context: AmuletEffectContext) => AmuletEffectResult;
+    getGrowthRepeat?: (context: Omit<AmuletGrowthContext, "executionIndex" | "currentData" | "vars">) => number | null | undefined;
     growData?: (context: AmuletGrowthContext) => bigint | null | undefined;
 };
 
@@ -165,6 +177,7 @@ export const DEFAULT_RULE_CONFIG: AmuletRuleConfig = {
     extraExecutions: 0,
     manualExtraTriggers: 0,
     activeOnWin: false,
+    growthAfterRound: false,
     effectTarget: "none",
     effectFormula: "",
     growthFormula: "data",
@@ -193,12 +206,17 @@ export function clampManualExtraTriggerCount(value: number | string | null | und
 }
 
 export function parseStoredDataFromItem(item: EffectItem): string {
-    if (!Array.isArray(item.store)) return "0";
+    return parseStoredDataListFromItem(item)[0] ?? "0";
+}
+
+export function parseStoredDataListFromItem(item: EffectItem): string[] {
+    if (!Array.isArray(item.store)) return [];
+    const values: string[] = [];
     for (const entry of item.store) {
         const text = String(entry ?? "").trim();
-        if (/^[+-]?\d+$/.test(text)) return normalizeNumericString(text);
+        if (/^[+-]?\d+$/.test(text)) values.push(normalizeNumericString(text));
     }
-    return "0";
+    return values;
 }
 
 export function resolveAmuletRule(item: EffectItem, custom?: Partial<AmuletRuleConfig> | null): ResolvedAmuletRule {
@@ -207,7 +225,12 @@ export function resolveAmuletRule(item: EffectItem, custom?: Partial<AmuletRuleC
     const registeredRule = getRegisteredAmuletRule(regId);
     const codeDefaultConfig = registeredRule?.getDefaultConfig?.(item) ?? {};
     const preset = PRESET_AMULET_RULES[regId] ?? {};
-    const rawData = String(codeDefaultConfig.dataRaw ?? preset.dataRaw ?? parseStoredDataFromItem(item)).trim();
+    const storedDataRawList = parseStoredDataListFromItem(item);
+    const fallbackRawData = String(codeDefaultConfig.dataRaw ?? preset.dataRaw ?? "0").trim();
+    const dataRawList = storedDataRawList.length > 0
+        ? storedDataRawList
+        : (/^[+-]?\d+$/.test(fallbackRawData) ? [normalizeNumericString(fallbackRawData)] : ["0"]);
+    const rawData = dataRawList[0] ?? "0";
     const merged: AmuletRuleConfig = {
         ...DEFAULT_RULE_CONFIG,
         ...codeDefaultConfig,
@@ -218,6 +241,7 @@ export function resolveAmuletRule(item: EffectItem, custom?: Partial<AmuletRuleC
         extraExecutions: clampExtraExecutionCount(custom?.extraExecutions ?? preset.extraExecutions ?? codeDefaultConfig.extraExecutions ?? 0),
         manualExtraTriggers: clampManualExtraTriggerCount(custom?.manualExtraTriggers ?? preset.manualExtraTriggers ?? codeDefaultConfig.manualExtraTriggers ?? 0),
         activeOnWin: custom?.activeOnWin ?? preset.activeOnWin ?? codeDefaultConfig.activeOnWin ?? ((custom?.effectTarget ?? preset.effectTarget ?? codeDefaultConfig.effectTarget ?? "none") !== "none"),
+        growthAfterRound: custom?.growthAfterRound ?? preset.growthAfterRound ?? codeDefaultConfig.growthAfterRound ?? false,
         effectTarget: custom?.effectTarget ?? preset.effectTarget ?? codeDefaultConfig.effectTarget ?? "none",
         effectFormula: custom?.effectFormula ?? preset.effectFormula ?? codeDefaultConfig.effectFormula ?? "",
         growthFormula: custom?.growthFormula ?? preset.growthFormula ?? codeDefaultConfig.growthFormula ?? "data",
@@ -227,6 +251,7 @@ export function resolveAmuletRule(item: EffectItem, custom?: Partial<AmuletRuleC
         ...merged,
         item,
         regId,
+        dataRawList,
         badgeId,
         hasExtensionSeal: badgeId === BADGE_EXTENSION_SEAL_ID,
         hasTransmissionSeal: badgeId === BADGE_TRANSMISSION_SEAL_ID,
@@ -420,10 +445,33 @@ class FormulaParser {
             this.index += 1;
         }
         const name = this.text.slice(start, this.index).toLowerCase();
+        if (name === "data") {
+            this.skipWhitespace();
+            if (this.peek() === "[") {
+                this.index += 1;
+                this.skipWhitespace();
+                const indexStart = this.index;
+                while (this.index < this.text.length && /[0-9]/.test(this.text[this.index])) {
+                    this.index += 1;
+                }
+                const rawIndex = this.text.slice(indexStart, this.index);
+                this.skipWhitespace();
+                if (this.peek() !== "]") throw new Error("Missing closing bracket");
+                this.index += 1;
+                const itemIndex = Number.parseInt(rawIndex, 10);
+                if (!Number.isFinite(itemIndex) || itemIndex < 0) {
+                    throw new Error("Invalid data index");
+                }
+                return this.vars.dataValues[itemIndex] ?? 0n;
+            }
+        }
         if (!(name in this.vars)) {
             throw new Error(`Unknown variable: ${name}`);
         }
-        return this.vars[name as keyof FormulaVars];
+        if (name === "data") {
+            return this.vars.data;
+        }
+        return this.vars[name as Exclude<keyof FormulaVars, "dataValues" | "data">];
     }
 
     private skipWhitespace() {
@@ -505,10 +553,14 @@ function applyRegisteredRuleEffect(context: AmuletEffectContext) {
 function applyDefaultGrowth(rule: ResolvedAmuletRule, vars: FormulaVars, currentData: bigint) {
     try {
         const grown = evaluateFormula(rule.growthFormula || "data", vars);
-        return rule.hasAngelSeal ? currentData + (grown - currentData) * 2n : grown;
+        return applyAngelSealGrowth(rule, currentData, grown);
     } catch {
         return currentData;
     }
+}
+
+function applyAngelSealGrowth(rule: ResolvedAmuletRule, currentData: bigint, grown: bigint) {
+    return rule.hasAngelSeal ? currentData + (grown - currentData) * 2n : grown;
 }
 
 function applyRegisteredGrowth(context: AmuletGrowthContext) {
@@ -518,10 +570,39 @@ function applyRegisteredGrowth(context: AmuletGrowthContext) {
     }
     try {
         const result = handler.growData(context);
-        if (typeof result === "bigint") return result;
+        if (typeof result === "bigint") {
+            return applyAngelSealGrowth(context.rule, context.currentData, result);
+        }
     } catch {
     }
     return applyDefaultGrowth(context.rule, context.vars, context.currentData);
+}
+
+function getGrowthRepeatCount(
+    rule: ResolvedAmuletRule,
+    index: number,
+    rules: ResolvedAmuletRule[],
+    result: CurrentPointResult,
+    level: number,
+) {
+    const handler = getRegisteredAmuletRule(rule.regId);
+    if (handler?.getGrowthRepeat) {
+        try {
+            const repeat = handler.getGrowthRepeat({
+                rule,
+                index,
+                rules,
+                level,
+                currentResult: result,
+            });
+            const normalized = Number(repeat);
+            if (Number.isFinite(normalized) && normalized >= 0) {
+                return Math.max(0, Math.trunc(normalized));
+            }
+        } catch {
+        }
+    }
+    return rule.hasExtensionSeal ? 2 : 1;
 }
 
 function isRuleActiveOnWin(
@@ -544,6 +625,31 @@ function isRuleActiveOnWin(
         });
     } catch {
         return true;
+    }
+}
+
+function getMaxEffectApplicationCount(
+    rule: ResolvedAmuletRule,
+    index: number,
+    rules: ResolvedAmuletRule[],
+    level: number,
+    runtime: AmuletRuntimeContext,
+) {
+    const handler = getRegisteredAmuletRule(rule.regId);
+    if (!handler?.getMaxEffectApplications) return null;
+    try {
+        const limit = handler.getMaxEffectApplications({
+            rule,
+            index,
+            rules,
+            level,
+            runtime,
+        });
+        const normalized = Number(limit);
+        if (!Number.isFinite(normalized)) return null;
+        return Math.max(0, Math.trunc(normalized));
+    } catch {
+        return null;
     }
 }
 
@@ -573,14 +679,26 @@ export function calculateCurrentPoint(
         if (!rule || !isRuleActiveOnWin(rule, index, amuletRules, level, runtime)) {
             return {triggered: false, transmissionCount: 0};
         }
+        const maxEffectApplications = getMaxEffectApplicationCount(rule, index, amuletRules, level, runtime);
+        if (maxEffectApplications != null && effectApplicationCounts[index] >= maxEffectApplications) {
+            return {triggered: false, transmissionCount: 0};
+        }
 
         const activationIndex = effectSequence;
         const executionIndex = executionSequence;
         const prevScore = state.score;
         const prevFan = state.fan;
         const prevPoint = computePoint(prevScore, prevFan);
+        const dataValues = rule.dataRawList.map((value) => {
+            try {
+                return BigInt(value || "0");
+            } catch {
+                return 0n;
+            }
+        });
         const vars: FormulaVars = {
-            data: BigInt(rule.dataRaw || "0"),
+            data: dataValues[0] ?? 0n,
+            dataValues,
             score: state.score,
             fan: state.fan,
             level: levelValue,
@@ -733,16 +851,29 @@ function growAmuletData(
     rules: ResolvedAmuletRule[],
     result: CurrentPointResult,
     level: number,
+    growthAfterRound: boolean | null = null,
 ): ResolvedAmuletRule[] {
     const levelValue = BigInt(level) * SCALE;
     return rules.map((rule, index) => {
+        if (growthAfterRound != null && rule.growthAfterRound !== growthAfterRound) {
+            return rule;
+        }
         let nextData = BigInt(rule.dataRaw || "0");
-        const growthRepeat = rule.hasExtensionSeal ? 2 : 1;
+        const growthRepeat = getGrowthRepeatCount(rule, index, rules, result, level);
 
         for (let executionIndex = 1; executionIndex <= growthRepeat; executionIndex += 1) {
             const currentData = nextData;
+            const dataValues = rule.dataRawList.map((value, dataIndex) => {
+                if (dataIndex === 0) return currentData;
+                try {
+                    return BigInt(value || "0");
+                } catch {
+                    return 0n;
+                }
+            });
             const vars: FormulaVars = {
-                data: currentData,
+                data: dataValues[0] ?? currentData,
+                dataValues,
                 score: result.finalScore,
                 fan: result.finalFan,
                 level: levelValue,
@@ -765,6 +896,7 @@ function growAmuletData(
         return {
             ...rule,
             dataRaw: nextData.toString(),
+            dataRawList: [nextData.toString(), ...rule.dataRawList.slice(1)],
         };
     });
 }
@@ -784,8 +916,8 @@ export function projectFuturePoints(
     let result = currentResult;
 
     for (const future of futureLevels) {
-        rules = growAmuletData(rules, result, level);
         level = future.level;
+        rules = growAmuletData(rules, result, level, false);
         result = calculateCurrentPoint(baseScore, baseFan, level, rules, runtime);
         const target = parseTargetPointValue(future.target ?? "") ?? null;
         out.push({
@@ -795,7 +927,15 @@ export function projectFuturePoints(
             fan: result.finalFan,
             target,
             reached: target == null ? null : result.finalPoint >= target,
+            amulets: rules.map((rule) => ({
+                uid: rule.item.uid,
+                regId: rule.regId,
+                item: rule.item,
+                dataRaw: rule.dataRaw,
+                dataRawList: [...rule.dataRawList],
+            })),
         });
+        rules = growAmuletData(rules, result, level, true);
     }
 
     return out;
