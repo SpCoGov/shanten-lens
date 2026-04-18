@@ -419,6 +419,7 @@ export default function ScorePage({
     const [showTileScores, setShowTileScores] = React.useState(false);
     const [showRuleOverview, setShowRuleOverview] = React.useState(false);
     const [selectedFutureLevel, setSelectedFutureLevel] = React.useState<number | null>(null);
+    const [selectedExecExplainIndex, setSelectedExecExplainIndex] = React.useState<number | null>(null);
     const [expandedFutureGroups, setExpandedFutureGroups] = React.useState<string[]>([]);
     const [ruleOverviewRarityFilter, setRuleOverviewRarityFilter] = React.useState<string>("all");
     const [ruleOverviewDriverFilter, setRuleOverviewDriverFilter] = React.useState<DriverFilter>("all");
@@ -539,6 +540,10 @@ export default function ScorePage({
     const selectedFutureProjection = React.useMemo(
         () => futureProjections.find((projection) => projection.level === selectedFutureLevel) ?? null,
         [futureProjections, selectedFutureLevel],
+    );
+    const selectedExecExplain = React.useMemo(
+        () => (selectedExecExplainIndex == null ? null : currentResult.perAmulet[selectedExecExplainIndex] ?? null),
+        [currentResult.perAmulet, selectedExecExplainIndex],
     );
     const displayedFutureItems = React.useMemo(() => {
         const items: Array<
@@ -941,8 +946,10 @@ export default function ScorePage({
                                                 </div>
                                             ) : null}
                                         </div>
-                                        <div
+                                        <button
+                                            type="button"
                                             className="badge"
+                                            onClick={() => setSelectedExecExplainIndex(index)}
                                             style={{
                                                 whiteSpace: "nowrap", lineHeight: 1,
                                                 minHeight: 38,
@@ -950,11 +957,12 @@ export default function ScorePage({
                                                 borderColor: isChainBreak ? "rgba(209,67,67,.55)" : undefined,
                                                 background: isChainBreak ? "rgba(255,241,241,.92)" : undefined,
                                                 color: isChainBreak ? "var(--danger, #d14343)" : undefined,
+                                                cursor: "pointer",
                                             }}
                                             title={isChainBreak ? t("score.transmission_chain_break") : undefined}
                                         >
                                             {t("score.exec_count", {count: effectApplicationCount})}
-                                        </div>
+                                        </button>
                                     </div>
                                 );
                             })}
@@ -1229,6 +1237,67 @@ export default function ScorePage({
                         </div>
                     )}
                 </div>
+            </Modal>
+
+            <Modal
+                open={selectedExecExplain != null}
+                onClose={() => setSelectedExecExplainIndex(null)}
+                title={t("score.exec_explain_title")}
+                width={680}
+            >
+                {selectedExecExplain == null ? null : (
+                    <div className="rows">
+                        <div className="row">
+                            <label>{t("score.exec_explain_final")}</label>
+                            <div className="badge ok">{selectedExecExplain.effectApplications}</div>
+                        </div>
+                        <div className="row">
+                            <label>{t("score.exec_explain_base_exec")}</label>
+                            <div className="badge">{selectedExecExplain.configuredExecutions}</div>
+                        </div>
+                        <div className="row">
+                            <label>{t("score.exec_explain_extra_exec")}</label>
+                            <div className="badge">{selectedExecExplain.configuredExtraExecutions}</div>
+                        </div>
+                        <div className="row">
+                            <label>{t("score.exec_explain_manual")}</label>
+                            <div className="badge">
+                                {selectedExecExplain.manualExtraTriggers > 0
+                                    ? `+${selectedExecExplain.manualExtraTriggers}`
+                                    : String(selectedExecExplain.manualExtraTriggers)}
+                            </div>
+                        </div>
+                        <div className="row">
+                            <label>{t("score.exec_explain_adjusted")}</label>
+                            <div className="badge">{selectedExecExplain.adjustedActivationCount}</div>
+                        </div>
+                        <div className="row">
+                            <label>{t("score.exec_explain_pre_win")}</label>
+                            <div className="badge">{selectedExecExplain.preWinActivationCount}</div>
+                        </div>
+                        <div className="row">
+                            <label>{t("score.exec_explain_deferred_manual")}</label>
+                            <div className="badge">{selectedExecExplain.deferredManualTriggerCount}</div>
+                        </div>
+                        <div className="row">
+                            <label>{t("score.exec_explain_transmission")}</label>
+                            <div className="badge">{selectedExecExplain.transmissionTriggerCount}</div>
+                        </div>
+                        <div className="row">
+                            <label>{t("score.exec_explain_copied")}</label>
+                            <div className="badge">{selectedExecExplain.copiedActivationCount}</div>
+                        </div>
+                        <div className="row">
+                            <label>{t("score.exec_explain_actual_activation")}</label>
+                            <div className="badge">{selectedExecExplain.activations}</div>
+                        </div>
+                        <div className="row">
+                            <label>{t("score.exec_explain_actual_execution")}</label>
+                            <div className="badge">{selectedExecExplain.executions}</div>
+                        </div>
+                        <div className="hint">{t("score.exec_explain_hint")}</div>
+                    </div>
+                )}
             </Modal>
 
             <Modal

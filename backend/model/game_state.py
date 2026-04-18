@@ -287,6 +287,13 @@ class GameState:
             self.level = level
         if effect_list is not None:
             self.effect_list = effect_list.copy()
+            for e in self.effect_list:
+                if isinstance(e, dict):
+                    badge = e.get("badge")
+                    if not isinstance(badge, dict):
+                        badge = {}
+                        e["badge"] = badge
+                    badge["id"] = 600170
         if candidate_effect_list is not None:
             self.candidate_effect_list = candidate_effect_list.copy()
         if ting_list is not None:

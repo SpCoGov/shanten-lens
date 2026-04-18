@@ -60,6 +60,13 @@ export type CurrentPointResult = {
         manualExtraTriggers: number;
         activations: number;
         effectApplications: number;
+        configuredExecutions: number;
+        configuredExtraExecutions: number;
+        adjustedActivationCount: number;
+        preWinActivationCount: number;
+        deferredManualTriggerCount: number;
+        transmissionTriggerCount: number;
+        copiedActivationCount: number;
         dataRaw: string;
         scoreAfter: bigint;
         fanAfter: bigint;
@@ -708,6 +715,8 @@ export function calculateCurrentPoint(
     const activationCounts = amuletRules.map(() => 0);
     const executionCounts = amuletRules.map(() => 0);
     const effectApplicationCounts = amuletRules.map(() => 0);
+    const transmissionTriggerCounts = amuletRules.map(() => 0);
+    const copiedActivationCounts = amuletRules.map(() => 0);
     const preWinActivationCounts = amuletRules.map((rule, index) =>
         getPreWinActivationCount(rule, index, amuletRules, level, runtime),
     );
@@ -775,7 +784,7 @@ export function calculateCurrentPoint(
                 const targetTriggerCount = getTriggerActivationCount(targetRule);
                 const targetExtraExecutionCount = getExtraActivationCount(targetRule);
                 const targetActivationCount = getEffectiveActivationCount(targetRule);
-                applyEffectApplication(
+                const copiedAttempt = applyEffectApplication(
                     targetIndex,
                     targetTriggerCount,
                     targetActivationCount,
@@ -784,6 +793,9 @@ export function calculateCurrentPoint(
                     Math.max(1, executionCounts[targetIndex] + 1),
                     false,
                 );
+                if (copiedAttempt.triggered) {
+                    copiedActivationCounts[targetIndex] += 1;
+                }
             },
         };
         const effectResult = applyRegisteredRuleEffect(effectContext);
@@ -805,7 +817,7 @@ export function calculateCurrentPoint(
         };
     };
 
-    const triggerRule = (index: number) => {
+    const triggerRule = (index: number, consumedBaseActivations = 0, consumedDeferredActivations = 0) => {
         const rule = amuletRules[index];
         if (!rule || !isRuleActiveOnWin(rule, index, amuletRules, level, runtime)) return;
 
@@ -813,11 +825,10 @@ export function calculateCurrentPoint(
         const extraExecutionCount = getExtraActivationCount(rule);
         const activationCount = getEffectiveActivationCount(rule);
         const adjustedActivationCount = Math.max(0, activationCount + rule.manualExtraTriggers);
-        const preWinActivationCount = Math.min(preWinActivationCounts[index] ?? 0, Math.min(activationCount, adjustedActivationCount));
-        const immediateActivationCount = Math.max(0, Math.min(activationCount, adjustedActivationCount) - preWinActivationCount);
-        const deferredManualTriggerCount = Math.max(0, adjustedActivationCount - activationCount);
+        const baseActivationCap = Math.max(0, Math.min(activationCount, adjustedActivationCount) - consumedBaseActivations);
+        const deferredManualTriggerCount = Math.max(0, adjustedActivationCount - activationCount - consumedDeferredActivations);
 
-        for (let activation = 0; activation < immediateActivationCount; activation += 1) {
+        for (let activation = 0; activation < baseActivationCap; activation += 1) {
             const countsAsExecution = activation < triggerCount;
             const executionSequence = countsAsExecution ? executionCounts[index] + 1 : Math.max(1, executionCounts[index]);
             const activationSequence = activationCounts[index] + 1;
@@ -839,6 +850,7 @@ export function calculateCurrentPoint(
             }
             if (countsAsExecution && amuletRules[index + 1]?.hasTransmissionSeal) {
                 for (let transmission = 0; transmission < effectAttempt.transmissionCount; transmission += 1) {
+                    transmissionTriggerCounts[index + 1] += 1;
                     triggerRule(index + 1);
                 }
             }
@@ -863,6 +875,7 @@ export function calculateCurrentPoint(
             executionCounts[index] += 1;
             if (amuletRules[index + 1]?.hasTransmissionSeal) {
                 for (let transmission = 0; transmission < effectAttempt.transmissionCount; transmission += 1) {
+                    transmissionTriggerCounts[index + 1] += 1;
                     triggerRule(index + 1);
                 }
             }
@@ -898,6 +911,7 @@ export function calculateCurrentPoint(
             executionCounts[index] += 1;
             if (amuletRules[index + 1]?.hasTransmissionSeal) {
                 for (let transmission = 0; transmission < effectAttempt.transmissionCount; transmission += 1) {
+                    transmissionTriggerCounts[index + 1] += 1;
                     triggerRule(index + 1);
                 }
             }
@@ -905,7 +919,12 @@ export function calculateCurrentPoint(
     }
 
     for (let index = 0; index < amuletRules.length; index += 1) {
-        triggerRule(index);
+        const triggerCount = getTriggerActivationCount(amuletRules[index]!);
+        const extraExecutionCount = getExtraActivationCount(amuletRules[index]!);
+        const activationCount = triggerCount + extraExecutionCount;
+        const adjustedActivationCount = Math.max(0, activationCount + amuletRules[index]!.manualExtraTriggers);
+        const consumedPreCount = Math.min(preWinActivationCounts[index] ?? 0, Math.min(activationCount, adjustedActivationCount));
+        triggerRule(index, consumedPreCount, 0);
     }
 
     const perAmulet: CurrentPointResult["perAmulet"] = amuletRules.map((rule, index) => ({
@@ -916,6 +935,16 @@ export function calculateCurrentPoint(
         manualExtraTriggers: rule.manualExtraTriggers,
         activations: activationCounts[index],
         effectApplications: effectApplicationCounts[index],
+        configuredExecutions: getTriggerActivationCount(rule),
+        configuredExtraExecutions: getExtraActivationCount(rule),
+        adjustedActivationCount: Math.max(0, getEffectiveActivationCount(rule) + rule.manualExtraTriggers),
+        preWinActivationCount: Math.min(
+            preWinActivationCounts[index] ?? 0,
+            Math.max(0, getEffectiveActivationCount(rule) + rule.manualExtraTriggers),
+        ),
+        deferredManualTriggerCount: Math.max(0, Math.max(0, getEffectiveActivationCount(rule) + rule.manualExtraTriggers) - getEffectiveActivationCount(rule)),
+        transmissionTriggerCount: transmissionTriggerCounts[index],
+        copiedActivationCount: copiedActivationCounts[index],
         dataRaw: rule.dataRaw,
         scoreAfter: state.score,
         fanAfter: state.fan,
