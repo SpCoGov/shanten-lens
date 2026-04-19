@@ -33,6 +33,8 @@ export type AmuletRuleConfig = {
     effectTarget: EffectTarget;
     effectFormula: string;
     growthFormula: string;
+    triggerGrowthFormula: string;
+    winGrowthFormula: string;
     note?: string;
 };
 
@@ -192,6 +194,8 @@ export const DEFAULT_RULE_CONFIG: AmuletRuleConfig = {
     effectTarget: "none",
     effectFormula: "",
     growthFormula: "data",
+    triggerGrowthFormula: "",
+    winGrowthFormula: "",
     note: "",
 };
 
@@ -256,6 +260,8 @@ export function resolveAmuletRule(item: EffectItem, custom?: Partial<AmuletRuleC
         effectTarget: custom?.effectTarget ?? preset.effectTarget ?? codeDefaultConfig.effectTarget ?? "none",
         effectFormula: custom?.effectFormula ?? preset.effectFormula ?? codeDefaultConfig.effectFormula ?? "",
         growthFormula: custom?.growthFormula ?? preset.growthFormula ?? codeDefaultConfig.growthFormula ?? "data",
+        triggerGrowthFormula: custom?.triggerGrowthFormula ?? preset.triggerGrowthFormula ?? codeDefaultConfig.triggerGrowthFormula ?? "",
+        winGrowthFormula: custom?.winGrowthFormula ?? preset.winGrowthFormula ?? codeDefaultConfig.winGrowthFormula ?? "",
         note: custom?.note ?? preset.note ?? codeDefaultConfig.note ?? "",
     };
     return {
@@ -704,6 +710,27 @@ function applyTriggerGrowthForRule(context: AmuletEffectContext) {
     }
 }
 
+function applyFormulaDataGrowth(rule: ResolvedAmuletRule, formula: string, vars: FormulaVars) {
+    const source = String(formula ?? "").trim();
+    if (!source) return;
+    try {
+        const assignment = source.match(/^(data(?:\[(\d+)])?)\s*=\s*(.+)$/);
+        if (!assignment) return;
+        const targetIndex = Number.parseInt(assignment[2] ?? "0", 10);
+        const expression = assignment[3] ?? "";
+        if (!Number.isFinite(targetIndex) || targetIndex < 0) return;
+        const nextData = evaluateFormula(expression, vars);
+        const nextDataRawList = [...rule.dataRawList];
+        while (nextDataRawList.length <= targetIndex) {
+            nextDataRawList.push("0");
+        }
+        nextDataRawList[targetIndex] = nextData.toString();
+        rule.dataRawList = nextDataRawList;
+        rule.dataRaw = nextDataRawList[0] ?? "0";
+    } catch {
+    }
+}
+
 export function calculateCurrentPoint(
     baseScore: bigint,
     baseFan: bigint,
@@ -721,6 +748,26 @@ export function calculateCurrentPoint(
         getPreWinActivationCount(rule, index, amuletRules, level, runtime),
     );
     const levelValue = BigInt(level) * SCALE;
+
+    amuletRules.forEach((rule) => {
+        const dataValues = rule.dataRawList.map((value) => {
+            try {
+                return BigInt(value || "0");
+            } catch {
+                return 0n;
+            }
+        });
+        applyFormulaDataGrowth(rule, rule.winGrowthFormula, {
+            data: dataValues[0] ?? 0n,
+            dataValues,
+            score: state.score,
+            fan: state.fan,
+            level: levelValue,
+            execution: SCALE,
+            extra_execution: BigInt(getExtraActivationCount(rule)) * SCALE,
+            activation: SCALE,
+        });
+    });
 
     const applyEffectApplication = (
         index: number,
@@ -810,6 +857,25 @@ export function calculateCurrentPoint(
         }
 
         applyTriggerGrowthForRule(effectContext);
+        applyFormulaDataGrowth(rule, rule.triggerGrowthFormula, {
+            ...vars,
+            score: state.score,
+            fan: state.fan,
+            data: (() => {
+                try {
+                    return BigInt(rule.dataRaw || "0");
+                } catch {
+                    return 0n;
+                }
+            })(),
+            dataValues: rule.dataRawList.map((value) => {
+                try {
+                    return BigInt(value || "0");
+                } catch {
+                    return 0n;
+                }
+            }),
+        });
         effectApplicationCounts[index] += 1;
         return {
             triggered: true,
@@ -961,6 +1027,28 @@ export function calculateCurrentPoint(
     };
 }
 
+function simulateLevelWins(
+    baseScore: bigint,
+    baseFan: bigint,
+    level: number,
+    rules: ResolvedAmuletRule[],
+    winCount: number,
+    runtime: AmuletRuntimeContext,
+) {
+    const normalizedWinCount = Math.max(1, Math.trunc(winCount));
+    let firstResult: CurrentPointResult | null = null;
+    let lastResult: CurrentPointResult | null = null;
+    for (let winIndex = 0; winIndex < normalizedWinCount; winIndex += 1) {
+        const result = calculateCurrentPoint(baseScore, baseFan, level, rules, runtime);
+        if (firstResult == null) firstResult = result;
+        lastResult = result;
+    }
+    return {
+        firstResult: firstResult!,
+        lastResult: lastResult!,
+    };
+}
+
 function growAmuletData(
     rules: ResolvedAmuletRule[],
     result: CurrentPointResult,
@@ -1033,13 +1121,9 @@ export function projectFuturePoints(
     for (const future of futureLevels) {
         level = future.level;
         rules = growAmuletData(rules, result, level, false);
-        result = calculateCurrentPoint(baseScore, baseFan, level, rules, runtime);
-        const projectedSingleWinResult = result;
-        if (winCount > 1) {
-            for (let winIndex = 1; winIndex < winCount; winIndex += 1) {
-                result = calculateCurrentPoint(baseScore, baseFan, level, rules, runtime);
-            }
-        }
+        const simulated = simulateLevelWins(baseScore, baseFan, level, rules, winCount, runtime);
+        const projectedSingleWinResult = simulated.firstResult;
+        result = simulated.lastResult;
         const target = parseTargetPointValue(future.target ?? "") ?? null;
         const totalPoint = projectedSingleWinResult.finalPoint * BigInt(Math.max(1, winCount));
         out.push({

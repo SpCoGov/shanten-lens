@@ -664,6 +664,8 @@ export default function ScorePage({
             effectTarget: merged.effectTarget,
             effectFormula: merged.effectFormula,
             growthFormula: merged.growthFormula,
+            triggerGrowthFormula: merged.triggerGrowthFormula,
+            winGrowthFormula: merged.winGrowthFormula,
             note: merged.note ?? "",
         });
         setManualExtraTriggerInput(String(merged.manualExtraTriggers ?? 0));
@@ -684,7 +686,10 @@ export default function ScorePage({
                 growthAfterRound: draftRule.growthAfterRound,
                 effectTarget: draftRule.effectTarget,
                 effectFormula: draftRule.effectFormula.trim(),
-                growthFormula: draftRule.growthFormula.trim() || "data", note: draftRule.note?.trim() ?? "",
+                growthFormula: draftRule.growthFormula.trim() || "data",
+                triggerGrowthFormula: draftRule.triggerGrowthFormula.trim(),
+                winGrowthFormula: draftRule.winGrowthFormula.trim(),
+                note: draftRule.note?.trim() ?? "",
             },
         }));
         setEditingKey(null);
@@ -1649,6 +1654,40 @@ export default function ScorePage({
                                 />
                                 <div className="hint" style={{marginTop: 6}}>
                                     {t("score.growth_formula_hint")}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="row">
+                            <label>{t("score.win_growth_formula_label")}</label>
+                            <div>
+                                <textarea
+                                    className="form-input"
+                                    rows={3}
+                                    value={draftRule.winGrowthFormula}
+                                    disabled={isEditingCodeDriven}
+                                    onChange={(e) => setDraftRule((prev) => ({...prev, winGrowthFormula: e.target.value}))}
+                                    placeholder={t("score.win_growth_formula_placeholder")}
+                                />
+                                <div className="hint" style={{marginTop: 6}}>
+                                    {t("score.win_growth_formula_hint")}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="row">
+                            <label>{t("score.trigger_growth_formula_label")}</label>
+                            <div>
+                                <textarea
+                                    className="form-input"
+                                    rows={3}
+                                    value={draftRule.triggerGrowthFormula}
+                                    disabled={isEditingCodeDriven}
+                                    onChange={(e) => setDraftRule((prev) => ({...prev, triggerGrowthFormula: e.target.value}))}
+                                    placeholder={t("score.trigger_growth_formula_placeholder")}
+                                />
+                                <div className="hint" style={{marginTop: 6}}>
+                                    {t("score.trigger_growth_formula_hint")}
                                 </div>
                             </div>
                         </div>

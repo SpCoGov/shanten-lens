@@ -264,6 +264,70 @@ registerAmuletRule([1580, 1581], {
     isActiveOnWin: () => true,
 });
 
+registerAmuletRule([1560, 1561], {
+    affectsPoint: true,
+    getDefaultConfig: () => ({
+        dataRaw: "100",
+        activeOnWin: true,
+        effectTarget: "none",
+        effectFormula: "",
+        growthFormula: "data",
+    }),
+    applyEffect: ({vars, state}) => {
+        return {
+            fan: ((vars.dataValues[0] ?? 100n) * state.fan) / 100n,
+        };
+    },
+    applyTriggerGrowth: ({rule}) => {
+        const data0 = (() => {
+            try {
+                return BigInt(rule.dataRawList[0] ?? "100");
+            } catch {
+                return 100n;
+            }
+        })();
+        const growth = rule.regId === 1561 ? 300n : 200n;
+        return [
+            (data0 + growth).toString(),
+            ...rule.dataRawList.slice(1),
+        ];
+    },
+    growData: ({currentData}) => currentData,
+    isActiveOnWin: () => true,
+});
+
+registerAmuletRule([1610, 1611], {
+    affectsPoint: true,
+    getDefaultConfig: () => ({
+        dataRaw: "100",
+        activeOnWin: true,
+        effectTarget: "none",
+        effectFormula: "",
+        growthFormula: "data",
+    }),
+    applyEffect: ({vars, state}) => {
+        return {
+            fan: ((vars.dataValues[0] ?? 100n) * state.fan) / 100n,
+        };
+    },
+    applyTriggerGrowth: ({rule}) => {
+        const data0 = (() => {
+            try {
+                return BigInt(rule.dataRawList[0] ?? "100");
+            } catch {
+                return 100n;
+            }
+        })();
+        const growthRate = rule.regId === 1611 ? 130n : 120n;
+        return [
+            ((data0 * growthRate) / 100n).toString(),
+            ...rule.dataRawList.slice(1),
+        ];
+    },
+    growData: ({currentData}) => currentData,
+    isActiveOnWin: () => true,
+});
+
 registerAmuletRule([110, 111], {
     affectsPoint: true,
     getDefaultConfig: () => ({
