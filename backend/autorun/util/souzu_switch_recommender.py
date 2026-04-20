@@ -1183,13 +1183,15 @@ def _tes_sort_tiles(tiles: Sequence[str]) -> List[str]:
 @lru_cache(maxsize=1)
 def _tes_patterns() -> tuple[int, ...]:
     # 打表生成需要排除的牌型的 map
-    patterns = [0 for _ in range(21)]
+    patterns = [0 for _ in range(30)]
     for n in range(0, 7):
         patterns[n] = 11123 + 11111 * n
     for n in range(0, 7):
         patterns[n + 7] = 12333 + 11111 * n
     for n in range(0, 7):
         patterns[n + 14] = 12223 + 11111 * n
+    for n in range(0, 9):
+        patterns[n + 21] = 1111 + 1111 * n
     return tuple(patterns)
 
 
@@ -1633,7 +1635,15 @@ def _run_exact_target_enumeration_search(
                 pattern_value = nums[0] * 10000 + nums[1] * 1000 + nums[2] * 100 + nums[3] * 10 + nums[4]
                 if pattern_value in _tes_patterns():
                     continue
-
+            if target[14].endswith('s'):
+                if target[8].endswith('s'):
+                    nums = [int(t[0]) for t in target[8:11]]
+                    if nums[0] * 1000 + nums[1] * 100 + nums[2] * 10 + int(target[14][0]) * 1 in get_patterns():
+                        continue
+                if target[11].endswith('s'):
+                    nums = [int(t[0]) for t in target[11:14]]
+                    if nums[0] * 1000 + nums[1] * 100 + nums[2] * 10 + int(target[14][0]) * 1 in get_patterns():
+                        continue
             waits = sorted(_waits_for_open_two_melds_faces(target[8:]), key=lambda tile: TILE_INDEX.get(tile, 99))
             if not waits:
                 continue
