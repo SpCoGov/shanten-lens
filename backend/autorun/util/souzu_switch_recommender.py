@@ -1638,11 +1638,11 @@ def _run_exact_target_enumeration_search(
             if target[14].endswith('s'):
                 if target[8].endswith('s'):
                     nums = [int(t[0]) for t in target[8:11]]
-                    if nums[0] * 1000 + nums[1] * 100 + nums[2] * 10 + int(target[14][0]) * 1 in get_patterns():
+                    if nums[0] * 1000 + nums[1] * 100 + nums[2] * 10 + int(target[14][0]) * 1 in _tes_patterns():
                         continue
                 if target[11].endswith('s'):
                     nums = [int(t[0]) for t in target[11:14]]
-                    if nums[0] * 1000 + nums[1] * 100 + nums[2] * 10 + int(target[14][0]) * 1 in get_patterns():
+                    if nums[0] * 1000 + nums[1] * 100 + nums[2] * 10 + int(target[14][0]) * 1 in _tes_patterns():
                         continue
             waits = sorted(_waits_for_open_two_melds_faces(target[8:]), key=lambda tile: TILE_INDEX.get(tile, 99))
             if not waits:
