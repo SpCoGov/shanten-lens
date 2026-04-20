@@ -917,7 +917,7 @@ input, textarea, select, code, pre, .selectable {
     min-width: 0;
     padding: 8px 9px;
     border-radius: 10px;
-    background: rgba(148, 163, 184, 0.08);
+    background: color-mix(in srgb, var(--text-muted) 8%, transparent);
     line-height: 1.4;
 }
 
@@ -929,7 +929,7 @@ input, textarea, select, code, pre, .selectable {
     padding: 3px 8px;
     border-radius: 999px;
     border: 1px solid color-mix(in srgb, var(--color-ring) 20%, transparent);
-    background: color-mix(in srgb, var(--color-ring) 8%, white);
+    background: color-mix(in srgb, var(--color-ring) 8%, var(--panel-bg));
     font-size: 12px;
     font-weight: 600;
     line-height: 1.2;
@@ -947,12 +947,12 @@ input, textarea, select, code, pre, .selectable {
 
 .future-collapsed-card {
     padding: 14px 16px;
-    border: 1px solid rgba(74, 222, 128, 0.24);
+    border: 1px solid color-mix(in srgb, var(--badge-ok-border) 62%, var(--border));
     border-radius: 16px;
     background:
-        linear-gradient(180deg, rgba(240, 253, 244, 0.92), rgba(255, 255, 255, 0.86)),
-        radial-gradient(circle at top right, rgba(74, 222, 128, 0.14), transparent 42%);
-    box-shadow: 0 10px 24px rgba(16, 24, 40, 0.05);
+        linear-gradient(180deg, color-mix(in srgb, var(--badge-ok-bg) 72%, var(--panel-bg)), color-mix(in srgb, var(--panel-bg) 94%, var(--bg))),
+        radial-gradient(circle at top right, color-mix(in srgb, var(--badge-ok-border) 18%, transparent), transparent 42%);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--color-ring) 7%, transparent);
 }
 
 .future-collapsed-toggle {
@@ -981,7 +981,7 @@ input, textarea, select, code, pre, .selectable {
     gap: 10px;
     margin-top: 4px;
     padding-left: 14px;
-    border-left: 2px solid rgba(74, 222, 128, 0.18);
+    border-left: 2px solid color-mix(in srgb, var(--badge-ok-border) 42%, transparent);
 }
 
 .future-collapsed-item {

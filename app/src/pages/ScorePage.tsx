@@ -371,10 +371,13 @@ function EffectTargetOptions({t}: { t: (key: string) => string }) {
 
 function getDoraTileFromIndicator(tile?: string | null) {
     const text = String(tile ?? "").trim();
-    const match = text.match(/^([1-9])([mpsz])$/i);
+    const match = text.match(/^([0-9])([mps])$/i) ?? text.match(/^([1-7])(z)$/i);
     if (!match) return null;
-    const value = Number.parseInt(match[1], 10);
+    let value = Number.parseInt(match[1], 10);
     const suit = match[2].toLowerCase();
+    if (value === 0 && (suit === "m" || suit === "p" || suit === "s")) {
+        value = 5;
+    }
     if (suit === "m") {
         if (value === 1) return "9m";
         if (value === 9) return "1m";
@@ -960,9 +963,9 @@ export default function ScorePage({
                                                 whiteSpace: "nowrap", lineHeight: 1,
                                                 minHeight: 38,
                                                 display: "inline-flex", alignItems: "center", justifyContent: "center", paddingInline: 14,
-                                                borderColor: isChainBreak ? "rgba(209,67,67,.55)" : undefined,
-                                                background: isChainBreak ? "rgba(255,241,241,.92)" : undefined,
-                                                color: isChainBreak ? "var(--danger, #d14343)" : undefined,
+                                                borderColor: isChainBreak ? "var(--badge-down-border)" : undefined,
+                                                background: isChainBreak ? "var(--badge-down-bg)" : undefined,
+                                                color: isChainBreak ? "var(--badge-down-fg)" : undefined,
                                                 cursor: "pointer",
                                             }}
                                             title={isChainBreak ? t("score.transmission_chain_break") : undefined}
@@ -1137,7 +1140,7 @@ export default function ScorePage({
                                         display: "grid", gap: 10,
                                         padding: 12,
                                         border: "1px solid var(--border)", borderRadius: 14,
-                                        background: "linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,255,255,.44))",
+                                        background: "linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 96%, var(--color-ring) 4%), color-mix(in srgb, var(--panel-bg) 88%, transparent))",
                                     }}
                                 >
                                     <div style={{fontWeight: 700}}>{section.title}</div>
@@ -1190,7 +1193,7 @@ export default function ScorePage({
                                                                         width: 56,
                                                                         height: 76,
                                                                         display: "grid", placeItems: "center", border: "1px solid var(--border)", borderRadius: 8,
-                                                                        background: "rgba(255,255,255,.85)", fontSize: 12,
+                                                                        background: "color-mix(in srgb, var(--panel-bg) 90%, var(--bg))", fontSize: 12,
                                                                         color: "var(--text-muted)",
                                                                     }}
                                                                 >
@@ -1205,7 +1208,11 @@ export default function ScorePage({
                                                                     paddingInline: 8,
                                                                     minHeight: 24,
                                                                     borderRadius: 8,
-                                                                    background: "rgba(79, 70, 229, .88)", color: "#fff", boxShadow: "0 8px 18px rgba(79, 70, 229, .22)", fontSize: 12,
+                                                                    borderColor: "color-mix(in srgb, var(--color-ring) 42%, var(--border))",
+                                                                    background: "color-mix(in srgb, var(--color-ring) 18%, var(--panel-bg))",
+                                                                    color: "var(--text)",
+                                                                    boxShadow: "0 8px 18px color-mix(in srgb, var(--color-ring) 16%, transparent)",
+                                                                    fontSize: 12,
                                                                     lineHeight: 1.2,
                                                                     maxWidth: 96,
                                                                     display: "grid", placeItems: "center", textAlign: "center", whiteSpace: "nowrap",
@@ -1223,7 +1230,11 @@ export default function ScorePage({
                                                                         paddingInline: 8,
                                                                         minHeight: 24,
                                                                         borderRadius: 999,
-                                                                        background: "rgba(220, 38, 38, .9)", color: "#fff", boxShadow: "0 8px 18px rgba(220, 38, 38, .2)", fontSize: 12,
+                                                                        borderColor: "var(--badge-down-border)",
+                                                                        background: "var(--badge-down-bg)",
+                                                                        color: "var(--badge-down-fg)",
+                                                                        boxShadow: "0 8px 18px color-mix(in srgb, var(--badge-down-fg) 16%, transparent)",
+                                                                        fontSize: 12,
                                                                         lineHeight: 1.2,
                                                                         display: "grid", placeItems: "center", textAlign: "center", whiteSpace: "nowrap",
                                                                     }}
@@ -1450,7 +1461,7 @@ export default function ScorePage({
                                                 style={{
                                                     display: "grid", gap: 2,
                                                     padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 10,
-                                                    background: "rgba(255,255,255,.65)",
+                                                    background: "color-mix(in srgb, var(--panel-bg) 88%, var(--bg))",
                                                 }}
                                             >
                                                 <div style={{fontSize: 12, color: "var(--text-muted)"}}>
