@@ -70,6 +70,30 @@ class PacketBot(GameBot):
             return False
         return stage == st.stage
 
+    def _ensure_stage_with_refresh(self, expected_stage: int, delay_sec: float = 3) -> bool:
+        st = self._state()
+        current_stage = getattr(st, "stage", None) if st else None
+        if current_stage == expected_stage:
+            return True
+
+        logger.error(
+            f"stage mismatch: expected={expected_stage}, current={current_stage}; "
+            "trying fetch_amulet_activity_data to refresh state"
+        )
+        ok, reason, _ = self.fetch_amulet_activity_data(delay_sec=delay_sec)
+        if not ok:
+            logger.error(f"refresh state failed: {reason}")
+            return False
+
+        st2 = self._state()
+        current_stage2 = getattr(st2, "stage", None) if st2 else None
+        if current_stage2 != expected_stage:
+            logger.error(
+                f"stage mismatch after refresh: expected={expected_stage}, current={current_stage2}"
+            )
+            return False
+        return True
+
     def _label(self, tile_id: int) -> str:
         st = self._state()
         try:
@@ -195,27 +219,33 @@ class PacketBot(GameBot):
         return ok, reason, resp
 
     def select_free_effect(self, selected_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        st = self._state()
-        if not self._check_stage(1):
+        if not self._ensure_stage_with_refresh(1, delay_sec=delay_sec):
             return False, "in the illegal stage", None
+        st = self._state()
+        if not st:
+            return False, "state-unavailable", None
         if any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
             ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySelectFreeEffect", data={"activityId": self.activity_id, "selectedId": selected_id}, delay_sec=delay_sec)
             return ok, reason, resp
         return False, "unknown id", None
 
     def select_reward_effect(self, selected_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        st = self._state()
-        if not self._check_stage(7):
+        if not self._ensure_stage_with_refresh(7, delay_sec=delay_sec):
             return False, "in the illegal stage", None
+        st = self._state()
+        if not st:
+            return False, "state-unavailable", None
         if int(selected_id) == 0 or any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
             ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySelectRewardPack", data={"activityId": self.activity_id, "id": selected_id}, delay_sec=delay_sec)
             return ok, reason, resp
         return False, "unknown id", None
 
     def select_effect(self, selected_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        st = self._state()
-        if not self._check_stage(5):
+        if not self._ensure_stage_with_refresh(5, delay_sec=delay_sec):
             return False, "in the illegal stage", None
+        st = self._state()
+        if not st:
+            return False, "state-unavailable", None
         if int(selected_id) == 0:
             logger.warning("select_effect: selected_id is 0")
         if int(selected_id) == 0 or any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
@@ -224,9 +254,11 @@ class PacketBot(GameBot):
         return False, "unknown id", None
 
     def buy_pack(self, good_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        st = self._state()
-        if not self._check_stage(4):
+        if not self._ensure_stage_with_refresh(4, delay_sec=delay_sec):
             return False, "in the illegal stage", None
+        st = self._state()
+        if not st:
+            return False, "state-unavailable", None
         good = next((g for g in st.goods if g.get("id") == good_id and g.get("sold") is False), None)
         if good:
             if good.get("price", 0) <= st.coin:
@@ -240,9 +272,11 @@ class PacketBot(GameBot):
         return False, "unknown id", None
 
     def refresh_shop(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        st = self._state()
-        if not self._check_stage(4):
+        if not self._ensure_stage_with_refresh(4, delay_sec=delay_sec):
             return False, "in the illegal stage", None
+        st = self._state()
+        if not st:
+            return False, "state-unavailable", None
         if st.coin >= st.refresh_price:
             ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivityRefreshShop", data={"activityId": self.activity_id}, delay_sec=delay_sec)
             return ok, reason, resp
@@ -281,13 +315,13 @@ class PacketBot(GameBot):
         return ok, reason, resp
 
     def end_shopping(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        if not self._check_stage(4):
+        if not self._ensure_stage_with_refresh(4, delay_sec=delay_sec):
             return False, "in the illegal stage", None
         ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivityEndShopping", data={"activityId": self.activity_id}, delay_sec=delay_sec)
         return ok, reason, resp
 
     def next_level(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        if not self._check_stage(6):
+        if not self._ensure_stage_with_refresh(6, delay_sec=delay_sec):
             return False, "in the illegal stage", None
         ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivityUpgrade", data={"activityId": self.activity_id}, delay_sec=delay_sec)
         return ok, reason, resp
