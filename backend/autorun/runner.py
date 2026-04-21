@@ -584,7 +584,7 @@ class AutoRunner:
                 uid=uid,
                 delay_sec=3,
                 interval=3,
-                timeout=3000,
+                timeout=30,
                 to_thread=True,
             )
             if ok:
@@ -611,7 +611,7 @@ class AutoRunner:
                     bot.start_game,
                     delay_sec=3,
                     interval=3,
-                    timeout=3000,
+                    timeout=30,
                     to_thread=True,
                 )
                 if ok:
@@ -630,7 +630,7 @@ class AutoRunner:
                     selected_id=first_effect,
                     delay_sec=3,
                     interval=3,
-                    timeout=3000,
+                    timeout=30,
                     to_thread=True,
                 )
                 if ok:
@@ -663,7 +663,7 @@ class AutoRunner:
                     bot.next_level,
                     delay_sec=3,
                     interval=3,
-                    timeout=3000,
+                    timeout=30,
                     to_thread=True,
                 )
                 if ok:
@@ -679,7 +679,7 @@ class AutoRunner:
                         bot.op_skip_change,
                         delay_sec=3,
                         interval=3,
-                        timeout=3000,
+                        timeout=30,
                         to_thread=True,
                     )
                     if ok:
@@ -704,7 +704,7 @@ class AutoRunner:
                     tile_ids=filtered_ids,
                     delay_sec=3,
                     interval=3,
-                    timeout=3000,
+                    timeout=30,
                     to_thread=True,
                 )
                 if ok:
@@ -729,7 +729,7 @@ class AutoRunner:
                         bot.giveup,
                         delay_sec=3,
                         interval=3,
-                        timeout=3000,
+                        timeout=30,
                         to_thread=True,
                     )
                     if ok:
@@ -762,7 +762,7 @@ class AutoRunner:
                         bot.op_tsumo,
                         delay_sec=3,
                         interval=3,
-                        timeout=3000,
+                        timeout=30,
                         to_thread=True,
                     )
                     if ok:
@@ -777,7 +777,7 @@ class AutoRunner:
                         tile_id=discard,
                         delay_sec=3,
                         interval=3,
-                        timeout=3000,
+                        timeout=30,
                         to_thread=True,
                     )
                     if ok:
@@ -800,7 +800,7 @@ class AutoRunner:
                                 bot.giveup,
                                 delay_sec=3,
                                 interval=3,
-                                timeout=3000,
+                                timeout=30,
                                 to_thread=True,
                             )
                             if ok:
@@ -814,7 +814,7 @@ class AutoRunner:
                             bot.end_shopping,
                             delay_sec=3,
                             interval=3,
-                            timeout=3000,
+                            timeout=30,
                             to_thread=True,
                         )
                         if ok:
@@ -828,7 +828,7 @@ class AutoRunner:
                         bot.refresh_shop,
                         delay_sec=3,
                         interval=3,
-                        timeout=3000,
+                        timeout=30,
                         to_thread=True,
                     )
                     if ok:
@@ -887,7 +887,7 @@ class AutoRunner:
                                 bot.giveup,
                                 delay_sec=3,
                                 interval=3,
-                                timeout=3000,
+                                timeout=30,
                                 to_thread=True,
                             )
                             if ok:
@@ -901,7 +901,7 @@ class AutoRunner:
                             bot.end_shopping,
                             delay_sec=3,
                             interval=3,
-                            timeout=3000,
+                            timeout=30,
                             to_thread=True,
                         )
                         if ok:
@@ -915,7 +915,7 @@ class AutoRunner:
                         bot.refresh_shop,
                         delay_sec=3,
                         interval=3,
-                        timeout=3000,
+                        timeout=30,
                         to_thread=True,
                     )
                     if ok:
@@ -962,7 +962,7 @@ class AutoRunner:
                     good_id=cheapest["id"],
                     delay_sec=3,
                     interval=3,
-                    timeout=3000,
+                    timeout=30,
                     to_thread=True,
                 )
                 if ok:
@@ -1004,7 +1004,7 @@ class AutoRunner:
                             selected_id=best_raw,
                             delay_sec=3,
                             interval=3,
-                            timeout=3000,
+                            timeout=30,
                             to_thread=True,
                         )
                     else:
@@ -1013,7 +1013,7 @@ class AutoRunner:
                             selected_id=best_raw,
                             delay_sec=3,
                             interval=3,
-                            timeout=3000,
+                            timeout=30,
                             to_thread=True,
                         )
                     if ok:
@@ -1032,7 +1032,7 @@ class AutoRunner:
                                     uid=uid,
                                     delay_sec=3,
                                     interval=3,
-                                    timeout=3000,
+                                    timeout=30,
                                     to_thread=True,
                                 )
                                 if ok:
@@ -1071,7 +1071,7 @@ class AutoRunner:
                                 uid=uid,
                                 delay_sec=3,
                                 interval=0.6,
-                                timeout=3000,
+                                timeout=30,
                                 to_thread=True,
                             )
                             if ok:
@@ -1088,7 +1088,7 @@ class AutoRunner:
                                 selected_id=0,
                                 delay_sec=3,
                                 interval=3,
-                                timeout=3000,
+                                timeout=30,
                                 to_thread=True,
                             )
                         else:
@@ -1097,7 +1097,7 @@ class AutoRunner:
                                 selected_id=0,
                                 delay_sec=3,
                                 interval=3,
-                                timeout=3000,
+                                timeout=30,
                                 to_thread=True,
                             )
                         if ok:
@@ -1115,7 +1115,7 @@ class AutoRunner:
                         selected_id=0,
                         delay_sec=3,
                         interval=3,
-                        timeout=3000,
+                        timeout=30,
                         to_thread=True,
                     )
                 else:
@@ -1124,7 +1124,7 @@ class AutoRunner:
                         selected_id=0,
                         delay_sec=3,
                         interval=3,
-                        timeout=3000,
+                        timeout=30,
                         to_thread=True,
                     )
                 if ok:

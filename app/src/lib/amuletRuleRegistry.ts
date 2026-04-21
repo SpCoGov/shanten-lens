@@ -138,7 +138,7 @@ registerAmuletRule(1271, {
 });
 
 // 能进链但是不会改变番数
-registerAmuletRule([2050, 2051, 150, 151, 1600, 1601], {
+registerAmuletRule([2050, 2051, 150, 151, 1600, 1601, 1650, 1651], {
     getDefaultConfig: () => ({
         activeOnWin: true,
         effectTarget: "none",

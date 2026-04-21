@@ -178,31 +178,31 @@ async def _compute_and_broadcast_discard_recommendations(
         ],
     }
     await broadcast(payload)
-
-    win_entries = [e for e in payload["data"] if e["data"].get("status") == "win_now"]
-    if not win_entries or not MANAGER.get("game.auto_tsumo"):
-        return
-
-    peer_key = None
-    addon_now = _addon.WS_ADDON_INSTANCE
-    if addon_now and addon_now.last_flow:
-        f = addon_now.last_flow
-        peer_key = f"{f.client_conn.address[0]}|{f.server_conn.address[0]}"
-
-    def _do_inject():
-        addon = _addon.WS_ADDON_INSTANCE
-        if not addon:
-            logger.warning("WS_ADDON_INSTANCE not ready; skip inject")
-            return
-        ok, reason, _ = addon.inject_now(
-            method=".lq.Lobby.amuletActivityOperate",
-            data={"activityId": 250811, "type": 8, "tileList": []},
-            t="Req",
-            peer_key=peer_key,
-        )
-        logger.info(f"success: {ok}, reason: {reason}")
-
-    ctx.master.event_loop.call_later(0.3, _do_inject)
+    # 已经移除了自动自摸
+    # win_entries = [e for e in payload["data"] if e["data"].get("status") == "win_now"]
+    # if not win_entries or not MANAGER.get("game.auto_tsumo"):
+    #     return
+    #
+    # peer_key = None
+    # addon_now = _addon.WS_ADDON_INSTANCE
+    # if addon_now and addon_now.last_flow:
+    #     f = addon_now.last_flow
+    #     peer_key = f"{f.client_conn.address[0]}|{f.server_conn.address[0]}"
+    #
+    # def _do_inject():
+    #     addon = _addon.WS_ADDON_INSTANCE
+    #     if not addon:
+    #         logger.warning("WS_ADDON_INSTANCE not ready; skip inject")
+    #         return
+    #     ok, reason, _ = addon.inject_now(
+    #         method=".lq.Lobby.amuletActivityOperate",
+    #         data={"activityId": 250811, "type": 8, "tileList": []},
+    #         t="Req",
+    #         peer_key=peer_key,
+    #     )
+    #     logger.info(f"success: {ok}, reason: {reason}")
+    #
+    # ctx.master.event_loop.call_later(0.3, _do_inject)
 
 
 def _cache_switch_runtime(runtime: dict | None) -> None:

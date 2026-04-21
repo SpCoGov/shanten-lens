@@ -12,7 +12,7 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         ConfigTable("game", file=conf_dir / "game.json")
         .add("modify_announcement", True, desc="modify announcement", kind="bool")
         .add("public_all", False, desc="public all tiles", kind="bool")
-        .add("auto_tsumo", False, desc="auto tsumo", kind="bool")
+        # .add("auto_tsumo", False, desc="auto tsumo", kind="bool")
     )
     mgr.add_table(
         ConfigTable("general", file=conf_dir / "general.json")
