@@ -492,7 +492,7 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         stop_after_first=bool(opts.get("stop_after_first", False)),
                         skip_signatures=list(opts.get("skip_signatures") or []),
                         wall_limit=int(opts.get("wall_limit", 36) or 36),
-                        search_algorithm=str(opts.get("search_algorithm", "constraint_decomposition_dfs") or "constraint_decomposition_dfs"),
+                        search_algorithm=str(opts.get("search_algorithm", "target_enumeration_search") or "target_enumeration_search"),
                     )
                 elif action == "start_debug":
                     from backend.mitm.hooks import start_switch_recommendation_debug_search
@@ -502,7 +502,7 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         stop_after_first=bool(opts.get("stop_after_first", False)),
                         skip_signatures=list(opts.get("skip_signatures") or []),
                         wall_limit=int(opts.get("wall_limit", 36) or 36),
-                        search_algorithm=str(opts.get("search_algorithm", "constraint_decomposition_dfs") or "constraint_decomposition_dfs"),
+                        search_algorithm=str(opts.get("search_algorithm", "target_enumeration_search") or "target_enumeration_search"),
                     )
                 elif action == "validate_manual_debug":
                     from backend.mitm.hooks import validate_manual_switch_debug_plan

@@ -41,8 +41,7 @@ type ManualStructureState = Record<ManualStructureKey, number[]>;
 const DEFAULT_WALL_LIMIT = 36;
 const WALL_LIMIT_MIN = 2;
 const WALL_LIMIT_MAX = 36;
-const LS_SEARCH_ALGORITHM = "sl-blackhole:search-algorithm";
-const DEFAULT_SEARCH_ALGORITHM = "constraint_decomposition_dfs";
+const DEFAULT_SEARCH_ALGORITHM = "target_enumeration_search";
 const RED_MAP: Record<string, string> = {"0m": "5m", "0p": "5p", "0s": "5s"};
 const STRUCTURE_LIMITS: Record<ManualStructureKey, number> = {
     meld1: 3,
@@ -66,10 +65,6 @@ function parseWallLimitInput(raw: string) {
     return {ok: true as const, value};
 }
 
-function readSearchAlgorithm() {
-    const raw = localStorage.getItem(LS_SEARCH_ALGORITHM) || DEFAULT_SEARCH_ALGORITHM;
-    return raw === "target_enumeration_search" ? "target_enumeration_search" : DEFAULT_SEARCH_ALGORITHM;
-}
 
 export function buildDebugSnapshotFromState(state: GameStateData): DebugSnapshot {
     return {
@@ -218,7 +213,7 @@ export default function SouzuSwitchDebugPage({
     const [wallLimit, setWallLimit] = React.useState(DEFAULT_WALL_LIMIT);
     const [wallLimitInput, setWallLimitInput] = React.useState(String(DEFAULT_WALL_LIMIT));
     const [autoStopFirst, setAutoStopFirst] = React.useState(true);
-    const [searchAlgorithm, setSearchAlgorithm] = React.useState<string>(() => readSearchAlgorithm());
+    const searchAlgorithm = DEFAULT_SEARCH_ALGORITHM;
     const [selectedQuadKeys, setSelectedQuadKeys] = React.useState<string[]>(["", ""]);
     const [activeBucket, setActiveBucket] = React.useState<ManualStructureKey>("meld1");
     const [manualStructure, setManualStructure] = React.useState<ManualStructureState>(emptyStructureState);
@@ -249,9 +244,6 @@ export default function SouzuSwitchDebugPage({
         [poolEntries],
     );
 
-    React.useEffect(() => {
-        localStorage.setItem(LS_SEARCH_ALGORITHM, searchAlgorithm);
-    }, [searchAlgorithm]);
 
     const resetManualBuilder = React.useCallback(() => {
         setSelectedQuadKeys(["", ""]);
@@ -430,21 +422,6 @@ export default function SouzuSwitchDebugPage({
                     <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
                         <input type="checkbox" checked={autoStopFirst} onChange={(e) => setAutoStopFirst(e.target.checked)}/>
                         <span>找到第一套方案后停止</span>
-                    </label>
-                    <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
-                        <span>{t("blackhole.search_algorithm")}</span>
-                        <select
-                            className="form-input"
-                            value={searchAlgorithm}
-                            onChange={(e) => setSearchAlgorithm(e.target.value)}
-                        >
-                            <option value="constraint_decomposition_dfs">
-                                {t("blackhole.algorithm_constraint_dfs")}
-                            </option>
-                            <option value="target_enumeration_search">
-                                {t("blackhole.algorithm_target_enum")}
-                            </option>
-                        </select>
                     </label>
                     <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
                         <span>牌山读取上限</span>
