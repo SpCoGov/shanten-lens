@@ -246,8 +246,6 @@ class PacketBot(GameBot):
         st = self._state()
         if not st:
             return False, "state-unavailable", None
-        if int(selected_id) == 0:
-            logger.warning("select_effect: selected_id is 0")
         if int(selected_id) == 0 or any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
             ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySelectPack", data={"activityId": self.activity_id, "id": selected_id}, delay_sec=delay_sec)
             return ok, reason, resp

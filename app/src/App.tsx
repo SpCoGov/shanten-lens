@@ -89,8 +89,15 @@ async function openSettingsWindow() {
 
 type Route = "home" | "score" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "diagnostics" | "packet-test" | "about";
 
+function isMoreRoute(route: Route) {
+    return route === "fuse"
+        || route === "souzu-debug"
+        || route === "diagnostics"
+        || route === "packet-test"
+        || route === "about";
+}
+
 const OUTER_PADDING = 16;
-const SIDEBAR_WIDTH = 320;
 const MAIN_GAP = 12;
 
 const appWindow = getCurrentWindow();
@@ -197,7 +204,10 @@ export default function App() {
     const [route, setRoute] = React.useState<Route>("home");
     const sidebarRef = React.useRef<HTMLDivElement | null>(null);
     const navRefs = React.useRef<Partial<Record<Route, HTMLButtonElement | null>>>({});
+    const moreButtonRef = React.useRef<HTMLButtonElement | null>(null);
+    const moreMenuRef = React.useRef<HTMLDivElement | null>(null);
     const themeButtonRef = React.useRef<HTMLButtonElement | null>(null);
+    const [moreMenuOpen, setMoreMenuOpen] = React.useState(false);
     const [connected, setConnected] = React.useState(false);
     const [debugEnabled, setDebugEnabled] = React.useState(false);
 
@@ -602,7 +612,7 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
-        if (!debugEnabled && route === "packet-test") {
+        if (!debugEnabled && (route === "packet-test" || route === "souzu-debug")) {
             setRoute("diagnostics");
         }
     }, [debugEnabled, route]);
@@ -644,15 +654,21 @@ export default function App() {
         </div>
     ) : undefined;
 
+    const navigateFromMore = React.useCallback((nextRoute: Route) => {
+        setRoute(nextRoute);
+        setMoreMenuOpen(false);
+    }, []);
+
     React.useEffect(() => {
         const updateSidebarIndicator = () => {
             const sidebar = sidebarRef.current;
-            const activeBtn = navRefs.current[route];
+            const activeBtn = navRefs.current[route] ?? (isMoreRoute(route) ? moreButtonRef.current : null);
             if (!sidebar || !activeBtn) return;
 
-            // Use layout offsets so entrance transforms don't skew initial indicator position.
-            const top = activeBtn.offsetTop;
-            const height = activeBtn.offsetHeight;
+            const sidebarRect = sidebar.getBoundingClientRect();
+            const buttonRect = activeBtn.getBoundingClientRect();
+            const top = buttonRect.top - sidebarRect.top + sidebar.scrollTop;
+            const height = buttonRect.height;
 
             sidebar.style.setProperty("--nav-indicator-top", `${top}px`);
             sidebar.style.setProperty("--nav-indicator-height", `${height}px`);
@@ -665,6 +681,7 @@ export default function App() {
         Object.values(navRefs.current).forEach((el) => {
             if (el) ro.observe(el);
         });
+        if (moreButtonRef.current) ro.observe(moreButtonRef.current);
 
         window.addEventListener("resize", updateSidebarIndicator);
         return () => {
@@ -672,6 +689,30 @@ export default function App() {
             window.removeEventListener("resize", updateSidebarIndicator);
         };
     }, [route]);
+
+    React.useEffect(() => {
+        if (!moreMenuOpen) return;
+
+        const closeOnOutsidePointer = (event: PointerEvent) => {
+            const target = event.target as Node | null;
+            if (!target) return;
+            if (moreButtonRef.current?.contains(target) || moreMenuRef.current?.contains(target)) return;
+            setMoreMenuOpen(false);
+        };
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setMoreMenuOpen(false);
+                moreButtonRef.current?.focus();
+            }
+        };
+
+        document.addEventListener("pointerdown", closeOnOutsidePointer);
+        document.addEventListener("keydown", closeOnEscape);
+        return () => {
+            document.removeEventListener("pointerdown", closeOnOutsidePointer);
+            document.removeEventListener("keydown", closeOnEscape);
+        };
+    }, [moreMenuOpen]);
 
     return (
         <div className="app">
@@ -698,44 +739,75 @@ export default function App() {
                         <span className="ms">calculate</span>
                     </button>
                     <button ref={(el) => {
-                        navRefs.current.fuse = el;
-                    }} className={`nav-icon ${route === "fuse" ? "active" : ""}`} title={t("nav.fuse")} onClick={() => setRoute("fuse")}>
-                        <span className="ms">gpp_maybe</span>
-                    </button>
-                    <button ref={(el) => {
                         navRefs.current.blackhole = el;
                     }} className={`nav-icon ${route === "blackhole" ? "active" : ""}`} title={t("nav.blackhole")} onClick={() => setRoute("blackhole")}>
                         <span className="ms">deblur</span>
                     </button>
-                    {debugEnabled && (
-                        <button ref={(el) => {
-                            navRefs.current["souzu-debug"] = el;
-                        }} className={`nav-icon ${route === "souzu-debug" ? "active" : ""}`} title="Souzu Debug" onClick={() => setRoute("souzu-debug")}>
-                            <span className="ms">science</span>
-                        </button>
-                    )}
                     <button ref={(el) => {
                         navRefs.current.autorun = el;
                     }} className={`nav-icon ${route === "autorun" ? "active" : ""}`} title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
                         <span className="ms">autoplay</span>
                     </button>
-                    <button ref={(el) => {
-                        navRefs.current.diagnostics = el;
-                    }} className={`nav-icon ${route === "diagnostics" ? "active" : ""}`} title={t("nav.diagnostics")} onClick={() => setRoute("diagnostics")}>
-                        <span className="ms">article</span>
-                    </button>
-                    {debugEnabled && (
-                        <button ref={(el) => {
-                            navRefs.current["packet-test"] = el;
-                        }} className={`nav-icon ${route === "packet-test" ? "active" : ""}`} title={t("nav.packetTest")} onClick={() => setRoute("packet-test")}>
-                            <span className="ms">send_and_archive</span>
+                    <div className="more-nav">
+                        <button
+                            ref={moreButtonRef}
+                            className={`nav-icon ${isMoreRoute(route) ? "active" : ""}`}
+                            title={t("nav.more", {defaultValue: "更多"})}
+                            aria-haspopup="menu"
+                            aria-expanded={moreMenuOpen}
+                            onClick={() => setMoreMenuOpen((open) => !open)}
+                        >
+                            <span className="ms">more_horiz</span>
                         </button>
-                    )}
-                    <button ref={(el) => {
-                        navRefs.current.about = el;
-                    }} className={`nav-icon ${route === "about" ? "active" : ""}`} title={t("nav.about")} onClick={() => setRoute("about")}>
-                        <span className="ms">help</span>
-                    </button>
+                        {moreMenuOpen && (
+                            <div className="more-menu" ref={moreMenuRef} role="menu">
+                                <button
+                                    className={`more-menu-item ${route === "fuse" ? "active" : ""}`}
+                                    role="menuitem"
+                                    onClick={() => navigateFromMore("fuse")}
+                                >
+                                    <span className="ms">gpp_maybe</span>
+                                    <span>{t("nav.fuse")}</span>
+                                </button>
+                                {debugEnabled && (
+                                    <button
+                                        className={`more-menu-item ${route === "souzu-debug" ? "active" : ""}`}
+                                        role="menuitem"
+                                        onClick={() => navigateFromMore("souzu-debug")}
+                                    >
+                                        <span className="ms">science</span>
+                                        <span>{t("nav.blackholeDebug")}</span>
+                                    </button>
+                                )}
+                                <button
+                                    className={`more-menu-item ${route === "diagnostics" ? "active" : ""}`}
+                                    role="menuitem"
+                                    onClick={() => navigateFromMore("diagnostics")}
+                                >
+                                    <span className="ms">article</span>
+                                    <span>{t("nav.diagnostics")}</span>
+                                </button>
+                                {debugEnabled && (
+                                    <button
+                                        className={`more-menu-item ${route === "packet-test" ? "active" : ""}`}
+                                        role="menuitem"
+                                        onClick={() => navigateFromMore("packet-test")}
+                                    >
+                                        <span className="ms">send_and_archive</span>
+                                        <span>{t("nav.packetTest")}</span>
+                                    </button>
+                                )}
+                                <button
+                                    className={`more-menu-item ${route === "about" ? "active" : ""}`}
+                                    role="menuitem"
+                                    onClick={() => navigateFromMore("about")}
+                                >
+                                    <span className="ms">help</span>
+                                    <span>{t("nav.about")}</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
                     <div className="sidebar-spacer"/>
 
@@ -778,7 +850,7 @@ export default function App() {
                                 style={{display: "flex", alignItems: "stretch", gap: MAIN_GAP}}
                             >
                                 {(stage === 2 || stage === 3) && (
-                                    <div className="panel advisor" style={{width: SIDEBAR_WIDTH, flex: "0 0 auto"}}>
+                                    <div className="panel advisor home-advisor-panel">
                                         <AdvisorPanel
                                             suuAnkou={planSuuAnkou}
                                             chiitoi={planChiitoi}

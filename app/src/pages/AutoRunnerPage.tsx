@@ -9,6 +9,7 @@ import {
     patchAutoConfig,
     removeTargetAt,
     setTargetValue,
+    type AutoRunnerRemakeRecord,
     type TargetItem,
     useAutoRunner,
 } from "../lib/autoRunnerStore";
@@ -29,6 +30,13 @@ function formatDuration(ms: number): string {
     return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
 }
 
+function formatAutoLevel(level?: number | null): string {
+    if (!level || level <= 0) return "-";
+    const a = Math.floor(level / 100);
+    const b = level % 100;
+    return `${a}-${b}`;
+}
+
 export default function AutoRunnerPage() {
     const {t} = useTranslation();
     const {config, status} = useAutoRunner();
@@ -39,6 +47,7 @@ export default function AutoRunnerPage() {
     const [openAmuletEditor, setOpenAmuletEditor] = React.useState(false);
     const [openBadgePicker, setOpenBadgePicker] = React.useState(false);
     const [detailTargetIndex, setDetailTargetIndex] = React.useState<number | null>(null);
+    const [selectedRecordSeq, setSelectedRecordSeq] = React.useState<number | null>(null);
     const [levelText, setLevelText] = React.useState<string>(formatLevelNum(config.cutoff_level));
 
     const working = Boolean(status.running);
@@ -189,6 +198,70 @@ export default function AutoRunnerPage() {
     }, [working, status.game_ready, status.game_ready_code, status.game_ready_reason, t]);
 
     const opInterval = Number.isFinite(Number(config.op_interval_ms)) ? Number(config.op_interval_ms) : 1000;
+    const remakeRecords = React.useMemo(
+        () => [...(status.remake_records ?? [])].sort((a, b) => (b.seq ?? 0) - (a.seq ?? 0)),
+        [status.remake_records],
+    );
+    const bestRecord = status.best_remake_record ?? null;
+
+    React.useEffect(() => {
+        if (selectedRecordSeq != null) return;
+        if (bestRecord?.seq != null) {
+            setSelectedRecordSeq(bestRecord.seq);
+        } else if (remakeRecords[0]?.seq != null) {
+            setSelectedRecordSeq(remakeRecords[0].seq);
+        }
+    }, [bestRecord, remakeRecords, selectedRecordSeq]);
+
+    const selectedRecord = React.useMemo(() => {
+        if (selectedRecordSeq == null) return bestRecord ?? remakeRecords[0] ?? null;
+        return remakeRecords.find((record) => record.seq === selectedRecordSeq) ?? bestRecord ?? remakeRecords[0] ?? null;
+    }, [bestRecord, remakeRecords, selectedRecordSeq]);
+
+    const reasonText = React.useCallback((reason?: string) => {
+        if (reason === "impossible") return t("autorun.remake_reason_impossible");
+        if (reason === "cutoff_no_shop_options") return t("autorun.remake_reason_cutoff_no_shop_options");
+        if (reason === "cutoff_cannot_afford") return t("autorun.remake_reason_cutoff_cannot_afford");
+        return reason || "-";
+    }, [t]);
+
+    const describeRecord = React.useCallback((record: AutoRunnerRemakeRecord | null) => {
+        if (!record) return "-";
+        return t("autorun.remake_record_summary", {
+            seq: record.seq ?? "-",
+            run: record.run_index ?? "-",
+            value: record.target_value ?? 0,
+            count: record.amulet_count ?? 0,
+            level: formatAutoLevel(record.level),
+        });
+    }, [t]);
+
+    const renderRecordAmulets = (record: AutoRunnerRemakeRecord | null) => {
+        const effectList = record?.effect_list ?? [];
+        if (!record) {
+            return <div className="hint">{t("autorun.remake_empty")}</div>;
+        }
+        if (effectList.length === 0) {
+            return <div className="hint">{t("autorun.remake_no_amulets")}</div>;
+        }
+        return (
+            <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(92px, 1fr))", gap: 10}}>
+                {effectList.map((item, idx) => {
+                    const rawId = Number(item?.id ?? 0);
+                    const regId = Math.floor(rawId / 10);
+                    const amuletName = amuletById.get(regId)?.name ?? `ID ${regId || rawId}`;
+                    return (
+                        <div key={`${record.seq}-${item?.uid ?? idx}`} style={{display: "grid", gap: 6, justifyItems: "center", minWidth: 0}}>
+                            <AmuletCard item={item} scale={0.56}/>
+                            <div className="hint" style={{fontSize: 12, textAlign: "center", width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}} title={`${amuletName}`}>
+                                {amuletName}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
 
     return (
         <div className="settings-wrap wide-page" style={{paddingBlock: 16}}>
@@ -281,6 +354,68 @@ export default function AutoRunnerPage() {
                         </p>
                     </section>
                 </div>
+
+                <section className="panel">
+                    <div className="panel-title">{t("autorun.section_remake_records_title")}</div>
+                    <div style={{display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 10}}>
+                        <span className="badge">{t("autorun.remake_record_count", {count: remakeRecords.length})}</span>
+                        <span className="badge ok">{t("autorun.remake_best_value", {value: bestRecord?.target_value ?? 0})}</span>
+                        <span className="badge">{t("autorun.remake_best_record", {text: describeRecord(bestRecord)})}</span>
+                    </div>
+
+                    {remakeRecords.length === 0 ? (
+                        <div className="hint">{t("autorun.remake_empty")}</div>
+                    ) : (
+                        <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, alignItems: "start"}}>
+                            <div style={{display: "grid", gap: 6, maxHeight: 360, overflowY: "auto", paddingRight: 4}}>
+                                {remakeRecords.map((record) => {
+                                    const active = selectedRecord?.seq === record.seq;
+                                    const isBest = bestRecord?.seq === record.seq;
+                                    return (
+                                        <button
+                                            key={record.seq}
+                                            type="button"
+                                            className={`nav-btn ${active ? "active" : ""}`}
+                                            onClick={() => setSelectedRecordSeq(record.seq)}
+                                            style={{
+                                                display: "grid",
+                                                gridTemplateColumns: "auto 1fr auto",
+                                                gap: 8,
+                                                alignItems: "center",
+                                                textAlign: "left",
+                                                width: "100%",
+                                            }}
+                                            title={reasonText(record.reason)}
+                                        >
+                                            <span>#{record.seq}</span>
+                                            <span style={{overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
+                                                {t("autorun.remake_record_row", {
+                                                    run: record.run_index ?? "-",
+                                                    value: record.target_value ?? 0,
+                                                    level: formatAutoLevel(record.level),
+                                                })}
+                                            </span>
+                                            {isBest ? <span className="badge ok">{t("autorun.remake_best_marker")}</span> : null}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div style={{display: "grid", gap: 10, minWidth: 0}}>
+                                <div style={{display: "flex", gap: 8, flexWrap: "wrap"}}>
+                                    <span className="badge">{describeRecord(selectedRecord)}</span>
+                                    <span className="badge">{t("autorun.remake_reason_label", {reason: reasonText(selectedRecord?.reason)})}</span>
+                                    <span className="badge">
+                                        {t("autorun.remake_time_label", {time: selectedRecord?.ts ? new Date(selectedRecord.ts).toLocaleString() : "-"})}
+                                    </span>
+                                </div>
+                                <div style={{maxHeight: 360, overflowY: "auto", paddingRight: 4}}>
+                                    {renderRecordAmulets(selectedRecord)}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </section>
 
                 <section className="panel">
                     <div className="panel-title">{t("autorun.section_goal_title")}</div>

@@ -335,7 +335,7 @@ export default function BlackHolePage({
 
             <div className={`blackhole-layout ${quadDrawerOpen ? "with-drawer" : ""}`}>
                 <div className="blackhole-main">
-                    <SouzuRuntimePanel runtime={runtime}/>
+                    {runtime?.searching ? <SouzuRuntimePanel runtime={runtime}/> : null}
                     <BlackHoleStrategyCard
                         data={viewData}
                         runtime={runtime}
@@ -428,10 +428,10 @@ export function BlackHoleStrategyCard({
                 </div>
             ) : data.status === "plan" ? (
                 <div style={{display: "grid", gap: 12}}>
-                    <div style={{padding: "12px 12px 0"}}>
+                    <PlanBody data={data} resolveFace={resolveFace} onOpenConsideredTiles={onOpenConsideredTiles}/>
+                    <div style={{padding: "0 12px 12px"}}>
                         <WorkerStatusPanel data={data} runtime={runtime}/>
                     </div>
-                    <PlanBody data={data} resolveFace={resolveFace} onOpenConsideredTiles={onOpenConsideredTiles}/>
                 </div>
             ) : (
                 <div className={styles.cardBodyMuted}>{t("advisor.awaiting_backend")}</div>
@@ -451,15 +451,29 @@ function PlanBody({
 }) {
     const {t} = useTranslation();
     const batches = zipBatches(data.switch_discards, data.switch_in, data.switch_batch_sizes);
+    const finalResult = (
+        <PlanFinalResult
+            data={data}
+            resolveFace={resolveFace}
+        />
+    );
     return (
         <div style={{padding: 12, display: "grid", gap: 14}}>
             <SearchParamsBand data={data} onOpenConsideredTiles={onOpenConsideredTiles}/>
-            <div className={styles.band}>
-                <div className={styles.bandLeft} style={{gridColumn: "1 / -1"}}>
-                    <div className={styles.bandActionLabel}>{"第几张听牌"}</div>
-                    <div className={styles.bandValue}>{String(data.draws_needed ?? "-")}</div>
-                </div>
+            <div
+                className={styles.bandSingle}
+                style={{
+                    border: "1px solid var(--color-divider)",
+                    borderRadius: 10,
+                    background: "var(--panel)",
+                    userSelect: "none",
+                }}
+            >
+                <div className={styles.bandActionLabel}>{"第几张听牌"}</div>
+                <div className={styles.bandValue}>{String(data.draws_needed ?? "-")}</div>
             </div>
+
+            {finalResult}
 
             {batches.map((batch, index) => (
                 <div key={index} className="blackhole-section">
@@ -475,10 +489,30 @@ function PlanBody({
                     </details>
                 </div>
             ))}
+        </div>
+    );
+}
 
+function PlanFinalResult({
+                             data,
+                             resolveFace,
+                         }: {
+    data: PlanData;
+    resolveFace?: (id: number) => string | null;
+}) {
+    const {t} = useTranslation();
+    const hasFinalResult = !!(
+        (data.quad_faces && data.quad_faces.length > 0) ||
+        (data.target13 && data.target13.length > 0) ||
+        (data.wall_draws && data.wall_draws.length > 0) ||
+        (data.waits && data.waits.length > 0)
+    );
+    if (!hasFinalResult) return null;
+
+    return (
+        <div style={{display: "grid", gap: 14}}>
             <FinalShapeGroup quadFaces={data.quad_faces || []} tenpaiFaces={data.target13 || []}/>
             <TileGroup title={t("advisor.wall_draw_sequence")} ids={data.wall_draws || []} resolveFace={resolveFace}/>
-            <TileGroup title={t("advisor.post_draw_discards")} ids={data.post_draw_discards || []} resolveFace={resolveFace}/>
             <FaceChipList title={t("advisor.final_waits")} faces={data.waits || []}/>
         </div>
     );
@@ -487,9 +521,11 @@ function PlanBody({
 function SearchParamsBand({
                               data,
                               onOpenConsideredTiles,
+                              showTitle = true,
                           }: {
     data: PlanData;
     onOpenConsideredTiles?: () => void;
+    showTitle?: boolean;
 }) {
     if (
         typeof data.max_change_count !== "number" &&
@@ -513,7 +549,7 @@ function SearchParamsBand({
 
     return (
         <div style={{display: "grid", gap: 8}}>
-            <div className={styles.label}>{"当前参数"}</div>
+            {showTitle ? <div className={styles.label}>{"当前参数"}</div> : null}
             <div style={{display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10}}>
                 {items.map((item) => (
                     <div
@@ -577,7 +613,7 @@ export function SouzuRuntimePanel({runtime}: { runtime?: SearchRuntimeData | nul
     );
 }
 
-export function WorkerStatusPanel({data, runtime}: { data: PlanData; runtime?: SearchRuntimeData | null }) {
+export function WorkerStatusPanel({data, runtime, showTitle = true}: { data: PlanData; runtime?: SearchRuntimeData | null; showTitle?: boolean }) {
     const workers = data.worker_states || [];
     const parallel = data.parallel_info;
     const processes = runtime?.processes || data.runtime?.processes || [];
@@ -609,15 +645,12 @@ export function WorkerStatusPanel({data, runtime}: { data: PlanData; runtime?: S
 
     return (
         <div style={{display: "grid", gap: 8}}>
-            <div className={styles.label}>{"搜索进程"}</div>
+            {showTitle ? <div className={styles.label}>{"搜索进程"}</div> : null}
             <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
                 <span className="badge">{`模式: ${parallel?.enabled ? "多进程" : "单进程"}`}</span>
                 <span className="badge">{`并行数: ${parallel?.max_workers ?? (workers.length || 1)}`}</span>
                 <span className="badge">{`已完成: ${parallel?.completed_jobs ?? 0}/${parallel?.total_jobs ?? 0}`}</span>
                 <span className="badge">{`真实子进程: ${runtime?.process_count ?? data.runtime?.process_count ?? processes.length}`}</span>
-            </div>
-            <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
-                {`并行判定: CPU核心数=${parallel?.cpu_count ?? "-"}，配置上限=${parallel?.configured_max_workers ?? "-"}，双杠候选=${parallel?.quad_pair_count ?? "-"}，满足并行条件=${parallel?.parallel_ok ? "是" : "否"}，已尝试启动子进程=${parallel?.attempted ? "是" : "否"}`}
             </div>
             {disabledReason ? (
                 <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>

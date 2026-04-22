@@ -23,6 +23,18 @@ export type EmailNotifyConfig = {
     to: string;     // 收件邮箱
 };
 
+export type AutoRunnerRemakeRecord = {
+    seq: number;
+    run_index: number;
+    ts: number;
+    reason: string;
+    stage?: number | null;
+    level?: number | null;
+    target_value: number;
+    amulet_count: number;
+    effect_list: any[];
+};
+
 export type AutoRunnerStatus = {
     mode?: "continuous" | "step";
     running: boolean;
@@ -41,6 +53,8 @@ export type AutoRunnerStatus = {
     probe_fail_count?: number;
     preferred_flow_ready?: boolean;
     preferred_flow_peer?: string;
+    remake_records?: AutoRunnerRemakeRecord[];
+    best_remake_record?: AutoRunnerRemakeRecord | null;
 };
 
 const defaultConfig: AutoRunnerConfig = {
@@ -74,6 +88,8 @@ const defaultStatus: AutoRunnerStatus = {
     game_ready_reason: "未探测，请点击“刷新状态”",
     game_ready_code: "NOT_PROBED",
     probe_fail_count: 0,
+    remake_records: [],
+    best_remake_record: null,
 };
 
 type State = {

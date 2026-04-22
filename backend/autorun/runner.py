@@ -56,6 +56,8 @@ class AutoRunner:
         self.elapsed_ms: int = 0
         self.runs: int = 0
         self.best_achieved_count: int = 0
+        self.remake_records: List[Dict[str, Any]] = []
+        self.best_remake_record: Optional[Dict[str, Any]] = None
         self.current_step: str = "-"
         self.last_error: Optional[str] = None
         self.need_start_game = False
@@ -466,6 +468,8 @@ class AutoRunner:
             self.last_error = None
             self.runs = 0
             self.best_achieved_count = 0
+            self.remake_records = []
+            self.best_remake_record = None
 
             self.need_start_game = True
 
@@ -724,6 +728,8 @@ class AutoRunner:
                 if suuannkou["status"] == "impossible":
                     self.current_step = "game.remake"
                     await self._broadcast_status(safe=True)
+                    self._record_remake_snapshot("impossible", game_state)
+                    await self._broadcast_status(safe=True)
                     self.need_start_game = True
                     ok, reason, resp = await call_with_1004_retry_async(
                         bot.giveup,
@@ -794,6 +800,8 @@ class AutoRunner:
                         # 如果当前已经到了截至关卡、则remake
                         if self.cutoff_level <= game_state.level:
                             self.current_step = "game.remake"
+                            await self._broadcast_status(safe=True)
+                            self._record_remake_snapshot("cutoff_no_shop_options", game_state)
                             await self._broadcast_status(safe=True)
                             self.need_start_game = True
                             ok, reason, resp = await call_with_1004_retry_async(
@@ -881,6 +889,8 @@ class AutoRunner:
                     if game_state.refresh_price > game_state.coin:
                         if self.cutoff_level <= game_state.level:
                             self.current_step = "game.remake"
+                            await self._broadcast_status(safe=True)
+                            self._record_remake_snapshot("cutoff_cannot_afford", game_state)
                             await self._broadcast_status(safe=True)
                             self.need_start_game = True
                             ok, reason, resp = await call_with_1004_retry_async(
@@ -1191,6 +1201,8 @@ class AutoRunner:
 
             "preferred_flow_ready": pf_ready,
             "preferred_flow_peer": pf_peer,
+            "remake_records": self.remake_records,
+            "best_remake_record": self.best_remake_record,
         }
 
     async def _broadcast_status(self, safe: bool = False) -> None:
@@ -1270,14 +1282,7 @@ class AutoRunner:
                 hits.append(i)
         return hits
 
-    def count_achieved_now(self) -> int:
-        gs = self._get_game_state()
-        try:
-            d = gs.to_dict() if hasattr(gs, "to_dict") else (gs or {})
-        except Exception:
-            d = (gs or {})
-        eff_list = d.get("effect_list") or []
-
+    def count_achieved_for_effect_list(self, eff_list: List[Dict[str, Any]]) -> int:
         hit: set[int] = set()
         for item in eff_list:
             for idx in self.match_targets_for_amulet(item, self.targets):
@@ -1290,6 +1295,53 @@ class AutoRunner:
                 continue
             total_value += _target_value(t)
         return total_value
+
+    def count_achieved_now(self) -> int:
+        gs = self._get_game_state()
+        try:
+            d = gs.to_dict() if hasattr(gs, "to_dict") else (gs or {})
+        except Exception:
+            d = (gs or {})
+        eff_list = d.get("effect_list") or []
+        return self.count_achieved_for_effect_list(eff_list)
+
+    @staticmethod
+    def _compact_effect_item(effect_item: Dict[str, Any]) -> Dict[str, Any]:
+        item: Dict[str, Any] = {}
+        for key in ("id", "uid", "volume"):
+            if key in effect_item:
+                item[key] = effect_item.get(key)
+        badge = effect_item.get("badge")
+        if isinstance(badge, dict):
+            compact_badge: Dict[str, Any] = {}
+            for key in ("id",):
+                if key in badge:
+                    compact_badge[key] = badge.get(key)
+            if compact_badge:
+                item["badge"] = compact_badge
+        return item
+
+    def _record_remake_snapshot(self, reason: str, game_state: GameState) -> None:
+        effect_list = [self._compact_effect_item(dict(it)) for it in (getattr(game_state, "effect_list", None) or [])]
+        try:
+            target_value = self.count_achieved_for_effect_list(effect_list)
+        except Exception:
+            target_value = 0
+        record = {
+            "seq": len(self.remake_records) + 1,
+            "run_index": self.runs,
+            "ts": _now_wall_ms(),
+            "reason": reason or "remake",
+            "stage": getattr(game_state, "stage", None),
+            "level": getattr(game_state, "level", None),
+            "target_value": target_value,
+            "amulet_count": len(effect_list),
+            "effect_list": effect_list,
+        }
+        self.remake_records.append(record)
+        best = self.best_remake_record
+        if best is None or int(record.get("target_value") or 0) > int(best.get("target_value") or 0):
+            self.best_remake_record = record
 
     async def _check_and_finish_if_done(self) -> bool:
         try:
