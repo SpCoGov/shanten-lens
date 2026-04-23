@@ -46,6 +46,51 @@ function isEquivalent(aRaw: string, bRaw: string): boolean {
     return new Set([pa.val, pb.val]).has(0) && new Set([pa.val, pb.val]).has(5);
 }
 
+function hasEquivalentTile(tile: string, candidates?: readonly string[]): boolean {
+    if (!candidates?.length) return false;
+    return candidates.some((candidate) => isEquivalent(candidate, tile));
+}
+
+function getEquivalentDoraCount(tile: string, doraCountByTile?: ReadonlyMap<string, number>): number {
+    if (!doraCountByTile || doraCountByTile.size === 0) return 0;
+    let count = 0;
+    doraCountByTile.forEach((value, key) => {
+        if (value > 0 && isEquivalent(key, tile)) {
+            count += value;
+        }
+    });
+    return count;
+}
+
+function buildTempaiSideGradient(isTianDora: boolean, doraCount: number): string {
+    const yellowUnits = isTianDora ? 1 : 0;
+    const cyanUnits = Math.max(0, doraCount);
+
+    if (yellowUnits === 0 && cyanUnits === 0) {
+        return "var(--tile-side-base)";
+    }
+
+    if (yellowUnits > 0 && cyanUnits === 0) {
+        return "linear-gradient(180deg, var(--tile-side-base-highlight) 0%, var(--tile-side-soul) 16%, var(--tile-side-soul) 100%)";
+    }
+
+    if (yellowUnits === 0 && cyanUnits > 0) {
+        return "linear-gradient(180deg, var(--tile-side-base-highlight) 0%, var(--tile-side-dora) 16%, var(--tile-side-dora) 100%)";
+    }
+
+    const totalUnits = yellowUnits + cyanUnits;
+    const yellowEnd = (yellowUnits / totalUnits) * 100;
+
+    return `linear-gradient(180deg,
+        var(--tile-side-base-highlight) 0%,
+        var(--tile-side-soul) 12%,
+        var(--tile-side-soul) ${yellowEnd}%,
+        var(--tile-side-separator) ${yellowEnd}%,
+        var(--tile-side-dora) ${yellowEnd}%,
+        var(--tile-side-dora) 100%
+    )`;
+}
+
 type AtlasCache = { img?: HTMLImageElement; ready: boolean; cbs: Array<() => void> };
 
 const atlasCache = new Map<string, AtlasCache>();
@@ -78,6 +123,8 @@ export default function Tile({
     tile,
     hoveredTile,
     setHoveredTile,
+    tianDoraTiles,
+    doraCountByTile,
     width = 64,
     height = 84,
     dim = false,
@@ -85,6 +132,8 @@ export default function Tile({
     tile: string;
     hoveredTile?: string | null;
     setHoveredTile?: (t: string | null) => void;
+    tianDoraTiles?: string[];
+    doraCountByTile?: ReadonlyMap<string, number>;
     width?: number;
     height?: number;
     dim?: boolean;
@@ -99,9 +148,17 @@ export default function Tile({
     const atlasSrc = ATLAS_CLASSIC_SRC;
     const tempaiTileSrc = `/assets/mahjong/tempai-svg/${norm}.svg`;
     const active = hoveredTile ? isEquivalent(hoveredTile, raw) : false;
+    const isTianDora = hasEquivalentTile(raw, tianDoraTiles);
+    const doraCount = getEquivalentDoraCount(raw, doraCountByTile);
+    const sideBandWidth = Math.max(1, Math.round(width * 0.03125));
+    const showTempaiSideBand = tileSkin === "tempai-svg" && !isLaizi;
     const tileBoxShadow = tileSkin === "tempai-svg"
-        ? "var(--tile-shadow), inset -8px 0 0 rgba(204, 204, 204, .82), inset -1px 0 0 rgba(115, 115, 115, .34)"
+        ? "var(--tile-shadow), inset -1px 0 0 var(--tile-side-base-edge)"
         : "var(--tile-shadow)";
+    const sideBandBackground = React.useMemo(
+        () => buildTempaiSideGradient(isTianDora, doraCount),
+        [doraCount, isTianDora],
+    );
 
     React.useEffect(() => {
         if (isLaizi || tileSkin === "tempai-svg") return;
@@ -131,7 +188,7 @@ export default function Tile({
                 width,
                 height,
                 borderRadius: 8,
-                background: tileSkin === "tempai-svg" ? "#f4f4f4" : "var(--tile-bg)",
+                background: tileSkin === "tempai-svg" ? "var(--tile-tempai-bg)" : "var(--tile-bg)",
                 boxShadow: tileBoxShadow,
                 display: "grid",
                 placeItems: "center",
@@ -145,23 +202,40 @@ export default function Tile({
             onClick={() => setHoveredTile?.(raw)}
             title={raw || norm}
         >
+            {showTempaiSideBand ? (
+                <div
+                    aria-hidden="true"
+                    style={{
+                        position: "absolute",
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                        width: sideBandWidth,
+                        background: sideBandBackground,
+                        boxShadow: "inset 1px 0 0 var(--tile-side-rim), inset 0 1px 0 rgba(255, 255, 255, .2)",
+                        zIndex: 1,
+                        pointerEvents: "none",
+                    }}
+                />
+            ) : null}
+
             {isLaizi ? (
                 tileSkin === "tempai-svg" ? (
                     <div className="mj-tile__laizi-gradient" />
                 ) : (
-                    <img
-                        src={LAIZI_CLASSIC_SRC}
-                        alt="bd"
-                        draggable={false}
-                        style={{width: "100%", height: "100%", objectFit: "contain", display: "block"}}
-                    />
+                <img
+                    src={LAIZI_CLASSIC_SRC}
+                    alt="bd"
+                    draggable={false}
+                    style={{width: "100%", height: "100%", objectFit: "contain", display: "block"}}
+                />
                 )
             ) : tileSkin === "tempai-svg" ? (
                 <img
                     src={tempaiTileSrc}
                     alt={raw || norm}
                     draggable={false}
-                    style={{width: "100%", height: "100%", objectFit: "fill", display: "block"}}
+                    style={{width: "100%", height: "100%", objectFit: "fill", display: "block", position: "relative", zIndex: 0}}
                 />
             ) : (
                 <canvas ref={canvasRef} />
@@ -173,6 +247,7 @@ export default function Tile({
                         position: "absolute",
                         inset: 0,
                         background: "var(--tile-dim-scrim)",
+                        zIndex: 2,
                     }}
                 />
             ) : null}

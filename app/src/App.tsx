@@ -44,6 +44,7 @@ import {WebviewWindow, getAllWebviewWindows} from '@tauri-apps/api/webviewWindow
 import {t} from "i18next";
 import {openMsgBoxWindow} from "./lib/msgbox";
 import type {PlanData, SearchRuntimeData} from "./lib/planTypes";
+import {buildDoraCountByTile} from "./lib/tileHighlights";
 
 type BackendLogPayload =
     | string
@@ -353,6 +354,16 @@ export default function App() {
         if (i < 0) return THEME_ORDER[0];
         return THEME_ORDER[(i + 1) % THEME_ORDER.length];
     }, []);
+
+    const tianDoraTiles = React.useMemo(
+        () => (latestGameState?.tian_dora_tiles ?? []).map((tile) => String(tile ?? "").trim()).filter(Boolean),
+        [latestGameState?.tian_dora_tiles],
+    );
+
+    const doraCountByTile = React.useMemo(
+        () => buildDoraCountByTile(deckMap, latestGameState?.dora_tiles ?? []),
+        [deckMap, latestGameState?.dora_tiles],
+    );
 
     const toggleTheme = React.useCallback((event?: React.MouseEvent<HTMLButtonElement>) => {
         const source = event?.currentTarget ?? themeButtonRef.current;
@@ -879,7 +890,13 @@ export default function App() {
                                         </div>
                                     )}
 
-                                    {(stage === 2 || stage === 3) && <TileGrid cells={cells}/>}
+                                    {(stage === 2 || stage === 3) && (
+                                        <TileGrid
+                                            cells={cells}
+                                            tianDoraTiles={tianDoraTiles}
+                                            doraCountByTile={doraCountByTile}
+                                        />
+                                    )}
 
                                     {stage === 2 && replacementTiles.length > 0 && (
                                         <ReplacementPanel replacementTiles={replacementTiles} usedCount={switchUsedCount}/>

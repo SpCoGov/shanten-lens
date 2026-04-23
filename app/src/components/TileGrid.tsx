@@ -14,7 +14,15 @@ const BASE_GAP_Y = 12;
 const MIN_SCALE = 0.45;
 const MAX_SCALE = 1.0;
 
-export default function TileGrid({cells}: { cells: Cell[] }) {
+export default function TileGrid({
+    cells,
+    tianDoraTiles = [],
+    doraCountByTile,
+}: {
+    cells: Cell[];
+    tianDoraTiles?: string[];
+    doraCountByTile?: ReadonlyMap<string, number>;
+}) {
     const [hovered, setHovered] = useState<string | null>(null);
     const [scale, setScale] = useState(1);
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -119,6 +127,8 @@ export default function TileGrid({cells}: { cells: Cell[] }) {
                                         dim={c.dim}
                                         hoveredTile={hovered}
                                         setHoveredTile={setHovered}
+                                        tianDoraTiles={tianDoraTiles}
+                                        doraCountByTile={doraCountByTile}
                                         width={tileW}
                                         height={tileH}
                                     />

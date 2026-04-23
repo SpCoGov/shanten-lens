@@ -84,9 +84,17 @@
     --link: var(--link-fg, var(--accent-blue));
 
     --tile-bg: #ffffff;
+    --tile-tempai-bg: var(--tile-bg);
     --tile-shadow: 0 4px 10px rgba(0, 0, 0, .22);
     --tile-outline: 2px solid color-mix(in srgb, var(--color-ring) 70%, transparent);
     --tile-dim-scrim: rgba(0, 0, 0, .35);
+    --tile-side-base-highlight: color-mix(in srgb, white 72%, var(--tile-tempai-bg));
+    --tile-side-base: color-mix(in srgb, #d2d2d2 78%, var(--tile-tempai-bg));
+    --tile-side-base-edge: color-mix(in srgb, #6b7280 58%, var(--tile-tempai-bg));
+    --tile-side-rim: color-mix(in srgb, white 38%, var(--tile-side-base-edge));
+    --tile-side-separator: color-mix(in srgb, var(--tile-tempai-bg) 54%, var(--tile-side-base-edge));
+    --tile-side-soul: color-mix(in srgb, #facc15 76%, var(--tile-tempai-bg));
+    --tile-side-dora: color-mix(in srgb, #22d3ee 74%, var(--tile-tempai-bg));
 
     --on-strong: #ffffff;
 
@@ -181,6 +189,7 @@
     --link: var(--link-fg, var(--accent-blue));
 
     --tile-bg: #f2f5f8;
+    --tile-tempai-bg: var(--tile-bg);
     --tile-shadow: 0 4px 10px rgba(0, 0, 0, .62);
     --tile-outline: 2px solid color-mix(in srgb, var(--color-ring) 80%, transparent);
     --tile-dim-scrim: rgba(0, 0, 0, .45);
@@ -281,6 +290,7 @@
     --link: var(--link-fg, var(--accent-blue));
 
     --tile-bg: #0f1815;
+    --tile-tempai-bg: color-mix(in srgb, #ecf7f2 92%, var(--tile-bg));
     --tile-shadow: 0 4px 10px rgba(0, 0, 0, .62);
     --tile-outline: 2px solid color-mix(in srgb, var(--color-ring) 80%, transparent);
     --tile-dim-scrim: rgba(0, 0, 0, .45);
@@ -380,6 +390,7 @@
     --link: var(--link-fg, var(--accent-blue));
 
     --tile-bg: #181122;
+    --tile-tempai-bg: color-mix(in srgb, #f3edff 90%, var(--tile-bg));
     --tile-shadow: 0 4px 10px rgba(0, 0, 0, .62);
     --tile-outline: 2px solid color-mix(in srgb, var(--color-ring) 80%, transparent);
     --tile-dim-scrim: rgba(0, 0, 0, .45);

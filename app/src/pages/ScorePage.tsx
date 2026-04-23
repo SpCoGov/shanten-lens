@@ -26,6 +26,7 @@ import {
     type EffectTarget,
     type ResolvedAmuletRule,
 } from "../lib/scoreEngine";
+import {buildDoraCountByTile} from "../lib/tileHighlights";
 
 type CustomRuleMap = Record<string, Partial<AmuletRuleConfig>>;
 type LevelTargetEntry = { label: string; level: number; target: string };
@@ -369,31 +370,6 @@ function EffectTargetOptions({t}: { t: (key: string) => string }) {
     );
 }
 
-function getDoraTileFromIndicator(tile?: string | null) {
-    const text = String(tile ?? "").trim();
-    const match = text.match(/^([0-9])([mps])$/i) ?? text.match(/^([1-7])(z)$/i);
-    if (!match) return null;
-    let value = Number.parseInt(match[1], 10);
-    const suit = match[2].toLowerCase();
-    if (value === 0 && (suit === "m" || suit === "p" || suit === "s")) {
-        value = 5;
-    }
-    if (suit === "m") {
-        if (value === 1) return "9m";
-        if (value === 9) return "1m";
-        return `${value + 1}m`;
-    }
-    if (suit === "p" || suit === "s") {
-        if (value === 9) return `1${suit}`;
-        return `${value + 1}${suit}`;
-    }
-    if (suit === "z") {
-        const next = value === 7 ? 1 : value + 1;
-        return `${next}z`;
-    }
-    return null;
-}
-
 export default function ScorePage({
                                       amulets,
                                       handTileIds,
@@ -490,16 +466,10 @@ export default function ScorePage({
         [tianDoraTiles],
     );
 
-    const doraCountByTile = React.useMemo(() => {
-        const out = new Map<string, number>();
-        (doraTileIds ?? []).forEach((tileId) => {
-            const indicatorTile = deckMap.get(tileId);
-            const doraTile = getDoraTileFromIndicator(indicatorTile);
-            if (!doraTile) return;
-            out.set(doraTile, (out.get(doraTile) ?? 0) + 1);
-        });
-        return out;
-    }, [deckMap, doraTileIds]);
+    const doraCountByTile = React.useMemo(
+        () => buildDoraCountByTile(deckMap, doraTileIds),
+        [deckMap, doraTileIds],
+    );
 
     const soulTileCount = 14;
 
