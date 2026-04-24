@@ -365,3 +365,19 @@ registerAmuletRule([1570, 1571], {
     },
     isActiveOnWin: () => true,
 });
+
+registerAmuletRule([2070, 2071], {
+    affectsPoint: true,
+    getDefaultConfig: () => ({
+        activeOnWin: true,
+        effectTarget: "none",
+        effectFormula: "",
+        growthFormula: "data",
+    }),
+    applyEffect: ({state, vars, rule}) => {
+        const rate = rule.regId === 2070 ? 10n : 20n;
+        const data = vars.dataValues[0] * rate * 100n;
+        return {score: state.score + data};
+    },
+    growData: ({currentData}) => currentData,
+});
