@@ -634,6 +634,8 @@ export default function ScorePage({
             manualExtraTriggers: merged.manualExtraTriggers,
             activeOnWin: merged.activeOnWin,
             growthAfterRound: merged.growthAfterRound,
+            forceTransmissionSeal: merged.forceTransmissionSeal,
+            disableFutureGrowth: merged.disableFutureGrowth,
             effectTarget: merged.effectTarget,
             effectFormula: merged.effectFormula,
             growthFormula: merged.growthFormula,
@@ -657,6 +659,8 @@ export default function ScorePage({
                 manualExtraTriggers,
                 activeOnWin: draftRule.activeOnWin,
                 growthAfterRound: draftRule.growthAfterRound,
+                forceTransmissionSeal: draftRule.forceTransmissionSeal,
+                disableFutureGrowth: draftRule.disableFutureGrowth,
                 effectTarget: draftRule.effectTarget,
                 effectFormula: draftRule.effectFormula.trim(),
                 growthFormula: draftRule.growthFormula.trim() || "data",
@@ -1588,6 +1592,36 @@ export default function ScorePage({
                                     }))}
                                 />
                                 <span>{draftRule.growthAfterRound ? t("score.growth_after_round_yes") : t("score.growth_after_round_no")}</span>
+                            </label>
+                        </div>
+
+                        <div className="row">
+                            <label>{t("score.force_transmission_seal_label")}</label>
+                            <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
+                                <input
+                                    type="checkbox"
+                                    checked={draftRule.forceTransmissionSeal}
+                                    onChange={(e) => setDraftRule((prev) => ({
+                                        ...prev,
+                                        forceTransmissionSeal: e.target.checked,
+                                    }))}
+                                />
+                                <span>{draftRule.forceTransmissionSeal ? t("score.force_transmission_seal_yes") : t("score.force_transmission_seal_no")}</span>
+                            </label>
+                        </div>
+
+                        <div className="row">
+                            <label>{t("score.disable_future_growth_label")}</label>
+                            <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
+                                <input
+                                    type="checkbox"
+                                    checked={draftRule.disableFutureGrowth}
+                                    onChange={(e) => setDraftRule((prev) => ({
+                                        ...prev,
+                                        disableFutureGrowth: e.target.checked,
+                                    }))}
+                                />
+                                <span>{draftRule.disableFutureGrowth ? t("score.disable_future_growth_yes") : t("score.disable_future_growth_no")}</span>
                             </label>
                         </div>
 

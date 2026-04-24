@@ -7,6 +7,7 @@ import styles from "../components/AdvisorPanel.module.css";
 import type {PlanData, TileId} from "../lib/planTypes";
 import type {GameStateData} from "../lib/gamestate";
 import {buildDebugSnapshotFromState} from "./SouzuSwitchDebugPage";
+import {t} from "i18next";
 
 const LS_VERBOSE = "sl-blackhole:verbose-progress";
 const LS_WALL_LIMIT = "sl-blackhole:wall-limit";

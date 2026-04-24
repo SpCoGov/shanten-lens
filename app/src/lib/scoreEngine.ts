@@ -30,6 +30,8 @@ export type AmuletRuleConfig = {
     manualExtraTriggers: number;
     activeOnWin: boolean;
     growthAfterRound: boolean;
+    forceTransmissionSeal: boolean;
+    disableFutureGrowth: boolean;
     effectTarget: EffectTarget;
     effectFormula: string;
     growthFormula: string;
@@ -101,6 +103,10 @@ export type AmuletRuleRuntimeState = {
 export type AmuletRuntimeContext = {
     hasPinzuInHand?: boolean;
     soulTileCount?: number;
+};
+
+export type CalculatePointOptions = {
+    freezeFutureGrowth?: boolean;
 };
 
 export type AmuletEffectContext = {
@@ -191,6 +197,8 @@ export const DEFAULT_RULE_CONFIG: AmuletRuleConfig = {
     manualExtraTriggers: 0,
     activeOnWin: false,
     growthAfterRound: false,
+    forceTransmissionSeal: false,
+    disableFutureGrowth: false,
     effectTarget: "none",
     effectFormula: "",
     growthFormula: "data",
@@ -257,6 +265,8 @@ export function resolveAmuletRule(item: EffectItem, custom?: Partial<AmuletRuleC
         manualExtraTriggers: clampManualExtraTriggerCount(custom?.manualExtraTriggers ?? preset.manualExtraTriggers ?? codeDefaultConfig.manualExtraTriggers ?? 0),
         activeOnWin: custom?.activeOnWin ?? preset.activeOnWin ?? codeDefaultConfig.activeOnWin ?? ((custom?.effectTarget ?? preset.effectTarget ?? codeDefaultConfig.effectTarget ?? "none") !== "none"),
         growthAfterRound: custom?.growthAfterRound ?? preset.growthAfterRound ?? codeDefaultConfig.growthAfterRound ?? false,
+        forceTransmissionSeal: custom?.forceTransmissionSeal ?? preset.forceTransmissionSeal ?? codeDefaultConfig.forceTransmissionSeal ?? false,
+        disableFutureGrowth: custom?.disableFutureGrowth ?? preset.disableFutureGrowth ?? codeDefaultConfig.disableFutureGrowth ?? false,
         effectTarget: custom?.effectTarget ?? preset.effectTarget ?? codeDefaultConfig.effectTarget ?? "none",
         effectFormula: custom?.effectFormula ?? preset.effectFormula ?? codeDefaultConfig.effectFormula ?? "",
         growthFormula: custom?.growthFormula ?? preset.growthFormula ?? codeDefaultConfig.growthFormula ?? "data",
@@ -271,7 +281,7 @@ export function resolveAmuletRule(item: EffectItem, custom?: Partial<AmuletRuleC
         dataRawList,
         badgeId,
         hasExtensionSeal: badgeId === BADGE_EXTENSION_SEAL_ID,
-        hasTransmissionSeal: badgeId === BADGE_TRANSMISSION_SEAL_ID,
+        hasTransmissionSeal: badgeId === BADGE_TRANSMISSION_SEAL_ID || merged.forceTransmissionSeal,
         hasAngelSeal: badgeId === BADGE_ANGEL_SEAL_ID,
     };
 }
@@ -737,6 +747,7 @@ export function calculateCurrentPoint(
     level: number,
     amuletRules: ResolvedAmuletRule[],
     runtime: AmuletRuntimeContext = {},
+    options: CalculatePointOptions = {},
 ): CurrentPointResult {
     const state: AmuletRuleRuntimeState = {score: baseScore, fan: baseFan};
     const activationCounts = amuletRules.map(() => 0);
@@ -757,6 +768,9 @@ export function calculateCurrentPoint(
                 return 0n;
             }
         });
+        if (options.freezeFutureGrowth && rule.disableFutureGrowth) {
+            return;
+        }
         applyFormulaDataGrowth(rule, rule.winGrowthFormula, {
             data: dataValues[0] ?? 0n,
             dataValues,
@@ -856,26 +870,28 @@ export function calculateCurrentPoint(
             return {triggered: false, transmissionCount: 0};
         }
 
-        applyTriggerGrowthForRule(effectContext);
-        applyFormulaDataGrowth(rule, rule.triggerGrowthFormula, {
-            ...vars,
-            score: state.score,
-            fan: state.fan,
-            data: (() => {
-                try {
-                    return BigInt(rule.dataRaw || "0");
-                } catch {
-                    return 0n;
-                }
-            })(),
-            dataValues: rule.dataRawList.map((value) => {
-                try {
-                    return BigInt(value || "0");
-                } catch {
-                    return 0n;
-                }
-            }),
-        });
+        if (!(options.freezeFutureGrowth && rule.disableFutureGrowth)) {
+            applyTriggerGrowthForRule(effectContext);
+            applyFormulaDataGrowth(rule, rule.triggerGrowthFormula, {
+                ...vars,
+                score: state.score,
+                fan: state.fan,
+                data: (() => {
+                    try {
+                        return BigInt(rule.dataRaw || "0");
+                    } catch {
+                        return 0n;
+                    }
+                })(),
+                dataValues: rule.dataRawList.map((value) => {
+                    try {
+                        return BigInt(value || "0");
+                    } catch {
+                        return 0n;
+                    }
+                }),
+            });
+        }
         effectApplicationCounts[index] += 1;
         return {
             triggered: true,
@@ -1039,7 +1055,7 @@ function simulateLevelWins(
     let firstResult: CurrentPointResult | null = null;
     let lastResult: CurrentPointResult | null = null;
     for (let winIndex = 0; winIndex < normalizedWinCount; winIndex += 1) {
-        const result = calculateCurrentPoint(baseScore, baseFan, level, rules, runtime);
+        const result = calculateCurrentPoint(baseScore, baseFan, level, rules, runtime, {freezeFutureGrowth: true});
         if (firstResult == null) firstResult = result;
         lastResult = result;
     }
@@ -1057,6 +1073,9 @@ function growAmuletData(
 ): ResolvedAmuletRule[] {
     const levelValue = BigInt(level) * SCALE;
     return rules.map((rule, index) => {
+        if (rule.disableFutureGrowth) {
+            return rule;
+        }
         if (growthAfterRound != null && rule.growthAfterRound !== growthAfterRound) {
             return rule;
         }
