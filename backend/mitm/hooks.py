@@ -1,6 +1,5 @@
 import asyncio
 import copy
-import os
 import threading
 from collections import OrderedDict
 from typing import Tuple, Any, Dict, List, Set, Optional, Union, Sequence
@@ -20,8 +19,6 @@ from backend.autorun.util.souzu_switch_recommender import (
     recommend_souzu_tenpai_switch,
     list_reachable_quads_for_switch,
     validate_manual_souzu_switch_plan,
-    get_active_search_runtime_snapshot,
-    terminate_active_search_workers,
 )
 from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
 from backend.msgbox import _ui_confirm_blocking, ui_alert
@@ -37,7 +34,6 @@ _SWITCH_RECOMMENDATION_SEQ = 0
 _SWITCH_STOP_EVENT = threading.Event()
 _SWITCH_SEARCH_TASK: asyncio.Task | None = None
 _LAST_SWITCH_PLAN: dict | None = None
-_LAST_SWITCH_RUNTIME: dict = get_active_search_runtime_snapshot(searching=False)
 _DISCARD_RECOMMENDATION_SEQ = 0
 
 
@@ -204,23 +200,6 @@ async def _compute_and_broadcast_discard_recommendations(
     #
     # ctx.master.event_loop.call_later(0.3, _do_inject)
 
-
-def _cache_switch_runtime(runtime: dict | None) -> None:
-    global _LAST_SWITCH_RUNTIME
-    if isinstance(runtime, dict):
-        _LAST_SWITCH_RUNTIME = copy.deepcopy(runtime)
-    else:
-        _LAST_SWITCH_RUNTIME = get_active_search_runtime_snapshot(searching=False)
-
-
-async def broadcast_switch_runtime_status() -> None:
-    runtime = copy.deepcopy(_LAST_SWITCH_RUNTIME) if isinstance(_LAST_SWITCH_RUNTIME, dict) else get_active_search_runtime_snapshot(searching=False)
-    await broadcast({
-        "type": "souzu_switch_runtime",
-        "data": runtime,
-    })
-
-
 async def _wait_for_switch_state_advance(prev_change_count: int, timeout_sec: float = 5.0) -> bool:
     deadline = time.monotonic() + max(0.1, float(timeout_sec))
     while time.monotonic() < deadline:
@@ -379,10 +358,6 @@ def _wrap_entry(yaku_key: str, plan: dict) -> dict:
             "manual_searchable",
             "manual_search_reason",
             "debug_pool",
-            "worker_states",
-            "parallel_info",
-            "parallel_fallback_reason",
-            "runtime",
     ):
         if key in plan:
             entry[key] = plan[key]
@@ -394,7 +369,6 @@ def _wrap_entry(yaku_key: str, plan: dict) -> dict:
 
 async def _broadcast_switch_recommendation(
         *,
-        stop_after_first: bool,
         skip_signatures: list[str] | None = None,
         wall_limit: int = 36,
         search_algorithm: str = "target_enumeration_search",
@@ -419,29 +393,18 @@ async def _broadcast_switch_recommendation(
     search_algorithm = "target_enumeration_search"
     search_params["search_algorithm"] = search_algorithm
     search_params["search_algorithm_label"] = _souzu_search_algorithm_label(search_algorithm)
-    _cache_switch_runtime(get_active_search_runtime_snapshot(searching=True))
-    await broadcast_switch_runtime_status()
-
     await broadcast({
         "type": "discard_recommendation",
         "data": [_wrap_entry("souzu_switch", {
             "status": "searching",
             "progress": "正在准备搜索…",
             "request_source": request_source,
-            "runtime": copy.deepcopy(_LAST_SWITCH_RUNTIME),
             **search_params,
         })],
     })
 
     latest_progress = {"text": "正在准备搜索…", "candidate": None, "candidate_version": 0, "telemetry": {}}
 
-    latest_progress = {
-        "text": latest_progress["text"],
-        "candidate": latest_progress["candidate"],
-        "candidate_version": latest_progress["candidate_version"],
-        "telemetry": latest_progress["telemetry"],
-        "runtime": copy.deepcopy(_LAST_SWITCH_RUNTIME),
-    }
     latest_progress["candidate"] = dict(search_params)
 
     async def _flush_progress(force: bool = False) -> None:
@@ -470,7 +433,6 @@ async def _broadcast_switch_recommendation(
                         "progress": message,
                         "request_source": request_source,
                         **(latest_progress["telemetry"] or {}),
-                        "runtime": latest_progress.get("runtime"),
                         **(latest_progress["candidate"] or {}),
                     })],
                 })
@@ -536,20 +498,12 @@ async def _broadcast_switch_recommendation(
         }
         latest_progress["candidate_version"] += 1
         _request_flush(force=True)
-        if stop_after_first:
-            _SWITCH_STOP_EVENT.set()
-
     def telemetry_cb(payload: dict) -> None:
         if send_state["finished"]:
             return
         if seq != _SWITCH_RECOMMENDATION_SEQ:
             return
-        copied = dict(payload or {})
-        runtime = copied.pop("runtime", None)
-        latest_progress["telemetry"] = copied
-        if isinstance(runtime, dict):
-            latest_progress["runtime"] = runtime
-            _cache_switch_runtime(runtime)
+        latest_progress["telemetry"] = dict(payload or {})
         latest_progress["candidate_version"] += 1
         _request_flush(force=True)
 
@@ -579,10 +533,8 @@ async def _broadcast_switch_recommendation(
         candidate_cb,
         telemetry_cb,
         _SWITCH_STOP_EVENT.is_set,
-        stop_after_first,
         set(skip_signatures or []),
         True,
-        int(MANAGER.get("backend.souzu_max_parallel_workers", os.cpu_count() or 1) or (os.cpu_count() or 1)),
         search_algorithm,
     ))
     _SWITCH_SEARCH_TASK = search_task
@@ -591,10 +543,7 @@ async def _broadcast_switch_recommendation(
         return
     if isinstance(plan, dict):
         plan = {**search_params, **plan, "request_source": request_source}
-    runtime = plan.get("runtime") if isinstance(plan, dict) else None
-    _cache_switch_runtime(runtime if isinstance(runtime, dict) else get_active_search_runtime_snapshot(searching=False))
     _cache_switch_plan(plan)
-    await broadcast_switch_runtime_status()
     send_state["finished"] = True
     send_state["flush_queued"] = False
     await broadcast({
@@ -605,14 +554,11 @@ async def _broadcast_switch_recommendation(
 
 async def start_switch_recommendation_search(
         *,
-        stop_after_first: bool,
         skip_signatures: list[str] | None = None,
         wall_limit: int = 36,
         search_algorithm: str = "target_enumeration_search",
 ) -> None:
     _SWITCH_STOP_EVENT.set()
-    _cache_switch_runtime(terminate_active_search_workers())
-    await broadcast_switch_runtime_status()
     state = _live_switch_search_state(wall_limit=wall_limit)
     disabled_reason = _souzu_switch_disabled_reason(state)
     if disabled_reason is not None:
@@ -646,7 +592,6 @@ async def start_switch_recommendation_search(
         })
         return
     asyncio.create_task(_broadcast_switch_recommendation(
-        stop_after_first=stop_after_first,
         skip_signatures=skip_signatures or [],
         wall_limit=wall_limit,
         search_algorithm=search_algorithm,
@@ -658,14 +603,11 @@ async def start_switch_recommendation_search(
 async def start_switch_recommendation_debug_search(
         *,
         snapshot: dict,
-        stop_after_first: bool,
         skip_signatures: list[str] | None = None,
         wall_limit: int = 36,
         search_algorithm: str = "target_enumeration_search",
 ) -> None:
     _SWITCH_STOP_EVENT.set()
-    _cache_switch_runtime(terminate_active_search_workers())
-    await broadcast_switch_runtime_status()
     try:
         state = _normalize_switch_debug_snapshot(snapshot, wall_limit=wall_limit)
     except ValueError as exc:
@@ -714,7 +656,6 @@ async def start_switch_recommendation_debug_search(
         return
 
     asyncio.create_task(_broadcast_switch_recommendation(
-        stop_after_first=stop_after_first,
         skip_signatures=skip_signatures or [],
         wall_limit=wall_limit,
         search_algorithm=search_algorithm,
@@ -824,14 +765,11 @@ async def stop_switch_recommendation_search(*, notify_client: bool = True) -> No
     _SWITCH_RECOMMENDATION_SEQ += 1
     _SWITCH_STOP_EVENT.set()
     _SWITCH_SEARCH_TASK = None
-    _cache_switch_runtime(terminate_active_search_workers())
-    await broadcast_switch_runtime_status()
     if notify_client:
         _cache_switch_plan({
             "status": "impossible",
             "reason": "stopped-by-user",
             "request_source": "live",
-            "runtime": copy.deepcopy(_LAST_SWITCH_RUNTIME),
             **_switch_search_params_from_state(_live_switch_search_state()),
         })
         await broadcast({
@@ -840,18 +778,9 @@ async def stop_switch_recommendation_search(*, notify_client: bool = True) -> No
                 "status": "impossible",
                 "reason": "stopped-by-user",
                 "request_source": "live",
-                "runtime": copy.deepcopy(_LAST_SWITCH_RUNTIME),
                 **_switch_search_params_from_state(_live_switch_search_state()),
             })],
         })
-
-
-async def kill_switch_search_workers() -> None:
-    global _SWITCH_SEARCH_TASK
-    _SWITCH_STOP_EVENT.set()
-    _SWITCH_SEARCH_TASK = None
-    _cache_switch_runtime(terminate_active_search_workers())
-    await broadcast_switch_runtime_status()
 
 
 def _first_src_base(row: dict) -> int:

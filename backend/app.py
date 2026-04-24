@@ -489,7 +489,6 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     from backend.mitm.hooks import start_switch_recommendation_search
                     opts = (data or {}).get("options") or {}
                     await start_switch_recommendation_search(
-                        stop_after_first=bool(opts.get("stop_after_first", False)),
                         skip_signatures=list(opts.get("skip_signatures") or []),
                         wall_limit=int(opts.get("wall_limit", 36) or 36),
                         search_algorithm=str(opts.get("search_algorithm", "target_enumeration_search") or "target_enumeration_search"),
@@ -499,7 +498,6 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     opts = (data or {}).get("options") or {}
                     await start_switch_recommendation_debug_search(
                         snapshot=(data or {}).get("snapshot") or {},
-                        stop_after_first=bool(opts.get("stop_after_first", False)),
                         skip_signatures=list(opts.get("skip_signatures") or []),
                         wall_limit=int(opts.get("wall_limit", 36) or 36),
                         search_algorithm=str(opts.get("search_algorithm", "target_enumeration_search") or "target_enumeration_search"),
@@ -518,12 +516,6 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     await stop_switch_recommendation_search(
                         notify_client=bool((data or {}).get("notify", True))
                     )
-                elif action == "kill_workers":
-                    from backend.mitm.hooks import kill_switch_search_workers
-                    await kill_switch_search_workers()
-                elif action == "runtime_status":
-                    from backend.mitm.hooks import broadcast_switch_runtime_status
-                    await broadcast_switch_runtime_status()
                 elif action == "list_quads":
                     from backend.mitm.hooks import broadcast_switch_quad_catalog
                     opts = (data or {}).get("options") or {}

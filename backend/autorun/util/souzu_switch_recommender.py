@@ -1,6 +1,4 @@
 ﻿import time
-import os
-import threading
 import itertools
 import bisect
 from collections import Counter, defaultdict
@@ -15,8 +13,6 @@ TILE_INDEX = {tile: idx for idx, tile in enumerate(ALL_TILES)}
 SEARCH_ALGO_TARGET_ENUM = "target_enumeration_search"
 ABSTRACT_COMPONENT_LIMIT = 0
 QUAD_REPRESENTATIVE_LIMIT = 0
-_ACTIVE_EXECUTORS: set[object] = set()
-_ACTIVE_EXECUTORS_LOCK = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -1990,7 +1986,6 @@ def _search_remaining_target_enumeration_plan(
         emit_candidate: Optional[Callable[[dict], None]],
         timed_out: Callable[[], bool],
         best_draws_limit: Optional[int] = None,
-        stop_after_first: bool = False,
         skip_signatures: Optional[Set[str]] = None,
 ) -> Optional[dict]:
     quad_orders = {by_id[tile_id].order for tile_id in quad_pair["quad_ids"]}
@@ -2103,7 +2098,7 @@ def _search_remaining_target_enumeration_plan(
                 if overlaps(meld, other_meld, single):
                     continue
                 candidate = try_candidate((meld, other_meld, single))
-                if candidate is not None and (stop_after_first or candidate["draws_needed"] <= 1):
+                if candidate is not None and candidate["draws_needed"] <= 1:
                     return best_plan
 
         for pair in pairs:
@@ -2113,7 +2108,7 @@ def _search_remaining_target_enumeration_plan(
                 if overlaps(meld, pair, taatsu):
                     continue
                 candidate = try_candidate((meld, pair, taatsu))
-                if candidate is not None and (stop_after_first or candidate["draws_needed"] <= 1):
+                if candidate is not None and candidate["draws_needed"] <= 1:
                     return best_plan
 
         for idx, pair_a in enumerate(souzu_pairs):
@@ -2123,120 +2118,10 @@ def _search_remaining_target_enumeration_plan(
                 if overlaps(meld, pair_a, pair_b):
                     continue
                 candidate = try_candidate((meld, pair_a, pair_b))
-                if candidate is not None and (stop_after_first or candidate["draws_needed"] <= 1):
+                if candidate is not None and candidate["draws_needed"] <= 1:
                     return best_plan
 
     return best_plan
-
-
-def _register_active_executor(executor: object) -> None:
-    with _ACTIVE_EXECUTORS_LOCK:
-        _ACTIVE_EXECUTORS.add(executor)
-
-
-def _unregister_active_executor(executor: object) -> None:
-    with _ACTIVE_EXECUTORS_LOCK:
-        _ACTIVE_EXECUTORS.discard(executor)
-
-
-def _process_snapshot(process: object) -> dict:
-    pid = getattr(process, "pid", None)
-    alive = False
-    try:
-        alive = bool(process.is_alive())
-    except Exception:
-        pass
-    exitcode = getattr(process, "exitcode", None)
-    if alive:
-        status = "running"
-    elif exitcode is None:
-        status = "idle"
-    elif exitcode == 0:
-        status = "exited"
-    else:
-        status = "terminated"
-    return {
-        "pid": int(pid) if pid is not None else None,
-        "alive": alive,
-        "exitcode": exitcode,
-        "status": status,
-    }
-
-
-def _executor_process_snapshot(executor: object) -> List[dict]:
-    process_map = getattr(executor, "_processes", None) or {}
-    return [
-        snapshot
-        for snapshot in (
-            _process_snapshot(process)
-            for process in list(process_map.values())
-        )
-        if snapshot.get("pid") is not None
-    ]
-
-
-def get_active_search_runtime_snapshot(*, searching: bool = False) -> dict:
-    processes: List[dict] = []
-    with _ACTIVE_EXECUTORS_LOCK:
-        executors = list(_ACTIVE_EXECUTORS)
-    for executor in executors:
-        try:
-            processes.extend(_executor_process_snapshot(executor))
-        except Exception:
-            continue
-    processes.sort(key=lambda item: int(item.get("pid") or 0))
-    return {
-        "searching": bool(searching),
-        "process_count": len(processes),
-        "processes": processes,
-        "updated_at": round(time.time(), 3),
-    }
-
-
-def terminate_active_search_workers() -> dict:
-    with _ACTIVE_EXECUTORS_LOCK:
-        executors = list(_ACTIVE_EXECUTORS)
-    for executor in executors:
-        try:
-            _terminate_executor_processes(executor)
-        except Exception:
-            pass
-        try:
-            executor.shutdown(wait=False, cancel_futures=True)
-        except Exception:
-            pass
-    return get_active_search_runtime_snapshot(searching=False)
-
-
-def _terminate_executor_processes(executor: object, *, wait_timeout: float = 2.0) -> None:
-    process_map = getattr(executor, "_processes", None) or {}
-    processes = list(process_map.values())
-    for proc in processes:
-        try:
-            if proc is not None and proc.is_alive():
-                proc.terminate()
-        except Exception:
-            pass
-    deadline = time.monotonic() + max(0.1, wait_timeout)
-    for proc in processes:
-        try:
-            remaining = max(0.0, deadline - time.monotonic())
-            if proc is not None:
-                proc.join(timeout=remaining)
-        except Exception:
-            pass
-    for proc in processes:
-        try:
-            if proc is not None and proc.is_alive() and hasattr(proc, "kill"):
-                proc.kill()
-        except Exception:
-            pass
-    for proc in processes:
-        try:
-            if proc is not None:
-                proc.join(timeout=0.2)
-        except Exception:
-            pass
 
 
 def recommend_souzu_tenpai_switch(
@@ -2252,10 +2137,8 @@ def recommend_souzu_tenpai_switch(
         candidate_cb: Optional[Callable[[dict], None]] = None,
         telemetry_cb: Optional[Callable[[dict], None]] = None,
         should_stop: Optional[Callable[[], bool]] = None,
-        stop_after_first: bool = False,
         skip_signatures: Optional[Set[str]] = None,
         auto_wall_limit: bool = True,
-        max_parallel_workers: Optional[int] = None,
         search_algorithm: Optional[str] = None,
 ) -> dict:
     _normalize_search_algorithm(search_algorithm)
@@ -2291,35 +2174,12 @@ def recommend_souzu_tenpai_switch(
         "last_node_souzu_prunes": 0,
     }
     last_progress_emit_at = 0.0
-    worker_states: List[dict] = []
-    parallel_info: dict = {"mode": "single", "enabled": False, "max_workers": 1, "total_jobs": 0, "completed_jobs": 0}
-    cpu_count = os.cpu_count() or 1
-
     def stop_requested() -> bool:
         return bool(should_stop and should_stop())
 
     def emit_telemetry() -> None:
-        if telemetry_cb is None:
-            return
-        now = time.monotonic()
-        snapshot: List[dict] = []
-        for item in worker_states:
-            copied = dict(item)
-            started_at = copied.get("started_at")
-            copied["elapsed_sec"] = round(max(0.0, now - float(started_at)), 2) if started_at is not None else 0.0
-            copied.pop("started_at", None)
-            snapshot.append(copied)
-        telemetry_cb({
-            "worker_states": snapshot,
-            "parallel_info": {
-                **dict(parallel_info),
-                "cpu_count": cpu_count,
-                "quad_pair_count": len(quad_pairs),
-                "parallel_ok": False,
-                "attempted": False,
-            },
-            "runtime": get_active_search_runtime_snapshot(searching=True),
-        })
+        if telemetry_cb is not None:
+            telemetry_cb({})
 
     def emit_progress(text: str, *, force: bool = False) -> None:
         nonlocal last_progress_emit_at
@@ -2395,37 +2255,9 @@ def recommend_souzu_tenpai_switch(
             "reason": "cannot-form-two-quads",
             "remaining_changes": remaining_changes,
             "debug_pool": debug_pool,
-            "runtime": get_active_search_runtime_snapshot(searching=False),
         }
 
-    parallel_info = {
-        "mode": "single",
-        "enabled": False,
-        "max_workers": 1,
-        "total_jobs": len(quad_pairs),
-        "completed_jobs": 0,
-        "cpu_count": cpu_count,
-        "quad_pair_count": len(quad_pairs),
-        "parallel_ok": False,
-        "wait_parallel_ok": False,
-        "attempted": False,
-        "disabled_reason": "Target enumeration search does not use parallel DFS workers.",
-    }
-    worker_states = [{
-        "worker_id": 1,
-        "kind": "main",
-        "status": "running",
-        "current_quad_index": None,
-        "current_quad_label": "",
-        "completed_jobs": 0,
-        "last_result": "",
-        "last_draws_needed": None,
-        "started_at": time.monotonic(),
-    }]
     emit_telemetry()
-    worker_states[0]["current_quad_index"] = 1
-    worker_states[0]["current_quad_label"] = "target-enumeration-search"
-    worker_states[0]["started_at"] = time.monotonic()
     emit_progress("Using target enumeration search", force=True)
     plan = _run_exact_target_enumeration_search(
         deck_map,
@@ -2439,15 +2271,7 @@ def recommend_souzu_tenpai_switch(
         candidate_cb,
         stop_requested,
     )
-    worker_states[0]["status"] = "done" if plan.get("status") == "plan" else ("stopped" if plan.get("reason") == "stopped-by-user" else "done")
-    worker_states[0]["completed_jobs"] = 1
-    worker_states[0]["last_result"] = "found-plan" if plan.get("status") == "plan" else "no-plan"
-    worker_states[0]["last_draws_needed"] = plan.get("draws_needed")
-    parallel_info["completed_jobs"] = 1
     if isinstance(plan, dict):
         plan["remaining_changes"] = remaining_changes
         plan["debug_pool"] = debug_pool
-        plan["worker_states"] = [{k: v for k, v in worker_states[0].items() if k != "started_at"}]
-        plan["parallel_info"] = parallel_info
-        plan["runtime"] = get_active_search_runtime_snapshot(searching=False)
     return plan

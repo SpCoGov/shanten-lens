@@ -4,17 +4,15 @@ import {pushToast} from "../lib/toast";
 import {ws} from "../lib/ws";
 import Tile from "../components/Tile";
 import styles from "../components/AdvisorPanel.module.css";
-import type {PlanData, SearchRuntimeData, TileId} from "../lib/planTypes";
+import type {PlanData, TileId} from "../lib/planTypes";
 import type {GameStateData} from "../lib/gamestate";
 import {buildDebugSnapshotFromState} from "./SouzuSwitchDebugPage";
 
-const LS_AUTO_STOP = "sl-blackhole:auto-stop-first";
 const LS_VERBOSE = "sl-blackhole:verbose-progress";
 const LS_WALL_LIMIT = "sl-blackhole:wall-limit";
 const WALL_LIMIT_MIN = 2;
 const WALL_LIMIT_MAX = 36;
 const DEFAULT_SEARCH_ALGORITHM = "target_enumeration_search";
-
 
 function readBool(key: string, fallback: boolean) {
     const raw = localStorage.getItem(key);
@@ -28,13 +26,13 @@ function readWallLimit() {
     return Math.min(36, Math.max(2, Math.trunc(raw)));
 }
 
-function parseWallLimitInput(raw: string) {
+function parseWallLimitInput(raw: string, t: (key: string) => string) {
     const value = Number(raw);
     if (!Number.isFinite(value) || !Number.isInteger(value)) {
-        return {ok: false as const, message: "牌山读取上限必须是 2 到 36 的整数"};
+        return {ok: false as const, message: t("blackhole.wall_limit_error_integer")};
     }
     if (value < WALL_LIMIT_MIN || value > WALL_LIMIT_MAX) {
-        return {ok: false as const, message: "牌山读取上限必须在 2 到 36 之间"};
+        return {ok: false as const, message: t("blackhole.wall_limit_error_range")};
     }
     return {ok: true as const, value};
 }
@@ -77,7 +75,6 @@ export default function BlackHolePage({
                                           replacementIds,
                                           wallIds,
                                           currentState,
-                                          runtime,
                                           onClear,
                                       }: {
     stage: number;
@@ -87,11 +84,9 @@ export default function BlackHolePage({
     replacementIds: TileId[];
     wallIds: TileId[];
     currentState: GameStateData | null;
-    runtime?: SearchRuntimeData | null;
     onClear?: () => void;
 }) {
     const {t} = useTranslation();
-    const [autoStopFirst, setAutoStopFirst] = React.useState<boolean>(() => readBool(LS_AUTO_STOP, true));
     const [verboseProgress, setVerboseProgress] = React.useState<boolean>(() => readBool(LS_VERBOSE, false));
     const [wallLimit, setWallLimit] = React.useState<number>(() => readWallLimit());
     const [wallLimitInput, setWallLimitInput] = React.useState<string>(() => String(readWallLimit()));
@@ -102,7 +97,6 @@ export default function BlackHolePage({
     const [quadDrawerOpen, setQuadDrawerOpen] = React.useState(false);
     const [drawerMode, setDrawerMode] = React.useState<"quad" | "considered">("quad");
 
-    React.useEffect(() => localStorage.setItem(LS_AUTO_STOP, autoStopFirst ? "1" : "0"), [autoStopFirst]);
     React.useEffect(() => localStorage.setItem(LS_VERBOSE, verboseProgress ? "1" : "0"), [verboseProgress]);
     React.useEffect(() => localStorage.setItem(LS_WALL_LIMIT, String(wallLimit)), [wallLimit]);
     React.useEffect(() => {
@@ -142,7 +136,7 @@ export default function BlackHolePage({
     );
 
     const resolveWallLimit = React.useCallback(() => {
-        const parsed = parseWallLimitInput(wallLimitInput.trim());
+        const parsed = parseWallLimitInput(wallLimitInput.trim(), t);
         if (!parsed.ok) {
             pushToast(parsed.message, "error", 2200);
             return null;
@@ -150,9 +144,9 @@ export default function BlackHolePage({
         setWallLimit(parsed.value);
         setWallLimitInput(String(parsed.value));
         return parsed.value;
-    }, [wallLimitInput]);
+    }, [t, wallLimitInput]);
 
-    const startSearch = React.useCallback((opts?: { stopAfterFirst?: boolean; resume?: boolean }) => {
+    const startSearch = React.useCallback((opts?: { resume?: boolean }) => {
         if (!canOperate) {
             pushToast(t("blackhole.need_switch_stage"), "error", 1800);
             return;
@@ -170,24 +164,16 @@ export default function BlackHolePage({
             data: {
                 action: "start",
                 options: {
-                    stop_after_first: opts?.stopAfterFirst ?? autoStopFirst,
                     skip_signatures: skipSignatures,
                     wall_limit: nextWallLimit,
                     search_algorithm: searchAlgorithm,
                 },
             },
         } as any);
-    }, [autoStopFirst, canOperate, planSignature, resolveWallLimit, searchAlgorithm, seenSignatures, t]);
+    }, [canOperate, planSignature, resolveWallLimit, searchAlgorithm, seenSignatures, t]);
 
     const stopSearch = React.useCallback(() => {
         ws.send({type: "souzu_switch_control", data: {action: "stop"}} as any);
-    }, []);
-    const refreshRuntime = React.useCallback(() => {
-        ws.send({type: "souzu_switch_control", data: {action: "runtime_status"}} as any);
-    }, []);
-    const killWorkers = React.useCallback(() => {
-        ws.send({type: "souzu_switch_control", data: {action: "kill_workers"}} as any);
-        ws.send({type: "souzu_switch_control", data: {action: "runtime_status"}} as any);
     }, []);
     const listQuads = React.useCallback(() => {
         const nextWallLimit = resolveWallLimit();
@@ -209,18 +195,18 @@ export default function BlackHolePage({
     }, [canOperate, hasExecutablePlan]);
     const exportCurrentSnapshot = React.useCallback(async () => {
         if (!currentState) {
-            pushToast("当前没有可导出的局面", "error", 1800);
+            pushToast(t("blackhole.export_empty"), "error", 1800);
             return;
         }
         const snapshot = buildDebugSnapshotFromState(currentState);
         const text = JSON.stringify(snapshot);
         try {
             await navigator.clipboard.writeText(text);
-            pushToast("已导出当前局面，并复制到剪贴板", "success", 1600);
+            pushToast(t("blackhole.export_success_clipboard"), "success", 1600);
         } catch {
-            pushToast("已导出当前局面", "success", 1400);
+            pushToast(t("blackhole.export_success"), "success", 1400);
         }
-    }, [currentState]);
+    }, [currentState, t]);
     const clearCache = React.useCallback(() => {
         setSeenSignatures([]);
         setQuadCatalogData(null);
@@ -263,17 +249,8 @@ export default function BlackHolePage({
                     <button className="nav-btn" onClick={stopSearch} disabled={!isSearching}>
                         {t("blackhole.stop")}
                     </button>
-                    <button className="nav-btn" onClick={killWorkers}>
-                        {"强制清理子进程"}
-                    </button>
-                    <button className="nav-btn" onClick={refreshRuntime}>
-                        {"刷新子进程"}
-                    </button>
-                    <button className="nav-btn" onClick={() => startSearch({stopAfterFirst: false, resume: true})} disabled={!canResume}>
+                    <button className="nav-btn" onClick={() => startSearch({resume: true})} disabled={!canResume}>
                         {t("blackhole.continue")}
-                    </button>
-                    <button className="nav-btn" onClick={() => startSearch({stopAfterFirst: true, resume: true})} disabled={!canResume}>
-                        {t("blackhole.next")}
                     </button>
                     <button className="nav-btn" onClick={listQuads}>
                         {t("blackhole.list_quads")}
@@ -282,16 +259,12 @@ export default function BlackHolePage({
                         {t("blackhole.execute_plan")}
                     </button>
                     <button className="nav-btn" onClick={exportCurrentSnapshot}>
-                        {"导出当前局面"}
+                        {t("blackhole.export_current")}
                     </button>
                     <button className="nav-btn" onClick={clearCache}>
                         {t("blackhole.clear_cache")}
                     </button>
 
-                    <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
-                        <input type="checkbox" checked={autoStopFirst} onChange={(e) => setAutoStopFirst(e.target.checked)}/>
-                        <span>{t("blackhole.auto_stop_first")}</span>
-                    </label>
                     <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
                         <input type="checkbox" checked={verboseProgress} onChange={(e) => setVerboseProgress(e.target.checked)}/>
                         <span>{t("blackhole.verbose_progress")}</span>
@@ -314,10 +287,8 @@ export default function BlackHolePage({
 
             <div className={`blackhole-layout ${quadDrawerOpen ? "with-drawer" : ""}`}>
                 <div className="blackhole-main">
-                    {runtime?.searching ? <SouzuRuntimePanel runtime={runtime}/> : null}
                     <BlackHoleStrategyCard
                         data={viewData}
-                        runtime={runtime}
                         resolveFace={resolveFace}
                         onOpenConsideredTiles={openConsideredTiles}
                         title={t("blackhole.card_title")}
@@ -328,7 +299,7 @@ export default function BlackHolePage({
                     <aside className="blackhole-drawer panel">
                         <div className="blackhole-drawer-head">
                             <div className="panel-title" style={{marginBottom: 0}}>
-                                {drawerMode === "quad" ? "所有可见杠" : "可使用的牌"}
+                                {drawerMode === "quad" ? t("blackhole.quad_drawer_title") : t("blackhole.considered_tiles_title")}
                             </div>
                             <button className="nav-btn" onClick={() => setQuadDrawerOpen(false)}>
                                 {t("modal.close")}
@@ -349,13 +320,11 @@ export default function BlackHolePage({
 export function BlackHoleStrategyCard({
                                           title,
                                           data,
-                                          runtime,
                                           resolveFace,
                                           onOpenConsideredTiles,
                                       }: {
     title: string;
     data: PlanData | null;
-    runtime?: SearchRuntimeData | null;
     resolveFace?: (id: number) => string | null;
     onOpenConsideredTiles?: () => void;
 }) {
@@ -390,15 +359,11 @@ export function BlackHoleStrategyCard({
                     <div className={styles.cardBodyMuted} style={{whiteSpace: "pre-wrap"}}>
                         {data.progress || t("advisor.searching")}
                     </div>
-                    <div style={{padding: "0 12px"}}>
-                        <WorkerStatusPanel data={data} runtime={runtime}/>
-                    </div>
                     {!hasPlanPreview ? <div style={{padding: "0 12px 12px"}}><SearchParamsBand data={data} onOpenConsideredTiles={onOpenConsideredTiles}/></div> : null}
                     {hasPlanPreview ? <PlanBody data={data} resolveFace={resolveFace} onOpenConsideredTiles={onOpenConsideredTiles}/> : null}
                 </div>
             ) : data.status === "impossible" ? (
                 <div style={{padding: 12, display: "grid", gap: 12}}>
-                    <WorkerStatusPanel data={data} runtime={runtime}/>
                     <SearchParamsBand data={data} onOpenConsideredTiles={onOpenConsideredTiles}/>
                     <div className={styles.bandSingle} style={{padding: 0}}>
                         <div className={styles.bandValue}>{t("advisor.impossible")}</div>
@@ -408,9 +373,6 @@ export function BlackHoleStrategyCard({
             ) : data.status === "plan" ? (
                 <div style={{display: "grid", gap: 12}}>
                     <PlanBody data={data} resolveFace={resolveFace} onOpenConsideredTiles={onOpenConsideredTiles}/>
-                    <div style={{padding: "0 12px 12px"}}>
-                        <WorkerStatusPanel data={data} runtime={runtime}/>
-                    </div>
                 </div>
             ) : (
                 <div className={styles.cardBodyMuted}>{t("advisor.awaiting_backend")}</div>
@@ -448,7 +410,7 @@ function PlanBody({
                     userSelect: "none",
                 }}
             >
-                <div className={styles.bandActionLabel}>{"第几张听牌"}</div>
+                <div className={styles.bandActionLabel}>{t("blackhole.draws_needed_label")}</div>
                 <div className={styles.bandValue}>{String(data.draws_needed ?? "-")}</div>
             </div>
 
@@ -517,10 +479,10 @@ function SearchParamsBand({
         ? (data.per_change_limit === 13 ? "无限制" : String(data.per_change_limit))
         : "-";
     const items = [
-        {label: "最大换牌次数", value: String(data.max_change_count ?? "-"), clickable: false},
-        {label: "换牌限制", value: perChangeLimit, clickable: false},
+        {label: t("blackhole.params_max_change_count"), value: String(data.max_change_count ?? "-"), clickable: false},
+        {label: t("blackhole.params_per_change_limit"), value: perChangeLimit, clickable: false},
         {
-            label: "可使用的牌数",
+            label: t("blackhole.params_considered_tile_count"),
             value: String(data.considered_tile_count ?? "-"),
             clickable: typeof data.considered_tile_count === "number" && !!onOpenConsideredTiles,
         },
@@ -528,7 +490,7 @@ function SearchParamsBand({
 
     return (
         <div style={{display: "grid", gap: 8}}>
-            {showTitle ? <div className={styles.label}>{"当前参数"}</div> : null}
+            {showTitle ? <div className={styles.label}>{t("blackhole.params_title")}</div> : null}
             <div style={{display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10}}>
                 {items.map((item) => (
                     <div
@@ -549,125 +511,8 @@ function SearchParamsBand({
                             {item.value}
                         </div>
                         {item.clickable ? (
-                            <div className={styles.cardBodyMuted} style={{padding: 0}}>{"点击查看牌面"}</div>
+                            <div className={styles.cardBodyMuted} style={{padding: 0}}>{t("blackhole.params_click_to_view")}</div>
                         ) : null}
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-export function SouzuRuntimePanel({runtime}: { runtime?: SearchRuntimeData | null }) {
-    if (!runtime) return null;
-    const processes = runtime.processes || [];
-    return (
-        <section className="panel" style={{marginBottom: 12}}>
-            <div className="panel-title">搜索运行时</div>
-            <div style={{display: "grid", gap: 8}}>
-                <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
-                    <span className="badge">{`状态: ${runtime.searching ? "搜索中" : "空闲"}`}</span>
-                    <span className="badge">{`子进程: ${runtime.process_count ?? processes.length}`}</span>
-                    <span className="badge">{`更新时间: ${runtime.updated_at ? new Date(runtime.updated_at * 1000).toLocaleTimeString() : "-"}`}</span>
-                </div>
-                {processes.length > 0 ? (
-                    <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10}}>
-                        {processes.map((process, index) => (
-                            <div key={`${process.pid ?? "proc"}-${index}`} style={{border: "1px solid var(--border)", borderRadius: 10, padding: 10, display: "grid", gap: 6}}>
-                                <div style={{display: "flex", justifyContent: "space-between", gap: 8}}>
-                                    <div style={{fontWeight: 700}}>{`子进程 ${index + 1}`}</div>
-                                    <div className="hint">{process.status || "-"}</div>
-                                </div>
-                                <div className="hint">{`PID: ${process.pid ?? "-"}`}</div>
-                                <div className="hint">{`存活: ${process.alive ? "是" : "否"}`}</div>
-                                <div className="hint">{`退出码: ${process.exitcode ?? "-"}`}</div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="hint">{"当前没有活动中的搜索子进程。"}</div>
-                )}
-            </div>
-        </section>
-    );
-}
-
-export function WorkerStatusPanel({data, runtime, showTitle = true}: { data: PlanData; runtime?: SearchRuntimeData | null; showTitle?: boolean }) {
-    const workers = data.worker_states || [];
-    const parallel = data.parallel_info;
-    const processes = runtime?.processes || data.runtime?.processes || [];
-    if (!workers.length && !parallel && !processes.length) return null;
-    const fallbackReason = parallel?.fallback_reason?.trim();
-    const disabledReason = parallel?.disabled_reason?.trim();
-    const startError = parallel?.start_error?.trim();
-
-    const statusText = (status?: string) => {
-        if (status === "running") return "运行中";
-        if (status === "completed") return "刚完成";
-        if (status === "done") return "已结束";
-        if (status === "stopped") return "已停止";
-        if (status === "idle") return "空闲";
-        return status || "-";
-    };
-
-    const describeParallelError = (message?: string | null) => {
-        const text = (message || "").trim();
-        if (!text) return "";
-        if (text.includes("'NoneType' object has no attribute 'get'")) {
-            return "子进程返回了空结果，主进程读取结果字段时失败，详细堆栈已输出到后端控制台。";
-        }
-        return "子进程启动或执行过程中出现异常，详细堆栈已输出到后端控制台。";
-    };
-
-    const startErrorText = describeParallelError(startError);
-    const fallbackText = describeParallelError(fallbackReason);
-
-    return (
-        <div style={{display: "grid", gap: 8}}>
-            {showTitle ? <div className={styles.label}>{"搜索进程"}</div> : null}
-            <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
-                <span className="badge">{`模式: ${parallel?.enabled ? "多进程" : "单进程"}`}</span>
-                <span className="badge">{`并行数: ${parallel?.max_workers ?? (workers.length || 1)}`}</span>
-                <span className="badge">{`已完成: ${parallel?.completed_jobs ?? 0}/${parallel?.total_jobs ?? 0}`}</span>
-                <span className="badge">{`真实子进程: ${runtime?.process_count ?? data.runtime?.process_count ?? processes.length}`}</span>
-            </div>
-            {disabledReason ? (
-                <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
-                    {`未启动子进程原因: ${disabledReason}`}
-                </div>
-            ) : null}
-            {startErrorText ? (
-                <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
-                    {`子进程启动失败: ${startErrorText}`}
-                </div>
-            ) : null}
-            {fallbackText ? (
-                <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
-                    {`已回退为单进程搜索: ${fallbackText}`}
-                </div>
-            ) : null}
-            <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10}}>
-                {workers.map((worker, index) => (
-                    <div
-                        key={`${worker.worker_id || index}-${worker.current_quad_index || 0}`}
-                        style={{
-                            border: "1px solid var(--border)",
-                            borderRadius: 10,
-                            padding: 10,
-                            display: "grid",
-                            gap: 6,
-                        }}
-                    >
-                        <div style={{display: "flex", justifyContent: "space-between", gap: 8}}>
-                            <div style={{fontWeight: 700}}>{`${worker.kind === "process" ? "进程" : "主搜索"} ${worker.worker_id ?? index + 1}`}</div>
-                            <div className="hint">{statusText(worker.status)}</div>
-                        </div>
-                        <div className="hint">{worker.current_quad_index ? `负责双杠 #${worker.current_quad_index}` : "当前未分配任务"}</div>
-                        <div className="hint" style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{worker.current_quad_label || "-"}</div>
-                        <div className="hint">{`已完成任务: ${worker.completed_jobs ?? 0}`}</div>
-                        <div className="hint">{`耗时: ${(worker.elapsed_sec ?? 0).toFixed(2)} 秒`}</div>
-                        <div className="hint">{`最近结果: ${worker.last_result || "-"}`}</div>
-                        <div className="hint">{`最近摸牌数: ${worker.last_draws_needed ?? "-"}`}</div>
                     </div>
                 ))}
             </div>

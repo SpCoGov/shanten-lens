@@ -3,9 +3,9 @@ import Tile from "../components/Tile";
 import {useTranslation} from "react-i18next";
 import {pushToast} from "../lib/toast";
 import type {GameStateData} from "../lib/gamestate";
-import type {PlanData, SearchRuntimeData} from "../lib/planTypes";
+import type {PlanData} from "../lib/planTypes";
 import {ws} from "../lib/ws";
-import {BlackHoleStrategyCard, SouzuRuntimePanel} from "./BlackHolePage";
+import {BlackHoleStrategyCard} from "./BlackHolePage";
 
 export type DebugSnapshot = {
     stage?: number;
@@ -54,13 +54,13 @@ function normFace(face: string | null | undefined) {
     return RED_MAP[face] || face;
 }
 
-function parseWallLimitInput(raw: string) {
+function parseWallLimitInput(raw: string, t: (key: string) => string) {
     const value = Number(raw);
     if (!Number.isFinite(value) || !Number.isInteger(value)) {
-        return {ok: false as const, message: "牌山读取上限必须是 2 到 36 的整数"};
+        return {ok: false as const, message: t("blackhole.wall_limit_error_integer")};
     }
     if (value < WALL_LIMIT_MIN || value > WALL_LIMIT_MAX) {
-        return {ok: false as const, message: "牌山读取上限必须在 2 到 36 之间"};
+        return {ok: false as const, message: t("blackhole.wall_limit_error_range")};
     }
     return {ok: true as const, value};
 }
@@ -199,12 +199,10 @@ function buildQuadOptions(entries: PoolEntry[]): QuadOption[] {
 export default function SouzuSwitchDebugPage({
     currentState,
     data,
-    runtime,
     onClear,
 }: {
     currentState: GameStateData | null;
     data: PlanData | null;
-    runtime?: SearchRuntimeData | null;
     onClear?: () => void;
 }) {
     const {t} = useTranslation();
@@ -212,7 +210,6 @@ export default function SouzuSwitchDebugPage({
     const [activeSnapshot, setActiveSnapshot] = React.useState<DebugSnapshot | null>(null);
     const [wallLimit, setWallLimit] = React.useState(DEFAULT_WALL_LIMIT);
     const [wallLimitInput, setWallLimitInput] = React.useState(String(DEFAULT_WALL_LIMIT));
-    const [autoStopFirst, setAutoStopFirst] = React.useState(true);
     const searchAlgorithm = DEFAULT_SEARCH_ALGORITHM;
     const [selectedQuadKeys, setSelectedQuadKeys] = React.useState<string[]>(["", ""]);
     const [activeBucket, setActiveBucket] = React.useState<ManualStructureKey>("meld1");
@@ -256,15 +253,15 @@ export default function SouzuSwitchDebugPage({
             const parsed = safeParseSnapshot(snapshotText);
             setActiveSnapshot(parsed);
             resetManualBuilder();
-            pushToast("局面已导入", "success", 1400);
+            pushToast(t("blackhole.debug_import_success"), "success", 1400);
         } catch (error) {
-            pushToast(error instanceof Error ? error.message : "导入失败", "error", 2200);
+            pushToast(error instanceof Error ? error.message : t("blackhole.debug_import_failed"), "error", 2200);
         }
-    }, [resetManualBuilder, snapshotText]);
+    }, [resetManualBuilder, snapshotText, t]);
 
     const exportCurrent = React.useCallback(async () => {
         if (!currentState) {
-            pushToast("当前没有可导出的局面", "error", 1800);
+            pushToast(t("blackhole.export_empty"), "error", 1800);
             return;
         }
         const snapshot = buildDebugSnapshotFromState(currentState);
@@ -274,14 +271,14 @@ export default function SouzuSwitchDebugPage({
         resetManualBuilder();
         try {
             await navigator.clipboard.writeText(nextText);
-            pushToast("已导出当前局面，并复制到剪贴板", "success", 1600);
+            pushToast(t("blackhole.export_success_clipboard"), "success", 1600);
         } catch {
-            pushToast("已导出当前局面", "success", 1400);
+            pushToast(t("blackhole.export_success"), "success", 1400);
         }
-    }, [currentState, resetManualBuilder]);
+    }, [currentState, resetManualBuilder, t]);
 
     const resolveWallLimit = React.useCallback(() => {
-        const parsed = parseWallLimitInput(wallLimitInput.trim());
+        const parsed = parseWallLimitInput(wallLimitInput.trim(), t);
         if (!parsed.ok) {
             pushToast(parsed.message, "error", 2200);
             return null;
@@ -289,7 +286,7 @@ export default function SouzuSwitchDebugPage({
         setWallLimit(parsed.value);
         setWallLimitInput(String(parsed.value));
         return parsed.value;
-    }, [wallLimitInput]);
+    }, [t, wallLimitInput]);
 
     const runImportedSnapshot = React.useCallback(() => {
         let snapshot: DebugSnapshot;
@@ -308,14 +305,13 @@ export default function SouzuSwitchDebugPage({
                 action: "start_debug",
                 snapshot,
                 options: {
-                    stop_after_first: autoStopFirst,
                     skip_signatures: [],
                     wall_limit: nextWallLimit,
                     search_algorithm: searchAlgorithm,
                 },
             },
         } as any);
-    }, [autoStopFirst, resolveWallLimit, searchAlgorithm, snapshotText]);
+    }, [resolveWallLimit, searchAlgorithm, snapshotText]);
 
     const validateManualPlan = React.useCallback(() => {
         let snapshot: DebugSnapshot;
@@ -361,13 +357,6 @@ export default function SouzuSwitchDebugPage({
     const stopSearch = React.useCallback(() => {
         ws.send({type: "souzu_switch_control", data: {action: "stop"}} as any);
     }, []);
-    const refreshRuntime = React.useCallback(() => {
-        ws.send({type: "souzu_switch_control", data: {action: "runtime_status"}} as any);
-    }, []);
-    const killWorkers = React.useCallback(() => {
-        ws.send({type: "souzu_switch_control", data: {action: "kill_workers"}} as any);
-        ws.send({type: "souzu_switch_control", data: {action: "runtime_status"}} as any);
-    }, []);
 
     React.useEffect(() => {
         setManualStructure((prev) => ({
@@ -409,22 +398,16 @@ export default function SouzuSwitchDebugPage({
     return (
         <div className="settings-wrap wide-page" style={{paddingBlock: 16}}>
             <div className="panel">
-                <div className="panel-title">花火指导调试工具</div>
+                <div className="panel-title">{t("blackhole.debug_title")}</div>
                 <div style={{display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center"}}>
-                    <button className="nav-btn" onClick={exportCurrent}>导出当前局面</button>
-                    <button className="nav-btn" onClick={importSnapshot}>导入文本局面</button>
-                    <button className="nav-btn" onClick={runImportedSnapshot}>对导入局面求解</button>
-                    <button className="nav-btn" onClick={validateManualPlan}>验证手工方案</button>
-                    <button className="nav-btn" onClick={clearDebugState}>清空调试数据</button>
-                    <button className="nav-btn" onClick={stopSearch}>停止搜索</button>
-                    <button className="nav-btn" onClick={killWorkers}>强制清理子进程</button>
-                    <button className="nav-btn" onClick={refreshRuntime}>刷新子进程</button>
+                    <button className="nav-btn" onClick={exportCurrent}>{t("blackhole.export_current")}</button>
+                    <button className="nav-btn" onClick={importSnapshot}>{t("blackhole.debug_import_snapshot")}</button>
+                    <button className="nav-btn" onClick={runImportedSnapshot}>{t("blackhole.debug_run_snapshot")}</button>
+                    <button className="nav-btn" onClick={validateManualPlan}>{t("blackhole.debug_validate_manual")}</button>
+                    <button className="nav-btn" onClick={clearDebugState}>{t("blackhole.debug_clear")}</button>
+                    <button className="nav-btn" onClick={stopSearch}>{t("blackhole.stop")}</button>
                     <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
-                        <input type="checkbox" checked={autoStopFirst} onChange={(e) => setAutoStopFirst(e.target.checked)}/>
-                        <span>找到第一套方案后停止</span>
-                    </label>
-                    <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
-                        <span>牌山读取上限</span>
+                        <span>{t("blackhole.wall_limit")}</span>
                         <input
                             className="form-input"
                             style={{width: 88}}
@@ -435,13 +418,13 @@ export default function SouzuSwitchDebugPage({
                     </label>
                 </div>
                 <div style={{marginTop: 10, color: "var(--muted)", fontSize: 13}}>
-                    {"手工验证模式会按你指定的两组杠和 7 张目标牌做验证，并额外说明搜索器能否自己枚举到该方案。"}
+                    {t("blackhole.debug_hint")}
                 </div>
             </div>
 
             <div className="responsive-two-col">
                 <section className="panel" style={{minWidth: 0}}>
-                    <div className="panel-title">局面数据</div>
+                    <div className="panel-title">{t("blackhole.debug_snapshot_data")}</div>
                     <textarea
                         className="form-input"
                         style={{minHeight: 300, maxWidth: "none", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"}}
@@ -452,7 +435,7 @@ export default function SouzuSwitchDebugPage({
                 </section>
 
                 <section className="panel" style={{minWidth: 0}}>
-                    <div className="panel-title">已导入局面预览</div>
+                    <div className="panel-title">{t("blackhole.debug_snapshot_preview")}</div>
                     {activeSnapshot ? (
                         <div style={{display: "grid", gap: 12}}>
                             <SnapshotTileRow title="手牌" ids={activeSnapshot.hand_tiles ?? []} resolveFace={resolveFace}/>
@@ -466,14 +449,14 @@ export default function SouzuSwitchDebugPage({
                             </div>
                         </div>
                     ) : (
-                        <div className="hint">{"还没有导入局面。可以先导出当前局面，或直接粘贴局面数据。"}</div>
+                        <div className="hint">{t("blackhole.debug_snapshot_empty")}</div>
                     )}
                 </section>
             </div>
 
             {activeSnapshot && (
                 <section className="panel" style={{minWidth: 0}}>
-                    <div className="panel-title">手工方案验证</div>
+                    <div className="panel-title">{t("blackhole.debug_manual_title")}</div>
                     <div style={{display: "grid", gap: 16}}>
                         <div style={{display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12}}>
                             <ManualQuadSelect
@@ -538,10 +521,9 @@ export default function SouzuSwitchDebugPage({
 
             <div className="blackhole-layout">
                 <div className="blackhole-main">
-                    <SouzuRuntimePanel runtime={runtime}/>
                     <ManualSearchabilityCard data={data}/>
                     <DebugPoolCard data={data} resolveFace={resolveFace}/>
-                    <BlackHoleStrategyCard title="调试结果" data={data} runtime={runtime} resolveFace={resolveFace}/>
+                    <BlackHoleStrategyCard title={t("blackhole.debug_result_title")} data={data} resolveFace={resolveFace}/>
                 </div>
             </div>
         </div>
@@ -549,13 +531,14 @@ export default function SouzuSwitchDebugPage({
 }
 
 function ManualSearchabilityCard({data}: { data: PlanData | null }) {
+    const {t} = useTranslation();
     if (!data || typeof data.manual_searchable !== "boolean") return null;
     return (
         <section className="panel" style={{marginBottom: 12}}>
-            <div className="panel-title">搜索器可发现性</div>
+            <div className="panel-title">{t("blackhole.debug_searchability_title")}</div>
             <div style={{display: "grid", gap: 8}}>
                 <div className={`badge ${data.manual_searchable ? "ok" : "down"}`} style={{width: "fit-content"}}>
-                    {data.manual_searchable ? "搜索器可以枚举到这套方案" : "搜索器当前枚举不到这套方案"}
+                    {data.manual_searchable ? t("blackhole.debug_searchability_yes") : t("blackhole.debug_searchability_no")}
                 </div>
                 <div className="hint" style={{fontSize: 13}}>{data.manual_search_reason || "-"}</div>
                 {Array.isArray(data.component_descs) && data.component_descs.length > 0 ? (

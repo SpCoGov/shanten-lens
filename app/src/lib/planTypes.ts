@@ -43,49 +43,6 @@ export type DebugPoolData = {
     }>;
 };
 
-export type WorkerState = {
-    worker_id?: number;
-    kind?: string;
-    status?: string;
-    current_quad_index?: number | null;
-    current_quad_label?: string;
-    current_wait_face?: string | null;
-    completed_jobs?: number;
-    last_result?: string;
-    last_draws_needed?: number | null;
-    elapsed_sec?: number;
-};
-
-export type ParallelInfo = {
-    mode?: string;
-    enabled?: boolean;
-    max_workers?: number;
-    configured_max_workers?: number;
-    total_jobs?: number;
-    completed_jobs?: number;
-    fallback_reason?: string;
-    cpu_count?: number;
-    quad_pair_count?: number;
-    parallel_ok?: boolean;
-    attempted?: boolean;
-    disabled_reason?: string;
-    start_error?: string;
-};
-
-export type SearchRuntimeProcess = {
-    pid?: number | null;
-    alive?: boolean;
-    exitcode?: number | null;
-    status?: string;
-};
-
-export type SearchRuntimeData = {
-    searching?: boolean;
-    process_count?: number;
-    updated_at?: number;
-    processes?: SearchRuntimeProcess[];
-};
-
 export type PlanData = {
     status?: "win_now" | "plan" | "impossible" | "searching" | "catalog";
     draws_needed?: number | null;
@@ -115,7 +72,4 @@ export type PlanData = {
     manual_searchable?: boolean;
     manual_search_reason?: string;
     debug_pool?: DebugPoolData;
-    worker_states?: WorkerState[];
-    parallel_info?: ParallelInfo;
-    runtime?: SearchRuntimeData;
 };
