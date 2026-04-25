@@ -646,6 +646,20 @@
     "ended": "已结束",
     "running": "进行中"
   },
+  "shop_buff_upgrade": {
+    "exchange_name": "交换次数",
+    "panel_title": "增益升级",
+    "current_level": "{{name}} 当前等级：Lv{{level}}",
+    "button": "{{name}} Lv{{level}} 升级  ⭐{{cost}}",
+    "button_maxed": "{{name}} Lv{{level}} 已满级",
+    "button_hint": "升级{{name}}，当前 Lv{{level}}，消耗 ⭐{{cost}}",
+    "success": "{{name}}升级请求已发送",
+    "insufficient_coin": "⭐不足，升级需要 {{cost}}，当前只有 {{coin}}",
+    "maxed": "{{name}}已满级",
+    "stage_not_allowed": "只有在商店阶段才可以升级交换次数",
+    "addon_not_ready": "注入失败：游戏或 addon 未就绪",
+    "failed": "升级失败：{{reason}}"
+  },
   "common": {
     "ok": "确定",
     "continue": "继续",

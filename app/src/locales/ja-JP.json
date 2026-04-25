@@ -643,6 +643,20 @@
     "ended": "終了",
     "running": "進行中"
   },
+  "shop_buff_upgrade": {
+    "exchange_name": "交換回数",
+    "panel_title": "バフ強化",
+    "current_level": "{{name}} 現在レベル：Lv{{level}}",
+    "button": "{{name}} Lv{{level}} 強化  ⭐{{cost}}",
+    "button_maxed": "{{name}} Lv{{level}} は最大",
+    "button_hint": "{{name}}を強化します。現在 Lv{{level}}、必要は ⭐{{cost}}",
+    "success": "{{name}}の強化リクエストを送信しました",
+    "insufficient_coin": "⭐が不足しています。必要 {{cost}}、現在 {{coin}}",
+    "maxed": "{{name}}は最大レベルです",
+    "stage_not_allowed": "交換回数を強化できるのはショップ段階のみです",
+    "addon_not_ready": "注入失敗：ゲームまたは addon が未準備です",
+    "failed": "強化失敗：{{reason}}"
+  },
   "common": {
     "ok": "OK",
     "continue": "続行",

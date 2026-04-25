@@ -1462,6 +1462,7 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             shop = game.get("shop", {})
             free_candidate_effect_list = game.get("effect", {}).get("freeRewardCandidates", None)
             max_effect_volume = game.get("effect", {}).get("maxEffectVolume", 0)
+            shop_buff_list = _parse_shop_buff_list(game.get("effect", {}).get("shopBuffList", None))
             candidate_effect_list = shop.get("candidateEffectList", [])
             if free_candidate_effect_list:
                 candidate_effect_list = free_candidate_effect_list
@@ -1474,12 +1475,12 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             if desktop_remain < 36:
                 new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, effect_list)
                 GAME_STATE.update_wall(new_wall)
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, boss_buff=boss_buff, tile_score_map=tile_score_map, target_point=target_point, point=point, tian_dora_tiles=tian_dora_tiles, push_gamestate=False)
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, boss_buff=boss_buff, shop_buff_list=shop_buff_list, tile_score_map=tile_score_map, target_point=target_point, point=point, tian_dora_tiles=tian_dora_tiles, push_gamestate=False)
                 GAME_STATE.refresh_wall_by_remaning()
             else:
                 new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, effect_list)
                 GAME_STATE.update_wall(new_wall)
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, boss_buff=boss_buff, tile_score_map=tile_score_map, target_point=target_point, point=point, tian_dora_tiles=tian_dora_tiles, push_gamestate=True)
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, ended=ended, level=level, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, boss_buff=boss_buff, shop_buff_list=shop_buff_list, tile_score_map=tile_score_map, target_point=target_point, point=point, tian_dora_tiles=tian_dora_tiles, push_gamestate=True)
             error_number_test = MANAGER.get("general.error_code_test")
             if error_number_test != 0:
                 return "modify", dict({"error": {"code": error_number_test, "u32Params": [], "strParams": [], "jsonParam": ""}})
@@ -1635,9 +1636,11 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             tian_dora_tiles = round_info.get("tianDora", {}).get("value", None)
             game = value_changes.get("game", {})
             coin = int(game.get("coin", {}).get("value", None))
+            effect = value_changes.get("effect", {})
+            shop_buff_list = _parse_shop_buff_list(effect.get("shopBuffList", {}).get("value", None))
             record = value_changes.get("record", None)
             GAME_STATE.update_record(record)
-            GAME_STATE.update_other_info(coin=coin, tian_dora_tiles=tian_dora_tiles, reason=".lq.Lobby.amuletActivityUpgradeShopBuff:21")
+            GAME_STATE.update_other_info(coin=coin, shop_buff_list=shop_buff_list, tian_dora_tiles=tian_dora_tiles, reason=".lq.Lobby.amuletActivityUpgradeShopBuff:21")
     return "pass", None
 
 
@@ -1664,6 +1667,31 @@ def _handle_amulet_activity_operate_type8_events(events: List[Dict[str, Any]]) -
                 point = value_changes.get("round", {}).get("point", {}).get("value", "0")
                 current_point = point
     GAME_STATE.update_other_info(point=current_point, tile_score_map=tile_score_map, push_gamestate=True, reason=".lq.Lobby.amuletActivityOperate:8")
+
+
+def _parse_shop_buff_list(raw_list: Any) -> Dict[int, int] | None:
+    if raw_list is None:
+        return None
+    if not isinstance(raw_list, list):
+        return {}
+
+    out: Dict[int, int] = {}
+    for entry in raw_list:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            buff_id = int(entry.get("id"))
+        except (TypeError, ValueError):
+            continue
+        store = entry.get("store")
+        if not isinstance(store, list) or len(store) <= 0:
+            out[buff_id] = 0
+            continue
+        try:
+            out[buff_id] = int(store[0])
+        except (TypeError, ValueError):
+            out[buff_id] = 0
+    return out
 
 
 def has_amulet_221(effects: List[Dict[str, Any]]) -> bool:

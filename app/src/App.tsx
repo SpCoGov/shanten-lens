@@ -31,7 +31,7 @@ import {
     toDeckMap,
     type WsEnvelope,
 } from "./lib/gamestate";
-import {installWsToastBridge, useGlobalToast} from "./lib/toast";
+import {installWsToastBridge, pushToast, useGlobalToast} from "./lib/toast";
 import {AutoRunnerStatus, setAutoStatus, useAutoRunner} from "./lib/autoRunnerStore";
 import GoodsBar from "./components/GoodsBar";
 import CandidateBar from "./components/CandidateBar";
@@ -100,6 +100,8 @@ function isMoreRoute(route: Route) {
 
 const OUTER_PADDING = 16;
 const MAIN_GAP = 12;
+const SHOP_BUFF_EXCHANGE_ID = 8001;
+const SHOP_BUFF_UPGRADE_COSTS = [5, 10, 15, 20, 50, 100, 150, 200];
 
 const appWindow = getCurrentWindow();
 
@@ -222,6 +224,7 @@ export default function App() {
     const [remain, setRemain] = React.useState<number>(0);
     const [hasGame, setHasGame] = React.useState<boolean>(false);
     const [bossBuff, setBossBuff] = React.useState<number[]>([]);
+    const [shopBuffList, setShopBuffList] = React.useState<Record<number, number>>({});
 
     const [wallStatsTiles, setWallStatsTiles] = React.useState<string[]>([]);
     const [handTileIds, setHandTileIds] = React.useState<number[]>([]);
@@ -308,6 +311,42 @@ export default function App() {
             }
         };
     }, []);
+
+    const exchangeShopBuffLevel = React.useMemo(() => {
+        const raw = (shopBuffList as Record<string, number>)[String(SHOP_BUFF_EXCHANGE_ID)] ?? shopBuffList[SHOP_BUFF_EXCHANGE_ID] ?? 0;
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) return 0;
+        return Math.max(0, Math.trunc(parsed));
+    }, [shopBuffList]);
+
+    const nextExchangeShopBuffCost = React.useMemo(
+        () => SHOP_BUFF_UPGRADE_COSTS[exchangeShopBuffLevel] ?? null,
+        [exchangeShopBuffLevel],
+    );
+
+    const handleUpgradeExchangeShopBuff = React.useCallback(() => {
+        if (stage !== 4) {
+            pushToast(t("shop_buff_upgrade.stage_not_allowed"), "info", 1800);
+            return;
+        }
+        if (nextExchangeShopBuffCost == null) {
+            pushToast(t("shop_buff_upgrade.maxed", {name: t("shop_buff_upgrade.exchange_name")}), "info", 1800);
+            return;
+        }
+        const currentCoin = Number.parseInt(String(coin ?? "0"), 10);
+        const normalizedCoin = Number.isFinite(currentCoin) ? currentCoin : 0;
+        if (normalizedCoin < nextExchangeShopBuffCost) {
+            pushToast(t("shop_buff_upgrade.insufficient_coin", {
+                cost: nextExchangeShopBuffCost,
+                coin: normalizedCoin,
+            }), "error", 2200);
+            return;
+        }
+        ws.send({
+            type: "upgrade_shop_buff",
+            data: {activityId: 250811, id: SHOP_BUFF_EXCHANGE_ID},
+        } as any);
+    }, [coin, nextExchangeShopBuffCost, stage, t]);
 
     const onSecretClick = React.useCallback(() => {
         hiddenThemeClicksRef.current += 1;
@@ -501,6 +540,9 @@ export default function App() {
                 setRemain(d.desktop_remain ?? 0);
                 setHasGame(d.stage !== undefined && d.ended !== undefined && d.stage >= 0);
                 setBossBuff(Array.isArray((d as any).boss_buff) ? (d as any).boss_buff : []);
+                setShopBuffList((d as any).shop_buff_list && typeof (d as any).shop_buff_list === "object"
+                    ? (d as any).shop_buff_list
+                    : {});
 
                 const repl = Array.isArray(d.replacement_tiles)
                     ? d.replacement_tiles.map((id) => deck.get(id) ?? "5m")
@@ -538,6 +580,27 @@ export default function App() {
                 }
             } else if (pkt.type === "autorun_status" && pkt.data) {
                 setAutoStatus(pkt.data as AutoRunnerStatus);
+            } else if (pkt.type === "upgrade_shop_buff_result") {
+                const d = (pkt.data ?? {}) as {
+                    ok?: boolean;
+                    reason?: string;
+                    cost?: number;
+                    coin?: number;
+                };
+                if (d.ok) {
+                    pushToast(t("shop_buff_upgrade.success", {name: t("shop_buff_upgrade.exchange_name")}), "success", 1800);
+                } else if (d.reason === "insufficient_coin") {
+                    pushToast(t("shop_buff_upgrade.insufficient_coin", {
+                        cost: d.cost ?? 0,
+                        coin: d.coin ?? 0,
+                    }), "error", 2200);
+                } else if (d.reason === "maxed") {
+                    pushToast(t("shop_buff_upgrade.maxed", {name: t("shop_buff_upgrade.exchange_name")}), "info", 1800);
+                } else if (d.reason === "addon-not-ready") {
+                    pushToast(t("shop_buff_upgrade.addon_not_ready"), "error", 2200);
+                } else {
+                    pushToast(t("shop_buff_upgrade.failed", {reason: d.reason || "unknown"}), "error", 2600);
+                }
             } else if (pkt.type === "msgbox" && pkt.data) {
                 const d = pkt.data || {};
                 if (!d.id) return;
@@ -876,6 +939,38 @@ export default function App() {
                                         <div className="panel">
                                             <div className="panel-title">{t("goods")}</div>
                                             <GoodsBar items={goods} scale={0.85}/>
+                                        </div>
+                                    )}
+
+                                    {stage === 4 && (
+                                        <div className="panel">
+                                            <div className="panel-title">{t("shop_buff_upgrade.panel_title")}</div>
+                                            <div style={{display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center"}}>
+                                                <button
+                                                    className="nav-btn"
+                                                    onClick={handleUpgradeExchangeShopBuff}
+                                                    disabled={nextExchangeShopBuffCost == null}
+                                                    style={{minWidth: 220}}
+                                                    title={nextExchangeShopBuffCost == null
+                                                        ? t("shop_buff_upgrade.maxed", {name: t("shop_buff_upgrade.exchange_name")})
+                                                        : t("shop_buff_upgrade.button_hint", {
+                                                            name: t("shop_buff_upgrade.exchange_name"),
+                                                            level: exchangeShopBuffLevel,
+                                                            cost: nextExchangeShopBuffCost,
+                                                        })}
+                                                >
+                                                    {nextExchangeShopBuffCost == null
+                                                        ? t("shop_buff_upgrade.button_maxed", {
+                                                            name: t("shop_buff_upgrade.exchange_name"),
+                                                            level: exchangeShopBuffLevel,
+                                                        })
+                                                        : t("shop_buff_upgrade.button", {
+                                                            name: t("shop_buff_upgrade.exchange_name"),
+                                                            level: exchangeShopBuffLevel,
+                                                            cost: nextExchangeShopBuffCost,
+                                                        })}
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
 

@@ -18,6 +18,7 @@ export interface GameStateData {
     goods?: GoodsItem[];
     candidate_effect_list?: CandidateEffectRef[];
     boss_buff?: number[];
+    shop_buff_list?: Record<number, number>;
     change_tile_count?: number;
     total_change_tile_count?: number;
     max_effect_volume?: number;

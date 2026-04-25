@@ -329,6 +329,67 @@ async def ws_handler(ws: WebSocketServerProtocol):
                 except Exception as e:
                     await ws_send(ws, {"type": "ui_toast", "data": {"kind": "error", "msg": f"注入异常：{e}"}})
 
+            elif t == "upgrade_shop_buff":
+                try:
+                    activity_id = int((data or {}).get("activityId", getattr(PACKET_BOT, "activity_id", 250811)))
+                    buff_id = int((data or {}).get("id", 0))
+                    upgrade_costs = [5, 10, 15, 20, 50, 100, 150, 200]
+                    current_level = int((GAME_STATE.shop_buff_list or {}).get(buff_id, 0))
+                    current_coin = int(getattr(GAME_STATE, "coin", 0) or 0)
+
+                    if current_level >= len(upgrade_costs):
+                        await ws_send(ws, {
+                            "type": "upgrade_shop_buff_result",
+                            "data": {"ok": False, "reason": "maxed", "id": buff_id, "level": current_level},
+                        })
+                        continue
+
+                    required_coin = upgrade_costs[current_level]
+                    if current_coin < required_coin:
+                        await ws_send(ws, {
+                            "type": "upgrade_shop_buff_result",
+                            "data": {
+                                "ok": False,
+                                "reason": "insufficient_coin",
+                                "id": buff_id,
+                                "level": current_level,
+                                "cost": required_coin,
+                                "coin": current_coin,
+                            },
+                        })
+                        continue
+
+                    addon = PACKET_BOT.get_addon()
+                    if not addon:
+                        await ws_send(ws, {
+                            "type": "upgrade_shop_buff_result",
+                            "data": {"ok": False, "reason": "addon-not-ready", "id": buff_id, "level": current_level},
+                        })
+                        continue
+
+                    ok, detail, msg_id = addon.inject_now(
+                        method=".lq.Lobby.amuletActivityUpgradeShopBuff",
+                        data={"activityId": activity_id, "id": buff_id},
+                        t="Req",
+                    )
+                    await ws_send(ws, {
+                        "type": "upgrade_shop_buff_result",
+                        "data": {
+                            "ok": ok,
+                            "reason": detail if not ok else "",
+                            "id": buff_id,
+                            "level": current_level,
+                            "cost": required_coin,
+                            "coin": current_coin,
+                            "msg_id": msg_id,
+                        },
+                    })
+                except Exception as e:
+                    await ws_send(ws, {
+                        "type": "upgrade_shop_buff_result",
+                        "data": {"ok": False, "reason": f"exception:{e}"},
+                    })
+
             elif t == "open_config_dir":
                 try:
                     _open_dir(str(CONF_DIR))

@@ -39,6 +39,7 @@ class GameState:
     total_change_tile_count: int = field(default_factory=int)
     max_effect_volume: int = field(default_factory=int)
     boss_buff: List[int] = field(default_factory=list)
+    shop_buff_list: Dict[int, int] = field(default_factory=dict)
     tile_score_map: Dict[str, str] = field(default_factory=dict)
     opening_hand_tiles: List[int] = field(default_factory=list)
     used_desktop_tiles: List[int] = field(default_factory=list)
@@ -76,6 +77,7 @@ class GameState:
             "total_change_tile_count": self.total_change_tile_count,
             "max_effect_volume": self.max_effect_volume,
             "boss_buff": self.boss_buff,
+            "shop_buff_list": self.shop_buff_list,
             "tile_score_map": self.tile_score_map,
 
             "update_reason": self.update_reason,
@@ -266,6 +268,7 @@ class GameState:
             total_change_tile_count: int = None,
             max_effect_volume: int = None,
             boss_buff: List[int] = None,
+            shop_buff_list: Dict[int, int] = None,
             tile_score_map: Dict[str, str] = None,
             tian_dora_tiles: List[str] = None,
             push_gamestate: bool = True,
@@ -312,6 +315,8 @@ class GameState:
             self.max_effect_volume = max_effect_volume
         if boss_buff is not None:
             self.boss_buff = boss_buff
+        if shop_buff_list is not None:
+            self.shop_buff_list = shop_buff_list.copy()
         if tile_score_map is not None:
             self.tile_score_map = tile_score_map.copy()
         if tian_dora_tiles is not None:
@@ -349,6 +354,7 @@ class GameState:
         self.next_operation.clear()
         self.ting_list.clear()
         self.boss_buff.clear()
+        self.shop_buff_list.clear()
         self.tile_score_map.clear()
 
         self.update_reason.clear()
