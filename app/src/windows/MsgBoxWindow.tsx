@@ -111,21 +111,19 @@ export default function MsgBoxWindow() {
         const measureAndResize = async () => {
             if (!rootRef.current) return;
 
-            // 用内容真实渲染后的几何尺寸
-            const rect = rootRef.current.getBoundingClientRect();
-
-            // 给少量余量，避免边界换行导致瞬时滚动条
-            let w = Math.ceil(rect.width + 16);
-            let h = Math.ceil(rect.height + 16);
+            const contentW = Math.max(rootRef.current.scrollWidth, rootRef.current.offsetWidth);
+            const contentH = Math.max(rootRef.current.scrollHeight, rootRef.current.offsetHeight);
+            const w = Math.ceil(contentW + 12);
+            const h = Math.ceil(contentH + 12);
 
             const mon = await currentMonitor();
             const availW = mon?.size?.width ?? 1920;
             const availH = mon?.size?.height ?? 1080;
 
-            const MAX_W = Math.floor(availW * 0.6);
-            const MAX_H = Math.floor(availH * 0.8);
-            const MIN_W = 420;
-            const MIN_H = 200;
+            const MAX_W = Math.min(520, Math.floor(availW * 0.5));
+            const MAX_H = Math.min(560, Math.floor(availH * 0.68));
+            const MIN_W = 320;
+            const MIN_H = 170;
 
             const targetW = clamp(w, MIN_W, MAX_W);
             const targetH = clamp(h, MIN_H, MAX_H);
@@ -139,14 +137,19 @@ export default function MsgBoxWindow() {
                 // ignore
             }
 
-            await appWindow.setSize(new LogicalSize(targetW, targetH));
-            if (!centeredOnceRef.current) {
-                centeredOnceRef.current = true;
-                await appWindow.center();
+            try {
+                await appWindow.setSize(new LogicalSize(targetW, targetH));
+                if (!centeredOnceRef.current) {
+                    centeredOnceRef.current = true;
+                    await appWindow.center();
+                }
+            } catch {
+                // ignore resize failure on some platforms/states
             }
         };
 
         let raf: number | null = null;
+        let timer: number | null = null;
         const ro = new ResizeObserver(() => {
             if (raf) cancelAnimationFrame(raf);
             raf = requestAnimationFrame(measureAndResize);
@@ -154,12 +157,16 @@ export default function MsgBoxWindow() {
 
         ro.observe(rootRef.current);
         void measureAndResize();
+        timer = window.setTimeout(() => {
+            void measureAndResize();
+        }, 80);
 
         return () => {
             ro.disconnect();
             if (raf) cancelAnimationFrame(raf);
+            if (timer) window.clearTimeout(timer);
         };
-    }, [appWindow]);
+    }, [appWindow, data]);
 
     const close = async () => {
         try {
@@ -206,18 +213,18 @@ export default function MsgBoxWindow() {
                         components={{ b: <b />, i: <i />, code: <code />, br: <br /> }}
                     />
                 </div>
-
-                <div className={styles.btns}>
-                    {hasCancel ? (
-                        <button className={`btn ghost ${styles.btn}`} onClick={() => reply(false)}>
-                            <Trans i18nKey={data?.cancelText || "common.cancel"} />
-                        </button>
-                    ) : null}
-                    <button className={`btn ${styles.btn}`} onClick={() => reply(true)}>
-                        <Trans i18nKey={data?.okText || "common.ok"} />
-                    </button>
-                </div>
             </main>
+
+            <footer className={styles.btns}>
+                {hasCancel ? (
+                    <button className={`btn ghost ${styles.btn}`} onClick={() => reply(false)}>
+                        <Trans i18nKey={data?.cancelText || "common.cancel"} />
+                    </button>
+                ) : null}
+                <button className={`btn ${styles.btn}`} onClick={() => reply(true)}>
+                    <Trans i18nKey={data?.okText || "common.ok"} />
+                </button>
+            </footer>
         </div>
     );
 }

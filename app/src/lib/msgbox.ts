@@ -10,6 +10,53 @@ export type MsgBoxPayload = {
 };
 
 const opening = new Set<string>();
+const MIN_WIDTH = 320;
+const MAX_WIDTH = 520;
+const MIN_HEIGHT = 170;
+const MAX_HEIGHT = 560;
+
+function clamp(n: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, n));
+}
+
+function visualUnits(line: string) {
+    let units = 0;
+    for (const ch of line) {
+        const code = ch.codePointAt(0) ?? 0;
+        // CJK / 全角字符按 2 个单位计算，ASCII 按 1 个单位
+        const wide = code > 0xFF || /[^\u0000-\u00ff]/.test(ch);
+        units += wide ? 2 : 1;
+    }
+    return units;
+}
+
+function estimateMsgBoxSize(payload: MsgBoxPayload) {
+    const text = String(payload.message ?? "");
+    const lines = text.split(/\r?\n/);
+    const maxLineUnits = Math.max(8, ...lines.map((line) => visualUnits(line)));
+    const hasCancel = !!payload.cancelText;
+
+    // 近似按字符宽度估算：中文 + 混排场景下体验更稳定
+    const contentUnits = clamp(maxLineUnits, 14, 48);
+    const width = clamp(220 + contentUnits * 7.6, MIN_WIDTH, MAX_WIDTH);
+
+    // 估算换行后的总“可见行数”
+    const charsPerLine = Math.max(12, Math.floor((width - 36) / 7.6));
+    const wrappedRows = lines.reduce((sum, line) => {
+        const units = Math.max(1, visualUnits(line));
+        return sum + Math.max(1, Math.ceil(units / charsPerLine));
+    }, 0);
+
+    // header + body padding + footer + lineHeight * rows
+    const footerHeight = hasCancel ? 62 : 56;
+    const estimatedHeight = 48 + 28 + footerHeight + wrappedRows * 23;
+    const height = clamp(estimatedHeight, MIN_HEIGHT, MAX_HEIGHT);
+
+    return {
+        width: Math.round(width),
+        height: Math.round(height),
+    };
+}
 
 function logPayload(p: MsgBoxPayload) {
     console.log("[openMsgBoxWindow] id:", p.id,
@@ -49,14 +96,15 @@ export async function openMsgBoxWindow(payload: MsgBoxPayload) {
 
         const p = encodePayload(payload);
         const url = `msgbox.html?id=${encodeURIComponent(payload.id)}${p ? `&p=${p}` : ""}`;
+        const size = estimateMsgBoxSize(payload);
 
         const win = new WebviewWindow(label, {
             url,
             title: "Message",
-            width: 520,
-            height: 220,
-            minWidth: 420,
-            minHeight: 200,
+            width: size.width,
+            height: size.height,
+            minWidth: MIN_WIDTH,
+            minHeight: MIN_HEIGHT,
             resizable: false,
             decorations: false,
             center: true,

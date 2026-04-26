@@ -11,7 +11,31 @@ applyTheme(readTheme());
 window.addEventListener("storage", (e) => {
     if (e.key === "sl-theme") applyTheme(readTheme());
 });
-ensureI18nReady().then(() => {
-    const root = createRoot(document.getElementById("root")!);
-    root.render(<MsgBoxWindow/>);
-});
+
+function MsgBoxBootFallback() {
+    return (
+        <div
+            style={{
+                minHeight: "100vh",
+                display: "grid",
+                placeItems: "center",
+                background: "var(--color-bg)",
+                color: "var(--color-text)",
+                fontSize: 13,
+                letterSpacing: 0.2,
+            }}
+        >
+            ...
+        </div>
+    );
+}
+
+const root = createRoot(document.getElementById("root")!);
+root.render(<MsgBoxBootFallback/>);
+
+ensureI18nReady()
+    .catch(() => {
+    })
+    .finally(() => {
+        root.render(<MsgBoxWindow/>);
+    });
