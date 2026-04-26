@@ -6,6 +6,7 @@ import {invoke} from "@tauri-apps/api/core";
 import SettingsPage from "./pages/SettingsPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
 import PacketTestPage from "./pages/PacketTestPage";
+import FrontendTestPage from "./pages/FrontendTestPage";
 import AutoRunnerPage from "./pages/AutoRunnerPage";
 import FusePage from "./pages/FusePage";
 import AboutPage from "./pages/AboutPage";
@@ -88,12 +89,13 @@ async function openSettingsWindow() {
     }
 }
 
-type Route = "home" | "score" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "diagnostics" | "packet-test" | "about";
+type Route = "home" | "score" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "diagnostics" | "packet-test" | "frontend-test" | "about";
 
 function isMoreRoute(route: Route) {
     return route === "fuse"
         || route === "souzu-debug"
         || route === "diagnostics"
+        || route === "frontend-test"
         || route === "packet-test"
         || route === "about";
 }
@@ -532,11 +534,11 @@ export default function App() {
                 const list = buildCells(deck, d.locked_tiles ?? [], d.wall_tiles ?? [], 36);
                 setCells(list);
                 setStage(d.stage ?? 0);
-                setCoin(typeof d.coin === "string" ? d.coin : String(d.coin ?? "0"));
+                setCoin(d.coin);
                 setPoint(typeof d.point === "string" ? d.point : String(d.point ?? "0"));
                 setTargetPoint(typeof d.target_point === "string" ? d.target_point : String(d.target_point ?? "0"));
                 setLevel(typeof d.level === "number" ? d.level : Number(d.level ?? 0));
-                setEnded(!!d.ended);
+                setEnded(d.ended);
                 setRemain(d.desktop_remain ?? 0);
                 setHasGame(d.stage !== undefined && d.ended !== undefined && d.stage >= 0);
                 setBossBuff(Array.isArray((d as any).boss_buff) ? (d as any).boss_buff : []);
@@ -839,6 +841,37 @@ export default function App() {
                                     <span className="ms">gpp_maybe</span>
                                     <span>{t("nav.fuse")}</span>
                                 </button>
+                                <button
+                                    className={`more-menu-item ${route === "diagnostics" ? "active" : ""}`}
+                                    role="menuitem"
+                                    onClick={() => navigateFromMore("diagnostics")}
+                                >
+                                    <span className="ms">article</span>
+                                    <span>{t("nav.diagnostics")}</span>
+                                </button>
+                                <button
+                                    className={`more-menu-item ${route === "about" ? "active" : ""}`}
+                                    role="menuitem"
+                                    onClick={() => navigateFromMore("about")}
+                                >
+                                    <span className="ms">help</span>
+                                    <span>{t("nav.about")}</span>
+                                </button>
+
+                                {debugEnabled && (
+                                    <div className="more-menu-divider" role="separator" aria-hidden="true"/>
+                                )}
+
+                                {debugEnabled && (
+                                    <button
+                                        className={`more-menu-item ${route === "frontend-test" ? "active" : ""}`}
+                                        role="menuitem"
+                                        onClick={() => navigateFromMore("frontend-test")}
+                                    >
+                                        <span className="ms">lab_profile</span>
+                                        <span>前端测试</span>
+                                    </button>
+                                )}
                                 {debugEnabled && (
                                     <button
                                         className={`more-menu-item ${route === "souzu-debug" ? "active" : ""}`}
@@ -849,14 +882,6 @@ export default function App() {
                                         <span>{t("nav.blackholeDebug")}</span>
                                     </button>
                                 )}
-                                <button
-                                    className={`more-menu-item ${route === "diagnostics" ? "active" : ""}`}
-                                    role="menuitem"
-                                    onClick={() => navigateFromMore("diagnostics")}
-                                >
-                                    <span className="ms">article</span>
-                                    <span>{t("nav.diagnostics")}</span>
-                                </button>
                                 {debugEnabled && (
                                     <button
                                         className={`more-menu-item ${route === "packet-test" ? "active" : ""}`}
@@ -867,14 +892,6 @@ export default function App() {
                                         <span>{t("nav.packetTest")}</span>
                                     </button>
                                 )}
-                                <button
-                                    className={`more-menu-item ${route === "about" ? "active" : ""}`}
-                                    role="menuitem"
-                                    onClick={() => navigateFromMore("about")}
-                                >
-                                    <span className="ms">help</span>
-                                    <span>{t("nav.about")}</span>
-                                </button>
                             </div>
                         )}
                     </div>
@@ -1043,6 +1060,7 @@ export default function App() {
                         {route === "autorun" && <AutoRunnerPage/>}
                         {route === "settings" && <SettingsPage/>}
                         {route === "diagnostics" && <DiagnosticsPage/>}
+                        {route === "frontend-test" && <FrontendTestPage/>}
                         {route === "packet-test" && debugEnabled && <PacketTestPage/>}
                         {route === "about" && <AboutPage onSecretClick={onSecretClick}/>}
                     </div>

@@ -577,6 +577,13 @@ input, textarea, select, code, pre, .selectable {
     font-size: 20px;
 }
 
+.more-menu-divider {
+    height: 0;
+    margin: 8px 6px;
+    border-top: 1px solid color-mix(in srgb, var(--border) 92%, var(--text) 8%);
+    opacity: 0.95;
+}
+
 .main-pane {
     border: 1px solid var(--border);
     border-radius: var(--radius);
