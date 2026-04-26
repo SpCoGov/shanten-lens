@@ -6,7 +6,10 @@ import socket
 import ssl
 import time
 import traceback
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from html import escape
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from backend.autorun.util.retry_1004 import call_with_1004_retry_async
@@ -32,6 +35,18 @@ def _now_mono_ms() -> int:
 
 SMTP_TIMEOUT_SEC = 12
 NEED_PIONNER_BADGE_COUNT = 4
+EMAIL_ASSETS_BASE_URL = "https://raw.githubusercontent.com/SpCoGov/shanten-lens/refs/heads/2.0/app/public/assets"
+EMAIL_AMULET_ASSETS_BASE_URL = f"{EMAIL_ASSETS_BASE_URL}/amulet"
+EMAIL_BADGE_ASSETS_BASE_URL = f"{EMAIL_ASSETS_BASE_URL}/badge"
+EMAIL_ASSETS_ROOT = Path(__file__).resolve().parents[2] / "app" / "public" / "assets"
+EMAIL_AMULET_ASSETS_ROOT = EMAIL_ASSETS_ROOT / "amulet"
+EMAIL_BADGE_ASSETS_ROOT = EMAIL_ASSETS_ROOT / "badge"
+EMAIL_RARITY_BG_INDEX = {
+    "PURPLE": 1,
+    "ORANGE": 2,
+    "BLUE": 3,
+    "GREEN": 4,
+}
 
 
 class AutoRunner:
@@ -82,60 +97,6 @@ class AutoRunner:
 
         self.update_config(self._get_config())
 
-    def _targets_status_lines(self, effect_list: List[Dict[str, Any]], targets: List[Dict[str, Any]]) -> List[str]:
-        """逐个目标给出‘已拥有/未拥有’，并在目标为 amulet 时标注 plus / badge 需求。"""
-        lines: List[str] = []
-        # 先构建已拥有集合，便于快速判断
-        owned: List[Tuple[int, bool, Optional[int]]] = []
-        for e in effect_list or []:
-            owned.append(self._extract_amulet_signature(e))
-
-        def has_amulet(reg_id: int, need_plus: bool, need_badge: Optional[int]) -> bool:
-            for (r, p, b) in owned:
-                if r != reg_id:
-                    continue
-                if need_badge is not None and b != need_badge:
-                    continue
-                # 需要 plus 时必须 plus；不需要 plus 时要求非 plus
-                if need_plus and not p:
-                    continue
-                if (not need_plus) and p:
-                    continue
-                return True
-            return False
-
-        for i, t in enumerate(targets or []):
-            kind = t.get("kind")
-            if kind == "badge":
-                try:
-                    bid = int(t.get("id"))
-                except Exception:
-                    bid = -1
-                # 任意带该 badge 的护身符算满足
-                ok = any((b == bid) for (_r, _p, b) in owned)
-                lines.append(f"- 目标#{i + 1} 印章: {bid} —— {'已拥有✓' if ok else '未拥有×'}")
-            elif kind == "amulet":
-                try:
-                    reg = int(t.get("id"))
-                except Exception:
-                    reg = -1
-                need_plus = bool(t.get("plus", False))
-                tb = t.get("badge", None)
-                need_badge: Optional[int]
-                if tb not in (None, ""):
-                    try:
-                        need_badge = int(tb)
-                    except Exception:
-                        need_badge = None
-                else:
-                    need_badge = None
-                ok = has_amulet(reg, need_plus, need_badge)
-                plus_txt = "plus=是" if need_plus else "plus=否"
-                badge_txt = f", 需印章={need_badge}" if need_badge is not None else ""
-                lines.append(f"- 目标#{i + 1} 护身符: reg={reg}（{plus_txt}{badge_txt}） —— {'已拥有✓' if ok else '未拥有×'}")
-            else:
-                lines.append(f"- 目标#{i + 1} 未知类型 —— 跳过")
-        return lines
 
     @staticmethod
     def _fmt_ms(ms: int) -> str:
@@ -153,12 +114,6 @@ class AutoRunner:
         btxt = f", badge={badge}" if badge is not None else ""
         return f"reg={reg}{plus}{btxt}"
 
-    def _owned_amulets_lines(self, effect_list: List[Dict[str, Any]]) -> List[str]:
-        lines: List[str] = []
-        for e in effect_list or []:
-            lines.append(f"  • {self._amulet_sig_str(e)}")
-        return lines or ["  （无）"]
-
     def _get_effect_list_snapshot(self) -> List[Dict[str, Any]]:
         gs = self._get_game_state()
         try:
@@ -166,56 +121,6 @@ class AutoRunner:
         except Exception:
             d = (gs or {})
         return d.get("effect_list") or []
-
-    def _notify_email_success_sync(self) -> None:
-        cfg = self.email_notify or {}
-        if not cfg.get("enabled"):
-            return
-        elapsed = self._calc_elapsed_ms()
-        effect_list = self._get_effect_list_snapshot()
-        lines_targets = self._targets_status_lines(effect_list, self.targets)
-        lines_owned = self._owned_amulets_lines(effect_list)
-
-        subject = "【Shanten Lens】自动化完成 ✓（目标已达成）"
-        body = "\n".join([
-            "自动化已完成（达到结束条件）。",
-            f"- 运行时长：{self._fmt_ms(elapsed)}",
-            f"- 已运行局数：{self.runs}",
-            f"- 达成目标数：{self.best_achieved_count}/{self.end_count}",
-            "",
-            "目标达成情况：",
-            *lines_targets,
-            "",
-            "当前已拥有护身符：",
-            *lines_owned,
-        ])
-        ok, reason = self.send_email_notify(subject, body)
-        if app_mod and hasattr(app_mod, "broadcast_sync_ui_toast"):
-            # 需要的话，可以在后端也给前端弹个 toast
-            try:
-                app_mod.broadcast_sync_ui_toast("success", "目标已达成，邮件已发送" if ok else f"目标已达成，邮件发送失败：{reason}")
-            except Exception:
-                pass
-
-    def _notify_email_failure_sync(self, reason_text: str) -> None:
-        cfg = self.email_notify or {}
-        if not cfg.get("enabled"):
-            return
-        elapsed = self._calc_elapsed_ms()
-        subject = "【Shanten Lens】自动化中止 ✗"
-        body = "\n".join([
-            "自动化因错误中止。",
-            f"- 错误原因：{reason_text or (self.last_error or 'unknown')}",
-            f"- 最后步骤：{self.current_step or '-'}",
-            f"- 运行时长：{self._fmt_ms(elapsed)}",
-            f"- 已运行局数：{self.runs}",
-        ])
-        ok, reason = self.send_email_notify(subject, body)
-        if app_mod and hasattr(app_mod, "broadcast_sync_ui_toast"):
-            try:
-                app_mod.broadcast_sync_ui_toast("error", "运行中止，邮件已发送" if ok else f"运行中止，邮件发送失败：{reason}")
-            except Exception:
-                pass
 
     def _preferred_flow_status(self) -> tuple[Optional[bool], Optional[str]]:
         packet_bot: PacketBot = self._get_packet_bot()
@@ -291,19 +196,347 @@ class AutoRunner:
         if self.PROBE_DEBUG:
             logger.info("[autorun] probe state cleared (NOT_PROBED)")
 
-    def send_email_notify(self, subject: str, body: str, *, to_override: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+    def _pad4(self, n: int) -> str:
+        return str(int(n)).zfill(4)
+
+    def _inline_img_tag(self, src: Optional[str], alt: str, style: str) -> str:
+        if not src:
+            return ""
+        return f'<img src="{escape(src, quote=True)}" alt="{escape(alt)}" style="{style}">'
+
+    def _get_amulet_item(self, reg_id: int):
+        if not app_mod or not getattr(app_mod, "AMULET_REG", None):
+            return None
+        try:
+            return app_mod.AMULET_REG.get(int(reg_id))
+        except Exception:
+            return None
+
+    def _get_badge_item(self, badge_id: Optional[int]):
+        if badge_id is None or not app_mod or not getattr(app_mod, "BADGE_REG", None):
+            return None
+        try:
+            return app_mod.BADGE_REG.get(int(badge_id))
+        except Exception:
+            return None
+
+    def _notify_email_success_sync(self) -> None:
+        cfg = self.email_notify or {}
+        if not cfg.get("enabled"):
+            return
+        elapsed = self._calc_elapsed_ms()
+        effect_list = self._get_effect_list_snapshot()
+        plain_body, html_body = self._build_success_email_bodies(effect_list, elapsed)
+        subject = "[Shanten Lens] 自动化完成（目标已达成）"
+        ok, reason = self.send_email_notify(subject, plain_body, html_body=html_body)
+        if app_mod and hasattr(app_mod, "broadcast_sync_ui_toast"):
+            try:
+                app_mod.broadcast_sync_ui_toast("success", "目标已达成，邮件已发送" if ok else f"目标已达成，邮件发送失败：{reason}")
+            except Exception:
+                pass
+
+
+    def _asset_url(self, kind: str, filename: str) -> str:
+        base = EMAIL_AMULET_ASSETS_BASE_URL if kind == "amulet" else EMAIL_BADGE_ASSETS_BASE_URL
+        return f"{base}/{filename}"
+
+    def _build_effect_display_info(self, effect_item: Dict[str, Any]) -> Dict[str, Any]:
+        reg_id, is_plus, badge_id = self._extract_amulet_signature(effect_item)
+        amulet = self._get_amulet_item(reg_id)
+        badge = self._get_badge_item(badge_id)
+        rarity_name = getattr(getattr(amulet, "rarity", None), "name", "GREEN")
+        bg_index = EMAIL_RARITY_BG_INDEX.get(str(rarity_name).upper(), 4)
+        try:
+            volume = int(effect_item.get("volume") or 1)
+        except Exception:
+            volume = 1
+        bg_file = f"fu_widen_bg{bg_index}.jpg" if volume == 2 else f"fu_bg{bg_index}.jpg"
+        icon_id = getattr(amulet, "icon_id", 0) if amulet else 0
+        icon_file = f"fu_{self._pad4(icon_id)}.png" if amulet else None
+        return {
+            "reg_id": reg_id,
+            "is_plus": is_plus,
+            "badge_id": badge_id,
+            "amulet": amulet,
+            "badge": badge,
+            "bg_url": self._asset_url("amulet", bg_file),
+            "icon_url": self._asset_url("amulet", icon_file) if icon_file else None,
+            "badge_url": self._asset_url("badge", f"badge_{badge_id}.png") if badge_id is not None else None,
+            "plus_url": self._asset_url("amulet", "plus.png") if is_plus else None,
+        }
+
+    def _amulet_summary_text(self, effect_item: Dict[str, Any]) -> str:
+        info = self._build_effect_display_info(effect_item)
+        name = getattr(info["amulet"], "name", None) or f"未知护身符 #{info['reg_id']}"
+        parts = [name]
+        if info["is_plus"]:
+            parts.append("Plus")
+        if info["badge"] is not None:
+            parts.append(f"印章:{getattr(info['badge'], 'name', info['badge_id'])}")
+        elif info["badge_id"] is not None:
+            parts.append(f"印章:{info['badge_id']}")
+        return " / ".join(parts)
+
+    def _target_summary_text(self, target: Dict[str, Any]) -> str:
+        if target.get("kind") == "badge":
+            try:
+                badge_id = int(target.get("id"))
+            except Exception:
+                badge_id = -1
+            badge = self._get_badge_item(badge_id)
+            badge_name = getattr(badge, "name", None) or f"未知印章 #{badge_id}"
+            return f"印章: {badge_name}"
+        if target.get("kind") == "amulet":
+            target_effect = {
+                "id": int(target.get("id") or 0) * 10 + (1 if target.get("plus") else 0),
+                "badge": {"id": int(target["badge"])} if target.get("badge") not in (None, "") else None,
+                "volume": int(target.get("volume") or 1),
+            }
+            return self._amulet_summary_text(target_effect)
+        return "未知目标"
+
+    def _target_is_owned(self, effect_list: List[Dict[str, Any]], target: Dict[str, Any]) -> bool:
+        if target.get("kind") == "badge":
+            try:
+                want_badge = int(target.get("id"))
+            except Exception:
+                return False
+            for effect_item in effect_list or []:
+                _reg_id, _is_plus, badge_id = self._extract_amulet_signature(effect_item)
+                if badge_id == want_badge:
+                    return True
+            return False
+        if target.get("kind") == "amulet":
+            for effect_item in effect_list or []:
+                if self.amulet_matches_target(effect_item, target):
+                    return True
+        return False
+
+    def _targets_status_lines(self, effect_list: List[Dict[str, Any]], targets: List[Dict[str, Any]]) -> List[str]:
+        lines: List[str] = []
+        for i, target in enumerate(targets or []):
+            ok = self._target_is_owned(effect_list, target)
+            lines.append(f"- 目标#{i + 1} {self._target_summary_text(target)} - {'已拥有✓' if ok else '未拥有×'}")
+        return lines
+
+    def _owned_amulets_lines(self, effect_list: List[Dict[str, Any]]) -> List[str]:
+        lines: List[str] = []
+        for effect_item in effect_list or []:
+            lines.append(f"  • {self._amulet_summary_text(effect_item)}")
+        return lines or ["  （无）"]
+
+    def _render_stat_pills(self, items: List[Tuple[str, str]]) -> str:
+        return "".join([
+            f'<div style="display:inline-block;min-width:120px;margin:0 12px 12px 0;padding:12px 14px;border:1px solid #d0d5dd;border-radius:12px;background:#fff;">'
+            f'<div style="color:#475467;font-size:12px;">{escape(label)}</div>'
+            f'<div style="margin-top:6px;color:#101828;font-size:22px;font-weight:700;">{escape(value)}</div>'
+            '</div>'
+            for label, value in items
+        ])
+
+    def _render_card_grid(self, cards: List[str], empty_text: str) -> str:
+        if not cards:
+            return f'<div style="color:#475467;font-size:14px;">{escape(empty_text)}</div>'
+        return "".join(cards)
+
+    def _render_email_section(self, title: str, content_html: str, *, subtitle: Optional[str] = None) -> str:
+        subtitle_html = f'<div style="margin-top:6px;color:#475467;font-size:14px;">{escape(subtitle)}</div>' if subtitle else ""
+        return (
+            '<div style="margin-top:28px;padding-top:24px;border-top:1px solid #eaecf0;">'
+            f'<div style="font-size:20px;font-weight:800;color:#101828;">{escape(title)}</div>'
+            f'{subtitle_html}'
+            f'<div style="margin-top:16px;">{content_html}</div>'
+            '</div>'
+        )
+
+    def _wrap_email_html(self, title: str, subtitle: str, body_html: str, *, accent: str) -> str:
+        return (
+            '<html><body style="margin:0;padding:24px;background:#f5f7fb;color:#101828;font-family:Segoe UI,Microsoft YaHei,Arial,sans-serif;">'
+            '<div style="max-width:1080px;margin:0 auto;">'
+            '<div style="padding:24px;border-radius:18px;background:#ffffff;border:1px solid #d0d5dd;">'
+            f'<div style="display:inline-block;padding:6px 10px;border-radius:999px;background:{accent};color:#ffffff;font-size:12px;font-weight:700;">Shanten Lens</div>'
+            f'<div style="margin-top:14px;font-size:28px;font-weight:800;color:#101828;">{escape(title)}</div>'
+            f'<div style="margin-top:8px;color:#475467;font-size:14px;">{escape(subtitle)}</div>'
+            f'{body_html}'
+            '</div></div></body></html>'
+        )
+
+    def _unwrap_email_html(self, html_doc: str) -> str:
+        marker = '<div style="max-width:1080px;margin:0 auto;">'
+        start = html_doc.find(marker)
+        if start < 0:
+            return html_doc
+        end = html_doc.rfind("</body></html>")
+        if end < 0:
+            return html_doc[start:]
+        return html_doc[start:end]
+
+    def _build_failure_email_bodies(self, reason_text: str, elapsed_ms: int) -> Tuple[str, str]:
+        reason = reason_text or (self.last_error or "unknown")
+        plain_body = "\n".join([
+            "自动化因错误中止。",
+            f"- 错误原因：{reason}",
+            f"- 最后步骤：{self.current_step or '-'}",
+            f"- 运行时长：{self._fmt_ms(elapsed_ms)}",
+            f"- 已运行局数：{self.runs}",
+        ])
+        alert_html = (
+            '<div style="margin-top:20px;padding:16px 18px;border:1px solid #fecdca;border-radius:14px;background:#fef3f2;">'
+            '<div style="color:#b42318;font-size:15px;font-weight:800;">错误详情</div>'
+            f'<div style="margin-top:8px;color:#7a271a;font-size:14px;line-height:1.6;">{escape(reason)}</div>'
+            '</div>'
+        )
+        body_html = (
+            f'<div style="margin-top:20px;">{self._render_stat_pills([("最后步骤", self.current_step or "-"), ("运行时长", self._fmt_ms(elapsed_ms)), ("已运行局数", str(self.runs))])}</div>'
+            + alert_html
+        )
+        html_body = self._wrap_email_html("自动化中止", "运行过程中触发错误，下面是本次终止摘要。", body_html, accent="#d92d20")
+        return plain_body, html_body
+
+    def _notify_email_failure_sync(self, reason_text: str) -> None:
+        cfg = self.email_notify or {}
+        if not cfg.get("enabled"):
+            return
+        elapsed = self._calc_elapsed_ms()
+        plain_body, html_body = self._build_failure_email_bodies(reason_text, elapsed)
+        subject = "[Shanten Lens] 自动化中止"
+        ok, reason = self.send_email_notify(subject, plain_body, html_body=html_body)
+        if app_mod and hasattr(app_mod, "broadcast_sync_ui_toast"):
+            try:
+                app_mod.broadcast_sync_ui_toast("error", "运行中止，邮件已发送" if ok else f"运行中止，邮件发送失败：{reason}")
+            except Exception:
+                pass
+
+    def _build_amulet_card_html(
+            self,
+            effect_item: Dict[str, Any],
+            *,
+            footer: Optional[str] = None,
+            status_label: Optional[str] = None,
+            status_ok: Optional[bool] = None,
+    ) -> str:
+        info = self._build_effect_display_info(effect_item)
+        name = getattr(info["amulet"], "name", None) or f"未知护身符 #{info['reg_id']}"
+        card_width = 160
+        card_height = 220
+        status_html = ""
+        if status_label:
+            status_bg = "#16a34a" if status_ok else "#dc2626"
+            status_html = (
+                f'<div style="display:inline-block;margin-bottom:8px;padding:4px 8px;border-radius:999px;'
+                f'background:{status_bg};color:#fff;font-size:12px;font-weight:700;line-height:1.2;">{escape(status_label)}</div>'
+            )
+        icon_html = self._inline_img_tag(
+            info.get("icon_url"),
+            name,
+            f"display:block;width:{card_width}px;height:{card_height}px;border:1px solid #d0d5dd;border-radius:14px;background:#f8fafc;",
+        )
+        footer_html = f'<div style="margin-top:6px;color:#475467;font-size:12px;">{escape(footer)}</div>' if footer else ""
+        return (
+            '<div style="display:inline-block;vertical-align:top;width:180px;margin:0 12px 16px 0;">'
+            f'{status_html}'
+            f'{icon_html}'
+            f'<div style="margin-top:8px;color:#101828;font-size:14px;font-weight:700;line-height:1.4;">{escape(name)}</div>'
+            f'{footer_html}'
+            '</div>'
+        )
+
+    def _build_success_email_bodies(self, effect_list: List[Dict[str, Any]], elapsed_ms: int) -> Tuple[str, str]:
+        plain_body = "\n".join([
+            "自动化已完成（达到结束条件）。",
+            f"- 运行时长：{self._fmt_ms(elapsed_ms)}",
+            f"- 已运行局数：{self.runs}",
+            f"- 达成目标数：{self.best_achieved_count}/{self.end_count}",
+            "",
+            "目标达成情况：",
+            *self._targets_status_lines(effect_list, self.targets),
+            "",
+            "当前已拥有护身符：",
+            *self._owned_amulets_lines(effect_list),
+        ])
+
+        target_cards: List[str] = []
+        for idx, target in enumerate(self.targets or []):
+            owned = self._target_is_owned(effect_list, target)
+            status_label = f"目标#{idx + 1} {'已拥有' if owned else '未拥有'}"
+            if target.get("kind") == "badge":
+                try:
+                    badge_id = int(target.get("id"))
+                except Exception:
+                    badge_id = -1
+                target_cards.append(self._build_badge_target_html(badge_id, status_label=status_label, status_ok=owned))
+                continue
+            if target.get("kind") == "amulet":
+                target_effect = {
+                    "id": int(target.get("id") or 0) * 10 + (1 if target.get("plus") else 0),
+                    "badge": {"id": int(target["badge"])} if target.get("badge") not in (None, "") else None,
+                    "volume": int(target.get("volume") or 1),
+                }
+                footer_parts: List[str] = []
+                if target.get("plus"):
+                    footer_parts.append("需要 Plus")
+                if target.get("badge") not in (None, ""):
+                    badge = self._get_badge_item(int(target["badge"]))
+                    footer_parts.append(f"需要印章: {getattr(badge, 'name', target['badge'])}")
+                target_cards.append(self._build_amulet_card_html(
+                    target_effect,
+                    footer=" / ".join(footer_parts) if footer_parts else None,
+                    status_label=status_label,
+                    status_ok=owned,
+                ))
+
+        owned_cards = [
+            self._build_amulet_card_html(effect_item)
+            for effect_item in (effect_list or [])
+        ]
+        body_html = (
+            f'<div style="margin-top:20px;">{self._render_stat_pills([("运行时长", self._fmt_ms(elapsed_ms)), ("已运行局数", str(self.runs)), ("达成目标数", f"{self.best_achieved_count}/{self.end_count}")])}</div>'
+            + self._render_email_section("目标达成情况", self._render_card_grid(target_cards, "未配置目标。"))
+            + self._render_email_section("当前已拥有护身符", self._render_card_grid(owned_cards, "当前没有已持有护身符。"))
+        )
+        html_body = self._wrap_email_html("自动化已完成", "达到结束条件后生成的护身符汇总。", body_html, accent="#1570ef")
+        return plain_body, html_body
+
+    def build_test_email_bodies(self) -> Tuple[str, str]:
+        effect_list = self._get_effect_list_snapshot()
+        success_plain, success_html = self._build_success_email_bodies(effect_list, self._calc_elapsed_ms())
+        failure_plain, failure_html = self._build_failure_email_bodies("这是测试邮件中的示例错误：网络超时 / 目标条件不满足。", self._calc_elapsed_ms())
+        plain_body = "\n\n".join([
+            "这是一封测试邮件，下面会预览成功通知和失败通知样式。",
+            "=== 成功样式预览 ===",
+            success_plain,
+            "=== 错误样式预览 ===",
+            failure_plain,
+        ])
+        html_body = self._wrap_email_html(
+            "测试通知预览",
+            "这封测试邮件同时展示成功通知和错误通知的最终样式。",
+            self._render_email_section("成功通知样式", self._unwrap_email_html(success_html), subtitle="自动化完成时会发送类似内容。")
+            + self._render_email_section("错误通知样式", self._unwrap_email_html(failure_html), subtitle="自动化出错中止时会发送类似内容。"),
+            accent="#7a5af8",
+        )
+        return plain_body, html_body
+
+    def send_email_notify(
+            self,
+            subject: str,
+            body: str,
+            *,
+            to_override: Optional[str] = None,
+            html_body: Optional[str] = None,
+            inline_images: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> Tuple[bool, Optional[str]]:
         cfg = self.email_notify or {}
         if not cfg.get("enabled"):
             return False, "email-notify-disabled"
 
         host = (cfg.get("host") or "").strip()
         port = int(cfg.get("port") or 0)
-        use_ssl = bool(cfg.get("ssl")) or (port == 465)  # 兼容常见 465=SSL
+        use_ssl = bool(cfg.get("ssl")) or (port == 465)
         from_addr = (cfg.get("from") or "").strip()
         pwd = cfg.get("pass") or ""
         to_addr = (to_override or cfg.get("to") or "").strip()
 
-        # 基本校验
         if not host or not port:
             return False, "smtp-host-or-port-missing"
         if "@" not in (from_addr or ""):
@@ -313,13 +546,20 @@ class AutoRunner:
         if not pwd:
             return False, "smtp-password-missing"
 
-        # 构造邮件
-        msg = MIMEText(body or "", "plain", "utf-8")
+        if html_body is None and subject.startswith("Shanten Lens "):
+            body, html_body = self.build_test_email_bodies()
+
+        if html_body:
+            msg = MIMEMultipart("alternative")
+            msg.attach(MIMEText(body or "", "plain", "utf-8"))
+            msg.attach(MIMEText(html_body, "html", "utf-8"))
+        else:
+            msg = MIMEText(body or "", "plain", "utf-8")
+
         msg["Subject"] = subject or ""
         msg["From"] = from_addr
         msg["To"] = to_addr
 
-        # 发送
         try:
             socket.setdefaulttimeout(SMTP_TIMEOUT_SEC)
             if use_ssl:
@@ -330,13 +570,11 @@ class AutoRunner:
             else:
                 ctx = ssl.create_default_context()
                 with smtplib.SMTP(host, port, timeout=SMTP_TIMEOUT_SEC) as s:
-                    # 587 常见：先 EHLO 再 STARTTLS
                     try:
                         s.ehlo()
                         s.starttls(context=ctx)
                         s.ehlo()
                     except smtplib.SMTPException:
-                        # 某些服务器不要求/不支持 STARTTLS，允许跳过
                         pass
                     s.login(from_addr, pwd)
                     s.sendmail(from_addr, [to_addr], msg.as_string())

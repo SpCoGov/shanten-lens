@@ -253,7 +253,7 @@ class PacketBot(GameBot):
 
     def buy_pack(self, good_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         if not self._ensure_stage_with_refresh(4, delay_sec=delay_sec):
-            return False, "in the illegal stage", None
+            return False, "in the illegal buy pack stage", None
         st = self._state()
         if not st:
             return False, "state-unavailable", None
@@ -271,7 +271,7 @@ class PacketBot(GameBot):
 
     def refresh_shop(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         if not self._ensure_stage_with_refresh(4, delay_sec=delay_sec):
-            return False, "in the illegal stage", None
+            return False, "in the illegal refresh stage", None
         st = self._state()
         if not st:
             return False, "state-unavailable", None
@@ -314,7 +314,7 @@ class PacketBot(GameBot):
 
     def end_shopping(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         if not self._ensure_stage_with_refresh(4, delay_sec=delay_sec):
-            return False, "in the illegal stage", None
+            return False, "in the illegal end shopping stage", None
         ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivityEndShopping", data={"activityId": self.activity_id}, delay_sec=delay_sec)
         return ok, reason, resp
 
