@@ -4,3 +4,6 @@ node_modules
 Shanten-Lens-portable.zip
 .venv
 .idea
+__pycache__/
+**/__pycache__/
+*.py[cod]
