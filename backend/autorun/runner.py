@@ -52,6 +52,7 @@ EMAIL_RARITY_BG_INDEX = {
 class AutoRunner:
     PROBE_DEBUG = False
     HEARTBEAT_INTERVAL = 1.0  # s
+    MAX_CONSECUTIVE_ABORT_TICKS = 3
 
     def __init__(self, *, get_config, get_game_state) -> None:
         self._get_config = get_config
@@ -76,6 +77,8 @@ class AutoRunner:
         self.current_step: str = "-"
         self.last_error: Optional[str] = None
         self.need_start_game = False
+        self._consecutive_abort_reasons: List[str] = []
+        self._deferred_abort_this_tick = False
 
         # 最近一次“手动探测”
         self._last_probe_ts: int = 0
@@ -765,6 +768,7 @@ class AutoRunner:
     async def _main_loop(self) -> None:
         try:
             while self.running and self.mode == "continuous":
+                self._deferred_abort_this_tick = False
                 try:
                     await self.run_tick()
                 except asyncio.CancelledError:
@@ -772,6 +776,8 @@ class AutoRunner:
                 except Exception as e:
                     self.last_error = str(e)
                     logger.exception("[autorun] run_tick error")
+                if not self._deferred_abort_this_tick:
+                    self._consecutive_abort_reasons.clear()
                 await asyncio.sleep(self.op_interval_ms / 1000)
         except asyncio.CancelledError:
             pass
@@ -1388,7 +1394,50 @@ class AutoRunner:
 
     async def abort(self, reason: str = "fatal error", *, push: bool = True) -> None:
         async with self._lock:
-            self.last_error = reason or "fatal error"
+            reason = reason or "fatal error"
+            current_task = asyncio.current_task()
+            is_main_loop_abort = (
+                self.mode == "continuous"
+                and self.running
+                and self._loop_task is current_task
+            )
+
+            # 如果需要收到retry-timeout的时候立刻停止的话、把下面的字符串改成"retry-timeout"
+            if is_main_loop_abort and "retry-timeoutA" not in reason:
+                self.last_error = reason
+                self._deferred_abort_this_tick = True
+                self._consecutive_abort_reasons.append(reason)
+                abort_count = len(self._consecutive_abort_reasons)
+                logger.warning(
+                    "[autorun] abort requested during main loop tick ({}/{}); skip this tick: {}",
+                    abort_count,
+                    self.MAX_CONSECUTIVE_ABORT_TICKS,
+                    reason,
+                )
+
+                if abort_count < self.MAX_CONSECUTIVE_ABORT_TICKS:
+                    if push:
+                        await self._broadcast_status(safe=True)
+                    return
+
+                reasons = "\n".join(
+                    f"{idx}. {abort_reason}"
+                    for idx, abort_reason in enumerate(self._consecutive_abort_reasons, start=1)
+                )
+                logger.warning(
+                    "[autorun] consecutive abort threshold reached; stopping main loop:\n{}",
+                    reasons,
+                )
+                reason = (
+                    f"fatal: consecutive aborts reached {self.MAX_CONSECUTIVE_ABORT_TICKS} ticks\n"
+                    f"{reasons}"
+                )
+                self._consecutive_abort_reasons.clear()
+            elif is_main_loop_abort:
+                self._consecutive_abort_reasons.clear()
+                logger.warning("[autorun] retry-timeout abort; stopping main loop immediately: {}", reason)
+
+            self.last_error = reason
 
             try:
                 self._notify_email_failure_sync(self.last_error)
@@ -1399,7 +1448,7 @@ class AutoRunner:
             self.elapsed_ms = self._calc_elapsed_ms()
             self._started_mono_ms = 0
             # 停掉主循环
-            if self._loop_task and not self._loop_task.done():
+            if self._loop_task and not self._loop_task.done() and self._loop_task is not current_task:
                 self._loop_task.cancel()
             self._loop_task = None
             # 停掉心跳
