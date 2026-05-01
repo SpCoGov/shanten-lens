@@ -105,7 +105,13 @@ const MAIN_GAP = 12;
 const SHOP_BUFF_EXCHANGE_ID = 8001;
 const SHOP_BUFF_UPGRADE_COSTS = [5, 10, 15, 20, 50, 100, 150, 200];
 
-const appWindow = getCurrentWindow();
+function getAppWindowSafe() {
+    try {
+        return getCurrentWindow();
+    } catch {
+        return null;
+    }
+}
 
 function buildPointProgressMeta(pointRaw?: string, targetRaw?: string) {
     const point = normalizeNumericString(pointRaw ?? "0");
@@ -151,6 +157,8 @@ function Topbar({
     const {t} = useTranslation();
     const progressMeta = (stage === 2 || stage === 3) ? buildPointProgressMeta(point, targetPoint) : null;
     const onMin = async () => {
+        const appWindow = getAppWindowSafe();
+        if (!appWindow) return;
         try {
             await appWindow.minimize();
         } catch (e) {
@@ -158,6 +166,8 @@ function Topbar({
         }
     };
     const onTgl = async () => {
+        const appWindow = getAppWindowSafe();
+        if (!appWindow) return;
         try {
             await appWindow.toggleMaximize();
         } catch (e) {
@@ -165,6 +175,8 @@ function Topbar({
         }
     };
     const onClose = async () => {
+        const appWindow = getAppWindowSafe();
+        if (!appWindow) return;
         try {
             await appWindow.close();
         } catch (e) {
