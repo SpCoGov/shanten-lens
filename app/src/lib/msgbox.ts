@@ -1,4 +1,5 @@
 import {WebviewWindow, getAllWebviewWindows} from "@tauri-apps/api/webviewWindow";
+import i18n from "./i18n";
 
 export type MsgBoxPayload = {
     id: string;
@@ -30,8 +31,20 @@ function visualUnits(line: string) {
     return units;
 }
 
+function displayTextForEstimate(textOrKey: string, values?: Record<string, unknown>) {
+    const translated =
+        i18n.isInitialized && i18n.exists(textOrKey)
+            ? String(i18n.t(textOrKey, values))
+            : textOrKey;
+
+    return translated
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/(?:p|div|li|h[1-6])>/gi, "\n")
+        .replace(/<[^>]+>/g, "");
+}
+
 function estimateMsgBoxSize(payload: MsgBoxPayload) {
-    const text = String(payload.message ?? "");
+    const text = displayTextForEstimate(String(payload.message ?? ""), payload.values);
     const lines = text.split(/\r?\n/);
     const maxLineUnits = Math.max(8, ...lines.map((line) => visualUnits(line)));
     const hasCancel = !!payload.cancelText;
@@ -47,9 +60,9 @@ function estimateMsgBoxSize(payload: MsgBoxPayload) {
         return sum + Math.max(1, Math.ceil(units / charsPerLine));
     }, 0);
 
-    // header + body padding + footer + lineHeight * rows
+    // header + body padding + footer + lineHeight * rows + native inset
     const footerHeight = hasCancel ? 62 : 56;
-    const estimatedHeight = 48 + 28 + footerHeight + wrappedRows * 23;
+    const estimatedHeight = 48 + 28 + footerHeight + wrappedRows * 30 + 29;
     const height = clamp(estimatedHeight, MIN_HEIGHT, MAX_HEIGHT);
 
     return {

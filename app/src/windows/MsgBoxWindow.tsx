@@ -25,6 +25,7 @@ export default function MsgBoxWindow() {
     const idRef = React.useRef<string>("");
 
     const rootRef = React.useRef<HTMLDivElement | null>(null);
+    const messageRef = React.useRef<HTMLDivElement | null>(null);
     const centeredOnceRef = React.useRef(false);
 
     function decodePayloadParam(): InitPayload | null {
@@ -111,10 +112,33 @@ export default function MsgBoxWindow() {
         const measureAndResize = async () => {
             if (!rootRef.current) return;
 
+            const header = rootRef.current.querySelector(`.${styles.header}`) as HTMLElement | null;
+            const main = rootRef.current.querySelector(`.${styles.main}`) as HTMLElement | null;
+            const footer = rootRef.current.querySelector(`.${styles.btns}`) as HTMLElement | null;
+            const mainStyle = main ? getComputedStyle(main) : null;
+            const mainPaddingY =
+                (Number.parseFloat(mainStyle?.paddingTop || "0") || 0) +
+                (Number.parseFloat(mainStyle?.paddingBottom || "0") || 0);
+
             const contentW = Math.max(rootRef.current.scrollWidth, rootRef.current.offsetWidth);
-            const contentH = Math.max(rootRef.current.scrollHeight, rootRef.current.offsetHeight);
+            const naturalContentH =
+                (header?.offsetHeight || 0) +
+                mainPaddingY +
+                Math.max(messageRef.current?.scrollHeight || 0, messageRef.current?.offsetHeight || 0) +
+                (footer?.offsetHeight || 0);
+            const contentH = Math.max(rootRef.current.scrollHeight, rootRef.current.offsetHeight, naturalContentH);
             const w = Math.ceil(contentW + 12);
-            const h = Math.ceil(contentH + 12);
+
+            let chromeInsetH = 0;
+            try {
+                const cur = await appWindow.innerSize();
+                const viewportH = document.documentElement.clientHeight || window.innerHeight || 0;
+                chromeInsetH = Math.max(0, cur.height - viewportH);
+            } catch {
+                // ignore
+            }
+
+            const h = Math.ceil(contentH + chromeInsetH + 12);
 
             const mon = await currentMonitor();
             const availW = mon?.size?.width ?? 1920;
@@ -187,7 +211,7 @@ export default function MsgBoxWindow() {
 
     const closeFromChrome = async () => {
         if (!data) return close();
-        await reply(hasCancel ? false : true);
+        await reply(!hasCancel);
     };
 
     const values = data?.values || {};
@@ -206,7 +230,11 @@ export default function MsgBoxWindow() {
             </header>
 
             <main className={styles.main}>
-                <div className={styles.message} title={t(data?.message || "msgbox.defaultMessage", values) as string}>
+                <div
+                    className={styles.message}
+                    ref={messageRef}
+                    title={t(data?.message || "msgbox.defaultMessage", values) as string}
+                >
                     <Trans
                         i18nKey={data?.message || "msgbox.defaultMessage"}
                         values={values}
