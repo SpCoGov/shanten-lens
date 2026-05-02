@@ -317,7 +317,7 @@ input, textarea, select, code, pre, .selectable {
 }
 
 .sidebar {
-    --nav-indicator-top: 0px;
+    --nav-indicator-top: 8px;
     --nav-indicator-height: 44px;
     border: 1px solid var(--border);
     border-radius: var(--radius);

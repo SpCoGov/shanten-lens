@@ -743,16 +743,19 @@ export default function App() {
         setMoreMenuOpen(false);
     }, []);
 
-    React.useEffect(() => {
+    React.useLayoutEffect(() => {
         const updateSidebarIndicator = () => {
             const sidebar = sidebarRef.current;
             const activeBtn = navRefs.current[route] ?? (isMoreRoute(route) ? moreButtonRef.current : null);
             if (!sidebar || !activeBtn) return;
 
-            const sidebarRect = sidebar.getBoundingClientRect();
-            const buttonRect = activeBtn.getBoundingClientRect();
-            const top = buttonRect.top - sidebarRect.top + sidebar.scrollTop;
-            const height = buttonRect.height;
+            let top = activeBtn.offsetTop;
+            let offsetParent = activeBtn.offsetParent;
+            while (offsetParent instanceof HTMLElement && offsetParent !== sidebar) {
+                top += offsetParent.offsetTop;
+                offsetParent = offsetParent.offsetParent;
+            }
+            const height = activeBtn.offsetHeight;
 
             sidebar.style.setProperty("--nav-indicator-top", `${top}px`);
             sidebar.style.setProperty("--nav-indicator-height", `${height}px`);
