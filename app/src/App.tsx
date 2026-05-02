@@ -90,7 +90,7 @@ async function openSettingsWindow() {
 }
 
 type Route = "home" | "score" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "diagnostics" | "packet-test" | "frontend-test" | "about";
-type TutorialId = "blackhole";
+type TutorialId = "home" | "blackhole";
 type TutorialStep = {
     title: string;
     body: string;
@@ -98,6 +98,7 @@ type TutorialStep = {
 };
 
 const BLACKHOLE_TUTORIAL_SEEN_KEY = "sl-tutorial:blackhole:v1";
+const HOME_TUTORIAL_SEEN_KEY = "sl-tutorial:home:v1";
 
 function readTutorialSeen(key: string) {
     try {
@@ -215,7 +216,7 @@ function TutorialOverlay({
         const clone = target.cloneNode(true) as HTMLElement;
         clone.removeAttribute("id");
         clone.setAttribute("aria-hidden", "true");
-        clone.querySelectorAll<HTMLElement>("button, input, select, textarea, a, [tabindex]").forEach((el) => {
+        const disableCloneInteractivity = (el: HTMLElement) => {
             el.setAttribute("tabindex", "-1");
             if (el instanceof HTMLButtonElement || el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) {
                 el.disabled = true;
@@ -223,7 +224,9 @@ function TutorialOverlay({
             if (el instanceof HTMLAnchorElement) {
                 el.removeAttribute("href");
             }
-        });
+        };
+        disableCloneInteractivity(clone);
+        clone.querySelectorAll<HTMLElement>("button, input, select, textarea, a, [tabindex]").forEach(disableCloneInteractivity);
         clone.classList.add("tutorial-target-clone");
         clone.style.left = `${targetRect.left}px`;
         clone.style.top = `${targetRect.top}px`;
@@ -406,6 +409,43 @@ export default function App() {
     const [rightPanelMode, setRightPanelMode] = React.useState<"replacementStats" | "wall">("replacementStats");
     const [wallTileIds, setWallTileIds] = React.useState<number[]>([]);
 
+    const homeTutorialSteps = React.useMemo<TutorialStep[]>(() => [
+        {
+            title: t("tutorial.home.step_welcome.title"),
+            body: t("tutorial.home.step_welcome.body"),
+        },
+        {
+            title: t("tutorial.home.step_home.title"),
+            body: t("tutorial.home.step_home.body"),
+            targetSelector: '[data-tutorial="nav-home"]',
+        },
+        {
+            title: t("tutorial.home.step_score.title"),
+            body: t("tutorial.home.step_score.body"),
+            targetSelector: '[data-tutorial="nav-score"]',
+        },
+        {
+            title: t("tutorial.home.step_blackhole.title"),
+            body: t("tutorial.home.step_blackhole.body"),
+            targetSelector: '[data-tutorial="nav-blackhole"]',
+        },
+        {
+            title: t("tutorial.home.step_autorun.title"),
+            body: t("tutorial.home.step_autorun.body"),
+            targetSelector: '[data-tutorial="nav-autorun"]',
+        },
+        {
+            title: t("tutorial.home.step_more.title"),
+            body: t("tutorial.home.step_more.body"),
+            targetSelector: '[data-tutorial="nav-more"]',
+        },
+        {
+            title: t("tutorial.home.step_refresh.title"),
+            body: t("tutorial.home.step_refresh.body"),
+            targetSelector: '[data-tutorial="nav-refresh"]',
+        },
+    ], [t]);
+
     const blackHoleTutorialSteps = React.useMemo<TutorialStep[]>(() => [
         {
             title: t("tutorial.blackhole.step_start.title"),
@@ -428,11 +468,18 @@ export default function App() {
         },
     ], [t]);
 
-    const openBlackHoleTutorial = React.useCallback(() => {
-        setActiveTutorial("blackhole");
-    }, []);
+    const activeTutorialSteps = activeTutorial === "home" ? homeTutorialSteps : blackHoleTutorialSteps;
+
+    const openCurrentTutorial = React.useCallback(() => {
+        if (route === "home" || route === "blackhole") {
+            setActiveTutorial(route);
+        }
+    }, [route]);
 
     const closeTutorial = React.useCallback(() => {
+        if (activeTutorial === "home") {
+            writeTutorialSeen(HOME_TUTORIAL_SEEN_KEY);
+        }
         if (activeTutorial === "blackhole") {
             writeTutorialSeen(BLACKHOLE_TUTORIAL_SEEN_KEY);
         }
@@ -440,10 +487,18 @@ export default function App() {
     }, [activeTutorial]);
 
     React.useEffect(() => {
+        if (activeTutorial) return;
+        if (route !== "home") return;
+        if (readTutorialSeen(HOME_TUTORIAL_SEEN_KEY)) return;
+        setActiveTutorial("home");
+    }, [activeTutorial, route]);
+
+    React.useEffect(() => {
+        if (activeTutorial) return;
         if (route !== "blackhole") return;
         if (readTutorialSeen(BLACKHOLE_TUTORIAL_SEEN_KEY)) return;
         setActiveTutorial("blackhole");
-    }, [route]);
+    }, [activeTutorial, route]);
 
     const [deckMap, setDeckMap] = React.useState<Map<number, string>>(new Map());
 
@@ -1011,7 +1066,7 @@ export default function App() {
                 stage={stage}
                 point={point}
                 targetPoint={targetPoint}
-                onTutorialClick={route === "blackhole" ? openBlackHoleTutorial : undefined}
+                onTutorialClick={route === "home" || route === "blackhole" ? openCurrentTutorial : undefined}
             />
 
             <div className="shell">
@@ -1019,29 +1074,30 @@ export default function App() {
                     <div className="sidebar-active-indicator" aria-hidden="true"/>
                     <button ref={(el) => {
                         navRefs.current.home = el;
-                    }} className={`nav-icon ${route === "home" ? "active" : ""}`} title={t("nav.home")} onClick={() => setRoute("home")}>
+                    }} className={`nav-icon ${route === "home" ? "active" : ""}`} data-tutorial="nav-home" title={t("nav.home")} onClick={() => setRoute("home")}>
                         <span className="ms">home</span>
                     </button>
                     <button ref={(el) => {
                         navRefs.current.score = el;
-                    }} className={`nav-icon ${route === "score" ? "active" : ""}`} title={t("nav.score")} onClick={() => setRoute("score")}>
+                    }} className={`nav-icon ${route === "score" ? "active" : ""}`} data-tutorial="nav-score" title={t("nav.score")} onClick={() => setRoute("score")}>
                         <span className="ms">calculate</span>
                     </button>
                     <button ref={(el) => {
                         navRefs.current.blackhole = el;
-                    }} className={`nav-icon ${route === "blackhole" ? "active" : ""}`} title={t("nav.blackhole")} onClick={() => setRoute("blackhole")}>
+                    }} className={`nav-icon ${route === "blackhole" ? "active" : ""}`} data-tutorial="nav-blackhole" title={t("nav.blackhole")} onClick={() => setRoute("blackhole")}>
                         <span className="ms">deblur</span>
                     </button>
                     <button ref={(el) => {
                         navRefs.current.autorun = el;
-                    }} className={`nav-icon ${route === "autorun" ? "active" : ""}`} title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
+                    }} className={`nav-icon ${route === "autorun" ? "active" : ""}`} data-tutorial="nav-autorun" title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
                         <span className="ms">autoplay</span>
                     </button>
                     <div className="more-nav">
                         <button
                             ref={moreButtonRef}
                             className={`nav-icon ${isMoreRoute(route) ? "active" : ""}`}
-                            title={t("nav.more")}
+                            data-tutorial="nav-more"
+                            title={t("nav.more", {defaultValue: t("tutorial.home.step_more.title")})}
                             aria-haspopup="menu"
                             aria-expanded={moreMenuOpen}
                             onClick={() => setMoreMenuOpen((open) => !open)}
@@ -1118,6 +1174,7 @@ export default function App() {
                     <div className="sidebar-bottom">
                         <button
                             className="nav-icon"
+                            data-tutorial="nav-refresh"
                             title={t("nav.refreshGame")}
                             onClick={() => ws.send({type: "fetch_amulet_activity_data", data: {activityId: 250811}})}
                         >
@@ -1317,7 +1374,10 @@ export default function App() {
                 </div>
             </footer>
             {activeTutorial === "blackhole" ? (
-                <TutorialOverlay steps={blackHoleTutorialSteps} onClose={closeTutorial}/>
+                <TutorialOverlay steps={activeTutorialSteps} onClose={closeTutorial}/>
+            ) : null}
+            {activeTutorial === "home" ? (
+                <TutorialOverlay steps={activeTutorialSteps} onClose={closeTutorial}/>
             ) : null}
         </div>
     );
