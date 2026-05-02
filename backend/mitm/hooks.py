@@ -1108,6 +1108,8 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
                 timeout=45.0,
             )
             return ("pass", None) if ok else ("drop", None)
+        if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityOperate":
+            cfg = MANAGER.to_table_payload("fuse") or {}
         if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityEndShopping":
             cfg = MANAGER.to_table_payload("fuse") or {}
             if not bool(cfg.get("enable_exit_life_guard", True)):

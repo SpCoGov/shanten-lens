@@ -80,7 +80,7 @@
     "home": "主页",
     "score": "点数",
     "blackhole": "花火指导",
-    "blackholeDebug" : "指导测试",
+    "blackholeDebug": "指导测试",
     "fuse": "熔断",
     "autorun": "自动化",
     "refreshGame": "刷新对局",
@@ -236,7 +236,16 @@
     "disabled_reason_game_not_ready": "游戏未启动/流程未就绪",
     "disabled_reason_probe_timeout": "连接超时（请检查游戏/代理）",
     "disabled_reason_not_ready": "未就绪",
-    "disabled_reason_not_probed": "未探测"
+    "disabled_reason_not_probed": "未探测",
+    "btn_export_config": "导出配置",
+    "btn_import_config": "导入配置",
+    "export_title": "导出自动化配置",
+    "export_hint": "已生成短配置码，并已尝试复制到剪贴板。配置码不包含任何邮件配置。",
+    "import_title": "导入自动化配置",
+    "import_placeholder": "粘贴导出的配置码",
+    "import_hint": "导入后会先更新当前页面配置，确认无误后请点击“保存配置”。邮件配置不会被导入。",
+    "import_error": "配置码无法解析，请检查是否完整复制。",
+    "btn_apply_import": "应用导入"
   },
   "diagnostics": {
     "ws_status_label": "WebSocket",

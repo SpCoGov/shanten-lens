@@ -9,6 +9,7 @@ import {
     patchAutoConfig,
     removeTargetAt,
     setTargetValue,
+    type AutoRunnerConfig,
     type AutoRunnerRemakeRecord,
     type TargetItem,
     useAutoRunner,
@@ -37,6 +38,121 @@ function formatAutoLevel(level?: number | null): string {
     return `${a}-${b}`;
 }
 
+const DENSE_ALPHABET = Array.from({length: 94}, (_, i) => String.fromCharCode(i + 33))
+    .filter((ch) => ch !== "\\" && ch !== "`" && ch !== "\"")
+    .join("");
+
+function toDenseText(text: string): string {
+    if (!text) return "!";
+    const bytes = new TextEncoder().encode(text);
+    let value = 0n;
+    for (const byte of bytes) {
+        value = (value << 8n) + BigInt(byte);
+    }
+    const base = BigInt(DENSE_ALPHABET.length);
+    let out = "";
+    while (value > 0n) {
+        out = DENSE_ALPHABET[Number(value % base)] + out;
+        value /= base;
+    }
+    return out;
+}
+
+function fromDenseText(text: string): string {
+    if (text === "!") return "";
+    if (!text) return "";
+    const base = BigInt(DENSE_ALPHABET.length);
+    let value = 0n;
+    for (const ch of text) {
+        const digit = DENSE_ALPHABET.indexOf(ch);
+        if (digit < 0) throw new Error("bad_dense_char");
+        value = value * base + BigInt(digit);
+    }
+    const bytes: number[] = [];
+    while (value > 0n) {
+        bytes.unshift(Number(value & 0xffn));
+        value >>= 8n;
+    }
+    return new TextDecoder().decode(new Uint8Array(bytes));
+}
+
+function encodeShortConfig(config: AutoRunnerConfig): string {
+    const parts: string[] = [];
+    const endCount = Math.max(1, Math.floor(Number(config.end_count ?? 1)));
+    const cutoffLevel = Number(config.cutoff_level ?? 0) || 0;
+    const interval = Math.max(0, Math.round(Number(config.op_interval_ms ?? 1000)));
+    if (endCount !== 1) parts.push(`e${endCount}`);
+    if (cutoffLevel > 0) parts.push(`l${cutoffLevel}`);
+    if (interval !== 1000) parts.push(`i${interval}`);
+    parts.push(...(config.targets ?? []).map((target) => {
+        const value = Math.max(1, Math.floor(Number((target as any).value ?? 1)));
+        const valueSuffix = value === 1 ? "" : `:${value}`;
+        if (target.kind === "amulet") {
+            const plus = target.plus ? "+" : "";
+            const badge = target.badge == null ? "" : `.${target.badge}`;
+            return `a${target.id}${plus}${badge}${valueSuffix}`;
+        }
+        return `b${target.id}${valueSuffix}`;
+    }));
+    return toDenseText(parts.join(";"));
+}
+
+function decodeShortConfig(text: string): Partial<AutoRunnerConfig> {
+    const raw = text.trim();
+    return decodeCompactConfigText(fromDenseText(raw));
+}
+
+function decodeCompactConfigText(payloadText: string): Partial<AutoRunnerConfig> {
+    const targets: TargetItem[] = [];
+    let endCount = 1;
+    let cutoffLevel = 0;
+    let interval = 1000;
+
+    for (const part of payloadText.split(";").filter(Boolean)) {
+        if (part.startsWith("e")) {
+            endCount = Math.max(1, Math.floor(Number(part.slice(1))));
+            continue;
+        }
+        if (part.startsWith("l")) {
+            cutoffLevel = Math.max(0, Math.floor(Number(part.slice(1))));
+            continue;
+        }
+        if (part.startsWith("i")) {
+            interval = Math.max(0, Math.min(5000, Math.round(Number(part.slice(1)))));
+            continue;
+        }
+        const valueSplit = part.split(":");
+        const head = valueSplit[0];
+        const value = Math.max(1, Math.floor(Number(valueSplit[1] ?? 1)));
+        if (head.startsWith("b")) {
+            const id = Number(head.slice(1));
+            if (!Number.isFinite(id)) throw new Error("bad_target");
+            targets.push({kind: "badge", id, value});
+            continue;
+        }
+        if (head.startsWith("a")) {
+            const match = /^a(\d+)(\+?)(?:\.(\d+))?$/.exec(head);
+            if (!match) throw new Error("bad_target");
+            targets.push({
+                kind: "amulet",
+                id: Number(match[1]),
+                plus: match[2] === "+",
+                badge: match[3] == null ? null : Number(match[3]),
+                value,
+            });
+            continue;
+        }
+        throw new Error("bad_part");
+    }
+
+    return {
+        end_count: endCount,
+        cutoff_level: cutoffLevel,
+        op_interval_ms: interval,
+        targets,
+    };
+}
+
 export default function AutoRunnerPage() {
     const {t} = useTranslation();
     const {config, status} = useAutoRunner();
@@ -49,6 +165,11 @@ export default function AutoRunnerPage() {
     const [detailTargetIndex, setDetailTargetIndex] = React.useState<number | null>(null);
     const [selectedRecordSeq, setSelectedRecordSeq] = React.useState<number | null>(null);
     const [levelText, setLevelText] = React.useState<string>(formatLevelNum(config.cutoff_level));
+    const [exportOpen, setExportOpen] = React.useState(false);
+    const [exportText, setExportText] = React.useState("");
+    const [importOpen, setImportOpen] = React.useState(false);
+    const [importText, setImportText] = React.useState("");
+    const [importError, setImportError] = React.useState("");
 
     const working = Boolean(status.running);
 
@@ -83,6 +204,31 @@ export default function AutoRunnerPage() {
     const stop = React.useCallback(() => {
         ws.send({type: "autorun_control", data: {action: "stop"}});
     }, []);
+
+    const openExport = React.useCallback(async () => {
+        const text = encodeShortConfig(config);
+        setExportText(text);
+        setExportOpen(true);
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch {
+            // Clipboard access can be unavailable; the modal still shows the code.
+        }
+    }, [config]);
+
+    const applyImport = React.useCallback(() => {
+        try {
+            const next = decodeShortConfig(importText);
+            patchAutoConfig(next);
+            setLevelText(formatLevelNum(next.cutoff_level));
+            setImportOpen(false);
+            setImportText("");
+            setImportError("");
+        } catch {
+            setImportError(t("autorun.import_error"));
+            return;
+        }
+    }, [importText, t]);
 
     const renderTarget = (target: TargetItem, idx: number) => {
         const value = Math.max(1, Math.floor(Number((target as any).value ?? 1)));
@@ -601,6 +747,16 @@ export default function AutoRunnerPage() {
                 </section>
 
                 <div className="page-footer-actions">
+                    <button className="nav-btn" onClick={openExport}>
+                        {t("autorun.btn_export_config")}
+                    </button>
+                    <button className="nav-btn" onClick={() => {
+                        setImportOpen(true);
+                        setImportText("");
+                        setImportError("");
+                    }}>
+                        {t("autorun.btn_import_config")}
+                    </button>
                     <button className="nav-btn" onClick={onSave} disabled={saving}>
                         {saving ? t("autorun.btn_saving") : t("autorun.btn_save")}
                     </button>
@@ -625,6 +781,40 @@ export default function AutoRunnerPage() {
             />
             <Modal open={detailTarget != null} onClose={() => setDetailTargetIndex(null)} title={detailTitle} width={560}>
                 <div style={{lineHeight: 1.7}}>{detailBody}</div>
+            </Modal>
+            <Modal open={exportOpen} onClose={() => {
+                setExportOpen(false);
+                setExportText("");
+            }} title={t("autorun.export_title")} width={640}>
+                <div style={{display: "grid", gap: 10}}>
+                    <textarea className="form-input" value={exportText} readOnly rows={4} style={{fontFamily: "monospace", resize: "vertical"}}/>
+                    <div className="hint">{t("autorun.export_hint")}</div>
+                </div>
+            </Modal>
+            <Modal open={importOpen} onClose={() => {
+                setImportOpen(false);
+                setImportText("");
+                setImportError("");
+            }} title={t("autorun.import_title")} width={640}>
+                <div style={{display: "grid", gap: 10}}>
+                    <textarea
+                        className="form-input"
+                        value={importText}
+                        onChange={(e) => {
+                            setImportText(e.target.value);
+                            setImportError("");
+                        }}
+                        rows={4}
+                        placeholder={t("autorun.import_placeholder")}
+                        style={{fontFamily: "monospace", resize: "vertical"}}
+                    />
+                    {importError ? <div className="notice error">{importError}</div> : <div className="hint">{t("autorun.import_hint")}</div>}
+                    <div className="toolbar" style={{justifyContent: "flex-end", gap: 8}}>
+                        <button className="nav-btn" onClick={applyImport} disabled={!importText.trim()}>
+                            {t("autorun.btn_apply_import")}
+                        </button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

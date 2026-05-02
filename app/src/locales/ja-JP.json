@@ -80,7 +80,7 @@
     "home": "ホーム",
     "score": "点数",
     "blackhole": "花火ガイド",
-    "blackholeDebug" : "ガイドテスト",
+    "blackholeDebug": "ガイドテスト",
     "fuse": "ヒューズ",
     "autorun": "自動化",
     "refreshGame": "更新",
@@ -236,7 +236,16 @@
     "disabled_reason_game_not_ready": "ゲーム未起動／フロー未準備",
     "disabled_reason_probe_timeout": "接続タイムアウト（ゲーム／プロキシを確認）",
     "disabled_reason_not_ready": "未準備",
-    "disabled_reason_not_probed": "未検査"
+    "disabled_reason_not_probed": "未検査",
+    "btn_export_config": "設定をエクスポート",
+    "btn_import_config": "設定をインポート",
+    "export_title": "自動化設定のエクスポート",
+    "export_hint": "短い設定コードを生成し、クリップボードへのコピーも試みました。メール設定は一切含まれません。",
+    "import_title": "自動化設定のインポート",
+    "import_placeholder": "エクスポートした設定コードを貼り付けてください",
+    "import_hint": "インポートすると、まず現在の画面上の設定に反映されます。内容を確認してから「設定を保存」を押してください。メール設定はインポートされません。",
+    "import_error": "設定コードを読み取れませんでした。全文がコピーされているか確認してください。",
+    "btn_apply_import": "インポートを適用"
   },
   "diagnostics": {
     "ws_status_label": "WebSocket",
