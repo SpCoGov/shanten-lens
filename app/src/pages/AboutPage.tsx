@@ -29,7 +29,13 @@ const ASSET_SOURCES = [
     },
 ];
 
-export default function AboutPage({onSecretClick}: { onSecretClick: () => void }) {
+export default function AboutPage({
+                                      onSecretClick,
+                                      onShowUsageNotice,
+                                  }: {
+    onSecretClick: () => void;
+    onShowUsageNotice: () => void;
+}) {
     const {t} = useTranslation();
     const [openTileGallery, setOpenTileGallery] = React.useState(false);
 
@@ -90,6 +96,9 @@ Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
                 <div className={styles.actionRow}>
                     <button className="nav-btn" onClick={() => setOpenTileGallery(true)}>
                         {t("about.view_all_tiles")}
+                    </button>
+                    <button className="nav-btn" onClick={onShowUsageNotice}>
+                        {t("about.show_usage_notice")}
                     </button>
                 </div>
             </section>

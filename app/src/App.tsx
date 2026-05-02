@@ -103,8 +103,13 @@ type VersionMismatch = {
     backendVersion: string;
 };
 
+type UsageNoticeState = {
+    checked: boolean;
+};
+
 const BLACKHOLE_TUTORIAL_SEEN_KEY = "sl-tutorial:blackhole:v1";
 const HOME_TUTORIAL_SEEN_KEY = "sl-tutorial:home:v1";
+const USAGE_NOTICE_ACK_KEY = "sl-ack-usage-notice";
 
 function readTutorialSeen(key: string) {
     try {
@@ -394,6 +399,8 @@ export default function App() {
     const [debugEnabled, setDebugEnabled] = React.useState(false);
     const [versionMismatch, setVersionMismatch] = React.useState<VersionMismatch | null>(null);
     const versionMismatchShownRef = React.useRef(false);
+    const [usageNotice, setUsageNotice] = React.useState<UsageNoticeState | null>(null);
+    const usageNoticeShownOnStartupRef = React.useRef(false);
     const [activeTutorial, setActiveTutorial] = React.useState<TutorialId | null>(null);
 
     const [cells, setCells] = React.useState<Cell[]>([]);
@@ -571,6 +578,51 @@ export default function App() {
             cancelText: undefined,
         });
     }, [theme]);
+
+    const closeProgram = React.useCallback(async () => {
+        try {
+            await getCurrentWindow().close();
+        } catch {
+            window.close();
+        }
+    }, []);
+
+    const openUsageNotice = React.useCallback(() => {
+        setUsageNotice({checked: localStorage.getItem(USAGE_NOTICE_ACK_KEY) === "true"});
+    }, []);
+
+    const saveUsageNoticeAcknowledgement = React.useCallback((acknowledged: boolean) => {
+        localStorage.setItem(USAGE_NOTICE_ACK_KEY, acknowledged ? "true" : "false");
+    }, []);
+
+    const closeUsageNotice = React.useCallback(async () => {
+        const acknowledged = localStorage.getItem(USAGE_NOTICE_ACK_KEY) === "true";
+        if (!acknowledged) {
+            await closeProgram();
+            return;
+        }
+        setUsageNotice(null);
+    }, [closeProgram]);
+
+    const submitUsageNotice = React.useCallback(async () => {
+        const acknowledged = localStorage.getItem(USAGE_NOTICE_ACK_KEY) === "true";
+        if (!acknowledged) {
+            await closeProgram();
+            return;
+        }
+        setUsageNotice(null);
+    }, [closeProgram]);
+
+    const toggleUsageNoticeAcknowledgement = React.useCallback((checked: boolean) => {
+        saveUsageNoticeAcknowledgement(checked);
+        setUsageNotice((current) => current ? {...current, checked} : current);
+    }, [saveUsageNoticeAcknowledgement]);
+
+    React.useEffect(() => {
+        if (localStorage.getItem(USAGE_NOTICE_ACK_KEY) === "true" || usageNoticeShownOnStartupRef.current) return;
+        usageNoticeShownOnStartupRef.current = true;
+        setUsageNotice({checked: false});
+    }, []);
 
     React.useEffect(() => {
         if (Math.random() >= HIDDEN_THEME_CHANCE) return;
@@ -1354,7 +1406,12 @@ export default function App() {
                         {route === "diagnostics" && <DiagnosticsPage/>}
                         {route === "frontend-test" && <FrontendTestPage/>}
                         {route === "packet-test" && debugEnabled && <PacketTestPage/>}
-                        {route === "about" && <AboutPage onSecretClick={onSecretClick}/>}
+                        {route === "about" && (
+                            <AboutPage
+                                onSecretClick={onSecretClick}
+                                onShowUsageNotice={openUsageNotice}
+                            />
+                        )}
                     </div>
                 </main>
             </div>
@@ -1396,6 +1453,70 @@ export default function App() {
             ) : null}
             {activeTutorial === "home" ? (
                 <TutorialOverlay steps={activeTutorialSteps} onClose={closeTutorial}/>
+            ) : null}
+            {usageNotice ? (
+                <div
+                    className="usage-notice-overlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="usage-notice-title"
+                    onClick={() => void closeUsageNotice()}
+                >
+                    <button
+                        className="usage-notice-close"
+                        onClick={() => void closeUsageNotice()}
+                        aria-label={t("modal.close")}
+                    >
+                        <span className="ms" aria-hidden="true">close</span>
+                    </button>
+                    <div className="usage-notice-shell" onClick={(event) => event.stopPropagation()}>
+                        <div className="usage-notice-mark" aria-hidden="true">
+                            <span className="ms">info</span>
+                        </div>
+
+                        <div className="usage-notice-copy">
+                            <h2 id="usage-notice-title">{t("app.usage_notice.title")}</h2>
+                            <p>{t("app.usage_notice.intro")}</p>
+                            <p>{t("app.usage_notice.risk")}</p>
+                        </div>
+
+                        <div className="usage-notice-terms">
+                            <section>
+                                <h3>{t("app.usage_notice.cn_terms_title")}</h3>
+                                <p>{t("app.usage_notice.cn_terms_body")}</p>
+                            </section>
+                            <section>
+                                <h3>{t("app.usage_notice.jp_terms_title")}</h3>
+                                <p>{t("app.usage_notice.jp_terms_body")}</p>
+                            </section>
+                            <p className="usage-notice-terms-note">{t("app.usage_notice.terms_note")}</p>
+                        </div>
+
+                        <p className="usage-notice-disclaimer">{t("app.usage_notice.disclaimer")}</p>
+
+                        <label className="usage-notice-check">
+                            <input
+                                type="checkbox"
+                                checked={usageNotice.checked}
+                                onChange={(event) => {
+                                    const checked = event.currentTarget.checked;
+                                    toggleUsageNoticeAcknowledgement(checked);
+                                }}
+                            />
+                            <span>{t("app.usage_notice.ack_label")}</span>
+                        </label>
+
+                        <button
+                            className={`usage-notice-action ${usageNotice.checked ? "is-continue" : "is-close"}`}
+                            onClick={() => void submitUsageNotice()}
+                        >
+                            <span className="ms" aria-hidden="true">
+                                {usageNotice.checked ? "check_circle" : "power_settings_new"}
+                            </span>
+                            {usageNotice.checked ? t("common.continue") : t("app.usage_notice.close_app")}
+                        </button>
+                    </div>
+                </div>
             ) : null}
             {versionMismatch ? (
                 <div

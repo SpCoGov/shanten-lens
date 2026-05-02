@@ -1356,6 +1356,175 @@ input, textarea, select, code, pre, .selectable {
     border-color: var(--border);
 }
 
+.usage-notice-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 5300;
+    display: grid;
+    place-items: center;
+    padding: 32px;
+    background: color-mix(in srgb, var(--bg) 8%, transparent);
+    backdrop-filter: blur(18px) saturate(.88);
+    color: var(--text);
+}
+
+.usage-notice-shell {
+    width: min(860px, calc(100vw - 64px));
+    max-height: calc(100vh - 96px);
+    overflow: auto;
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 18px 22px;
+    padding: 10px 8px 14px;
+    text-shadow: var(--shadow-text);
+    scrollbar-gutter: stable;
+}
+
+.usage-notice-close {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    width: 40px;
+    height: 40px;
+    border: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    color: var(--text);
+    background: transparent;
+    cursor: pointer;
+}
+
+.usage-notice-close:hover {
+    border-color: color-mix(in srgb, var(--color-ring) 52%, var(--border));
+    color: var(--color-ring);
+}
+
+.usage-notice-mark {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: var(--color-ring);
+    border: 1px solid color-mix(in srgb, var(--color-ring) 62%, transparent);
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--color-ring) 9%, transparent);
+}
+
+.usage-notice-mark .ms {
+    font-size: 42px;
+}
+
+.usage-notice-copy,
+.usage-notice-terms,
+.usage-notice-disclaimer,
+.usage-notice-check,
+.usage-notice-action {
+    grid-column: 2;
+}
+
+.usage-notice-copy {
+    min-width: 0;
+}
+
+.usage-notice-copy h2 {
+    margin: 0 0 10px;
+    font-size: 26px;
+    line-height: 1.28;
+    letter-spacing: 0;
+}
+
+.usage-notice-copy p,
+.usage-notice-terms p,
+.usage-notice-disclaimer,
+.usage-notice-terms-note {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.75;
+}
+
+.usage-notice-copy p + p {
+    margin-top: 6px;
+}
+
+.usage-notice-terms {
+    display: grid;
+    gap: 12px;
+}
+
+.usage-notice-terms section {
+    margin: 0;
+    padding: 0 0 0 14px;
+    border: 0;
+    border-left: 2px solid color-mix(in srgb, var(--color-ring) 78%, transparent);
+    border-radius: 0;
+    background: transparent;
+}
+
+.usage-notice-terms h3 {
+    margin: 0 0 6px;
+    font-size: 14px;
+    color: var(--color-ring);
+}
+
+.usage-notice-terms p {
+    color: color-mix(in srgb, var(--text) 88%, transparent);
+}
+
+.usage-notice-terms-note {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.usage-notice-disclaimer {
+    color: var(--text);
+}
+
+.usage-notice-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: fit-content;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.usage-notice-check input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-ring);
+}
+
+.usage-notice-action {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--color-ring) 58%, var(--border));
+    color: var(--text);
+    background: transparent;
+    cursor: pointer;
+}
+
+.usage-notice-action:hover {
+    color: var(--color-ring);
+}
+
+.usage-notice-action.is-continue {
+    border-color: color-mix(in srgb, var(--state-ok) 58%, var(--border));
+}
+
+.usage-notice-action.is-continue:hover {
+    color: var(--state-ok);
+}
+
+.usage-notice-action .ms {
+    font-size: 21px;
+}
+
 .version-mismatch-overlay {
     position: fixed;
     inset: 0;
@@ -1486,6 +1655,24 @@ input, textarea, select, code, pre, .selectable {
 }
 
 @media (max-width: 560px) {
+    .usage-notice-overlay {
+        padding: 24px;
+    }
+
+    .usage-notice-shell {
+        width: min(460px, calc(100vw - 48px));
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .usage-notice-copy,
+    .usage-notice-terms,
+    .usage-notice-disclaimer,
+    .usage-notice-check,
+    .usage-notice-action {
+        grid-column: 1;
+    }
+
     .version-mismatch-overlay {
         padding: 24px;
     }
