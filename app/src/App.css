@@ -300,9 +300,120 @@ input, textarea, select, code, pre, .selectable {
     box-shadow: 0 8px 20px color-mix(in srgb, var(--color-ring) 10%, transparent);
 }
 
+.tutorial-replay-btn {
+    margin-right: 4px;
+}
+
 .win-btn.close:hover {
     background: var(--danger-weak-bg);
     border-color: var(--danger-weak-border);
+}
+
+.tutorial-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    pointer-events: none;
+}
+
+.tutorial-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: color-mix(in srgb, var(--panel-bg) 34%, rgba(10, 14, 18, .68));
+    backdrop-filter: blur(12px) saturate(1.08);
+    pointer-events: none;
+}
+
+.tutorial-spotlight {
+    position: fixed;
+    z-index: 2;
+    border: 2px solid color-mix(in srgb, white 22%, var(--color-ring));
+    border-radius: 14px;
+    box-shadow:
+        0 0 0 9999px rgba(0, 0, 0, .28),
+        0 0 28px color-mix(in srgb, var(--color-ring) 38%, transparent);
+    pointer-events: none;
+    transition: left .24s ease, top .24s ease, width .24s ease, height .24s ease;
+}
+
+.tutorial-clone-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.tutorial-target-clone {
+    position: fixed !important;
+    margin: 0 !important;
+    pointer-events: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+}
+
+.tutorial-card {
+    position: relative;
+    z-index: 3;
+    width: min(520px, calc(100vw - 48px));
+    border: 1px solid color-mix(in srgb, var(--color-ring) 28%, var(--border));
+    border-radius: 14px;
+    padding: 20px;
+    background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .28), var(--panel-shadow);
+    pointer-events: auto;
+}
+
+.tutorial-kicker {
+    margin-bottom: 10px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.tutorial-card h2 {
+    margin: 0 0 10px;
+    font-size: 20px;
+    line-height: 1.25;
+}
+
+.tutorial-card p {
+    margin: 0;
+    color: var(--text);
+    line-height: 1.65;
+}
+
+.tutorial-progress {
+    display: flex;
+    gap: 6px;
+    margin-top: 18px;
+}
+
+.tutorial-progress span {
+    width: 28px;
+    height: 4px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--muted) 36%, transparent);
+}
+
+.tutorial-progress span.active {
+    background: var(--color-ring);
+}
+
+.tutorial-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.tutorial-actions-main {
+    display: flex;
+    gap: 8px;
 }
 
 .shell {

@@ -244,7 +244,7 @@ export default function BlackHolePage({
             <div className="panel">
                 <div className="panel-title">{t("blackhole.title")}</div>
                 <div style={{display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center"}}>
-                    <button className="nav-btn" onClick={() => startSearch()} disabled={isSearching}>
+                    <button className="nav-btn" data-tutorial="blackhole-start" onClick={() => startSearch()} disabled={isSearching}>
                         {t("blackhole.start")}
                     </button>
                     <button className="nav-btn" onClick={stopSearch} disabled={!isSearching}>
@@ -256,7 +256,7 @@ export default function BlackHolePage({
                     <button className="nav-btn" onClick={listQuads}>
                         {t("blackhole.list_quads")}
                     </button>
-                    <button className="nav-btn" onClick={executePlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
+                    <button className="nav-btn" data-tutorial="blackhole-execute" onClick={executePlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
                         {t("blackhole.execute_plan")}
                     </button>
                     <button className="nav-btn" onClick={exportCurrentSnapshot}>
@@ -287,7 +287,7 @@ export default function BlackHolePage({
             </div>
 
             <div className={`blackhole-layout ${quadDrawerOpen ? "with-drawer" : ""}`}>
-                <div className="blackhole-main">
+                <div className="blackhole-main" data-tutorial="blackhole-main">
                     <BlackHoleStrategyCard
                         data={viewData}
                         resolveFace={resolveFace}

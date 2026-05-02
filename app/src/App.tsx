@@ -90,6 +90,30 @@ async function openSettingsWindow() {
 }
 
 type Route = "home" | "score" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "diagnostics" | "packet-test" | "frontend-test" | "about";
+type TutorialId = "blackhole";
+type TutorialStep = {
+    title: string;
+    body: string;
+    targetSelector?: string;
+};
+
+const BLACKHOLE_TUTORIAL_SEEN_KEY = "sl-tutorial:blackhole:v1";
+
+function readTutorialSeen(key: string) {
+    try {
+        return localStorage.getItem(key) === "1";
+    } catch {
+        return true;
+    }
+}
+
+function writeTutorialSeen(key: string) {
+    try {
+        localStorage.setItem(key, "1");
+    } catch {
+        // Ignore storage failures; manual replay still works during this session.
+    }
+}
 
 function isMoreRoute(route: Route) {
     return route === "fuse"
@@ -143,16 +167,143 @@ function buildPointProgressMeta(pointRaw?: string, targetRaw?: string) {
     };
 }
 
+function TutorialOverlay({
+                             steps,
+                             onClose,
+                         }: {
+    steps: TutorialStep[];
+    onClose: () => void;
+}) {
+    const {t} = useTranslation();
+    const [stepIndex, setStepIndex] = React.useState(0);
+    const [targetRect, setTargetRect] = React.useState<DOMRect | null>(null);
+    const cloneLayerRef = React.useRef<HTMLDivElement | null>(null);
+    const step = steps[stepIndex];
+    const isFirst = stepIndex === 0;
+    const isLast = stepIndex === steps.length - 1;
+
+    const updateTargetRect = React.useCallback(() => {
+        if (!step?.targetSelector) {
+            setTargetRect(null);
+            return;
+        }
+        const target = document.querySelector(step.targetSelector);
+        setTargetRect(target instanceof HTMLElement ? target.getBoundingClientRect() : null);
+    }, [step?.targetSelector]);
+
+    React.useLayoutEffect(() => {
+        updateTargetRect();
+        const raf = window.requestAnimationFrame(updateTargetRect);
+        window.addEventListener("resize", updateTargetRect);
+        window.addEventListener("scroll", updateTargetRect, true);
+        return () => {
+            window.cancelAnimationFrame(raf);
+            window.removeEventListener("resize", updateTargetRect);
+            window.removeEventListener("scroll", updateTargetRect, true);
+        };
+    }, [updateTargetRect]);
+
+    React.useLayoutEffect(() => {
+        const layer = cloneLayerRef.current;
+        if (!layer) return;
+        layer.replaceChildren();
+        if (!step?.targetSelector || !targetRect) return;
+
+        const target = document.querySelector(step.targetSelector);
+        if (!(target instanceof HTMLElement)) return;
+
+        const clone = target.cloneNode(true) as HTMLElement;
+        clone.removeAttribute("id");
+        clone.setAttribute("aria-hidden", "true");
+        clone.querySelectorAll<HTMLElement>("button, input, select, textarea, a, [tabindex]").forEach((el) => {
+            el.setAttribute("tabindex", "-1");
+            if (el instanceof HTMLButtonElement || el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) {
+                el.disabled = true;
+            }
+            if (el instanceof HTMLAnchorElement) {
+                el.removeAttribute("href");
+            }
+        });
+        clone.classList.add("tutorial-target-clone");
+        clone.style.left = `${targetRect.left}px`;
+        clone.style.top = `${targetRect.top}px`;
+        clone.style.width = `${targetRect.width}px`;
+        clone.style.height = `${targetRect.height}px`;
+        layer.appendChild(clone);
+
+        return () => {
+            layer.replaceChildren();
+        };
+    }, [step?.targetSelector, targetRect]);
+
+    React.useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") onClose();
+            if (event.key === "ArrowLeft" && !isFirst) setStepIndex((value) => value - 1);
+            if (event.key === "ArrowRight") {
+                if (isLast) onClose();
+                else setStepIndex((value) => value + 1);
+            }
+        };
+        document.addEventListener("keydown", onKeyDown);
+        return () => document.removeEventListener("keydown", onKeyDown);
+    }, [isFirst, isLast, onClose]);
+
+    return (
+        <div className="tutorial-overlay" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
+            <div className="tutorial-backdrop" aria-hidden="true"/>
+            <div className="tutorial-clone-layer" ref={cloneLayerRef} aria-hidden="true"/>
+            {targetRect ? (
+                <div
+                    className="tutorial-spotlight"
+                    aria-hidden="true"
+                    style={{
+                        left: targetRect.left - 8,
+                        top: targetRect.top - 8,
+                        width: targetRect.width + 16,
+                        height: targetRect.height + 16,
+                    }}
+                />
+            ) : null}
+            <div className="tutorial-card">
+                <div className="tutorial-kicker">
+                    {t("tutorial.step_count", {current: stepIndex + 1, total: steps.length})}
+                </div>
+                <h2 id="tutorial-title">{step.title}</h2>
+                <p>{step.body}</p>
+                <div className="tutorial-progress" aria-hidden="true">
+                    {steps.map((_, index) => (
+                        <span key={index} className={index === stepIndex ? "active" : ""}/>
+                    ))}
+                </div>
+                <div className="tutorial-actions">
+                    <button className="btn ghost" onClick={onClose}>{t("tutorial.skip")}</button>
+                    <div className="tutorial-actions-main">
+                        <button className="btn ghost" onClick={() => setStepIndex((value) => Math.max(0, value - 1))} disabled={isFirst}>
+                            {t("tutorial.prev")}
+                        </button>
+                        <button className="btn" onClick={() => isLast ? onClose() : setStepIndex((value) => value + 1)}>
+                            {isLast ? t("tutorial.done") : t("tutorial.next")}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function Topbar({
                     onSecretClick,
                     stage,
                     point,
                     targetPoint,
+                    onTutorialClick,
                 }: {
     onSecretClick: () => void;
     stage: number;
     point?: string;
     targetPoint?: string;
+    onTutorialClick?: () => void;
 }) {
     const {t} = useTranslation();
     const progressMeta = (stage === 2 || stage === 3) ? buildPointProgressMeta(point, targetPoint) : null;
@@ -199,6 +350,11 @@ function Topbar({
             </div>
 
             <div className="win" data-tauri-drag-region="false">
+                {onTutorialClick ? (
+                    <button className="win-btn tutorial-replay-btn" data-tauri-drag-region="false" title={t("tutorial.replay")} onClick={onTutorialClick}>
+                        <span className="ms">school</span>
+                    </button>
+                ) : null}
                 <button className="win-btn" data-tauri-drag-region="false" title={t("window.minimize")} onClick={onMin}>
                     <span className="ms">remove</span>
                 </button>
@@ -227,6 +383,7 @@ export default function App() {
     const [moreMenuOpen, setMoreMenuOpen] = React.useState(false);
     const [connected, setConnected] = React.useState(false);
     const [debugEnabled, setDebugEnabled] = React.useState(false);
+    const [activeTutorial, setActiveTutorial] = React.useState<TutorialId | null>(null);
 
     const [cells, setCells] = React.useState<Cell[]>([]);
     const [stage, setStage] = React.useState<number>(0);
@@ -248,6 +405,45 @@ export default function App() {
     const [switchUsedCount, setSwitchUsedCount] = React.useState<number>(0);
     const [rightPanelMode, setRightPanelMode] = React.useState<"replacementStats" | "wall">("replacementStats");
     const [wallTileIds, setWallTileIds] = React.useState<number[]>([]);
+
+    const blackHoleTutorialSteps = React.useMemo<TutorialStep[]>(() => [
+        {
+            title: t("tutorial.blackhole.step_start.title"),
+            body: t("tutorial.blackhole.step_start.body"),
+            targetSelector: '[data-tutorial="blackhole-start"]',
+        },
+        {
+            title: t("tutorial.blackhole.step_results.title"),
+            body: t("tutorial.blackhole.step_results.body"),
+            targetSelector: '[data-tutorial="blackhole-main"]',
+        },
+        {
+            title: t("tutorial.blackhole.step_execute.title"),
+            body: t("tutorial.blackhole.step_execute.body"),
+            targetSelector: '[data-tutorial="blackhole-execute"]',
+        },
+        {
+            title: t("tutorial.blackhole.step_restart.title"),
+            body: t("tutorial.blackhole.step_restart.body"),
+        },
+    ], [t]);
+
+    const openBlackHoleTutorial = React.useCallback(() => {
+        setActiveTutorial("blackhole");
+    }, []);
+
+    const closeTutorial = React.useCallback(() => {
+        if (activeTutorial === "blackhole") {
+            writeTutorialSeen(BLACKHOLE_TUTORIAL_SEEN_KEY);
+        }
+        setActiveTutorial(null);
+    }, [activeTutorial]);
+
+    React.useEffect(() => {
+        if (route !== "blackhole") return;
+        if (readTutorialSeen(BLACKHOLE_TUTORIAL_SEEN_KEY)) return;
+        setActiveTutorial("blackhole");
+    }, [route]);
 
     const [deckMap, setDeckMap] = React.useState<Map<number, string>>(new Map());
 
@@ -810,7 +1006,13 @@ export default function App() {
             </div>
             <div className={`toast ${toastVisible ? "visible" : ""} ${toast?.kind || "info"}`}>{toast?.msg}</div>
 
-            <Topbar onSecretClick={onSecretClick} stage={stage} point={point} targetPoint={targetPoint}/>
+            <Topbar
+                onSecretClick={onSecretClick}
+                stage={stage}
+                point={point}
+                targetPoint={targetPoint}
+                onTutorialClick={route === "blackhole" ? openBlackHoleTutorial : undefined}
+            />
 
             <div className="shell">
                 <aside className="sidebar" ref={sidebarRef}>
@@ -839,7 +1041,7 @@ export default function App() {
                         <button
                             ref={moreButtonRef}
                             className={`nav-icon ${isMoreRoute(route) ? "active" : ""}`}
-                            title={t("nav.more", {defaultValue: "更多"})}
+                            title={t("nav.more")}
                             aria-haspopup="menu"
                             aria-expanded={moreMenuOpen}
                             onClick={() => setMoreMenuOpen((open) => !open)}
@@ -1114,6 +1316,9 @@ export default function App() {
                     )}
                 </div>
             </footer>
+            {activeTutorial === "blackhole" ? (
+                <TutorialOverlay steps={blackHoleTutorialSteps} onClose={closeTutorial}/>
+            ) : null}
         </div>
     );
 }
