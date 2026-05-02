@@ -13,6 +13,15 @@
     "hidden_theme": {
       "title": "恭喜你解锁了隐藏版向听镜",
       "message": "向听镜已帮你把所有护身符升级到顶级。"
+    },
+    "version_mismatch": {
+      "title": "前后端版本不一致",
+      "message": "检测到当前前端与后端版本不同，部分功能可能无法正常工作。",
+      "frontend_label": "前端",
+      "backend_label": "后端",
+      "frontend": "前端版本：{{version}}",
+      "backend": "后端版本：{{version}}",
+      "hint": "请确认启动的是同一版本的程序包，或重新解压/更新后再启动。"
     }
   },
   "window": {

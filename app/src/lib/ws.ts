@@ -3,6 +3,7 @@ import {setRegistry, type RegistryPayload} from "./registryStore";
 import {setFuseConfig, type FuseConfig} from "./fuseStore";
 import {AutoRunnerConfig, setAutoConfig} from "./autoRunnerStore";
 import {pushToast} from "./toast";
+import {APP_VERSION} from "./version";
 
 export type UpdateConfigPacket = { type: "update_config"; data: Record<string, Record<string, any>> };
 export type Packet =
@@ -82,6 +83,7 @@ class WS {
             this.connected = true;
             console.log(`[WS ${ts()}] connected`);
             this._startKeepAlive();
+            this.send({type: "frontend_hello", data: {version: APP_VERSION}});
             // 通知所有 onOpen 订阅者
             this.openHandlers.forEach((fn) => {
                 try {

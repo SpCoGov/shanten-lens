@@ -27,6 +27,7 @@ from backend.model.game_state import GameState
 from backend.model.items import AmuletRegistry, BadgeRegistry
 from backend.packet_monitor import PACKET_MONITOR
 from backend.ui_runtime import start_ui_loop_once, get_ui_loop, post_coro, mark_ui_services_started
+from backend.version import APP_VERSION
 
 GAME_STATE = GameState()
 PACKET_BOT: PacketBot
@@ -265,6 +266,7 @@ SELF_WIN_MS = 500  # 毫秒
 async def ws_handler(ws: WebSocketServerProtocol):
     CLIENTS.add(ws)
 
+    await ws_send(ws, {"type": "backend_hello", "data": {"version": APP_VERSION}})
     await ws_send(ws, {"type": "update_fuse_config", "data": MANAGER.to_table_payload("fuse")})
     await ws_send(ws, {"type": "update_autorun_config", "data": MANAGER.to_table_payload("autorun")})
     await ws_send(ws, {"type": "update_registry", "data": _registry_payload()})
@@ -284,7 +286,18 @@ async def ws_handler(ws: WebSocketServerProtocol):
             t = pkt.get("type")
             data = pkt.get("data", {})
 
-            if t == "keep_alive":
+            if t == "frontend_hello":
+                frontend_version = str((data or {}).get("version") or "")
+                if frontend_version and frontend_version != APP_VERSION:
+                    await ws_send(ws, {
+                        "type": "version_mismatch",
+                        "data": {
+                            "frontendVersion": frontend_version,
+                            "backendVersion": APP_VERSION,
+                        },
+                    })
+
+            elif t == "keep_alive":
                 pass
 
             elif t == "edit_config":

@@ -13,6 +13,7 @@ export default function Modal({
                                   children,
                                   width = 720,
                                   actions,
+                                  className,
                               }: {
     open: boolean;
     onClose: () => void;
@@ -20,6 +21,7 @@ export default function Modal({
     children: React.ReactNode;
     width?: number;
     actions?: React.ReactNode;
+    className?: string;
 }) {
     React.useEffect(() => {
         if (!open) return;
@@ -62,19 +64,19 @@ export default function Modal({
             }}
         >
             <div
-                className={styles.card}
+                className={`${styles.card}${className ? ` ${className}` : ""}`}
                 style={{width}}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className={styles.header}>
-                    <div className={styles.headerTitle}>{title}</div>
-                    <div className={styles.headerActions}>
+                <div className={`${styles.header} modal-header`}>
+                    <div className={`${styles.headerTitle} modal-title`}>{title}</div>
+                    <div className={`${styles.headerActions} modal-actions`}>
                         {actions}
                         <button className="nav-btn" onClick={onClose}>{t("modal.close")}</button>
                     </div>
                 </div>
 
-                <div className={styles.body}>
+                <div className={`${styles.body} modal-body`}>
                     {children}
                 </div>
             </div>

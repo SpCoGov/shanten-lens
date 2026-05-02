@@ -46,6 +46,7 @@ import {t} from "i18next";
 import {openMsgBoxWindow} from "./lib/msgbox";
 import type {PlanData} from "./lib/planTypes";
 import {buildDoraCountByTile} from "./lib/tileHighlights";
+import {APP_VERSION} from "./lib/version";
 
 type BackendLogPayload =
     | string
@@ -95,6 +96,11 @@ type TutorialStep = {
     title: string;
     body: string;
     targetSelector?: string;
+};
+
+type VersionMismatch = {
+    frontendVersion: string;
+    backendVersion: string;
 };
 
 const BLACKHOLE_TUTORIAL_SEEN_KEY = "sl-tutorial:blackhole:v1";
@@ -386,6 +392,8 @@ export default function App() {
     const [moreMenuOpen, setMoreMenuOpen] = React.useState(false);
     const [connected, setConnected] = React.useState(false);
     const [debugEnabled, setDebugEnabled] = React.useState(false);
+    const [versionMismatch, setVersionMismatch] = React.useState<VersionMismatch | null>(null);
+    const versionMismatchShownRef = React.useRef(false);
     const [activeTutorial, setActiveTutorial] = React.useState<TutorialId | null>(null);
 
     const [cells, setCells] = React.useState<Cell[]>([]);
@@ -866,6 +874,16 @@ export default function App() {
                 } else {
                     pushToast(t("shop_buff_upgrade.failed", {reason: d.reason || "unknown"}), "error", 2600);
                 }
+            } else if (pkt.type === "version_mismatch" && pkt.data) {
+                const d = pkt.data as Partial<VersionMismatch>;
+                if (!versionMismatchShownRef.current) {
+                    versionMismatchShownRef.current = true;
+                    setVersionMismatch({
+                        frontendVersion: String(d.frontendVersion || APP_VERSION),
+                        backendVersion: String(d.backendVersion || "unknown"),
+                    });
+                }
+                return;
             } else if (pkt.type === "msgbox" && pkt.data) {
                 const d = pkt.data || {};
                 if (!d.id) return;
@@ -1378,6 +1396,52 @@ export default function App() {
             ) : null}
             {activeTutorial === "home" ? (
                 <TutorialOverlay steps={activeTutorialSteps} onClose={closeTutorial}/>
+            ) : null}
+            {versionMismatch ? (
+                <div
+                    className="version-mismatch-overlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="version-mismatch-title"
+                    onClick={() => setVersionMismatch(null)}
+                >
+                    <button
+                        className="version-mismatch-close"
+                        onClick={() => setVersionMismatch(null)}
+                        aria-label={t("modal.close")}
+                    >
+                        <span className="ms" aria-hidden="true">close</span>
+                    </button>
+                    <div className="version-mismatch-shell" onClick={(event) => event.stopPropagation()}>
+                        <div className="version-mismatch-mark" aria-hidden="true">
+                            <span className="ms">warning</span>
+                        </div>
+
+                        <div className="version-mismatch-copy">
+                            <h2 id="version-mismatch-title">{t("app.version_mismatch.title")}</h2>
+                            <p>{t("app.version_mismatch.message")}</p>
+                        </div>
+
+                        <div className="version-mismatch-grid">
+                            <div className="version-mismatch-card">
+                                <span className="ms" aria-hidden="true">desktop_windows</span>
+                                <div>
+                                    <div className="version-mismatch-label">{t("app.version_mismatch.frontend_label")}</div>
+                                    <div className="version-mismatch-value">{versionMismatch.frontendVersion || APP_VERSION}</div>
+                                </div>
+                            </div>
+                            <div className="version-mismatch-card is-backend">
+                                <span className="ms" aria-hidden="true">dns</span>
+                                <div>
+                                    <div className="version-mismatch-label">{t("app.version_mismatch.backend_label")}</div>
+                                    <div className="version-mismatch-value">{versionMismatch.backendVersion || "unknown"}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p className="version-mismatch-hint">{t("app.version_mismatch.hint")}</p>
+                    </div>
+                </div>
             ) : null}
         </div>
     );

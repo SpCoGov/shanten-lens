@@ -6,6 +6,7 @@ import AmuletCard from "../components/AmuletCard";
 import {type EffectItem} from "../lib/gamestate";
 import Modal from "../components/Modal";
 import Tile from "../components/Tile";
+import {APP_VERSION} from "../lib/version";
 
 const TILE_GROUPS: Array<{ titleKey: string; tiles: string[] }> = [
     {titleKey: "about.tile_groups.manzu", tiles: ["0m", "1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m"]},
@@ -47,7 +48,7 @@ export default function AboutPage({onSecretClick}: { onSecretClick: () => void }
             <div className={styles.meta}>
                 <span className={styles.author}>{t("app.author")}</span>
                 <span className={styles.sep} aria-hidden>|</span>
-                <span className={styles.version}>v2.1.2</span>
+                <span className={styles.version}>v{APP_VERSION}</span>
                 <span className={styles.build}>(build&nbsp;1)</span>
             </div>
 
