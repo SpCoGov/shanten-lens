@@ -1,16 +1,12 @@
 import asyncio
 import copy
 import threading
-from collections import OrderedDict
-from typing import Tuple, Any, Dict, List, Set, Optional, Union, Sequence
 import time
+from typing import Tuple, Any, Dict, List, Set, Optional, Union, Sequence
 
 from loguru import logger
-from mitmproxy import ctx
 
 import backend.app
-import backend.mitm.addon as _addon
-from backend import big_number
 from backend.app import AMULET_REG, BADGE_REG
 from backend.app import MANAGER, GAME_STATE, broadcast
 from backend.autorun.util.chiitoi_recommender import chiitoi_recommendation_json
@@ -1050,11 +1046,13 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
 
             return "pass", None
         # 黑客、不稳定存的第一个数据为复制或变身的护身符：{"id":2320,"store":[2290,1234]} 229为盗印，不稳定228、黑客232、卡维230
-        if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityOperate":
+        if (
+                view.get("type") == "Req"
+                and view.get("method") == ".lq.Lobby.amuletActivityOperate"
+                and (view.get("data") or {}).get("type") == 8
+        ):
             cfg = MANAGER.to_table_payload("fuse") or {}
             if not bool(cfg.get("enable_anti_steal_eat", True)):
-                return "pass", None
-            if view.get("data").get("type") != 8:
                 return "pass", None
             prot_badges: List[int] = list(map(int, [BADGE_CONDUCTION]))
 
@@ -1108,8 +1106,44 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
                 timeout=45.0,
             )
             return ("pass", None) if ok else ("drop", None)
-        if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityOperate":
+        if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityOperate" and (view.get("data") or {}).get("type") == 1:
             cfg = MANAGER.to_table_payload("fuse") or {}
+            if not bool(cfg.get("enable_missing_hand_tile_guard", True)):
+                return "pass", None
+
+            data = view.get("data") or {}
+
+            played_tiles = _coerce_int_list(data.get("tileList"))
+            if played_tiles:
+                remaining_hand_tiles = _coerce_int_list(getattr(GAME_STATE, "hand_tiles", None) or [])
+                missing_tiles: List[int] = []
+                for tile_id in played_tiles:
+                    try:
+                        remaining_hand_tiles.remove(tile_id)
+                    except ValueError:
+                        missing_tiles.append(tile_id)
+                if missing_tiles:
+                    logger.warning(
+                        "blocked amuletActivityOperate type=1 with tiles not in hand: missing={}, hand={}, request={}",
+                        missing_tiles,
+                        _coerce_int_list(getattr(GAME_STATE, "hand_tiles", None) or []),
+                        played_tiles,
+                    )
+                    hand_tiles = _coerce_int_list(getattr(GAME_STATE, "hand_tiles", None) or [])
+                    ok = _ui_confirm_blocking(
+                        title_key="fuse.guard.missingHandTile.title",
+                        message_key="fuse.guard.missingHandTile.message",
+                        values={
+                            "missingTiles": ", ".join(str(tile_id) for tile_id in missing_tiles),
+                            "playedTiles": ", ".join(str(tile_id) for tile_id in played_tiles),
+                            "handTiles": ", ".join(str(tile_id) for tile_id in hand_tiles),
+                        },
+                        ok_key="common.continue",
+                        cancel_key="common.cancel",
+                        timeout=45.0,
+                    )
+                    return ("pass", None) if ok else ("drop", None)
+
         if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityEndShopping":
             cfg = MANAGER.to_table_payload("fuse") or {}
             if not bool(cfg.get("enable_exit_life_guard", True)):

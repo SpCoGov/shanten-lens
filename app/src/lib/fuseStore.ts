@@ -10,6 +10,7 @@ export type FuseConfig = {
     enable_prestart_kavi_guard?: boolean;
     conduction_min_count?: number;
     enable_anti_steal_eat?: boolean;
+    enable_missing_hand_tile_guard?: boolean;
     enable_kavi_plus_buffer_guard?: boolean;
     enable_exit_life_guard?: boolean;
 };

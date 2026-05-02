@@ -275,6 +275,9 @@
     "section_badge_guard_title": "スタンプ・ガード",
     "section_badge_guard_desc": "エンチャンターカーヴィが「伝導」または「拡張」を持ち、スタンプ盗みの左側に置かれている場合、和了をブロックします。",
     "toggle_badge_guard": "スタンプ・ガードを有効化",
+    "section_discard_guard_title": "打牌ガード",
+    "section_discard_guard_desc": "打牌リクエストに現在の手牌に存在しない牌が含まれている場合、確認ダイアログを表示し、その打牌をブロックできます。",
+    "toggle_missing_hand_tile_guard": "手牌にない牌の打牌ヒューズを有効化",
     "section_kavi_plus_title": "エンチャンターカーヴィ+緩衝ガード",
     "section_kavi_plus_desc": "「エンチャンターカーヴィ+」と「拡張」が共存する場合、その間に<strong>非・拡張</strong>のお守りが少なくとも1つ挟まれていなければ開始をブロックします。",
     "toggle_kavi_plus": "エンチャンターカーヴィ+緩衝ガードを有効化",
@@ -302,6 +305,10 @@
       "kaviTheft": {
         "title": "ヒューズ確認：保護対象のスタンプが失われる可能性",
         "message": "<b>リスクのある組み合わせを検出しました</b><br/>保護対象スタンプ: {{protectedBadges}}<br/><br/>{{pairsText}}<br/><br/>このまま和了を続行しますか？"
+      },
+      "missingHandTile": {
+        "title": "ヒューズ確認：手牌にない牌の打牌",
+        "message": "<b>異常な打牌リクエストを検出しました</b><br/>打牌リクエスト：{{playedTiles}}<br/>現在の手牌にない牌：{{missingTiles}}<br/><br/>現在の手牌：{{handTiles}}<br/><br/>このまま打牌を続行しますか？"
       },
       "kaviPrestartConduction": {
         "title": "ヒューズ確認：開局を続行しますか？",

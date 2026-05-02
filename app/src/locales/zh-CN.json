@@ -275,6 +275,9 @@
     "section_badge_guard_title": "印章守护",
     "section_badge_guard_desc": "若卡维携带「传导」或「膨胀」印章且置于盗印左侧，将阻止和牌。",
     "toggle_badge_guard": "启用印章守护",
+    "section_discard_guard_title": "打牌守护",
+    "section_discard_guard_desc": "若打牌请求中包含当前手牌不存在的牌，将弹出确认并可阻止该次打牌。",
+    "toggle_missing_hand_tile_guard": "启用手牌不存在熔断",
     "section_kavi_plus_title": "卡维+缓冲守护",
     "section_kavi_plus_desc": "当存在「卡维+」与「膨胀」时，若二者之间没有至少隔一个<strong>非膨胀</strong>护身符作为缓冲，阻止开局。",
     "toggle_kavi_plus": "启用卡维+缓冲守护",
@@ -302,6 +305,10 @@
       "kaviTheft": {
         "title": "熔断确认：可能吞噬受保护印章",
         "message": "<b>检测到风险组合</b><br/>受保护印章: {{protectedBadges}}<br/><br/>{{pairsText}}<br/><br/>是否继续和牌？"
+      },
+      "missingHandTile": {
+        "title": "熔断确认：出牌不在手牌中",
+        "message": "<b>检测到异常出牌请求</b><br/>请求打出的牌：{{playedTiles}}<br/>不在当前手牌中的牌：{{missingTiles}}<br/><br/>当前手牌：{{handTiles}}<br/><br/>是否仍然继续打牌？"
       },
       "kaviPrestartConduction": {
         "title": "熔断确认：确认开局？",
