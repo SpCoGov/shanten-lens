@@ -1477,6 +1477,7 @@ export default function App() {
                         <div className="usage-notice-copy">
                             <h2 id="usage-notice-title">{t("app.usage_notice.title")}</h2>
                             <p>{t("app.usage_notice.intro")}</p>
+                            <p>{t("app.usage_notice.open_source")}</p>
                             <p>{t("app.usage_notice.risk")}</p>
                         </div>
 
