@@ -15,6 +15,12 @@ export default function FrontendTestPage() {
     const [msgboxMessage, setMsgboxMessage] = React.useState("这是一个前端测试用消息框。");
     const [msgboxTitle, setMsgboxTitle] = React.useState("前端测试");
 
+    const [shouldThrowRenderError, setShouldThrowRenderError] = React.useState(false);
+
+    if (shouldThrowRenderError) {
+        throw new Error("Manual frontend render error test");
+    }
+
     const openConfirmMsgBox = async () => {
         await openMsgBoxWindow({
             id: `frontend-test-${Date.now()}`,
@@ -75,6 +81,23 @@ export default function FrontendTestPage() {
                 <div style={{display: "flex", gap: 10, flexWrap: "wrap"}}>
                     <button className="btn" onClick={openConfirmMsgBox}>打开确认框（OK/Cancel）</button>
                     <button className="btn" onClick={openAlertMsgBox}>打开提示框（仅 OK）</button>
+                </div>
+            </section>
+
+            <section className="mj-panel card" style={{display: "grid", gap: 12}}>
+                <h3 style={{margin: 0}}>Error Boundary 测试</h3>
+                <div style={{display: "flex", gap: 10, flexWrap: "wrap"}}>
+                    <button className="btn" onClick={() => setShouldThrowRenderError(true)}>
+                        手动抛出渲染错误
+                    </button>
+                    <button
+                        className="btn"
+                        onClick={() => {
+                            void Promise.reject(new Error("Manual frontend async error test"));
+                        }}
+                    >
+                        手动抛出异步错误
+                    </button>
                 </div>
             </section>
         </div>

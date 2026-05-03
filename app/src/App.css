@@ -1525,6 +1525,123 @@ input, textarea, select, code, pre, .selectable {
     font-size: 21px;
 }
 
+.app-error-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 6000;
+    display: grid;
+    place-items: center;
+    padding: 32px;
+    background: color-mix(in srgb, var(--bg) 8%, transparent);
+    backdrop-filter: blur(18px) saturate(.88);
+    color: var(--text);
+}
+
+.app-error-shell {
+    width: min(860px, calc(100vw - 64px));
+    max-height: calc(100vh - 96px);
+    overflow: auto;
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 18px 22px;
+    padding: 10px 8px 14px;
+    text-shadow: var(--shadow-text);
+    scrollbar-gutter: stable;
+}
+
+.app-error-mark {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: var(--state-down);
+    border: 1px solid color-mix(in srgb, var(--state-down) 62%, transparent);
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--state-down) 9%, transparent);
+}
+
+.app-error-mark .ms {
+    font-size: 42px;
+}
+
+.app-error-copy,
+.app-error-meta,
+.app-error-message,
+.app-error-details,
+.app-error-action {
+    grid-column: 2;
+}
+
+.app-error-copy h2 {
+    margin: 0 0 10px;
+    font-size: 26px;
+    line-height: 1.28;
+    letter-spacing: 0;
+}
+
+.app-error-copy p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.75;
+}
+
+.app-error-meta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.app-error-message,
+.app-error-details {
+    border-left: 2px solid color-mix(in srgb, var(--state-down) 78%, transparent);
+    padding-left: 14px;
+}
+
+.app-error-message h3,
+.app-error-details h3 {
+    margin: 0 0 6px;
+    font-size: 14px;
+    color: var(--state-down);
+}
+
+.app-error-message pre,
+.app-error-details pre {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    color: color-mix(in srgb, var(--text) 88%, transparent);
+}
+
+.app-error-details {
+    max-height: 240px;
+    overflow: auto;
+}
+
+.app-error-action {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--state-down) 58%, var(--border));
+    color: var(--text);
+    background: transparent;
+    cursor: pointer;
+}
+
+.app-error-action:hover {
+    color: var(--state-down);
+}
+
+.app-error-action .ms {
+    font-size: 21px;
+}
+
 .version-mismatch-overlay {
     position: fixed;
     inset: 0;
@@ -1670,6 +1787,24 @@ input, textarea, select, code, pre, .selectable {
     .usage-notice-disclaimer,
     .usage-notice-check,
     .usage-notice-action {
+        grid-column: 1;
+    }
+
+    .app-error-overlay {
+        padding: 24px;
+    }
+
+    .app-error-shell {
+        width: min(460px, calc(100vw - 48px));
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .app-error-copy,
+    .app-error-meta,
+    .app-error-message,
+    .app-error-details,
+    .app-error-action {
         grid-column: 1;
     }
 

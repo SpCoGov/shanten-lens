@@ -23,6 +23,24 @@
       "backend": "后端版本：{{version}}",
       "hint": "请确认启动的是同一版本的程序包，或重新解压/更新后再启动。"
     },
+    "error_boundary": {
+      "render_title": "界面渲染异常",
+      "runtime_title": "运行时异常",
+      "promise_title": "异步任务异常",
+      "startup_title": "应用启动异常",
+      "message": "应用遇到未处理异常。已保留诊断信息，请重新加载后继续；如问题反复出现，请将下方错误详情提供给开发者。",
+      "source": "来源",
+      "time": "时间",
+      "message_label": "错误信息",
+      "details_label": "诊断详情",
+      "reload": "重新加载",
+      "sources": {
+        "render": "界面渲染",
+        "runtime": "运行时",
+        "promise": "异步任务",
+        "startup": "启动流程"
+      }
+    },
     "usage_notice": {
       "title": "使用须知",
       "intro": "向听镜项目仅用于教育和研究目的。",

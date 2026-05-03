@@ -23,6 +23,24 @@
       "backend": "バックエンド: {{version}}",
       "hint": "同じバージョンのパッケージから起動しているか確認し、必要なら再解凍または更新してから起動してください。"
     },
+    "error_boundary": {
+      "render_title": "画面描画エラー",
+      "runtime_title": "実行時エラー",
+      "promise_title": "非同期処理エラー",
+      "startup_title": "アプリ起動エラー",
+      "message": "未処理のエラーが発生しました。診断情報を保持しています。再読み込みして続行してください。問題が繰り返し発生する場合は、下記の詳細を開発者へ共有してください。",
+      "source": "発生元",
+      "time": "時刻",
+      "message_label": "エラー内容",
+      "details_label": "診断詳細",
+      "reload": "再読み込み",
+      "sources": {
+        "render": "画面描画",
+        "runtime": "実行時",
+        "promise": "非同期処理",
+        "startup": "起動処理"
+      }
+    },
     "usage_notice": {
       "title": "使用上の注意",
       "intro": "向听镜プロジェクトは教育および研究目的のみに提供されています。",
