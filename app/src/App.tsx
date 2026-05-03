@@ -463,6 +463,10 @@ export default function App() {
 
     const blackHoleTutorialSteps = React.useMemo<TutorialStep[]>(() => [
         {
+            title: t("tutorial.blackhole.step_welcome.title"),
+            body: t("tutorial.blackhole.step_welcome.body"),
+        },
+        {
             title: t("tutorial.blackhole.step_start.title"),
             body: t("tutorial.blackhole.step_start.body"),
             targetSelector: '[data-tutorial="blackhole-start"]',
