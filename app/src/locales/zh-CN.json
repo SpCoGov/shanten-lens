@@ -304,6 +304,9 @@
     "section_kavi_plus_title": "卡维+缓冲守护",
     "section_kavi_plus_desc": "当存在「卡维+」与「膨胀」时，若二者之间没有至少隔一个<strong>非膨胀</strong>护身符作为缓冲，阻止开局。",
     "toggle_kavi_plus": "启用卡维+缓冲守护",
+    "section_hanabi_win_title": "花火和牌保护",
+    "section_hanabi_win_desc": "和牌时若拥有「花火+」，但当前不包含两个杠，将阻止和牌。",
+    "toggle_hanabi_win_guard": "启用花火和牌保护",
     "section_exit_life_title": "退出商店守护",
     "section_exit_life_desc": "若当前护身符中<strong>没有</strong>携带「生命」印章，阻止退出商店。",
     "toggle_exit_life": "启用退出商店守护",
@@ -340,6 +343,10 @@
       "kaviPrestartExpansion": {
         "title": "熔断确认：确认开局？",
         "message": "<b>检测到：卡维 Plus 与膨胀（{{expBadgeId}}）之间缺少缓冲护身符。</b><br/><br/>左侧：{{leftStateText}}　{{leftName}}（{{leftBadgeLabel}}）<br/>右侧：{{rightStateText}}　{{rightName}}（{{rightBadgeLabel}}）<br/><br/>建议：为避免误触发，至少让卡维一侧与膨胀之间隔一个“非膨胀”的护身符。<br/><br/>是否仍然继续开局？"
+      },
+      "hanabiWin": {
+        "title": "熔断确认：花火和牌保护",
+        "message": "<b>检测到：当前拥有花火+（{{hanabiId}}），但杠数量不是 2。</b><br/>当前杠数量：{{mingCount}}<br/><br/>是否仍然继续和牌？"
       },
       "forcePick": {
         "title": "熔断确认：必须选择监控项",

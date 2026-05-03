@@ -11,6 +11,7 @@ export type DebugSnapshot = {
     stage?: number;
     deck_map: Record<string, string>;
     hand_tiles: number[];
+    ming?: {type: number; tileList: number[]}[];
     replacement_tiles: number[];
     wall_tiles: number[];
     switch_used_tiles: number[];
@@ -71,6 +72,7 @@ export function buildDebugSnapshotFromState(state: GameStateData): DebugSnapshot
         stage: state.stage,
         deck_map: state.deck_map || {},
         hand_tiles: Array.isArray(state.hand_tiles) ? state.hand_tiles : [],
+        ming: Array.isArray(state.ming) ? state.ming : [],
         replacement_tiles: Array.isArray(state.replacement_tiles) ? state.replacement_tiles : [],
         wall_tiles: Array.isArray(state.wall_tiles) ? state.wall_tiles : [],
         switch_used_tiles: Array.isArray(state.switch_used_tiles) ? state.switch_used_tiles : [],

@@ -40,6 +40,7 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         .add("enable_anti_steal_eat", True, kind="bool")
         .add("enable_missing_hand_tile_guard", True, kind="bool")
         .add("enable_kavi_plus_buffer_guard", True, kind="bool")
+        .add("enable_hanabi_win_guard", True, kind="bool")
         .add("enable_exit_life_guard", False, kind="bool")
     )
     mgr.add_table(

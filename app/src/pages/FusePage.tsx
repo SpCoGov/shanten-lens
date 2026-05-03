@@ -194,6 +194,27 @@ export default function FusePage() {
 
                     <section className="panel">
                         <div className="panel-title">
+                            <Trans i18nKey="fuse.section_hanabi_win_title"/>
+                        </div>
+                        <p className="hint" style={{marginTop: 0, lineHeight: 1.5}}>
+                            <Trans i18nKey="fuse.section_hanabi_win_desc"/>
+                        </p>
+
+                        <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                            <input
+                                className="form-checkbox"
+                                type="checkbox"
+                                checked={Boolean(config.enable_hanabi_win_guard)}
+                                onChange={(e) => patchFuseConfig({enable_hanabi_win_guard: e.target.checked})}
+                            />
+                            <span>
+                                <Trans i18nKey="fuse.toggle_hanabi_win_guard"/>
+                            </span>
+                        </label>
+                    </section>
+
+                    <section className="panel">
+                        <div className="panel-title">
                             <Trans i18nKey="fuse.section_exit_life_title"/>
                         </div>
                         <p className="hint" style={{marginTop: 0, lineHeight: 1.5}}>

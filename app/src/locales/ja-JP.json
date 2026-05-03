@@ -304,6 +304,9 @@
     "section_kavi_plus_title": "エンチャンターカーヴィ+緩衝ガード",
     "section_kavi_plus_desc": "「エンチャンターカーヴィ+」と「拡張」が共存する場合、その間に<strong>非・拡張</strong>のお守りが少なくとも1つ挟まれていなければ開始をブロックします。",
     "toggle_kavi_plus": "エンチャンターカーヴィ+緩衝ガードを有効化",
+    "section_hanabi_win_title": "花火和牌保護",
+    "section_hanabi_win_desc": "和了時に「花火+」を所持していて、現在のカンが2つでない場合、和了をブロックします。",
+    "toggle_hanabi_win_guard": "花火和牌保護を有効化",
     "section_exit_life_title": "店退出ガード",
     "section_exit_life_desc": "現在のお守りに「生命」スタンプが<strong>無い</strong>場合、店からの退出をブロックします。",
     "toggle_exit_life": "店退出ガードを有効化",
@@ -340,6 +343,10 @@
       "kaviPrestartExpansion": {
         "title": "ヒューズ確認：開局を続行しますか？",
         "message": "<b>検出：カーヴィ Plus と「拡張」（{{expBadgeId}}）の間にバッファお守りがありません。</b><br/><br/>左側：{{leftStateText}}　{{leftName}}（{{leftBadgeLabel}}）<br/>右側：{{rightStateText}}　{{rightName}}（{{rightBadgeLabel}}）<br/><br/>推奨：誤作動を避けるため、カーヴィと拡張の間は少なくとも1枚「非・拡張」のお守りを挟んでください。<br/><br/>このまま開局しますか？"
+      },
+      "hanabiWin": {
+        "title": "ヒューズ確認：花火和牌保護",
+        "message": "<b>検出：花火+（{{hanabiId}}）を所持していますが、カン数が2ではありません。</b><br/>現在のカン数：{{mingCount}}<br/><br/>このまま和了を続行しますか？"
       },
       "forcePick": {
         "title": "ヒューズ確認：監視対象から選択が必須",

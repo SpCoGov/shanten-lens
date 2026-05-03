@@ -8,6 +8,7 @@ export interface GameStateData {
     hand_tiles: number[];
     dora_tiles: number[];
     tian_dora_tiles?: string[];
+    ming?: MingItem[];
     replacement_tiles: number[];
     wall_tiles: number[];
     ended: boolean;
@@ -24,6 +25,11 @@ export interface GameStateData {
     max_effect_volume?: number;
     tile_score_map?: Record<string, string>;
     update_reason?: string[];
+}
+
+export interface MingItem {
+    type: number;
+    tileList: number[];
 }
 
 export interface BadgeAffix {

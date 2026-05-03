@@ -17,6 +17,7 @@ class GameState:
     hand_tiles: List[int] = field(default_factory=list)  # 手牌
     dora_tiles: List[int] = field(default_factory=list)  # 宝牌指示牌（包含未翻开的）
     tian_dora_tiles: List[str] = field(default_factory=list)  # 魂牌
+    ming: List[Dict] = field(default_factory=list)
     replacement_tiles: List[int] = field(default_factory=list)  # 替换牌（换牌阶段）
     wall_tiles: List[int] = field(default_factory=list)  # 牌山顺序（打牌阶段能摸到的）
     switch_used_tiles: List[int] = field(default_factory=list)  # 交换阶段交换到的牌
@@ -56,6 +57,7 @@ class GameState:
             "hand_tiles": self.hand_tiles,
             "dora_tiles": self.dora_tiles,
             "tian_dora_tiles": self.tian_dora_tiles,
+            "ming": self.ming,
             "replacement_tiles": self.replacement_tiles,
             "wall_tiles": self.wall_tiles,
             "switch_used_tiles": self.switch_used_tiles,
@@ -271,6 +273,7 @@ class GameState:
             shop_buff_list: Dict[int, int] = None,
             tile_score_map: Dict[str, str] = None,
             tian_dora_tiles: List[str] = None,
+            ming: List[Dict] = None,
             push_gamestate: bool = True,
             reason: str = "",
     ):
@@ -321,6 +324,8 @@ class GameState:
             self.tile_score_map = tile_score_map.copy()
         if tian_dora_tiles is not None:
             self.tian_dora_tiles = tian_dora_tiles.copy()
+        if ming is not None:
+            self.ming = ming.copy()
         self.update_reason.append(reason)
         if push_gamestate:
             loop = asyncio.get_running_loop()
@@ -332,6 +337,7 @@ class GameState:
         self.hand_tiles.clear()
         self.dora_tiles.clear()
         self.tian_dora_tiles.clear()
+        self.ming.clear()
         self.replacement_tiles.clear()
         self.wall_tiles.clear()
         self.switch_used_tiles.clear()
