@@ -1,4 +1,5 @@
 import React from "react";
+import {createPortal} from "react-dom";
 import "./styles/theme.css";
 import "./App.css";
 import {listen} from "@tauri-apps/api/event";
@@ -58,6 +59,17 @@ type BackendLogPayload =
     index?: number;
     total?: number;
     text?: string;
+};
+
+type SouzuSwitchExecutionState = {
+    status: "running" | "completed" | "failed";
+    batch_count: number;
+    batch_index: number;
+    reason: string;
+    reason_key: string;
+    reason_values: Record<string, unknown>;
+    phase: string;
+    phase_key: string;
 };
 
 const settingsUrl = import.meta.env.DEV
@@ -402,6 +414,7 @@ export default function App() {
     const [usageNotice, setUsageNotice] = React.useState<UsageNoticeState | null>(null);
     const usageNoticeShownOnStartupRef = React.useRef(false);
     const [activeTutorial, setActiveTutorial] = React.useState<TutorialId | null>(null);
+    const [souzuSwitchExecution, setSouzuSwitchExecution] = React.useState<SouzuSwitchExecutionState | null>(null);
 
     const [cells, setCells] = React.useState<Cell[]>([]);
     const [stage, setStage] = React.useState<number>(0);
@@ -906,6 +919,40 @@ export default function App() {
                         if (source === "debug") setDebugSouzuSwitch(item.data ?? null);
                         else setPlanSouzuSwitch(item.data ?? null);
                     }
+                }
+            } else if (pkt.type === "souzu_switch_execution" && pkt.data) {
+                const d = pkt.data as {
+                    status?: string;
+                    batch_count?: number;
+                    batch_index?: number;
+                    reason?: string;
+                    reason_key?: string;
+                    reason_values?: Record<string, unknown>;
+                    phase?: string;
+                    phase_key?: string;
+                };
+                if (d.status === "running") {
+                    setSouzuSwitchExecution({
+                        status: "running",
+                        batch_count: Math.max(0, Number(d.batch_count || 0)),
+                        batch_index: Math.max(0, Number(d.batch_index || 0)),
+                        reason: "",
+                        reason_key: "",
+                        reason_values: {},
+                        phase: String(d.phase || ""),
+                        phase_key: String(d.phase_key || ""),
+                    });
+                } else if (d.status === "completed" || d.status === "failed") {
+                    setSouzuSwitchExecution({
+                        status: d.status,
+                        batch_count: Math.max(0, Number(d.batch_count || 0)),
+                        batch_index: Math.max(0, Number(d.batch_index || 0)),
+                        reason: String(d.reason || ""),
+                        reason_key: String(d.reason_key || ""),
+                        reason_values: d.reason_values && typeof d.reason_values === "object" ? d.reason_values : {},
+                        phase: String(d.phase || ""),
+                        phase_key: String(d.phase_key || ""),
+                    });
                 }
             } else if (pkt.type === "autorun_status" && pkt.data) {
                 setAutoStatus(pkt.data as AutoRunnerStatus);
@@ -1569,6 +1616,76 @@ export default function App() {
                     </div>
                 </div>
             ) : null}
+            {souzuSwitchExecution ? createPortal(
+                <SouzuSwitchExecutionOverlay
+                    execution={souzuSwitchExecution}
+                    onConfirm={() => setSouzuSwitchExecution(null)}
+                />,
+                document.body,
+            ) : null}
+        </div>
+    );
+}
+
+function SouzuSwitchExecutionOverlay({
+                                         execution,
+                                         onConfirm,
+                                     }: {
+    execution: SouzuSwitchExecutionState;
+    onConfirm: () => void;
+}) {
+    const {t} = useTranslation();
+    const finished = execution.status !== "running";
+    const title = execution.status === "failed"
+        ? t("blackhole.execute_failed_title")
+        : finished
+            ? t("blackhole.execute_completed_title")
+            : t("blackhole.execute_progress_title");
+    const body = execution.status === "failed"
+        ? t("blackhole.execute_failed_body")
+        : finished
+            ? t("blackhole.execute_completed_body")
+            : t("blackhole.execute_progress_body");
+    const phaseText = execution.phase_key ? t(execution.phase_key) : execution.phase;
+    const reasonText = execution.reason_key
+        ? t(execution.reason_key, execution.reason_values)
+        : execution.reason;
+    return (
+        <div
+            className={`usage-notice-overlay blackhole-execute-progress-overlay ${finished ? "is-finished" : ""} ${execution.status === "failed" ? "is-failed" : ""}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="blackhole-execute-progress-title"
+        >
+            <div className="usage-notice-shell blackhole-execute-progress-shell">
+                <div className="usage-notice-mark" aria-hidden="true">
+                    <span className="ms">{execution.status === "failed" ? "error" : finished ? "check_circle" : "sync"}</span>
+                </div>
+
+                <div className="usage-notice-copy">
+                    <h2 id="blackhole-execute-progress-title">{title}</h2>
+                    <p>{body}</p>
+                    {execution.batch_count > 0 ? (
+                        <p>{t("blackhole.execute_progress_batches", {
+                            count: execution.batch_count,
+                            current: Math.min(execution.batch_index || 1, execution.batch_count),
+                        })}</p>
+                    ) : null}
+                    {!finished && phaseText ? <p>{phaseText}</p> : null}
+                    {reasonText ? <p>{t("blackhole.execute_result_reason", {reason: reasonText})}</p> : null}
+                </div>
+
+                {finished ? (
+                    <button className="usage-notice-action is-continue" onClick={onConfirm}>
+                        <span className="ms" aria-hidden="true">check_circle</span>
+                        {t("common.ok")}
+                    </button>
+                ) : (
+                    <div className="blackhole-execute-progress" role="progressbar" aria-label={t("blackhole.execute_progress_title")}>
+                        <span/>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

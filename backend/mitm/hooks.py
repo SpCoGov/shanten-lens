@@ -15,9 +15,11 @@ from backend.autorun.util.souzu_switch_recommender import (
     recommend_souzu_tenpai_switch,
     list_reachable_quads_for_switch,
     validate_manual_souzu_switch_plan,
+    SOUZU_SWITCH_EXECUTION_EVENT,
+    souzu_switch_execution_payload,
 )
 from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
-from backend.msgbox import _ui_confirm_blocking, ui_alert
+from backend.msgbox import _ui_confirm_blocking
 
 ID_KAVI = 230
 BADGE_LIFE = 600100
@@ -246,45 +248,112 @@ async def execute_current_switch_plan() -> tuple[bool, str]:
     if not bot:
         return False, "发包模块未就绪，请先进入青云之志并保持连接。"
 
-    for index, discard_ids in enumerate(batches, start=1):
-        current_hand = list(getattr(GAME_STATE, "hand_tiles", None) or [])
-        if not current_hand:
-            return False, "当前手牌为空，无法继续换牌。"
-        missing = [tid for tid in discard_ids if tid not in current_hand]
-        if missing:
-            return False, f"第 {index} 步换牌所需的手牌已发生变化，请重进青云之志查看最新状态。"
+    batch_count = len(batches)
 
-        prefer_keep = [tid for tid in current_hand if tid not in discard_ids]
-        buffs = set(getattr(GAME_STATE, "boss_buff", None) or [])
-        if 901 in buffs:
-            if len(discard_ids) > 3:
-                return False, f"第{index}步方案要求换出 {len(discard_ids)} 张，超过 901 的单次上限 3 张。"
-            filtered_ids = prefer_keep
-        else:
-            filtered_ids = prefer_keep
+    async def emit_execution(
+            status: str,
+            *,
+            batch_index: int = 0,
+            reason: str = "",
+            reason_key: str = "",
+            reason_values: dict | None = None,
+            ok: bool | None = None,
+            phase: str = "",
+            phase_key: str = "",
+    ) -> None:
+        await broadcast({
+            "type": SOUZU_SWITCH_EXECUTION_EVENT,
+            "data": souzu_switch_execution_payload(
+                status,
+                batch_count=batch_count,
+                batch_index=batch_index,
+                reason=reason,
+                reason_key=reason_key,
+                reason_values=reason_values,
+                ok=ok,
+                phase=phase,
+                phase_key=phase_key,
+            ),
+        })
 
-        prev_change_count = int(getattr(GAME_STATE, "change_tile_count", 0) or 0)
-        ok, reason, _resp = await call_with_1004_retry_async(
-            bot.op_change,
-            tile_ids=filtered_ids,
-            delay_sec=3,
-            interval=3,
-            timeout=3000,
-            to_thread=True,
-        )
-        if not ok:
-            return False, reason or f"第 {index} 步换牌失败"
-        advanced = await _wait_for_switch_state_advance(prev_change_count)
-        if not advanced and index < len(batches):
-            return False, f"第 {index} 步换牌后状态未及时刷新，请重进青云之志查看最新状态。"
+    async def heartbeat(batch_index: int, phase_key: str) -> None:
+        while True:
+            await asyncio.sleep(1.0)
+            await emit_execution("running", batch_index=batch_index, phase_key=phase_key)
 
-    await ui_alert(
-        title_key="黑洞换牌已完成",
-        message_key="已按当前方案完成全部换牌，请按“跳过”键结束换牌阶段。",
-        ok_key="common.ok",
-        timeout=45.0,
+    await emit_execution("running")
+    final_ok = True
+    final_reason = ""
+    final_reason_key = ""
+    final_reason_values: dict | None = None
+    final_batch_index = 0
+    try:
+        for index, discard_ids in enumerate(batches, start=1):
+            final_batch_index = index
+            await emit_execution("running", batch_index=index, phase_key="blackhole.execute_phase_prepare")
+            current_hand = list(getattr(GAME_STATE, "hand_tiles", None) or [])
+            if not current_hand:
+                final_ok = False
+                final_reason_key = "blackhole.execute_reason_empty_hand"
+                break
+            missing = [tid for tid in discard_ids if tid not in current_hand]
+            if missing:
+                final_ok = False
+                final_reason_key = "blackhole.execute_reason_hand_changed"
+                final_reason_values = {"index": index}
+                break
+
+            prefer_keep = [tid for tid in current_hand if tid not in discard_ids]
+            buffs = set(getattr(GAME_STATE, "boss_buff", None) or [])
+            if 901 in buffs:
+                if len(discard_ids) > 3:
+                    final_ok = False
+                    final_reason_key = "blackhole.execute_reason_limit_exceeded"
+                    final_reason_values = {"index": index, "count": len(discard_ids)}
+                    break
+                filtered_ids = prefer_keep
+            else:
+                filtered_ids = prefer_keep
+
+            prev_change_count = int(getattr(GAME_STATE, "change_tile_count", 0) or 0)
+            hb_task = asyncio.create_task(heartbeat(index, "blackhole.execute_phase_sending"))
+            try:
+                ok, reason, _resp = await call_with_1004_retry_async(
+                    bot.op_change,
+                    tile_ids=filtered_ids,
+                    delay_sec=3,
+                    interval=3,
+                    timeout=3000,
+                    to_thread=True,
+                )
+            finally:
+                hb_task.cancel()
+                await asyncio.gather(hb_task, return_exceptions=True)
+            if not ok:
+                final_ok = False
+                final_reason_key = "blackhole.execute_reason_step_failed"
+                final_reason_values = {"index": index, "reason": reason or "unknown"}
+                break
+            await emit_execution("running", batch_index=index, phase_key="blackhole.execute_phase_waiting")
+            advanced = await _wait_for_switch_state_advance(prev_change_count)
+            if not advanced and index < len(batches):
+                final_ok = False
+                final_reason_key = "blackhole.execute_reason_state_stale"
+                final_reason_values = {"index": index}
+                break
+    except Exception as exc:
+        final_ok = False
+        final_reason_key = "blackhole.execute_reason_unknown"
+        final_reason_values = {"reason": str(exc) or "unknown"}
+    await emit_execution(
+        "completed" if final_ok else "failed",
+        batch_index=final_batch_index or batch_count,
+        reason=final_reason,
+        reason_key=final_reason_key,
+        reason_values=final_reason_values,
+        ok=final_ok,
     )
-    return True, ""
+    return final_ok, final_reason
 
 
 def _current_discard(plan: dict) -> int | None:

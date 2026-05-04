@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import {useTranslation} from "react-i18next";
 import {pushToast} from "../lib/toast";
 import {ws} from "../lib/ws";

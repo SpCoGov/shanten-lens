@@ -598,32 +598,11 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     )
                 elif action == "execute_plan":
                     from backend.mitm.hooks import execute_current_switch_plan
-                    await ws_send(ws, {
-                        "type": "ui_toast",
-                        "data": {"kind": "info", "msg": "开始执行黑洞换牌", "duration": 1600},
-                    })
                     ok, reason = await execute_current_switch_plan()
                     await ws_send(ws, {
                         "type": "souzu_switch_control_result",
                         "data": {"action": "execute_plan", "ok": ok, "reason": reason},
                     })
-                    if ok:
-                        await ws_send(ws, {
-                            "type": "ui_toast",
-                            "data": {"kind": "success", "msg": "黑洞换牌执行完成", "duration": 1800},
-                        })
-                    if not ok:
-                        await ws_send(ws, {
-                            "type": "ui_toast",
-                            "data": {"kind": "error", "msg": f"黑洞换牌失败：{reason or 'unknown'}", "duration": 2600},
-                        })
-                        from backend.msgbox import ui_alert
-                        await ui_alert(
-                            title_key="黑洞换牌失败",
-                            message_key=f"执行换牌时发生错误：{reason or 'unknown'}\n请重进青云之志查看最新状态。",
-                            ok_key="common.ok",
-                            timeout=45.0,
-                        )
             elif t == "msgbox_result":
                 from backend.msgbox import handle_msgbox_result
                 handle_msgbox_result(pkt)

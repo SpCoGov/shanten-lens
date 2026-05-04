@@ -13,6 +13,33 @@ TILE_INDEX = {tile: idx for idx, tile in enumerate(ALL_TILES)}
 SEARCH_ALGO_TARGET_ENUM = "target_enumeration_search"
 ABSTRACT_COMPONENT_LIMIT = 0
 QUAD_REPRESENTATIVE_LIMIT = 0
+SOUZU_SWITCH_EXECUTION_EVENT = "souzu_switch_execution"
+
+
+def souzu_switch_execution_payload(
+        status: str,
+        *,
+        batch_count: int = 0,
+        batch_index: int = 0,
+        reason: str = "",
+        reason_key: str = "",
+        reason_values: Optional[dict] = None,
+        ok: bool | None = None,
+        phase: str = "",
+        phase_key: str = "",
+) -> dict:
+    return {
+        "status": status,
+        "batch_count": max(0, int(batch_count or 0)),
+        "batch_index": max(0, int(batch_index or 0)),
+        "reason": reason or "",
+        "reason_key": reason_key or "",
+        "reason_values": dict(reason_values or {}),
+        "ok": ok,
+        "phase": phase or "",
+        "phase_key": phase_key or "",
+        "updated_at": time.time(),
+    }
 
 
 @dataclass(frozen=True)

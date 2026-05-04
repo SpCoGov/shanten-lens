@@ -1525,6 +1525,85 @@ input, textarea, select, code, pre, .selectable {
     font-size: 21px;
 }
 
+.blackhole-execute-progress-overlay {
+    cursor: wait;
+    z-index: 2147483647;
+}
+
+.blackhole-execute-progress-shell {
+    width: min(560px, calc(100vw - 64px));
+    max-height: none;
+    overflow: visible;
+}
+
+.blackhole-execute-progress-shell .usage-notice-mark .ms {
+    animation: blackhole-execute-spin 1.1s linear infinite;
+}
+
+.blackhole-execute-progress-overlay.is-finished {
+    cursor: default;
+}
+
+.blackhole-execute-progress-overlay.is-finished .usage-notice-mark .ms {
+    animation: none;
+}
+
+.blackhole-execute-progress-overlay.is-failed .usage-notice-mark {
+    color: var(--state-down);
+    border-color: color-mix(in srgb, var(--state-down) 62%, transparent);
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--state-down) 9%, transparent);
+}
+
+.blackhole-execute-progress-overlay.is-failed .usage-notice-copy h2,
+.blackhole-execute-progress-overlay.is-failed .usage-notice-action:hover {
+    color: var(--state-down);
+}
+
+.blackhole-execute-progress-overlay.is-failed .usage-notice-action {
+    border-color: color-mix(in srgb, var(--state-down) 58%, var(--border));
+}
+
+.blackhole-execute-progress {
+    grid-column: 2;
+    position: relative;
+    height: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--color-ring) 36%, var(--border));
+    background: color-mix(in srgb, var(--panel) 76%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bg) 28%, transparent);
+}
+
+.blackhole-execute-progress span {
+    position: absolute;
+    inset-block: 0;
+    left: -42%;
+    width: 42%;
+    border-radius: inherit;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in srgb, var(--color-ring) 74%, var(--state-ok)),
+        transparent
+    );
+    animation: blackhole-execute-progress 1.35s ease-in-out infinite;
+}
+
+@keyframes blackhole-execute-progress {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(340%);
+    }
+}
+
+@keyframes blackhole-execute-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .app-error-overlay {
     position: fixed;
     inset: 0;
