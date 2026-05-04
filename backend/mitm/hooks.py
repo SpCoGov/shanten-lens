@@ -22,6 +22,8 @@ from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_
 from backend.msgbox import _ui_confirm_blocking
 
 ID_KAVI = 230
+ID_MOON_PROTECTION = 227
+ID_STAR_VACUUM = 207
 BADGE_LIFE = 600100
 BADGE_CONDUCTION = 600170
 BADGE_EXPANSION = 600160
@@ -1725,35 +1727,62 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
 
         if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityEndShopping":
             cfg = MANAGER.to_table_payload("fuse") or {}
-            if not bool(cfg.get("enable_exit_life_guard", True)):
-                return "pass", None
             ef = _effects()
-            has_life = any(_bid(e) == BADGE_LIFE for e in ef)
-            if has_life:
-                return "pass", None
 
-            amulets_payload = [
-                {
-                    "name": _name(r),
-                    "badgeLabel": _badge_label(r),
-                    "baseId": _base(r.get("id", 0)),
-                    "rawId": int(r.get("id", 0) or 0),
-                }
-                for r in ef
-            ]
-            logger.info("run _ui_confirm_blocking")
-            ok = _ui_confirm_blocking(
-                title_key="fuse.guard.noLife.title",
-                message_key="fuse.guard.noLife.message",
-                values={
-                    "lifeBadgeId": BADGE_LIFE,
-                    "amulets": amulets_payload,
-                },
-                ok_key="common.continue",
-                cancel_key="common.cancel",
-                timeout=45.0,
-            )
-            return ("pass", None) if ok else ("drop", None)
+            if bool(cfg.get("enable_exit_coin_guard", True)):
+                effect_base_ids = {_base(e.get("id", 0)) for e in ef}
+                has_moon_protection = ID_MOON_PROTECTION in effect_base_ids
+                has_star_vacuum = ID_STAR_VACUUM in effect_base_ids
+                try:
+                    coin = int(getattr(GAME_STATE, "coin", 0) or 0)
+                except Exception:
+                    coin = 0
+                if has_moon_protection and has_star_vacuum and coin != 0:
+                    moon_row = next((e for e in ef if _base(e.get("id", 0)) == ID_MOON_PROTECTION), None)
+                    vacuum_row = next((e for e in ef if _base(e.get("id", 0)) == ID_STAR_VACUUM), None)
+                    ok = _ui_confirm_blocking(
+                        title_key="fuse.guard.exitCoin.title",
+                        message_key="fuse.guard.exitCoin.message",
+                        values={
+                            "coin": coin,
+                            "moonId": ID_MOON_PROTECTION,
+                            "moonName": _name(moon_row),
+                            "vacuumId": ID_STAR_VACUUM,
+                            "vacuumName": _name(vacuum_row),
+                        },
+                        ok_key="common.continue",
+                        cancel_key="common.cancel",
+                        timeout=45.0,
+                    )
+                    if not ok:
+                        return "drop", None
+
+            if bool(cfg.get("enable_exit_life_guard", True)):
+                has_life = any(_bid(e) == BADGE_LIFE for e in ef)
+                if not has_life:
+                    amulets_payload = [
+                        {
+                            "name": _name(r),
+                            "badgeLabel": _badge_label(r),
+                            "baseId": _base(r.get("id", 0)),
+                            "rawId": int(r.get("id", 0) or 0),
+                        }
+                        for r in ef
+                    ]
+                    logger.info("run _ui_confirm_blocking")
+                    ok = _ui_confirm_blocking(
+                        title_key="fuse.guard.noLife.title",
+                        message_key="fuse.guard.noLife.message",
+                        values={
+                            "lifeBadgeId": BADGE_LIFE,
+                            "amulets": amulets_payload,
+                        },
+                        ok_key="common.continue",
+                        cancel_key="common.cancel",
+                        timeout=45.0,
+                    )
+                    if not ok:
+                        return "drop", None
         return "pass", None
     except Exception:
         logger.exception("error occurred")

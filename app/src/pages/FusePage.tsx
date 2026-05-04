@@ -221,6 +221,18 @@ export default function FusePage() {
                             <Trans i18nKey="fuse.section_exit_life_desc"/>
                         </p>
 
+                        <label className="row" style={{gridTemplateColumns: "auto 1fr", marginBottom: 10}}>
+                            <input
+                                className="form-checkbox"
+                                type="checkbox"
+                                checked={Boolean(config.enable_exit_coin_guard)}
+                                onChange={(e) => patchFuseConfig({enable_exit_coin_guard: e.target.checked})}
+                            />
+                            <span>
+                                <Trans i18nKey="fuse.toggle_exit_coin_guard"/>
+                            </span>
+                        </label>
+
                         <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
                             <input
                                 className="form-checkbox"

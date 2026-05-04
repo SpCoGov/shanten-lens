@@ -335,7 +335,8 @@
     "section_hanabi_win_desc": "和牌时若拥有「花火+」，但当前不包含两个杠，将阻止和牌。",
     "toggle_hanabi_win_guard": "启用花火和牌保护",
     "section_exit_life_title": "退出商店守护",
-    "section_exit_life_desc": "若当前护身符中<strong>没有</strong>携带「生命」印章，阻止退出商店。",
+    "section_exit_life_desc": "退出商店时执行额外检查：可阻止金币未清空，或当前护身符中<strong>没有</strong>携带「生命」印章。",
+    "toggle_exit_coin_guard": "启用月光+吸星器金币熔断",
     "toggle_exit_life": "启用退出商店守护",
     "btn_save": "保存熔断配置",
     "btn_saving": "保存中…",
@@ -354,6 +355,10 @@
       "noLife": {
         "title": "熔断确认：无生命印章",
         "message": "检测到：当前护身符中没有携带「生命」印章（{{lifeBadgeId}}）。是否仍然继续退出商店？"
+      },
+      "exitCoin": {
+        "title": "熔断确认：金币未清空",
+        "message": "<b>检测到：同时拥有 {{moonName}}（{{moonId}}）和 {{vacuumName}}（{{vacuumId}}），但当前金币不为 0。</b><br/>当前金币：{{coin}}<br/><br/>是否仍然继续退出商店？"
       },
       "kaviTheft": {
         "title": "熔断确认：可能吞噬受保护印章",
