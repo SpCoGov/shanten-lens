@@ -1067,7 +1067,7 @@ def on_outbound(view: Dict) -> Tuple[str, Any]:
                         continue
                 ming = getattr(GAME_STATE, "ming", None) or []
                 ming_count = len(ming) if isinstance(ming, list) else 0
-                if has_hanabi_plus and ming_count != 2:
+                if has_hanabi_plus and ming_count < 2:
                     ok = _ui_confirm_blocking(
                         title_key="fuse.guard.hanabiWin.title",
                         message_key="fuse.guard.hanabiWin.message",
