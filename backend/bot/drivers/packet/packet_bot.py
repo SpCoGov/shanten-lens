@@ -201,7 +201,17 @@ class PacketBot(GameBot):
             raise NotImplementedError("PacketBot.op_replace: no op_code 'replace'")
         if not self._ops_allow(t):
             logger.error("gamestate disallow replace")
-            return False, "gamestate disallow discard", None
+            return False, "gamestate disallow replace", None
+        ok, reason, resp = self._operate(pkt_type=t, tile_list=tile_ids, delay_sec=delay_sec)
+        return ok, reason, resp
+
+    def op_kan(self, tile_ids: List[int], delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
+        t = self.op_code.get("kan")
+        if t is None:
+            raise NotImplementedError("PacketBot.op_replace: no op_code 'kan'")
+        if not self._ops_allow(t):
+            logger.error("gamestate disallow kan")
+            return False, "gamestate disallow kan", None
         ok, reason, resp = self._operate(pkt_type=t, tile_list=tile_ids, delay_sec=delay_sec)
         return ok, reason, resp
 

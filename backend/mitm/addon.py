@@ -149,7 +149,7 @@ class WsAddon:
             return
 
         try:
-            if (not message.from_client) and view.get("method") in [".lq.Lobby.fetchAmuletActivityData", ".lq.Lobby.fetchActivityRank", ".lq.Lobby.fetchAccountStatisticInfo"]:
+            if (not message.from_client) and view.get("method") in [".lq.Lobby.fetchAmuletActivityData", ".lq.Lobby.fetchActivityRank", ".lq.Lobby.fetchAccountStatisticInfo", ".lq.Lobby.amuletActivityGiveup", ".lq.Lobby.amuletActivityStartGame"]:
                 self.preferred_flow = flow
                 self.preferred_peer_key = f"{flow.client_conn.address[0]}|{flow.server_conn.address[0]}"
                 logger.info(f"[PREFERRED-FLOW] set to game flow f={id(flow)} ({self.preferred_peer_key})")

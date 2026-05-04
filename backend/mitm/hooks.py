@@ -232,7 +232,203 @@ def _plan_batches(plan: dict) -> list[list[int]]:
     return [batch for batch in normalized_discards if batch]
 
 
-async def execute_current_switch_plan() -> tuple[bool, str]:
+RED_TILE_MAP = {"0m": "5m", "0p": "5p", "0s": "5s"}
+
+
+def _norm_face(face: str) -> str:
+    return RED_TILE_MAP.get(str(face), str(face))
+
+
+def _full_plan_quad_faces(plan: dict) -> list[str]:
+    faces = [_norm_face(face) for face in list(plan.get("quad_faces") or []) if face]
+    if len(faces) >= 2:
+        return faces[:2]
+    target = [_norm_face(face) for face in list(plan.get("target14") or []) if face]
+    counts: dict[str, int] = {}
+    out: list[str] = []
+    for face in target:
+        counts[face] = counts.get(face, 0) + 1
+    for face, count in counts.items():
+        if count >= 4:
+            out.append(face)
+        if len(out) >= 2:
+            break
+    return out
+
+
+def _find_quad_ids_in_hand(face: str, used_ids: set[int] | None = None) -> list[int]:
+    used = used_ids or set()
+    deck_map = getattr(GAME_STATE, "deck_map", None) or {}
+    hand_tiles = list(getattr(GAME_STATE, "hand_tiles", None) or [])
+    ids = [
+        int(tile_id)
+        for tile_id in hand_tiles
+        if int(tile_id) not in used and _norm_face(deck_map.get(tile_id, "")) == _norm_face(face)
+    ]
+    return ids[:4] if len(ids) >= 4 else []
+
+
+def _operation_tile_groups(op: dict) -> list[list[int]]:
+    groups: list[list[int]] = []
+
+    def add(raw: Any) -> None:
+        ids = _coerce_int_list(raw)
+        if len(ids) >= 4:
+            groups.append(ids[:4])
+
+    for key in ("tiles", "tileList", "tile_list"):
+        add(op.get(key))
+
+    gang = op.get("gang")
+    if isinstance(gang, list):
+        for item in gang:
+            if isinstance(item, dict):
+                for key in ("tiles", "tileList", "tile_list"):
+                    add(item.get(key))
+            else:
+                add(item)
+
+    for value in op.values():
+        if isinstance(value, list):
+            add(value)
+    return groups
+
+
+def _next_operation_has_type(op_type: int) -> bool:
+    operations = list(getattr(GAME_STATE, "next_operation", None) or [])
+    return any(int(op.get("type", -1) or -1) == op_type for op in operations if isinstance(op, dict))
+
+
+def _available_kan_ids_for_face(face: str, used_ids: set[int] | None = None) -> list[int]:
+    used = used_ids or set()
+    deck_map = getattr(GAME_STATE, "deck_map", None) or {}
+    operations = list(getattr(GAME_STATE, "next_operation", None) or [])
+    for op in operations:
+        if not isinstance(op, dict) or int(op.get("type", -1) or -1) != 4:
+            continue
+        for ids in _operation_tile_groups(op):
+            if any(int(tile_id) in used for tile_id in ids):
+                continue
+            if all(_norm_face(deck_map.get(int(tile_id), "")) == _norm_face(face) for tile_id in ids):
+                return [int(tile_id) for tile_id in ids[:4]]
+    return []
+
+
+async def _wait_for_available_kan_ids(
+        face: str,
+        used_ids: set[int],
+        *,
+        timeout_sec: float = 120.0,
+        on_wait: Any = None,
+) -> list[int]:
+    deadline = time.monotonic() + max(0.1, float(timeout_sec))
+    last_emit = 0.0
+    while time.monotonic() < deadline:
+        ids = _available_kan_ids_for_face(face, used_ids)
+        if ids:
+            return ids
+        now = time.monotonic()
+        if on_wait is not None and now - last_emit >= 1.0:
+            last_emit = now
+            await on_wait()
+        await asyncio.sleep(0.2)
+    return []
+
+
+async def _wait_for_operation_type(
+        op_type: int,
+        *,
+        timeout_sec: float = 120.0,
+        on_wait: Any = None,
+) -> bool:
+    deadline = time.monotonic() + max(0.1, float(timeout_sec))
+    last_emit = 0.0
+    while time.monotonic() < deadline:
+        if _next_operation_has_type(op_type):
+            return True
+        now = time.monotonic()
+        if on_wait is not None and now - last_emit >= 1.0:
+            last_emit = now
+            await on_wait()
+        await asyncio.sleep(0.2)
+    return False
+
+
+async def _wait_for_switch_stage_exit(timeout_sec: float = 8.0) -> bool:
+    deadline = time.monotonic() + max(0.1, float(timeout_sec))
+    while time.monotonic() < deadline:
+        if int(getattr(GAME_STATE, "stage", 0) or 0) != 2:
+            return True
+        await asyncio.sleep(0.2)
+    return False
+
+
+def _pick_full_plan_discard_id(plan: dict) -> int | None:
+    current_hand = [int(tile_id) for tile_id in list(getattr(GAME_STATE, "hand_tiles", None) or [])]
+    if not current_hand:
+        return None
+    hand_set = set(current_hand)
+    for tile_id in list(plan.get("post_draw_discards") or []):
+        try:
+            tid = int(tile_id)
+        except (TypeError, ValueError):
+            continue
+        if tid in hand_set:
+            return tid
+
+    keep_counts: dict[str, int] = {}
+    for face in list(plan.get("target13") or []):
+        norm = _norm_face(face)
+        keep_counts[norm] = keep_counts.get(norm, 0) + 1
+    if not keep_counts:
+        return None
+
+    deck_map = getattr(GAME_STATE, "deck_map", None) or {}
+    remaining_keep = dict(keep_counts)
+    for tile_id in current_hand:
+        face = _norm_face(deck_map.get(tile_id, ""))
+        if remaining_keep.get(face, 0) > 0:
+            remaining_keep[face] -= 1
+            continue
+        return tile_id
+    return None
+
+
+def _target_face_counts_for_full_plan(plan: dict) -> dict[str, int]:
+    faces = list(plan.get("target14") or [])
+    if not faces:
+        faces = list(plan.get("target13") or [])
+    counts: dict[str, int] = {}
+    for face in faces:
+        norm = _norm_face(face)
+        counts[norm] = counts.get(norm, 0) + 1
+    return counts
+
+
+def _full_plan_target_draw_count(plan: dict) -> int:
+    try:
+        return int(plan.get("draws_needed", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _pick_discard_against_face_counts(face_counts: dict[str, int]) -> int | None:
+    current_hand = [int(tile_id) for tile_id in list(getattr(GAME_STATE, "hand_tiles", None) or [])]
+    if not current_hand or not face_counts:
+        return None
+
+    deck_map = getattr(GAME_STATE, "deck_map", None) or {}
+    remaining_keep = dict(face_counts)
+    for tile_id in current_hand:
+        face = _norm_face(deck_map.get(tile_id, ""))
+        if remaining_keep.get(face, 0) > 0:
+            remaining_keep[face] -= 1
+            continue
+        return tile_id
+    return None
+
+
+async def execute_current_switch_plan(*, finalize_event: bool = True, finish_switch: bool = False) -> tuple[bool, str]:
     plan = copy.deepcopy(_LAST_SWITCH_PLAN) if isinstance(_LAST_SWITCH_PLAN, dict) else None
     if not plan or plan.get("status") != "plan":
         return False, "当前没有可执行的黑洞换牌方案。"
@@ -336,24 +532,309 @@ async def execute_current_switch_plan() -> tuple[bool, str]:
                 break
             await emit_execution("running", batch_index=index, phase_key="blackhole.execute_phase_waiting")
             advanced = await _wait_for_switch_state_advance(prev_change_count)
-            if not advanced and index < len(batches):
+            if not advanced:
                 final_ok = False
                 final_reason_key = "blackhole.execute_reason_state_stale"
                 final_reason_values = {"index": index}
                 break
+        if final_ok and finish_switch:
+            await emit_execution("running", batch_index=batch_count, phase_key="blackhole.execute_phase_finish_switch")
+            can_finish_switch = await _wait_for_operation_type(
+                100,
+                timeout_sec=8.0,
+                on_wait=lambda: emit_execution(
+                    "running",
+                    batch_index=batch_count,
+                    phase_key="blackhole.execute_phase_finish_switch",
+                ),
+            )
+            if not can_finish_switch:
+                final_ok = False
+                final_reason_key = "blackhole.execute_reason_finish_switch_unavailable"
+            else:
+                ok, reason, _resp = await call_with_1004_retry_async(
+                    bot.op_skip_change,
+                    delay_sec=3,
+                    interval=3,
+                    timeout=3000,
+                    to_thread=True,
+                )
+                if not ok:
+                    final_ok = False
+                    final_reason_key = "blackhole.execute_reason_finish_switch_failed"
+                    final_reason_values = {"reason": reason or "unknown"}
+                else:
+                    await _wait_for_switch_stage_exit()
     except Exception as exc:
         final_ok = False
         final_reason_key = "blackhole.execute_reason_unknown"
         final_reason_values = {"reason": str(exc) or "unknown"}
-    await emit_execution(
-        "completed" if final_ok else "failed",
-        batch_index=final_batch_index or batch_count,
-        reason=final_reason,
-        reason_key=final_reason_key,
-        reason_values=final_reason_values,
-        ok=final_ok,
-    )
+    if finalize_event:
+        await emit_execution(
+            "completed" if final_ok else "failed",
+            batch_index=final_batch_index or batch_count,
+            reason=final_reason,
+            reason_key=final_reason_key,
+            reason_values=final_reason_values,
+            ok=final_ok,
+        )
     return final_ok, final_reason
+
+
+async def execute_current_full_plan() -> tuple[bool, str]:
+    plan = copy.deepcopy(_LAST_SWITCH_PLAN) if isinstance(_LAST_SWITCH_PLAN, dict) else None
+    if not plan or plan.get("status") != "plan":
+        return False, "current plan unavailable"
+
+    batches = _plan_batches(plan)
+    batch_count = len(batches)
+
+    async def emit_execution(
+            status: str,
+            *,
+            batch_index: int = 0,
+            reason: str = "",
+            reason_key: str = "",
+            reason_values: dict | None = None,
+            ok: bool | None = None,
+            phase_key: str = "",
+    ) -> None:
+        await broadcast({
+            "type": SOUZU_SWITCH_EXECUTION_EVENT,
+            "data": souzu_switch_execution_payload(
+                status,
+                batch_count=batch_count,
+                batch_index=batch_index,
+                reason=reason,
+                reason_key=reason_key,
+                reason_values=reason_values,
+                ok=ok,
+                phase_key=phase_key,
+                execution_kind="full_plan",
+            ),
+        })
+
+    bot = getattr(backend.app, "PACKET_BOT", None)
+    if not bot:
+        await emit_execution("failed", reason_key="blackhole.execute_reason_bot_not_ready", ok=False)
+        return False, "bot not ready"
+
+    ok, reason = await execute_current_switch_plan(finalize_event=False, finish_switch=True)
+    if not ok:
+        await emit_execution(
+            "failed",
+            batch_index=batch_count,
+            reason_key="blackhole.execute_reason_switch_failed",
+            reason_values={"reason": reason or "unknown"},
+            ok=False,
+        )
+        return False, reason
+
+    quad_faces = _full_plan_quad_faces(plan)
+    if len(quad_faces) < 2:
+        await emit_execution("failed", batch_index=batch_count, reason_key="blackhole.execute_reason_no_quad_plan", ok=False)
+        return False, "no quad plan"
+
+    keep_counts = _target_face_counts_for_full_plan(plan)
+    used_quad_ids: set[int] = set()
+    completed_quad_indexes: set[int] = set()
+    target_draw_count = _full_plan_target_draw_count(plan)
+    advanced_draw_count = 1 if target_draw_count > 0 else 0
+    deadline = time.monotonic() + 180.0
+    last_wait_emit = 0.0
+
+    def target_reached() -> bool:
+        return target_draw_count > 0 and advanced_draw_count >= target_draw_count
+
+    while len(completed_quad_indexes) < len(quad_faces[:2]):
+        if time.monotonic() >= deadline:
+            await emit_execution(
+                "failed",
+                batch_index=batch_count,
+                reason_key="blackhole.execute_reason_full_timeout",
+                ok=False,
+            )
+            return False, "full plan timeout"
+
+        kan_done = False
+        for face_index, face in enumerate(quad_faces[:2], start=1):
+            if face_index in completed_quad_indexes:
+                continue
+            quad_ids = _available_kan_ids_for_face(face, used_quad_ids)
+            if len(quad_ids) != 4:
+                continue
+            used_quad_ids.update(quad_ids)
+            await emit_execution(
+                "running",
+                batch_index=batch_count,
+                phase_key="blackhole.execute_phase_kan",
+                reason_values={"index": face_index},
+            )
+            ok, reason, _resp = await call_with_1004_retry_async(
+                bot.op_kan,
+                tile_ids=quad_ids,
+                delay_sec=3,
+                interval=3,
+                timeout=3000,
+                to_thread=True,
+            )
+            if not ok:
+                await emit_execution(
+                    "failed",
+                    batch_index=batch_count,
+                    reason_key="blackhole.execute_reason_kan_failed",
+                    reason_values={"index": face_index, "face": face, "reason": reason or "unknown"},
+                    ok=False,
+                )
+                return False, reason or f"kan failed: {face}"
+            completed_quad_indexes.add(face_index)
+            advanced_draw_count += 1
+            kan_done = True
+            await asyncio.sleep(0.4)
+            break
+        if kan_done:
+            continue
+
+        if _next_operation_has_type(8):
+            await emit_execution("running", batch_index=batch_count, phase_key="blackhole.execute_phase_draw")
+            ok, reason, _resp = await call_with_1004_retry_async(
+                bot.op_tsumo,
+                delay_sec=3,
+                interval=3,
+                timeout=3000,
+                to_thread=True,
+            )
+            if not ok:
+                await emit_execution(
+                    "failed",
+                    batch_index=batch_count,
+                    reason_key="blackhole.execute_reason_draw_failed",
+                    reason_values={"reason": reason or "unknown"},
+                    ok=False,
+                )
+                return False, reason or "draw failed"
+            advanced_draw_count += 1
+            await asyncio.sleep(0.4)
+            continue
+
+        if _next_operation_has_type(1):
+            discard_id = _pick_discard_against_face_counts(keep_counts)
+            if discard_id is None:
+                await emit_execution(
+                    "failed",
+                    batch_index=batch_count,
+                    reason_key="blackhole.execute_reason_collect_discard_unavailable",
+                    ok=False,
+                )
+                return False, "collect discard unavailable"
+            await emit_execution(
+                "running",
+                batch_index=batch_count,
+                phase_key="blackhole.execute_phase_auto_discard",
+                reason_values={"tile_id": discard_id},
+            )
+            ok, reason, _resp = await call_with_1004_retry_async(
+                bot.discard_by_tile_id,
+                tile_id=discard_id,
+                delay_sec=3,
+                interval=3,
+                timeout=3000,
+                to_thread=True,
+            )
+            if not ok:
+                await emit_execution(
+                    "failed",
+                    batch_index=batch_count,
+                    reason_key="blackhole.execute_reason_auto_discard_failed",
+                    reason_values={"tile_id": discard_id, "reason": reason or "unknown"},
+                    ok=False,
+                )
+                return False, reason or "auto discard failed"
+            advanced_draw_count += 1
+            await asyncio.sleep(0.4)
+            continue
+
+        now = time.monotonic()
+        if now - last_wait_emit >= 1.0:
+            last_wait_emit = now
+            await emit_execution(
+                "running",
+                batch_index=batch_count,
+                phase_key="blackhole.execute_phase_wait_operation",
+            )
+        await asyncio.sleep(0.2)
+
+    if target_draw_count <= 0:
+        await emit_execution("completed", batch_index=batch_count, reason_key="blackhole.execute_reason_full_completed", ok=True)
+        return True, ""
+
+    while not target_reached():
+        if time.monotonic() >= deadline:
+            await emit_execution(
+                "failed",
+                batch_index=batch_count,
+                reason_key="blackhole.execute_reason_discard_not_available",
+                ok=False,
+            )
+            return False, "discard not available"
+        if _next_operation_has_type(8):
+            await emit_execution("running", batch_index=batch_count, phase_key="blackhole.execute_phase_draw")
+            ok, reason, _resp = await call_with_1004_retry_async(
+                bot.op_tsumo,
+                delay_sec=3,
+                interval=3,
+                timeout=3000,
+                to_thread=True,
+            )
+            if not ok:
+                await emit_execution(
+                    "failed",
+                    batch_index=batch_count,
+                    reason_key="blackhole.execute_reason_draw_failed",
+                    reason_values={"reason": reason or "unknown"},
+                    ok=False,
+                )
+                return False, reason or "draw failed"
+            advanced_draw_count += 1
+            await asyncio.sleep(0.4)
+            continue
+        if _next_operation_has_type(1):
+            discard_id = _pick_full_plan_discard_id(plan) or _pick_discard_against_face_counts(keep_counts)
+            if discard_id is None:
+                await emit_execution("failed", batch_index=batch_count, reason_key="blackhole.execute_reason_no_discard", ok=False)
+                return False, "no discard"
+            await emit_execution(
+                "running",
+                batch_index=batch_count,
+                phase_key="blackhole.execute_phase_auto_discard",
+                reason_values={"tile_id": discard_id},
+            )
+            logger.info(f"discard {discard_id} {GAME_STATE.deck_map.get(discard_id)}")
+            ok, reason, _resp = await call_with_1004_retry_async(
+                bot.discard_by_tile_id,
+                tile_id=discard_id,
+                delay_sec=3,
+                interval=3,
+                timeout=3000,
+                to_thread=True,
+            )
+            if not ok:
+                await emit_execution(
+                    "failed",
+                    batch_index=batch_count,
+                    reason_key="blackhole.execute_reason_discard_failed",
+                    reason_values={"tile_id": discard_id, "reason": reason or "unknown"},
+                    ok=False,
+                )
+                return False, reason or "discard failed"
+            advanced_draw_count += 1
+            await asyncio.sleep(0.4)
+            continue
+        await emit_execution("running", batch_index=batch_count, phase_key="blackhole.execute_phase_wait_operation")
+        await asyncio.sleep(0.4)
+
+    await emit_execution("completed", batch_index=batch_count, reason_key="blackhole.execute_reason_full_completed", ok=True)
+    return True, ""
 
 
 def _current_discard(plan: dict) -> int | None:

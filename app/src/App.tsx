@@ -70,6 +70,8 @@ type SouzuSwitchExecutionState = {
     reason_values: Record<string, unknown>;
     phase: string;
     phase_key: string;
+    execution_kind: string;
+    updated_at: number;
 };
 
 const settingsUrl = import.meta.env.DEV
@@ -493,6 +495,11 @@ export default function App() {
             title: t("tutorial.blackhole.step_execute.title"),
             body: t("tutorial.blackhole.step_execute.body"),
             targetSelector: '[data-tutorial="blackhole-execute"]',
+        },
+        {
+            title: t("tutorial.blackhole.step_execute_full.title"),
+            body: t("tutorial.blackhole.step_execute_full.body"),
+            targetSelector: '[data-tutorial="blackhole-execute-full"]',
         },
         {
             title: t("tutorial.blackhole.step_restart.title"),
@@ -930,6 +937,8 @@ export default function App() {
                     reason_values?: Record<string, unknown>;
                     phase?: string;
                     phase_key?: string;
+                    execution_kind?: string;
+                    updated_at?: number;
                 };
                 if (d.status === "running") {
                     setSouzuSwitchExecution({
@@ -938,9 +947,11 @@ export default function App() {
                         batch_index: Math.max(0, Number(d.batch_index || 0)),
                         reason: "",
                         reason_key: "",
-                        reason_values: {},
+                        reason_values: d.reason_values && typeof d.reason_values === "object" ? d.reason_values : {},
                         phase: String(d.phase || ""),
                         phase_key: String(d.phase_key || ""),
+                        execution_kind: String(d.execution_kind || "switch"),
+                        updated_at: Number(d.updated_at || Date.now()),
                     });
                 } else if (d.status === "completed" || d.status === "failed") {
                     setSouzuSwitchExecution({
@@ -952,6 +963,8 @@ export default function App() {
                         reason_values: d.reason_values && typeof d.reason_values === "object" ? d.reason_values : {},
                         phase: String(d.phase || ""),
                         phase_key: String(d.phase_key || ""),
+                        execution_kind: String(d.execution_kind || "switch"),
+                        updated_at: Number(d.updated_at || Date.now()),
                     });
                 }
             } else if (pkt.type === "autorun_status" && pkt.data) {
@@ -1636,20 +1649,39 @@ function SouzuSwitchExecutionOverlay({
 }) {
     const {t} = useTranslation();
     const finished = execution.status !== "running";
+    const [autoCloseSeconds, setAutoCloseSeconds] = React.useState(3);
+    const isFullPlan = execution.execution_kind === "full_plan";
     const title = execution.status === "failed"
-        ? t("blackhole.execute_failed_title")
+        ? t(isFullPlan ? "blackhole.execute_full_failed_title" : "blackhole.execute_failed_title")
         : finished
-            ? t("blackhole.execute_completed_title")
-            : t("blackhole.execute_progress_title");
+            ? t(isFullPlan ? "blackhole.execute_full_completed_title" : "blackhole.execute_completed_title")
+            : t(isFullPlan ? "blackhole.execute_full_progress_title" : "blackhole.execute_progress_title");
     const body = execution.status === "failed"
-        ? t("blackhole.execute_failed_body")
+        ? t(isFullPlan ? "blackhole.execute_full_failed_body" : "blackhole.execute_failed_body")
         : finished
-            ? t("blackhole.execute_completed_body")
-            : t("blackhole.execute_progress_body");
-    const phaseText = execution.phase_key ? t(execution.phase_key) : execution.phase;
+            ? t(isFullPlan ? "blackhole.execute_full_completed_body" : "blackhole.execute_completed_body")
+            : t(isFullPlan ? "blackhole.execute_full_progress_body" : "blackhole.execute_progress_body");
+    const phaseText = execution.phase_key
+        ? t(execution.phase_key, execution.reason_values)
+        : execution.phase;
     const reasonText = execution.reason_key
         ? t(execution.reason_key, execution.reason_values)
         : execution.reason;
+    React.useEffect(() => {
+        if (!finished) {
+            setAutoCloseSeconds(3);
+            return;
+        }
+        setAutoCloseSeconds(3);
+        const interval = window.setInterval(() => {
+            setAutoCloseSeconds((value) => Math.max(0, value - 1));
+        }, 1000);
+        const timeout = window.setTimeout(onConfirm, 3000);
+        return () => {
+            window.clearInterval(interval);
+            window.clearTimeout(timeout);
+        };
+    }, [finished, onConfirm, execution.status, execution.updated_at]);
     return (
         <div
             className={`usage-notice-overlay blackhole-execute-progress-overlay ${finished ? "is-finished" : ""} ${execution.status === "failed" ? "is-failed" : ""}`}
@@ -1678,10 +1710,10 @@ function SouzuSwitchExecutionOverlay({
                 {finished ? (
                     <button className="usage-notice-action is-continue" onClick={onConfirm}>
                         <span className="ms" aria-hidden="true">check_circle</span>
-                        {t("common.ok")}
+                        {t("common.ok")} ({autoCloseSeconds})
                     </button>
                 ) : (
-                    <div className="blackhole-execute-progress" role="progressbar" aria-label={t("blackhole.execute_progress_title")}>
+                    <div className="blackhole-execute-progress" role="progressbar" aria-label={title}>
                         <span/>
                     </div>
                 )}

@@ -194,6 +194,10 @@ export default function BlackHolePage({
         if (!canOperate || !hasExecutablePlan) return;
         ws.send({type: "souzu_switch_control", data: {action: "execute_plan"}} as any);
     }, [canOperate, hasExecutablePlan]);
+    const executeFullPlan = React.useCallback(() => {
+        if (!canOperate || !hasExecutablePlan) return;
+        ws.send({type: "souzu_switch_control", data: {action: "execute_full_plan"}} as any);
+    }, [canOperate, hasExecutablePlan]);
     const exportCurrentSnapshot = React.useCallback(async () => {
         if (!currentState) {
             pushToast(t("blackhole.export_empty"), "error", 1800);
@@ -258,6 +262,9 @@ export default function BlackHolePage({
                     </button>
                     <button className="nav-btn" data-tutorial="blackhole-execute" onClick={executePlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
                         {t("blackhole.execute_plan")}
+                    </button>
+                    <button className="nav-btn" data-tutorial="blackhole-execute-full" onClick={executeFullPlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
+                        {t("blackhole.execute_full_plan")}
                     </button>
                     <button className="nav-btn" onClick={exportCurrentSnapshot}>
                         {t("blackhole.export_current")}

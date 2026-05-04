@@ -27,6 +27,7 @@ def souzu_switch_execution_payload(
         ok: bool | None = None,
         phase: str = "",
         phase_key: str = "",
+        execution_kind: str = "switch",
 ) -> dict:
     return {
         "status": status,
@@ -38,6 +39,7 @@ def souzu_switch_execution_payload(
         "ok": ok,
         "phase": phase or "",
         "phase_key": phase_key or "",
+        "execution_kind": execution_kind or "switch",
         "updated_at": time.time(),
     }
 

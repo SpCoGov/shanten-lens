@@ -603,6 +603,13 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         "type": "souzu_switch_control_result",
                         "data": {"action": "execute_plan", "ok": ok, "reason": reason},
                     })
+                elif action == "execute_full_plan":
+                    from backend.mitm.hooks import execute_current_full_plan
+                    ok, reason = await execute_current_full_plan()
+                    await ws_send(ws, {
+                        "type": "souzu_switch_control_result",
+                        "data": {"action": "execute_full_plan", "ok": ok, "reason": reason},
+                    })
             elif t == "msgbox_result":
                 from backend.msgbox import handle_msgbox_result
                 handle_msgbox_result(pkt)
