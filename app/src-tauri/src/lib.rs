@@ -492,7 +492,7 @@ pub fn run() {
         let ah2 = ah.clone();
         let gate2 = gate.clone();
         tauri::async_runtime::spawn(async move {
-          std::thread::sleep(std::time::Duration::from_secs(20));
+          std::thread::sleep(std::time::Duration::from_secs(5));
           if !gate2.switched.load(Ordering::SeqCst) {
             if let Some(progress_state) = ah2.try_state::<StartupProgressState>() {
               set_startup_progress(

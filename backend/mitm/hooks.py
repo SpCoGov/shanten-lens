@@ -697,28 +697,6 @@ async def execute_current_full_plan() -> tuple[bool, str]:
         if kan_done:
             continue
 
-        if _next_operation_has_type(8):
-            await emit_execution("running", batch_index=batch_count, phase_key="blackhole.execute_phase_draw")
-            ok, reason, _resp = await call_with_1004_retry_async(
-                bot.op_tsumo,
-                delay_sec=3,
-                interval=3,
-                timeout=3000,
-                to_thread=True,
-            )
-            if not ok:
-                await emit_execution(
-                    "failed",
-                    batch_index=batch_count,
-                    reason_key="blackhole.execute_reason_draw_failed",
-                    reason_values={"reason": reason or "unknown"},
-                    ok=False,
-                )
-                return False, reason or "draw failed"
-            advanced_draw_count += 1
-            await asyncio.sleep(0.4)
-            continue
-
         if _next_operation_has_type(1):
             discard_id = _pick_discard_against_face_counts(keep_counts)
             if discard_id is None:
@@ -779,27 +757,6 @@ async def execute_current_full_plan() -> tuple[bool, str]:
                 ok=False,
             )
             return False, "discard not available"
-        if _next_operation_has_type(8):
-            await emit_execution("running", batch_index=batch_count, phase_key="blackhole.execute_phase_draw")
-            ok, reason, _resp = await call_with_1004_retry_async(
-                bot.op_tsumo,
-                delay_sec=3,
-                interval=3,
-                timeout=3000,
-                to_thread=True,
-            )
-            if not ok:
-                await emit_execution(
-                    "failed",
-                    batch_index=batch_count,
-                    reason_key="blackhole.execute_reason_draw_failed",
-                    reason_values={"reason": reason or "unknown"},
-                    ok=False,
-                )
-                return False, reason or "draw failed"
-            advanced_draw_count += 1
-            await asyncio.sleep(0.4)
-            continue
         if _next_operation_has_type(1):
             discard_id = _pick_full_plan_discard_id(plan) or _pick_discard_against_face_counts(keep_counts)
             if discard_id is None:
