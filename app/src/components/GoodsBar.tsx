@@ -8,10 +8,12 @@ export default function GoodsBar({
                                      items,
                                      scale = 0.9,
                                      max = 5,
+                                     hotkeyLabels,
                                  }: {
     items: GoodsItem[];
     scale?: number;
     max?: number;
+    hotkeyLabels?: string[];
 }) {
     const list = Array.isArray(items) ? items.slice(0, max) : [];
 
@@ -42,8 +44,13 @@ export default function GoodsBar({
                 padding: "6px 4px",
             }}
         >
-            {list.map((it) => (
-                <GoodsCard key={`${it.id}-${it.goodsId}`} item={it} scale={scale} />
+            {list.map((it, index) => (
+                <GoodsCard
+                    key={`${it.id}-${it.goodsId}`}
+                    item={it}
+                    scale={scale}
+                    hotkeyLabel={hotkeyLabels?.[index]}
+                />
             ))}
         </div>
     );

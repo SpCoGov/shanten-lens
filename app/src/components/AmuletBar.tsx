@@ -9,10 +9,12 @@ export default function AmuletBar({
                                       items,
                                       scale = 0.55,
                                       max = 8,
+                                      onItemClick,
                                   }: {
     items: EffectItem[];
     scale?: number;
     max?: number;
+    onItemClick?: (item: EffectItem) => void;
 }) {
     const list = Array.isArray(items) ? items.slice(0, max) : [];
     const {t} = useTranslation();
@@ -44,7 +46,7 @@ export default function AmuletBar({
             }}
         >
             {list.map((it) => (
-                <AmuletCard key={`${it.uid}-${it.id}`} item={it} scale={scale}/>
+                <AmuletCard key={`${it.uid}-${it.id}`} item={it} scale={scale} onClick={onItemClick}/>
             ))}
         </div>
     );

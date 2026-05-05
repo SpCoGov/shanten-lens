@@ -15,7 +15,17 @@ function pad4(n: number) {
     return n.toString().padStart(4, "0");
 }
 
-export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; scale?: number }) {
+export default function AmuletCard({
+                                       item,
+                                       scale = 0.65,
+                                       onClick,
+                                       hotkeyLabel,
+                                   }: {
+    item: EffectItem;
+    scale?: number;
+    onClick?: (item: EffectItem) => void;
+    hotkeyLabel?: string;
+}) {
     const reg = getRegistry();
     const currentTheme = typeof document !== "undefined" ? document.documentElement.getAttribute("data-theme") : null;
 
@@ -68,8 +78,18 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
                 height: H,
                 userSelect: "none",
                 flex: "0 0 auto",
+                cursor: onClick ? "pointer" : "default",
             }}
             title={titleText}
+            role={onClick ? "button" : undefined}
+            tabIndex={onClick ? 0 : undefined}
+            onClick={onClick ? () => onClick(item) : undefined}
+            onKeyDown={onClick ? (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onClick(item);
+                }
+            } : undefined}
         >
             {unknown ? (
                 <div
@@ -166,6 +186,21 @@ export default function AmuletCard({item, scale = 0.65}: { item: EffectItem; sca
                     {t("amulet_card.unknown_label", {regId: regId})}
                 </div>
             )}
+
+            {hotkeyLabel ? (
+                <div
+                    className="card-hotkey-badge"
+                    style={{
+                        right: Math.round(6 * scale),
+                        bottom: Math.round(6 * scale),
+                        minWidth: Math.max(20, Math.round(28 * scale)),
+                        height: Math.max(18, Math.round(24 * scale)),
+                        fontSize: Math.max(11, Math.round(14 * scale)),
+                    }}
+                >
+                    {hotkeyLabel}
+                </div>
+            ) : null}
         </div>
     );
 }

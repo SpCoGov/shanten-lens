@@ -403,6 +403,142 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         "data": {"ok": False, "reason": f"exception:{e}"},
                     })
 
+            elif t == "amulet_hotkey_action":
+                action = str((data or {}).get("action") or "")
+
+                async def _hotkey_result(ok: bool, reason: str = "", **extra):
+                    await ws_send(ws, {
+                        "type": "amulet_hotkey_action_result",
+                        "data": {"ok": ok, "reason": reason, "action": action, **extra},
+                    })
+
+                try:
+                    bot = getattr(sys.modules.get("backend.app"), "PACKET_BOT", None)
+                    if not bot:
+                        await _hotkey_result(False, "addon-not-ready")
+                        continue
+
+                    current_stage = int(getattr(GAME_STATE, "stage", -1) or -1)
+                    if current_stage not in {1, 4, 5, 7}:
+                        await _hotkey_result(False, "stage-not-allowed", stage=current_stage)
+                        continue
+
+                    if action == "buy_pack":
+                        if current_stage != 4:
+                            await _hotkey_result(False, "stage-not-allowed", stage=current_stage)
+                            continue
+                        good_id = int((data or {}).get("goodId", 0) or 0)
+                        ok, reason, _ = await call_with_1004_retry_async(
+                            bot.buy_pack,
+                            good_id=good_id,
+                            delay_sec=3,
+                            interval=0.4,
+                            timeout=12,
+                            to_thread=True,
+                        )
+                        await _hotkey_result(ok, "" if ok else reason, goodId=good_id)
+                        continue
+
+                    if action == "refresh_shop":
+                        if current_stage != 4:
+                            await _hotkey_result(False, "stage-not-allowed", stage=current_stage)
+                            continue
+                        ok, reason, _ = await call_with_1004_retry_async(
+                            bot.refresh_shop,
+                            delay_sec=3,
+                            interval=0.4,
+                            timeout=12,
+                            to_thread=True,
+                        )
+                        await _hotkey_result(ok, "" if ok else reason)
+                        continue
+
+                    if action == "select_candidate":
+                        selected_id = int((data or {}).get("selectedId", 0) or 0)
+                        if current_stage == 1:
+                            if selected_id == 0:
+                                await _hotkey_result(False, "skip-not-allowed", stage=current_stage)
+                                continue
+                            fn = bot.select_free_effect
+                        elif current_stage == 5:
+                            fn = bot.select_effect
+                        elif current_stage == 7:
+                            fn = bot.select_reward_effect
+                        else:
+                            await _hotkey_result(False, "stage-not-allowed", stage=current_stage)
+                            continue
+                        ok, reason, _ = await call_with_1004_retry_async(
+                            fn,
+                            selected_id=selected_id,
+                            delay_sec=3,
+                            interval=0.4,
+                            timeout=12,
+                            to_thread=True,
+                        )
+                        await _hotkey_result(ok, "" if ok else reason, selectedId=selected_id)
+                        continue
+
+                    if action == "sell_effect":
+                        uid = int((data or {}).get("uid", 0) or 0)
+                        if uid <= 0:
+                            await _hotkey_result(False, "unknown id")
+                            continue
+                        ok, reason, _ = await call_with_1004_retry_async(
+                            bot.sell_effect,
+                            uid=uid,
+                            delay_sec=3,
+                            interval=0.4,
+                            timeout=12,
+                            to_thread=True,
+                        )
+                        await _hotkey_result(ok, "" if ok else reason, uid=uid)
+                        continue
+
+                    if action == "sell_recent":
+                        effect_list = list(getattr(GAME_STATE, "effect_list", None) or [])
+                        uid = None
+                        if str((data or {}).get("mode") or "last_list") == "last_selected":
+                            raw_id = int((data or {}).get("rawId", 0) or 0)
+                            for effect in reversed(effect_list):
+                                if not isinstance(effect, dict):
+                                    continue
+                                try:
+                                    if int(effect.get("id", 0) or 0) == raw_id:
+                                        uid = int(effect.get("uid", 0) or 0)
+                                        break
+                                except Exception:
+                                    pass
+                            if not uid:
+                                await _hotkey_result(False, "selected-effect-not-found", rawId=raw_id)
+                                continue
+                        else:
+                            for effect in reversed(effect_list):
+                                if not isinstance(effect, dict):
+                                    continue
+                                try:
+                                    uid = int(effect.get("uid", 0) or 0)
+                                except Exception:
+                                    uid = None
+                                if uid:
+                                    break
+                        if not uid:
+                            await _hotkey_result(False, "no-effects")
+                            continue
+                        ok, reason, _ = await call_with_1004_retry_async(
+                            bot.sell_effect,
+                            uid=uid,
+                            delay_sec=3,
+                            interval=0.4,
+                            timeout=12,
+                            to_thread=True,
+                        )
+                        await _hotkey_result(ok, "" if ok else reason, uid=uid)
+                        continue
+
+                    await _hotkey_result(False, "unknown-action")
+                except Exception as e:
+                    await _hotkey_result(False, f"exception:{e}")
+
             elif t == "open_config_dir":
                 try:
                     _open_dir(str(CONF_DIR))

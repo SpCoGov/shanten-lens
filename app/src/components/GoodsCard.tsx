@@ -13,9 +13,11 @@ const GOODS_IMG: Record<number, string> = {
 export default function GoodsCard({
                                       item,
                                       scale = 0.9,
+                                      hotkeyLabel,
                                   }: {
     item: GoodsItem;
     scale?: number;
+    hotkeyLabel?: string;
 }) {
     const W0 = 150;
     const H0 = 220;
@@ -109,6 +111,21 @@ export default function GoodsCard({
                     </div>
                 </div>
             )}
+
+            {hotkeyLabel ? (
+                <div
+                    className="card-hotkey-badge"
+                    style={{
+                        right: Math.round(7 * scale),
+                        bottom: Math.round(7 * scale),
+                        minWidth: Math.max(20, Math.round(30 * scale)),
+                        height: Math.max(18, Math.round(24 * scale)),
+                        fontSize: Math.max(11, Math.round(14 * scale)),
+                    }}
+                >
+                    {hotkeyLabel}
+                </div>
+            ) : null}
         </div>
     );
 }

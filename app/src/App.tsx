@@ -74,6 +74,152 @@ type SouzuSwitchExecutionState = {
     updated_at: number;
 };
 
+type AmuletHotkeySettings = {
+    enabled: boolean;
+    buyPack: string[];
+    selectCandidate: string[];
+    skipCandidate: string;
+    sellRecent: string;
+    refreshShop: string;
+    sellMode: "last_list" | "last_selected";
+};
+
+const AMULET_HOTKEY_STORAGE_KEY = "sl-amulet-hotkeys";
+const DEFAULT_AMULET_HOTKEYS: AmuletHotkeySettings = {
+    enabled: false,
+    buyPack: ["q", "w", "e", "r", "t"],
+    selectCandidate: ["1", "2", "3"],
+    skipCandidate: "4",
+    sellRecent: "`",
+    refreshShop: "f",
+    sellMode: "last_list",
+};
+
+function normalizeHotkeyKey(value: string): string {
+    if (value === " ") return " ";
+    const v = String(value || "").trim();
+    if (!v) return "";
+    if (v === "Space") return " ";
+    const parts = v.split("+").map((part) => part.trim()).filter(Boolean);
+    if (parts.length <= 1) return normalizeSingleHotkeyKey(v);
+
+    const mods = new Set<string>();
+    let main = "";
+    for (const part of parts) {
+        const lower = part.toLowerCase();
+        if (lower === "control" || lower === "ctrl") mods.add("ctrl");
+        else if (lower === "alt" || lower === "option") mods.add("alt");
+        else if (lower === "shift") mods.add("shift");
+        else if (lower === "meta" || lower === "cmd" || lower === "command" || lower === "win") mods.add("meta");
+        else main = normalizeSingleHotkeyKey(part);
+    }
+    if (!main) return "";
+    return [...["ctrl", "alt", "shift", "meta"].filter((mod) => mods.has(mod)), main].join("+");
+}
+
+function normalizeSingleHotkeyKey(value: string): string {
+    const v = String(value || "").trim();
+    if (!v) return "";
+    if (v === " ") return " ";
+    const lower = v.toLowerCase();
+    if (lower === "space") return " ";
+    if (/^[0-9]$/.test(v)) return `digit${v}`;
+    if (/^digit[0-9]$/i.test(v)) return lower;
+    if (/^numpad[0-9]$/i.test(v)) return lower;
+    if (v.length === 1) return lower;
+    return lower;
+}
+
+function keyboardCodeKey(event: KeyboardEvent): string {
+    if (/^Digit[0-9]$/.test(event.code)) return event.code.toLowerCase();
+    if (/^Numpad[0-9]$/.test(event.code)) return event.code.toLowerCase();
+    if (event.code === "NumpadDecimal") return "numpaddecimal";
+    if (event.code === "NumpadAdd") return "numpadadd";
+    if (event.code === "NumpadSubtract") return "numpadsubtract";
+    if (event.code === "NumpadMultiply") return "numpadmultiply";
+    if (event.code === "NumpadDivide") return "numpaddivide";
+    if (event.code === "NumpadEnter") return "numpadenter";
+    return "";
+}
+
+function keyboardEventKey(event: KeyboardEvent): string {
+    if (["Control", "Alt", "Shift", "Meta"].includes(event.key)) return "";
+    let key = "";
+    const codeKey = keyboardCodeKey(event);
+    if (codeKey) key = codeKey;
+    else if (event.key === "Dead" && event.code === "Backquote") key = "`";
+    else if (event.code === "Backquote") key = "`";
+    else key = normalizeSingleHotkeyKey(event.key);
+    if (!key) return "";
+    const mods = [
+        event.ctrlKey ? "ctrl" : "",
+        event.altKey ? "alt" : "",
+        event.shiftKey ? "shift" : "",
+        event.metaKey ? "meta" : "",
+    ].filter(Boolean);
+    return [...mods, key].join("+");
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    const tag = target.tagName.toLowerCase();
+    return tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable;
+}
+
+function readAmuletHotkeySettings(): AmuletHotkeySettings {
+    try {
+        const raw = localStorage.getItem(AMULET_HOTKEY_STORAGE_KEY);
+        if (!raw) return DEFAULT_AMULET_HOTKEYS;
+        const parsed = JSON.parse(raw) as Partial<AmuletHotkeySettings>;
+        return {
+            enabled: Boolean(parsed.enabled),
+            buyPack: Array.isArray(parsed.buyPack) && parsed.buyPack.length === 5
+                ? parsed.buyPack.map((k, i) => normalizeHotkeyKey(k) || DEFAULT_AMULET_HOTKEYS.buyPack[i])
+                : DEFAULT_AMULET_HOTKEYS.buyPack,
+            selectCandidate: Array.isArray(parsed.selectCandidate) && parsed.selectCandidate.length === 3
+                ? parsed.selectCandidate.map((k, i) => normalizeHotkeyKey(k) || DEFAULT_AMULET_HOTKEYS.selectCandidate[i])
+                : DEFAULT_AMULET_HOTKEYS.selectCandidate,
+            skipCandidate: normalizeHotkeyKey(parsed.skipCandidate || "") || DEFAULT_AMULET_HOTKEYS.skipCandidate,
+            sellRecent: normalizeHotkeyKey(parsed.sellRecent || "") || DEFAULT_AMULET_HOTKEYS.sellRecent,
+            refreshShop: normalizeHotkeyKey(parsed.refreshShop || "") || DEFAULT_AMULET_HOTKEYS.refreshShop,
+            sellMode: parsed.sellMode === "last_selected" ? "last_selected" : "last_list",
+        };
+    } catch {
+        return DEFAULT_AMULET_HOTKEYS;
+    }
+}
+
+function displayHotkey(value: string): string {
+    const normalized = normalizeHotkeyKey(value);
+    if (!normalized) return "";
+    return normalized.split("+").map((part) => {
+        if (part === "ctrl") return "Ctrl";
+        if (part === "alt") return "Alt";
+        if (part === "shift") return "Shift";
+        if (part === "meta") return "Meta";
+        if (part === " ") return "Space";
+        if (/^digit[0-9]$/.test(part)) return part.slice(5);
+        if (/^numpad[0-9]$/.test(part)) return `Num ${part.slice(6)}`;
+        if (part === "numpaddecimal") return "Num .";
+        if (part === "numpadadd") return "Num +";
+        if (part === "numpadsubtract") return "Num -";
+        if (part === "numpadmultiply") return "Num *";
+        if (part === "numpaddivide") return "Num /";
+        if (part === "numpadenter") return "Num Enter";
+        return part.length === 1 ? part.toUpperCase() : part;
+    }).join("+");
+}
+
+function collectAmuletHotkeyEntries(settings: AmuletHotkeySettings): Array<{id: string; key: string}> {
+    return [
+        ...settings.buyPack.map((key, index) => ({id: `buyPack:${index}`, key: normalizeHotkeyKey(key)})),
+        ...settings.selectCandidate.map((key, index) => ({id: `selectCandidate:${index}`, key: normalizeHotkeyKey(key)})),
+        {id: "skipCandidate", key: normalizeHotkeyKey(settings.skipCandidate)},
+        {id: "sellRecent", key: normalizeHotkeyKey(settings.sellRecent)},
+        {id: "refreshShop", key: normalizeHotkeyKey(settings.refreshShop)},
+    ].filter((entry) => entry.key);
+}
+
 const settingsUrl = import.meta.env.DEV
     ? `${location.origin}/settings.html`
     : 'settings.html';
@@ -546,6 +692,10 @@ export default function App() {
     const [planSouzuSwitch, setPlanSouzuSwitch] = React.useState<PlanData | null>(null);
     const [debugSouzuSwitch, setDebugSouzuSwitch] = React.useState<PlanData | null>(null);
     const [latestGameState, setLatestGameState] = React.useState<GameStateData | null>(null);
+    const [amuletHotkeys, setAmuletHotkeys] = React.useState<AmuletHotkeySettings>(() => readAmuletHotkeySettings());
+    const [hotkeyEditorOpen, setHotkeyEditorOpen] = React.useState(false);
+    const [sellConfirmTarget, setSellConfirmTarget] = React.useState<EffectItem | null>(null);
+    const [lastSelectedCandidateId, setLastSelectedCandidateId] = React.useState<number | null>(null);
 
     const [amulets, setAmulets] = React.useState<EffectItem[]>([]);
     const [goods, setGoods] = React.useState<GoodsItem[]>([]);
@@ -589,6 +739,10 @@ export default function App() {
         applyTheme(theme);
         localStorage.setItem(THEME_KEY, theme);
     }, [theme]);
+
+    React.useEffect(() => {
+        localStorage.setItem(AMULET_HOTKEY_STORAGE_KEY, JSON.stringify(amuletHotkeys));
+    }, [amuletHotkeys]);
 
     const activateHiddenTheme = React.useCallback(() => {
         if (theme === "dark-purple") return;
@@ -990,6 +1144,37 @@ export default function App() {
                 } else {
                     pushToast(t("shop_buff_upgrade.failed", {reason: d.reason || "unknown"}), "error", 2600);
                 }
+            } else if (pkt.type === "amulet_hotkey_action_result") {
+                const d = (pkt.data ?? {}) as {
+                    ok?: boolean;
+                    action?: string;
+                    reason?: string;
+                    stage?: number;
+                };
+                if (d.ok) {
+                    const labelKey = d.action === "buy_pack"
+                        ? "buy_pack"
+                        : d.action === "refresh_shop"
+                            ? "refresh_shop"
+                            : d.action === "sell_recent" || d.action === "sell_effect"
+                                ? "sell_recent"
+                                : "select_candidate";
+                    pushToast(t("amulet_hotkeys.toast_sent", {action: t(`amulet_hotkeys.action.${labelKey}`)}), "success", 1200);
+                } else {
+                    const reason = d.reason || "unknown";
+                    const msg = reason === "stage-not-allowed"
+                        ? t("amulet_hotkeys.stage_unavailable", {stage: d.stage ?? stage})
+                        : reason === "coin not enough"
+                            ? t("amulet_hotkeys.not_enough_coin_short")
+                            : reason === "no-effects"
+                                ? t("amulet_hotkeys.no_effects")
+                                : reason === "selected-effect-not-found"
+                                    ? t("amulet_hotkeys.selected_effect_missing")
+                                    : reason === "skip-not-allowed"
+                                        ? t("amulet_hotkeys.free_cannot_skip")
+                                        : t("amulet_hotkeys.action_failed", {reason});
+                    pushToast(msg, "error", 1800);
+                }
             } else if (pkt.type === "version_mismatch" && pkt.data) {
                 const d = pkt.data as Partial<VersionMismatch>;
                 if (!versionMismatchShownRef.current) {
@@ -1122,6 +1307,196 @@ export default function App() {
             )}
         </div>
     ) : undefined;
+
+    const canUseAmuletHotkeys = React.useMemo(() => [1, 4, 5, 7].includes(stage), [stage]);
+    const amuletHotkeyConflicts = React.useMemo(() => {
+        const byKey = new Map<string, string[]>();
+        for (const entry of collectAmuletHotkeyEntries(amuletHotkeys)) {
+            byKey.set(entry.key, [...(byKey.get(entry.key) ?? []), entry.id]);
+        }
+        const ids = new Set<string>();
+        byKey.forEach((entryIds) => {
+            if (entryIds.length > 1) {
+                entryIds.forEach((id) => ids.add(id));
+            }
+        });
+        return ids;
+    }, [amuletHotkeys]);
+    const hasAmuletHotkeyConflicts = amuletHotkeyConflicts.size > 0;
+
+    const amuletHotkeyInputClass = React.useCallback((id: string) => (
+        amuletHotkeyConflicts.has(id) ? "is-conflict" : ""
+    ), [amuletHotkeyConflicts]);
+
+    const setAmuletHotkeyEnabled = React.useCallback((enabled: boolean) => {
+        setAmuletHotkeys((current) => ({...current, enabled}));
+    }, []);
+
+    const updateAmuletHotkey = React.useCallback((
+        group: "buyPack" | "selectCandidate" | "skipCandidate" | "sellRecent" | "refreshShop",
+        value: string,
+        index?: number,
+    ) => {
+        const normalized = normalizeHotkeyKey(value);
+        if (!normalized) return;
+        setAmuletHotkeys((current) => {
+            if (group === "buyPack") {
+                const buyPack = [...current.buyPack];
+                buyPack[index ?? 0] = normalized;
+                return {...current, buyPack};
+            }
+            if (group === "selectCandidate") {
+                const selectCandidate = [...current.selectCandidate];
+                selectCandidate[index ?? 0] = normalized;
+                return {...current, selectCandidate};
+            }
+            return {...current, [group]: normalized};
+        });
+    }, []);
+
+    const captureHotkeyInput = React.useCallback((
+        event: React.KeyboardEvent<HTMLInputElement>,
+        group: "buyPack" | "selectCandidate" | "skipCandidate" | "sellRecent" | "refreshShop",
+        index?: number,
+    ) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.key === "Tab") return;
+        const key = keyboardEventKey(event.nativeEvent);
+        if (!key) return;
+        updateAmuletHotkey(group, key, index);
+    }, [updateAmuletHotkey]);
+
+    const sendAmuletHotkeyAction = React.useCallback((action: string, payload: Record<string, unknown> = {}) => {
+        ws.send({
+            type: "amulet_hotkey_action",
+            data: {activityId: 250811, action, ...payload},
+        } as any);
+    }, []);
+
+    const selectCandidateById = React.useCallback((selectedId: number) => {
+        if (![1, 5, 7].includes(stage)) {
+            pushToast(t("amulet_hotkeys.stage_unavailable", {stage}), "info", 1400);
+            return;
+        }
+        setLastSelectedCandidateId(selectedId);
+        sendAmuletHotkeyAction("select_candidate", {selectedId});
+    }, [sendAmuletHotkeyAction, stage, t]);
+
+    const refreshShopManually = React.useCallback(() => {
+        if (stage !== 4) {
+            pushToast(t("amulet_hotkeys.stage_unavailable", {stage}), "info", 1400);
+            return;
+        }
+        const currentCoin = Number.parseInt(String(coin ?? "0"), 10);
+        const safeCoin = Number.isFinite(currentCoin) ? currentCoin : 0;
+        const refreshPrice = Number.parseInt(String(latestGameState?.refresh_price ?? 0), 10);
+        if (Number.isFinite(refreshPrice) && safeCoin < refreshPrice) {
+            pushToast(t("amulet_hotkeys.not_enough_coin", {cost: refreshPrice, coin: safeCoin}), "error", 1600);
+            return;
+        }
+        sendAmuletHotkeyAction("refresh_shop");
+    }, [coin, latestGameState?.refresh_price, sendAmuletHotkeyAction, stage, t]);
+
+    const sellOwnedAmulet = React.useCallback((item: EffectItem) => {
+        setSellConfirmTarget(null);
+        sendAmuletHotkeyAction("sell_effect", {uid: item.uid});
+    }, [sendAmuletHotkeyAction]);
+
+    const handleAmuletHotkey = React.useCallback((event: KeyboardEvent) => {
+        if (hotkeyEditorOpen || sellConfirmTarget || usageNotice || versionMismatch || activeTutorial) return;
+        if (!amuletHotkeys.enabled || !canUseAmuletHotkeys) return;
+        if (isTypingTarget(event.target)) return;
+
+        const key = keyboardEventKey(event);
+        if (!key) return;
+        const currentCoin = Number.parseInt(String(coin ?? "0"), 10);
+        const safeCoin = Number.isFinite(currentCoin) ? currentCoin : 0;
+
+        if (stage === 4) {
+            const buyIndex = amuletHotkeys.buyPack.findIndex((item) => normalizeHotkeyKey(item) === key);
+            if (buyIndex >= 0) {
+                event.preventDefault();
+                const good = (goods ?? []).slice(0, 5)[buyIndex];
+                if (!good || good.sold) {
+                    pushToast(t("amulet_hotkeys.no_pack_slot", {slot: buyIndex + 1}), "info", 1200);
+                    return;
+                }
+                const price = Number.parseInt(String(good.price ?? 0), 10);
+                if (Number.isFinite(price) && safeCoin < price) {
+                    pushToast(t("amulet_hotkeys.not_enough_coin", {cost: price, coin: safeCoin}), "error", 1600);
+                    return;
+                }
+                sendAmuletHotkeyAction("buy_pack", {goodId: good.id});
+                return;
+            }
+
+            if (key === normalizeHotkeyKey(amuletHotkeys.refreshShop)) {
+                event.preventDefault();
+                refreshShopManually();
+                return;
+            }
+        }
+
+        if (stage === 1 || stage === 5 || stage === 7) {
+            const candidateIndex = amuletHotkeys.selectCandidate.findIndex((item) => normalizeHotkeyKey(item) === key);
+            if (candidateIndex >= 0) {
+                event.preventDefault();
+                const candidate = (candidates ?? []).slice(0, 3)[candidateIndex];
+                if (!candidate) {
+                    pushToast(t("amulet_hotkeys.no_amulet_slot", {slot: candidateIndex + 1}), "info", 1200);
+                    return;
+                }
+                selectCandidateById(candidate.id);
+                return;
+            }
+
+            if (key === normalizeHotkeyKey(amuletHotkeys.skipCandidate)) {
+                event.preventDefault();
+                if (stage === 1) {
+                    pushToast(t("amulet_hotkeys.free_cannot_skip"), "info", 1400);
+                    return;
+                }
+                sendAmuletHotkeyAction("select_candidate", {selectedId: 0});
+                return;
+            }
+        }
+
+        if (key === normalizeHotkeyKey(amuletHotkeys.sellRecent)) {
+            event.preventDefault();
+            if (amuletHotkeys.sellMode === "last_selected") {
+                if (lastSelectedCandidateId == null) {
+                    pushToast(t("amulet_hotkeys.no_selected_record"), "info", 1400);
+                    return;
+                }
+                sendAmuletHotkeyAction("sell_recent", {mode: "last_selected", rawId: lastSelectedCandidateId});
+                return;
+            }
+            sendAmuletHotkeyAction("sell_recent", {mode: "last_list"});
+        }
+    }, [
+        amuletHotkeys,
+        canUseAmuletHotkeys,
+        candidates,
+        coin,
+        goods,
+        hotkeyEditorOpen,
+        lastSelectedCandidateId,
+        refreshShopManually,
+        sellConfirmTarget,
+        selectCandidateById,
+        sendAmuletHotkeyAction,
+        stage,
+        t,
+        usageNotice,
+        versionMismatch,
+        activeTutorial,
+    ]);
+
+    React.useEffect(() => {
+        document.addEventListener("keydown", handleAmuletHotkey);
+        return () => document.removeEventListener("keydown", handleAmuletHotkey);
+    }, [handleAmuletHotkey]);
 
     const navigateFromMore = React.useCallback((nextRoute: Route) => {
         setRoute(nextRoute);
@@ -1308,6 +1683,14 @@ export default function App() {
                     <div className="sidebar-bottom">
                         <button
                             className="nav-icon"
+                            title={t("amulet_hotkeys.customize")}
+                            onClick={() => setHotkeyEditorOpen(true)}
+                        >
+                            <span className="ms">keyboard</span>
+                        </button>
+
+                        <button
+                            className="nav-icon"
                             data-tutorial="nav-refresh"
                             title={t("nav.refreshGame")}
                             onClick={() => ws.send({type: "fetch_amulet_activity_data", data: {activityId: 250811}})}
@@ -1357,13 +1740,30 @@ export default function App() {
                                 <div style={{flex: 1, minWidth: 0, position: "relative"}}>
                                     <div className="panel">
                                         <div className="panel-title">{t("amulet")}</div>
-                                        <AmuletBar items={amulets} scale={0.55}/>
+                                        <AmuletBar items={amulets} scale={0.55} onItemClick={(item) => setSellConfirmTarget(item)}/>
                                     </div>
 
                                     {(stage === 4 || stage === 5) && (
                                         <div className="panel">
-                                            <div className="panel-title">{t("goods")}</div>
-                                            <GoodsBar items={goods} scale={0.85}/>
+                                            <div className="panel-title panel-title-with-action">
+                                                <span>{t("goods")}</span>
+                                                <button
+                                                    className="panel-title-action"
+                                                    onClick={refreshShopManually}
+                                                    disabled={stage !== 4}
+                                                    title={t("amulet_hotkeys.refresh_shop_hint", {
+                                                        price: latestGameState?.refresh_price ?? 0,
+                                                    })}
+                                                >
+                                                    <span className="ms" aria-hidden="true">refresh</span>
+                                                    <span>{t("amulet_hotkeys.refresh_shop_price", {price: latestGameState?.refresh_price ?? 0})}</span>
+                                                </button>
+                                            </div>
+                                            <GoodsBar
+                                                items={goods}
+                                                scale={0.85}
+                                                hotkeyLabels={amuletHotkeys.enabled ? amuletHotkeys.buyPack.map(displayHotkey) : undefined}
+                                            />
                                         </div>
                                     )}
 
@@ -1402,7 +1802,13 @@ export default function App() {
                                     {[1, 5, 7].includes(stage) && (
                                         <div className="panel">
                                             <div className="panel-title">{t("candidate_amulet")}</div>
-                                            <CandidateBar candidates={candidates} scale={0.55}/>
+                                            <CandidateBar
+                                                candidates={candidates}
+                                                scale={0.55}
+                                                max={3}
+                                                onCandidateClick={(candidate) => selectCandidateById(candidate.id)}
+                                                hotkeyLabels={amuletHotkeys.enabled ? amuletHotkeys.selectCandidate.map(displayHotkey) : undefined}
+                                            />
                                         </div>
                                     )}
 
@@ -1517,6 +1923,169 @@ export default function App() {
             ) : null}
             {activeTutorial === "home" ? (
                 <TutorialOverlay steps={activeTutorialSteps} onClose={closeTutorial}/>
+            ) : null}
+            {hotkeyEditorOpen ? (
+                <div
+                    className="hotkey-editor-overlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="hotkey-editor-title"
+                    onClick={() => setHotkeyEditorOpen(false)}
+                >
+                    <div className="hotkey-editor-panel" onClick={(event) => event.stopPropagation()}>
+                        <div className="hotkey-editor-header">
+                            <div>
+                                <h2 id="hotkey-editor-title">{t("amulet_hotkeys.editor_title")}</h2>
+                                <p>{t("amulet_hotkeys.editor_hint")}</p>
+                                {hasAmuletHotkeyConflicts ? (
+                                    <p className="hotkey-editor-conflict-message">{t("amulet_hotkeys.conflict_hint")}</p>
+                                ) : null}
+                            </div>
+                            <button className="hotkey-editor-close" onClick={() => setHotkeyEditorOpen(false)} aria-label={t("modal.close")}>
+                                <span className="ms" aria-hidden="true">close</span>
+                            </button>
+                        </div>
+
+                        <label
+                            className={`hotkey-editor-switch ${amuletHotkeys.enabled ? "is-on" : ""}`}
+                            title={amuletHotkeys.enabled ? t("amulet_hotkeys.disable") : t("amulet_hotkeys.enable")}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={amuletHotkeys.enabled}
+                                onChange={(event) => setAmuletHotkeyEnabled(event.currentTarget.checked)}
+                            />
+                            <span className="sidebar-hotkey-track" aria-hidden="true">
+                                <span className="sidebar-hotkey-thumb"/>
+                            </span>
+                            <span>{amuletHotkeys.enabled ? t("amulet_hotkeys.disable") : t("amulet_hotkeys.enable")}</span>
+                        </label>
+
+                        <div className="hotkey-editor-grid">
+                            <div className="hotkey-editor-group">
+                                <div className="hotkey-editor-group-title">{t("amulet_hotkeys.group_buy")}</div>
+                                {amuletHotkeys.buyPack.map((key, index) => (
+                                    <label className={`hotkey-editor-row ${amuletHotkeyInputClass(`buyPack:${index}`)}`} key={`buy-${index}`}>
+                                        <span>{t("amulet_hotkeys.pack_slot", {slot: index + 1})}</span>
+                                        <input
+                                            className={amuletHotkeyInputClass(`buyPack:${index}`)}
+                                            value={displayHotkey(key)}
+                                            readOnly
+                                            onKeyDown={(event) => captureHotkeyInput(event, "buyPack", index)}
+                                            onFocus={(event) => event.currentTarget.select()}
+                                        />
+                                    </label>
+                                ))}
+                            </div>
+
+                            <div className="hotkey-editor-group">
+                                <div className="hotkey-editor-group-title">{t("amulet_hotkeys.group_choose")}</div>
+                                {amuletHotkeys.selectCandidate.map((key, index) => (
+                                    <label className={`hotkey-editor-row ${amuletHotkeyInputClass(`selectCandidate:${index}`)}`} key={`select-${index}`}>
+                                        <span>{t("amulet_hotkeys.amulet_slot", {slot: index + 1})}</span>
+                                        <input
+                                            className={amuletHotkeyInputClass(`selectCandidate:${index}`)}
+                                            value={displayHotkey(key)}
+                                            readOnly
+                                            onKeyDown={(event) => captureHotkeyInput(event, "selectCandidate", index)}
+                                            onFocus={(event) => event.currentTarget.select()}
+                                        />
+                                    </label>
+                                ))}
+                                <label className={`hotkey-editor-row ${amuletHotkeyInputClass("skipCandidate")}`}>
+                                    <span>{t("amulet_hotkeys.skip_amulet")}</span>
+                                    <input
+                                        className={amuletHotkeyInputClass("skipCandidate")}
+                                        value={displayHotkey(amuletHotkeys.skipCandidate)}
+                                        readOnly
+                                        onKeyDown={(event) => captureHotkeyInput(event, "skipCandidate")}
+                                        onFocus={(event) => event.currentTarget.select()}
+                                    />
+                                </label>
+                            </div>
+
+                            <div className="hotkey-editor-group">
+                                <div className="hotkey-editor-group-title">{t("amulet_hotkeys.group_shop")}</div>
+                                <label className={`hotkey-editor-row ${amuletHotkeyInputClass("sellRecent")}`}>
+                                    <span>{t("amulet_hotkeys.sell_key")}</span>
+                                    <input
+                                        className={amuletHotkeyInputClass("sellRecent")}
+                                        value={displayHotkey(amuletHotkeys.sellRecent)}
+                                        readOnly
+                                        onKeyDown={(event) => captureHotkeyInput(event, "sellRecent")}
+                                        onFocus={(event) => event.currentTarget.select()}
+                                    />
+                                </label>
+                                <div className="hotkey-editor-radio-group" role="radiogroup" aria-label={t("amulet_hotkeys.sell_mode")}>
+                                    <label>
+                                        <input
+                                            type="radio"
+                                            checked={amuletHotkeys.sellMode === "last_list"}
+                                            onChange={() => setAmuletHotkeys((current) => ({...current, sellMode: "last_list"}))}
+                                        />
+                                        <span>{t("amulet_hotkeys.sell_mode_last_list")}</span>
+                                    </label>
+                                    <label>
+                                        <input
+                                            type="radio"
+                                            checked={amuletHotkeys.sellMode === "last_selected"}
+                                            onChange={() => setAmuletHotkeys((current) => ({...current, sellMode: "last_selected"}))}
+                                        />
+                                        <span>{t("amulet_hotkeys.sell_mode_last_selected")}</span>
+                                    </label>
+                                </div>
+                                <label className={`hotkey-editor-row ${amuletHotkeyInputClass("refreshShop")}`}>
+                                    <span>{t("amulet_hotkeys.refresh_key")}</span>
+                                    <input
+                                        className={amuletHotkeyInputClass("refreshShop")}
+                                        value={displayHotkey(amuletHotkeys.refreshShop)}
+                                        readOnly
+                                        onKeyDown={(event) => captureHotkeyInput(event, "refreshShop")}
+                                        onFocus={(event) => event.currentTarget.select()}
+                                    />
+                                </label>
+                                <button
+                                    className="hotkey-editor-reset"
+                                    onClick={() => setAmuletHotkeys({...DEFAULT_AMULET_HOTKEYS, enabled: amuletHotkeys.enabled})}
+                                >
+                                    {t("amulet_hotkeys.reset_defaults")}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+            {sellConfirmTarget ? (
+                <div
+                    className="hotkey-editor-overlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="sell-amulet-title"
+                    onClick={() => setSellConfirmTarget(null)}
+                >
+                    <div className="sell-amulet-dialog" onClick={(event) => event.stopPropagation()}>
+                        <div className="hotkey-editor-header">
+                            <div>
+                                <h2 id="sell-amulet-title">{t("amulet_hotkeys.sell_confirm_title")}</h2>
+                                <p>{t("amulet_hotkeys.sell_confirm_body", {uid: sellConfirmTarget.uid})}</p>
+                            </div>
+                            <button className="hotkey-editor-close" onClick={() => setSellConfirmTarget(null)} aria-label={t("modal.close")}>
+                                <span className="ms" aria-hidden="true">close</span>
+                            </button>
+                        </div>
+                        <div className="sell-amulet-preview">
+                            <AmuletBar items={[sellConfirmTarget]} scale={0.62} max={1}/>
+                        </div>
+                        <div className="sell-amulet-actions">
+                            <button className="nav-btn" onClick={() => setSellConfirmTarget(null)}>
+                                {t("common.cancel")}
+                            </button>
+                            <button className="nav-btn sell-amulet-danger" onClick={() => sellOwnedAmulet(sellConfirmTarget)}>
+                                {t("amulet_hotkeys.sell_confirm_action")}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             ) : null}
             {usageNotice ? (
                 <div
