@@ -616,6 +616,11 @@ export default function App() {
             targetSelector: '[data-tutorial="nav-more"]',
         },
         {
+            title: t("tutorial.home.step_hotkeys.title"),
+            body: t("tutorial.home.step_hotkeys.body"),
+            targetSelector: '[data-tutorial="nav-hotkeys"]',
+        },
+        {
             title: t("tutorial.home.step_refresh.title"),
             body: t("tutorial.home.step_refresh.body"),
             targetSelector: '[data-tutorial="nav-refresh"]',
@@ -1683,6 +1688,7 @@ export default function App() {
                     <div className="sidebar-bottom">
                         <button
                             className="nav-icon"
+                            data-tutorial="nav-hotkeys"
                             title={t("amulet_hotkeys.customize")}
                             onClick={() => setHotkeyEditorOpen(true)}
                         >
