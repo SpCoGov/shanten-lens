@@ -10,6 +10,7 @@ export type AutoRunnerConfig = {
     cutoff_level?: number;
     __tick__?: number; // 轻量刷新
     op_interval_ms?: number;
+    need_pionner_badge_count?: number;
     email_notify?: EmailNotifyConfig;
 };
 
@@ -62,6 +63,7 @@ const defaultConfig: AutoRunnerConfig = {
     targets: [],
     cutoff_level: 102,
     op_interval_ms: 1000,
+    need_pionner_badge_count: 4,
     email_notify: {
         enabled: false,
         host: "",

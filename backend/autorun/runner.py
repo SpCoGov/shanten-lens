@@ -96,6 +96,7 @@ class AutoRunner:
         self.targets: List[Dict[str, Any]] = []
         self.cutoff_level: int = 0
         self.op_interval_ms: int = 1000
+        self.need_pionner_badge_count: int = NEED_PIONNER_BADGE_COUNT
         self.email_notify: dict = {}
 
         self.update_config(self._get_config())
@@ -173,6 +174,13 @@ class AutoRunner:
         self.end_count = max(1, int((cfg or {}).get("end_count", 1) or 1))
         self.targets = list((cfg or {}).get("targets") or [])
         self.op_interval_ms = max(1, int((cfg or {}).get("op_interval_ms", 1000)))
+        try:
+            self.need_pionner_badge_count = max(
+                0,
+                int((cfg or {}).get("need_pionner_badge_count", NEED_PIONNER_BADGE_COUNT)),
+            )
+        except (TypeError, ValueError):
+            self.need_pionner_badge_count = NEED_PIONNER_BADGE_COUNT
         self.email_notify = (cfg or {}).get("email_notify")
         try:
             self.cutoff_level = int((cfg or {}).get("cutoff_level", 0) or 0)
@@ -803,7 +811,7 @@ class AutoRunner:
         current_effect_list: List[Dict[str, Any]] = [dict(it) for it in (effect_list_before_select or [])]
         for item in new_items:
             current_effect_list.append(dict(item))
-            value = _selected_effect_value(item, effect_list_before_select, self.targets)
+            value = _selected_effect_value(item, effect_list_before_select, self.targets, self.need_pionner_badge_count)
             if value > 0:
                 continue
 
@@ -1234,7 +1242,12 @@ class AutoRunner:
                     self.current_step = "game.select_reward_effect"
                 await self._broadcast_status(safe=True)
                 # value: 99-目标护身符、2-指引护身符（当前持有的指引护身符未满3个的情况下）、1-幸福护身符、0-普通
-                best_raw, best_bid, value, sell_uid = select_amulet_from_candidates(game_state.candidate_effect_list, game_state.effect_list, self.targets)
+                best_raw, best_bid, value, sell_uid = select_amulet_from_candidates(
+                    game_state.candidate_effect_list,
+                    game_state.effect_list,
+                    self.targets,
+                    self.need_pionner_badge_count,
+                )
                 if sell_uid:
                     # 先卖掉
                     ok, reason, resp = await call_with_1004_retry_async(
@@ -1307,7 +1320,7 @@ class AutoRunner:
                 if value >= 99:
                     # 护身符是目标所需的护身符、但是空间不足、卖掉其他不重要的以换取空间
                     # sort_sell_priority会按照优先级列出可以卖的护身符列表：List[Dict[str, Any]]，其中每个字典包含一个体积（volume）字段，卖掉这个护身符即可获得对应体积字段的空间。按照优先级选出要卖的护身符、以便剩余的空间充足足以买下新护身符，如果卖掉所有的可以卖的护身符列表里的护身符的都没办法腾出足够的空间的时候、跳过购买
-                    sell_list = sort_sell_priority(game_state.effect_list, self.targets)
+                    sell_list = sort_sell_priority(game_state.effect_list, self.targets, self.need_pionner_badge_count)
                     to_sell, freed, enough = select_items_to_sell_for_purchase(
                         free_space=free_space,
                         need_space=need_space,
@@ -1795,6 +1808,7 @@ def _selected_effect_value(
         effect_item: Dict[str, Any],
         effect_list_before_select: List[Dict[str, Any]],
         targets: List[Dict[str, Any]],
+        need_pionner_badge_count: int = NEED_PIONNER_BADGE_COUNT,
 ) -> int:
     raw_id = int(effect_item.get("id", 0) or 0)
     if raw_id <= 0:
@@ -1827,7 +1841,7 @@ def _selected_effect_value(
             return 99 if badge_id in required_badges else 0
         return 99
 
-    if _owned_count_with_badge(effect_list_before_select, 600070) < NEED_PIONNER_BADGE_COUNT and badge_id == 600070:
+    if _owned_count_with_badge(effect_list_before_select, 600070) < need_pionner_badge_count and badge_id == 600070:
         return 2
 
     if badge_id == 600110:
@@ -1980,6 +1994,7 @@ def select_amulet_from_candidates(
         candidate_effect_list: List[Dict[str, Any]],
         effect_list: List[Dict[str, Any]],
         targets: List[Dict[str, Any]],
+        need_pionner_badge_count: int = NEED_PIONNER_BADGE_COUNT,
 ) -> Tuple[Optional[int], Optional[int], Optional[int], Optional[int]]:
     if not candidate_effect_list:
         return None, None, None, None
@@ -2027,7 +2042,7 @@ def select_amulet_from_candidates(
 
     # 指引 600070 未满 3 个
     WANT_BADGE_STACK = 600070
-    if _owned_count_with_badge(effect_list, WANT_BADGE_STACK) < NEED_PIONNER_BADGE_COUNT:
+    if _owned_count_with_badge(effect_list, WANT_BADGE_STACK) < need_pionner_badge_count:
         for c in candidate_effect_list:
             bid = _candidate_badge_id(c)
             if bid == WANT_BADGE_STACK:
@@ -2154,7 +2169,11 @@ def _is_needed_for_any_target(effect_item: Dict[str, Any], targets: List[Dict[st
     return False
 
 
-def sort_sell_priority(effect_list: List[Dict[str, Any]], targets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def sort_sell_priority(
+        effect_list: List[Dict[str, Any]],
+        targets: List[Dict[str, Any]],
+        need_pionner_badge_count: int = NEED_PIONNER_BADGE_COUNT,
+) -> List[Dict[str, Any]]:
     if not effect_list:
         return []
 
@@ -2168,7 +2187,7 @@ def sort_sell_priority(effect_list: List[Dict[str, Any]], targets: List[Dict[str
             continue  # 目标需要的护身符：移出结果
 
         _, __, badge_id = _extract_amulet_signature(it)
-        if badge_id == KEEP_BADGE and demoted_taken < NEED_PIONNER_BADGE_COUNT:
+        if badge_id == KEEP_BADGE and demoted_taken < need_pionner_badge_count:
             demoted.append(it)  # 降权：排在最后
             demoted_taken += 1
         else:

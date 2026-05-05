@@ -295,7 +295,8 @@
     "import_placeholder": "エクスポートした設定コードを貼り付けてください",
     "import_hint": "インポートすると、まず現在の画面上の設定に反映されます。内容を確認してから「設定を保存」を押してください。メール設定はインポートされません。",
     "import_error": "設定コードを読み取れませんでした。全文がコピーされているか確認してください。",
-    "btn_apply_import": "インポートを適用"
+    "btn_apply_import": "インポートを適用",
+    "label_need_pionner_badge_count": "先導の印保持数"
   },
   "diagnostics": {
     "ws_status_label": "WebSocket",

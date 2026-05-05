@@ -295,7 +295,8 @@
     "import_placeholder": "粘贴导出的配置码",
     "import_hint": "导入后会先更新当前页面配置，确认无误后请点击“保存配置”。邮件配置不会被导入。",
     "import_error": "配置码无法解析，请检查是否完整复制。",
-    "btn_apply_import": "应用导入"
+    "btn_apply_import": "应用导入",
+    "label_need_pionner_badge_count": "指引印章保留数"
   },
   "diagnostics": {
     "ws_status_label": "WebSocket",

@@ -41,6 +41,7 @@ function formatAutoLevel(level?: number | null): string {
 const DENSE_ALPHABET = Array.from({length: 94}, (_, i) => String.fromCharCode(i + 33))
     .filter((ch) => ch !== "\\" && ch !== "`" && ch !== "\"")
     .join("");
+const PIONNER_BADGE_COUNT_SENTINEL = 990000;
 
 function toDenseText(text: string): string {
     if (!text) return "!";
@@ -81,8 +82,13 @@ function encodeShortConfig(config: AutoRunnerConfig): string {
     const endCount = Math.max(1, Math.floor(Number(config.end_count ?? 1)));
     const cutoffLevel = Number(config.cutoff_level ?? 0) || 0;
     const interval = Math.max(0, Math.round(Number(config.op_interval_ms ?? 1000)));
+    const needPionnerBadgeCount = Math.max(0, Math.floor(Number(config.need_pionner_badge_count ?? 4)));
     if (endCount !== 1) parts.push(`e${endCount}`);
+    if (needPionnerBadgeCount !== 4) {
+        parts.push(`l${PIONNER_BADGE_COUNT_SENTINEL + Math.min(99, needPionnerBadgeCount)}`);
+    }
     if (cutoffLevel > 0) parts.push(`l${cutoffLevel}`);
+    if (needPionnerBadgeCount !== 4 && cutoffLevel <= 0) parts.push("l0");
     if (interval !== 1000) parts.push(`i${interval}`);
     parts.push(...(config.targets ?? []).map((target) => {
         const value = Math.max(1, Math.floor(Number((target as any).value ?? 1)));
@@ -107,6 +113,7 @@ function decodeCompactConfigText(payloadText: string): Partial<AutoRunnerConfig>
     let endCount = 1;
     let cutoffLevel = 0;
     let interval = 1000;
+    let needPionnerBadgeCount = 4;
 
     for (const part of payloadText.split(";").filter(Boolean)) {
         if (part.startsWith("e")) {
@@ -114,11 +121,20 @@ function decodeCompactConfigText(payloadText: string): Partial<AutoRunnerConfig>
             continue;
         }
         if (part.startsWith("l")) {
-            cutoffLevel = Math.max(0, Math.floor(Number(part.slice(1))));
+            const level = Math.max(0, Math.floor(Number(part.slice(1))));
+            if (level >= PIONNER_BADGE_COUNT_SENTINEL && level < PIONNER_BADGE_COUNT_SENTINEL + 100) {
+                needPionnerBadgeCount = level - PIONNER_BADGE_COUNT_SENTINEL;
+                continue;
+            }
+            cutoffLevel = level;
             continue;
         }
         if (part.startsWith("i")) {
             interval = Math.max(0, Math.min(5000, Math.round(Number(part.slice(1)))));
+            continue;
+        }
+        if (part.startsWith("p")) {
+            needPionnerBadgeCount = Math.max(0, Math.floor(Number(part.slice(1))));
             continue;
         }
         const valueSplit = part.split(":");
@@ -149,6 +165,7 @@ function decodeCompactConfigText(payloadText: string): Partial<AutoRunnerConfig>
         end_count: endCount,
         cutoff_level: cutoffLevel,
         op_interval_ms: interval,
+        need_pionner_badge_count: needPionnerBadgeCount,
         targets,
     };
 }
@@ -614,6 +631,21 @@ export default function AutoRunnerPage() {
                                         setLevelText(s);
                                         const n = parseLevelText(s);
                                         patchAutoConfig({cutoff_level: n ?? 0});
+                                    }}
+                                    style={{width: 130}}
+                                />
+                            </div>
+                            <div className="row flush" style={{gridTemplateColumns: "max-content max-content", alignItems: "center"}}>
+                                <label>{t("autorun.label_need_pionner_badge_count")}</label>
+                                <input
+                                    className="form-input"
+                                    type="number"
+                                    min={0}
+                                    max={99}
+                                    value={Number(config.need_pionner_badge_count ?? 4)}
+                                    onChange={(e) => {
+                                        const value = Math.max(0, Math.min(99, Math.floor(Number(e.target.value || 0))));
+                                        patchAutoConfig({need_pionner_badge_count: value});
                                     }}
                                     style={{width: 130}}
                                 />
