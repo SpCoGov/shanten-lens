@@ -594,7 +594,9 @@
     "plus_suffix": "（プラス）",
     "plus_alt": "プラス",
     "badge_alt": "スタンプ：{{name}}",
-    "unknown_label": "未知ID {{regId}}"
+    "unknown_label": "未知ID {{regId}}",
+    "upgrade_badge": "同系統のお守りを所持中。アップグレード可能",
+    "price_title": "売却価格：{{price}}"
   },
   "amulet_picker": {
     "title": "お守りを選択",

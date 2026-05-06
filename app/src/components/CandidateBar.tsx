@@ -19,18 +19,30 @@ function toEffectItem(c: CandidateEffectRef): EffectItem {
 
 export default function CandidateBar({
                                          candidates,
+                                         ownedAmulets,
                                          scale = 0.55,
                                          max = 8,
                                          onCandidateClick,
                                          hotkeyLabels,
                                      }: {
     candidates: CandidateEffectRef[];
+    ownedAmulets?: EffectItem[];
     scale?: number;
     max?: number;
     onCandidateClick?: (candidate: CandidateEffectRef) => void;
     hotkeyLabels?: string[];
 }) {
     const list = Array.isArray(candidates) ? candidates.slice(0, max) : [];
+    const ownedRegIds = React.useMemo(() => {
+        const ids = new Set<number>();
+        for (const item of ownedAmulets ?? []) {
+            const rawId = Number(item?.id ?? 0);
+            if (Number.isFinite(rawId) && rawId > 0) {
+                ids.add(Math.floor(rawId / 10));
+            }
+        }
+        return ids;
+    }, [ownedAmulets]);
 
     if (list.length === 0) {
         return (
@@ -68,6 +80,8 @@ export default function CandidateBar({
                         scale={scale}
                         onClick={onCandidateClick ? () => onCandidateClick(c) : undefined}
                         hotkeyLabel={hotkeyLabels?.[index]}
+                        upgradeBadge={ownedRegIds.has(Math.floor(Number(c.id ?? 0) / 10))}
+                        showPrice
                     />
                 );
             })}

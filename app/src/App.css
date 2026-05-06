@@ -898,6 +898,40 @@ input, textarea, select, code, pre, .selectable {
     height: 4px;
 }
 
+.card-price-badge {
+    position: absolute;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 0 7px;
+    border: 1px solid color-mix(in srgb, #f59e0b 58%, var(--border));
+    border-radius: 7px;
+    background: color-mix(in srgb, #f59e0b 18%, var(--panel-bg));
+    color: var(--text);
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: none;
+    pointer-events: none;
+}
+
+.card-upgrade-badge {
+    position: absolute;
+    z-index: 6;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid color-mix(in srgb, var(--state-ok) 74%, #064e3b);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--state-ok) 72%, #15803d);
+    color: #ffffff;
+    text-shadow: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    pointer-events: none;
+}
+
 .panel-title-with-action {
     display: flex;
     align-items: center;

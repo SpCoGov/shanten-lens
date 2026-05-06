@@ -3,6 +3,7 @@ import "../styles/theme.css";
 import {type EffectItem} from "../lib/gamestate";
 import {getRegistry} from "../lib/registryStore";
 import {t} from "i18next";
+import {calcAmuletPrice} from "../lib/amuletPrice";
 
 const RAR_BG_INDEX: Record<string, number> = {
     PURPLE: 1,
@@ -20,11 +21,15 @@ export default function AmuletCard({
                                        scale = 0.65,
                                        onClick,
                                        hotkeyLabel,
+                                       upgradeBadge,
+                                       showPrice,
                                    }: {
     item: EffectItem;
     scale?: number;
     onClick?: (item: EffectItem) => void;
     hotkeyLabel?: string;
+    upgradeBadge?: boolean;
+    showPrice?: boolean;
 }) {
     const reg = getRegistry();
     const currentTheme = typeof document !== "undefined" ? document.documentElement.getAttribute("data-theme") : null;
@@ -69,6 +74,7 @@ export default function AmuletCard({
             name: amu!.name,
             suffix: plus ? t("amulet_card.plus_suffix") : ""
         });
+    const price = calcAmuletPrice(item);
 
     return (
         <div
@@ -187,6 +193,23 @@ export default function AmuletCard({
                 </div>
             )}
 
+            {upgradeBadge ? (
+                <div
+                    className="card-upgrade-badge"
+                    title={t("amulet_card.upgrade_badge")}
+                    style={{
+                        left: Math.round(6 * scale),
+                        top: Math.round(6 * scale),
+                        width: Math.max(28, Math.round(42 * scale)),
+                        height: Math.max(28, Math.round(42 * scale)),
+                    }}
+                >
+                    <span className="ms" aria-hidden="true" style={{fontSize: Math.max(20, Math.round(30 * scale))}}>
+                        upgrade
+                    </span>
+                </div>
+            ) : null}
+
             {hotkeyLabel ? (
                 <div
                     className="card-hotkey-badge"
@@ -199,6 +222,23 @@ export default function AmuletCard({
                     }}
                 >
                     {hotkeyLabel}
+                </div>
+            ) : null}
+
+            {showPrice ? (
+                <div
+                    className="card-price-badge"
+                    title={t("amulet_card.price_title", {price})}
+                    style={{
+                        left: Math.round(6 * scale),
+                        bottom: Math.round(6 * scale),
+                        minWidth: Math.max(28, Math.round(44 * scale)),
+                        height: Math.max(18, Math.round(24 * scale)),
+                        fontSize: Math.max(11, Math.round(14 * scale)),
+                    }}
+                >
+                    <span aria-hidden="true">⭐</span>
+                    <span>{price}</span>
                 </div>
             ) : null}
         </div>

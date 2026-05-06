@@ -594,7 +594,9 @@
     "plus_suffix": "（Plus）",
     "plus_alt": "Plus",
     "badge_alt": "印章：{{name}}",
-    "unknown_label": "未知ID {{regId}}"
+    "unknown_label": "未知ID {{regId}}",
+    "upgrade_badge": "已有同类护身符，可升级",
+    "price_title": "卖出价格：{{price}}"
   },
   "amulet_picker": {
     "title": "选择护身符",

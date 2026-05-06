@@ -1810,6 +1810,7 @@ export default function App() {
                                             <div className="panel-title">{t("candidate_amulet")}</div>
                                             <CandidateBar
                                                 candidates={candidates}
+                                                ownedAmulets={amulets}
                                                 scale={0.55}
                                                 max={3}
                                                 onCandidateClick={(candidate) => selectCandidateById(candidate.id)}
@@ -2080,7 +2081,7 @@ export default function App() {
                             </button>
                         </div>
                         <div className="sell-amulet-preview">
-                            <AmuletBar items={[sellConfirmTarget]} scale={0.62} max={1}/>
+                            <AmuletBar items={[sellConfirmTarget]} scale={0.62} max={1} showPrice/>
                         </div>
                         <div className="sell-amulet-actions">
                             <button className="nav-btn" onClick={() => setSellConfirmTarget(null)}>
