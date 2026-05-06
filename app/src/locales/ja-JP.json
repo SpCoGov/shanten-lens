@@ -856,6 +856,18 @@
     "replacement": "交換牌統計",
     "wall": "牌山統計"
   },
+  "level_records": {
+    "tabs_label": "左側パネル",
+    "tab_records": "記録",
+    "tab_advisor": "ガイド",
+    "level_label": "ステージ {{level}}",
+    "avg_souzu_score": "索子平均スコア",
+    "amulet_229_data0": "スタンプ盗み",
+    "amulet_227_data0": "月光の加護",
+    "amulet_157_data0": "ウエイトトレーニング",
+    "best_label": "最高 {{value}}",
+    "no_data": "データなし"
+  },
   "replacement_stats": {
     "title": "交換牌統計",
     "empty": "現在、交換できる牌がありません",

@@ -72,7 +72,6 @@ function StrategyCard({
                 </div>
             ) : isImpossible ? (
                 <div className={styles.bandSingle}>
-                    <div className={styles.bandLabel}>{t("advisor.need_draws_label")}</div>
                     <div className={styles.bandValue}>{isMenzenOnlyWord ? t("advisor.menzen_only") : t("advisor.impossible")}</div>
                 </div>
             ) : (
@@ -95,7 +94,6 @@ function StrategyCard({
                                 <span className={`${styles.tilePill} ${styles.tileReset} ${styles.tileRound}`}>
                                     <Tile tile={firstDiscardFace || "-"}/>
                                 </span>
-                                <span className={styles.chipText}>{t("advisor.id_label", {id: firstDiscardId})}</span>
                             </div>
                         ) : (
                             <div className={`${styles.actionChip} ${styles.chipDisabled}`}>-</div>

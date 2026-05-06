@@ -1,6 +1,6 @@
 .wrap {
     width: 100%;
-    max-width: 320px;
+    max-width: 280px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -112,7 +112,7 @@
 
 .band {
     display: grid;
-    grid-template-columns: 1fr 1px 1fr;
+    grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
     gap: 12px;
     padding: 12px 14px;
@@ -131,43 +131,54 @@
     gap: 6px;
 }
 
+.bandLeft {
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.bandRight {
+    align-items: flex-end;
+    justify-content: center;
+}
+
 .bandLabel, .bandActionLabel {
     font-size: 12px;
     color: var(--muted);
 }
 
+.bandLeft .bandLabel {
+    max-width: 100%;
+}
+
 .bandValue {
-    font-size: 26px;
+    font-size: 28px;
     font-weight: 800;
-    letter-spacing: .3px;
+    letter-spacing: 0;
     color: var(--text);
     line-height: 1.05;
 }
 
 .vbar {
-    width: 1px;
-    height: 36px;
-    background: var(--color-divider);
-    justify-self: center;
-    border-radius: 1px;
+    display: none;
 }
 
 .actionChip {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    border: 1px solid var(--color-divider);
-    border-radius: 999px;
-    padding: 6px 10px 6px 6px;
-    background: var(--panel);
+    width: fit-content;
+    max-width: 100%;
+    border: 0;
+    border-radius: 8px;
+    padding: 0;
+    background: transparent;
     transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
 }
 
 .actionChip:hover {
-    background: var(--btn-hover-bg);
+    background: transparent;
     transform: translateY(-1px);
-    border-color: color-mix(in srgb, var(--color-ring) 22%, var(--color-divider));
-    box-shadow: 0 10px 18px color-mix(in srgb, var(--color-ring) 10%, transparent);
+    border-color: transparent;
+    box-shadow: none;
 }
 
 .chipText {
@@ -200,10 +211,6 @@
     flex-direction: column;
     gap: 6px;
     padding: 12px 14px;
-}
-
-.band {
-    align-items: start;
 }
 
 .bandLabel,

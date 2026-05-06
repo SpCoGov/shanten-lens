@@ -655,6 +655,18 @@
     "replacement": "替换牌区统计",
     "wall": "牌山统计"
   },
+  "level_records": {
+    "tabs_label": "左侧面板",
+    "tab_records": "记录",
+    "tab_advisor": "指导",
+    "level_label": "关卡 {{level}}",
+    "avg_souzu_score": "平均索分数",
+    "amulet_229_data0": "盗印大盗",
+    "amulet_227_data0": "月光守护",
+    "amulet_157_data0": "负重前行",
+    "best_label": "历史 {{value}}",
+    "no_data": "暂无数据"
+  },
   "wall_stats": {
     "title": "牌山统计",
     "empty": "当前无可摸牌",

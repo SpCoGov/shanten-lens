@@ -21,6 +21,7 @@ import WallStats from "./components/WallStats";
 import ReplacementPanel from "./components/ReplacementPanel";
 import ReplacementStats from "./components/ReplacementStats";
 import AdvisorPanel from "./components/AdvisorPanel";
+import LevelRecordPanel, {useLevelRecordItems} from "./components/LevelRecordPanel";
 import AmuletBar from "./components/AmuletBar";
 import {setAppLanguage} from "./lib/i18n";
 import {
@@ -94,6 +95,8 @@ const DEFAULT_AMULET_HOTKEYS: AmuletHotkeySettings = {
     refreshShop: "f",
     sellMode: "last_list",
 };
+
+type HomeSideMode = "records" | "advisor";
 
 function normalizeHotkeyKey(value: string): string {
     if (value === " ") return " ";
@@ -543,6 +546,43 @@ function Topbar({
     );
 }
 
+function HomeSideTabs({
+    mode,
+    onModeChange,
+    recordsAvailable,
+}: {
+    mode: HomeSideMode;
+    onModeChange: (mode: HomeSideMode) => void;
+    recordsAvailable: boolean;
+}) {
+    const {t} = useTranslation();
+    return (
+        <div className="home-side-tabs" role="tablist" aria-label={t("level_records.tabs_label")}>
+            <button
+                className={`home-side-tab ${mode === "records" ? "is-active" : ""}`}
+                onClick={() => onModeChange("records")}
+                role="tab"
+                aria-selected={mode === "records"}
+                title={t("level_records.tab_records")}
+                aria-label={t("level_records.tab_records")}
+                disabled={!recordsAvailable}
+            >
+                <span className="ms" aria-hidden="true">leaderboard</span>
+            </button>
+            <button
+                className={`home-side-tab ${mode === "advisor" ? "is-active" : ""}`}
+                onClick={() => onModeChange("advisor")}
+                role="tab"
+                aria-selected={mode === "advisor"}
+                title={t("level_records.tab_advisor")}
+                aria-label={t("level_records.tab_advisor")}
+            >
+                <span className="ms" aria-hidden="true">tips_and_updates</span>
+            </button>
+        </div>
+    );
+}
+
 export default function App() {
     const {t} = useTranslation();
     type ThemeMode = "auto" | "dark" | "dark-green" | "dark-purple";
@@ -706,6 +746,12 @@ export default function App() {
     const [goods, setGoods] = React.useState<GoodsItem[]>([]);
     const [candidates, setCandidates] = React.useState<CandidateEffectRef[]>([]);
     const [tileScoreMap, setTileScoreMap] = React.useState<Record<string, string>>({});
+    const [homeSideMode, setHomeSideMode] = React.useState<HomeSideMode>("records");
+    const levelRecordItems = useLevelRecordItems({level, tileScoreMap, amulets});
+    const hasLevelRecords = levelRecordItems.length > 0;
+    const isAdvisorStage = stage === 2 || stage === 3;
+    const showHomeSidePanel = isAdvisorStage || hasLevelRecords;
+    const effectiveHomeSideMode: HomeSideMode = isAdvisorStage && !hasLevelRecords ? "advisor" : homeSideMode;
 
     const THEME_ORDER: ThemeMode[] = ["auto", "dark", "dark-green"];
     const THEME_KEY = "sl-theme";
@@ -1739,15 +1785,30 @@ export default function App() {
                                 className="home-grid"
                                 style={{display: "flex", alignItems: "stretch", gap: MAIN_GAP}}
                             >
-                                {(stage === 2 || stage === 3) && (
-                                    <div className="panel advisor home-advisor-panel">
-                                        <AdvisorPanel
-                                            suuAnkou={planSuuAnkou}
-                                            chiitoi={planChiitoi}
-                                            resolveFace={(id) => deckMap.get(id) ?? null}
-                                        />
+                                {showHomeSidePanel ? (
+                                    <div className="panel advisor home-advisor-panel home-side-panel">
+                                        {isAdvisorStage ? (
+                                            <>
+                                                <HomeSideTabs
+                                                    mode={effectiveHomeSideMode}
+                                                    onModeChange={setHomeSideMode}
+                                                    recordsAvailable={hasLevelRecords}
+                                                />
+                                                {effectiveHomeSideMode === "advisor" ? (
+                                                    <AdvisorPanel
+                                                        suuAnkou={planSuuAnkou}
+                                                        chiitoi={planChiitoi}
+                                                        resolveFace={(id) => deckMap.get(id) ?? null}
+                                                    />
+                                                ) : (
+                                                    <LevelRecordPanel level={level} items={levelRecordItems}/>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <LevelRecordPanel level={level} items={levelRecordItems}/>
+                                        )}
                                     </div>
-                                )}
+                                ) : null}
 
                                 <div style={{flex: 1, minWidth: 0, position: "relative"}}>
                                     <div className="panel">
