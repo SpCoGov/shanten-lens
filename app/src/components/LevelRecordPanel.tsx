@@ -7,6 +7,7 @@ import {useRegistry} from "../lib/registryStore";
 
 const LEVEL_RECORDS_STORAGE_KEY = "sl-level-metric-records-v1";
 const AVG_SOUZU_SCORE_METRIC_KEY = "avg_souzu_score";
+const MAX_SOUZU_SCORE_METRIC_KEY = "max_souzu_score";
 const AMULET_DATA_METRICS = [
     {regId: 229, key: "amulet_229_data0", labelKey: "level_records.amulet_229_data0"},
     {regId: 227, key: "amulet_227_data0", labelKey: "level_records.amulet_227_data0"},
@@ -84,6 +85,20 @@ function computeAverageSouzuScore(tileScoreMap: Record<string, string>): string 
     return (quotient + (remainder * 2n >= divisor ? 1n : 0n)).toString();
 }
 
+function computeMaxSouzuScore(tileScoreMap: Record<string, string>): string | null {
+    let max: bigint | null = null;
+    for (let i = 1; i <= 9; i += 1) {
+        const raw = lookupTileScore(tileScoreMap, `${i}s`);
+        if (raw == null) continue;
+        try {
+            const parsed = parseFixed2(raw);
+            if (max == null || parsed > max) max = parsed;
+        } catch {
+        }
+    }
+    return max == null ? null : max.toString();
+}
+
 function readEffectData0(item: EffectItem): string | null {
     const raw = Array.isArray(item.store) ? item.store[0] : null;
     if (raw == null) return null;
@@ -149,6 +164,11 @@ export function useLevelRecordItems({
             key: AVG_SOUZU_SCORE_METRIC_KEY,
             label: t("level_records.avg_souzu_score"),
             current: computeAverageSouzuScore(tileScoreMap),
+        },
+        {
+            key: MAX_SOUZU_SCORE_METRIC_KEY,
+            label: t("level_records.max_souzu_score"),
+            current: computeMaxSouzuScore(tileScoreMap),
         },
         ...AMULET_DATA_METRICS.map((metric) => ({
             key: metric.key,
