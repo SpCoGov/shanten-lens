@@ -570,6 +570,41 @@ async def ws_handler(ws: WebSocketServerProtocol):
             elif t == "packet_monitor_request_snapshot":
                 await ws_send(ws, {"type": "packet_monitor_snapshot", "data": packet_monitor_snapshot_payload()})
 
+            elif t == "mitm_dump_flows":
+                try:
+                    bot = globals().get("PACKET_BOT")
+                    addon = bot.get_addon() if bot and hasattr(bot, "get_addon") else None
+                    if not addon:
+                        await ws_send(ws, {
+                            "type": "mitm_dump_flows_result",
+                            "data": {"ok": False, "reason": "addon-not-ready", "flows": []},
+                        })
+                        await ws_send(ws, {
+                            "type": "ui_toast",
+                            "data": {"kind": "error", "msg": "MITM addon 未就绪，无法打印 flow", "duration": 2600},
+                        })
+                        continue
+
+                    flows = addon.dump_current_flows()
+                    await ws_send(ws, {
+                        "type": "mitm_dump_flows_result",
+                        "data": {"ok": True, "flows": flows, "count": len(flows)},
+                    })
+                    await ws_send(ws, {
+                        "type": "ui_toast",
+                        "data": {"kind": "success", "msg": f"已打印 {len(flows)} 个 MITM flow 到日志", "duration": 2200},
+                    })
+                except Exception as e:
+                    logger.exception("mitm dump flows failed")
+                    await ws_send(ws, {
+                        "type": "mitm_dump_flows_result",
+                        "data": {"ok": False, "reason": str(e), "flows": []},
+                    })
+                    await ws_send(ws, {
+                        "type": "ui_toast",
+                        "data": {"kind": "error", "msg": f"打印 MITM flow 失败：{e}", "duration": 2600},
+                    })
+
             elif t == "packet_monitor_update_settings":
                 enabled = bool((data or {}).get("enabled", False))
                 blocked_methods_raw = (data or {}).get("blockedMethods") or []

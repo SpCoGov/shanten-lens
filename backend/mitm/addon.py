@@ -46,6 +46,7 @@ class WsAddon:
         self.on_inbound: Optional[HookFn] = None
         self.subscribers: List[Callable[[Dict], None]] = []
         self._flows: Dict[str, http.HTTPFlow] = {}  # peer_key -> flow
+        self._flow_packet_stats: dict[int, dict[str, Any]] = {}
         self.last_flow: Optional[http.HTTPFlow] = None  # 最近一次触达的 flow
         self._client_last_req_id: dict[int, int] = {}  # flow_id -> last req id
         self._waiters: Dict[int, asyncio.Future] = {}
@@ -148,8 +149,10 @@ class WsAddon:
             )
             return
 
+        self._record_flow_packet(flow, view, message.from_client)
+
         try:
-            if (not message.from_client) and view.get("method") in [".lq.Lobby.fetchAmuletActivityData", ".lq.Lobby.fetchActivityRank", ".lq.Lobby.fetchAccountStatisticInfo", ".lq.Lobby.amuletActivityGiveup", ".lq.Lobby.amuletActivityStartGame"]:
+            if (not message.from_client) and view.get("method") in [".lq.Lobby.loginBeat",""]:
                 self.preferred_flow = flow
                 self.preferred_peer_key = f"{flow.client_conn.address[0]}|{flow.server_conn.address[0]}"
                 logger.info(f"[PREFERRED-FLOW] set to game flow f={id(flow)} ({self.preferred_peer_key})")
@@ -243,6 +246,162 @@ class WsAddon:
             return self._flows.get(peer_key)
         return self.last_flow
 
+    def _record_flow_packet(self, flow: http.HTTPFlow, view: dict[str, Any], from_client: bool) -> None:
+        flow_id = id(flow)
+        packet_type = str(view.get("type") or "Unknown")
+        method = str(view.get("method") or "")
+        direction = "client_to_server" if from_client else "server_to_client"
+        stats = self._flow_packet_stats.setdefault(
+            flow_id,
+            {
+                "total": 0,
+                "by_type": {},
+                "by_direction": {},
+                "by_method": {},
+                "by_type_method": {},
+            },
+        )
+        stats["total"] += 1
+        stats["by_type"][packet_type] = int(stats["by_type"].get(packet_type, 0)) + 1
+        stats["by_direction"][direction] = int(stats["by_direction"].get(direction, 0)) + 1
+        if method:
+            stats["by_method"][method] = int(stats["by_method"].get(method, 0)) + 1
+            type_methods = stats["by_type_method"].setdefault(packet_type, {})
+            type_methods[method] = int(type_methods.get(method, 0)) + 1
+
+    def _flow_summary(self, flow: http.HTTPFlow, peer_key: Optional[str] = None) -> dict[str, Any]:
+        ws = getattr(flow, "websocket", None)
+        stats = self._flow_packet_stats.get(id(flow)) or {}
+        try:
+            client = f"{flow.client_conn.address[0]}:{flow.client_conn.address[1]}"
+        except Exception:
+            client = "n/a"
+        try:
+            server = f"{flow.server_conn.address[0]}:{flow.server_conn.address[1]}"
+        except Exception:
+            server = "n/a"
+        try:
+            request = flow.request
+            request_line = f"{request.method} {request.pretty_url}"
+        except Exception:
+            request_line = "n/a"
+        try:
+            messages = len(ws.messages) if ws else 0
+        except Exception:
+            messages = 0
+        return {
+            "id": id(flow),
+            "peer_key": peer_key or _peer_key_ws(flow),
+            "client": client,
+            "server": server,
+            "request": request_line,
+            "websocket": bool(ws),
+            "messages": messages,
+            "is_preferred": flow is self.preferred_flow,
+            "is_last": flow is self.last_flow,
+            "packet_stats": {
+                "total": int(stats.get("total") or 0),
+                "by_type": dict(stats.get("by_type") or {}),
+                "by_direction": dict(stats.get("by_direction") or {}),
+                "by_method": dict(stats.get("by_method") or {}),
+                "by_type_method": {
+                    str(packet_type): dict(methods or {})
+                    for packet_type, methods in dict(stats.get("by_type_method") or {}).items()
+                },
+            },
+            "exclusive_packets": [],
+        }
+
+    def _attach_exclusive_packets(self, rows: list[dict[str, Any]]) -> None:
+        packet_owner_count: dict[tuple[str, str], int] = {}
+        for row in rows:
+            seen_in_flow: set[tuple[str, str]] = set()
+            by_type_method = row.get("packet_stats", {}).get("by_type_method", {})
+            for packet_type, methods in dict(by_type_method or {}).items():
+                for method in dict(methods or {}).keys():
+                    if method:
+                        seen_in_flow.add((str(packet_type), str(method)))
+            for key in seen_in_flow:
+                packet_owner_count[key] = packet_owner_count.get(key, 0) + 1
+
+        for row in rows:
+            exclusive_packets: list[dict[str, Any]] = []
+            by_type_method = row.get("packet_stats", {}).get("by_type_method", {})
+            for packet_type, methods in dict(by_type_method or {}).items():
+                for method, count in dict(methods or {}).items():
+                    key = (str(packet_type), str(method))
+                    if packet_owner_count.get(key) == 1:
+                        exclusive_packets.append({
+                            "packet_type": key[0],
+                            "method": key[1],
+                            "count": int(count),
+                        })
+            exclusive_packets.sort(key=lambda item: (-item["count"], item["packet_type"], item["method"]))
+            row["exclusive_packets"] = exclusive_packets
+
+    def dump_current_flows(self) -> list[dict[str, Any]]:
+        seen: set[int] = set()
+        rows: list[dict[str, Any]] = []
+
+        for peer_key, flow in list(self._flows.items()):
+            if not flow or id(flow) in seen:
+                continue
+            seen.add(id(flow))
+            rows.append(self._flow_summary(flow, peer_key))
+
+        for flow in (self.preferred_flow, self.last_flow):
+            if not flow or id(flow) in seen:
+                continue
+            seen.add(id(flow))
+            rows.append(self._flow_summary(flow))
+
+        self._attach_exclusive_packets(rows)
+
+        logger.info("== CURRENT MITM FLOWS BEGIN ==")
+        if not rows:
+            logger.info("no active websocket flows recorded")
+        else:
+            for idx, row in enumerate(rows, 1):
+                flags = ",".join(
+                    flag
+                    for flag, active in (
+                        ("preferred", row["is_preferred"]),
+                        ("last", row["is_last"]),
+                    )
+                    if active
+                ) or "-"
+                logger.info(
+                    "[flow {idx}] id={id} peer={peer} client={client} server={server} "
+                    "ws={ws} messages={messages} packets={packets} by_type={by_type} "
+                    "flags={flags} request={request}",
+                    idx=idx,
+                    id=row["id"],
+                    peer=row["peer_key"],
+                    client=row["client"],
+                    server=row["server"],
+                    ws=row["websocket"],
+                    messages=row["messages"],
+                    packets=row["packet_stats"]["total"],
+                    by_type=json.dumps(row["packet_stats"]["by_type"], ensure_ascii=False),
+                    flags=flags,
+                    request=row["request"],
+                )
+                by_type_method = row["packet_stats"]["by_type_method"]
+                if by_type_method:
+                    logger.info(
+                        "[flow {idx}] packet methods by type: {stats}",
+                        idx=idx,
+                        stats=json.dumps(by_type_method, ensure_ascii=False),
+                    )
+                exclusive_packets = row.get("exclusive_packets") or []
+                logger.info(
+                    "[flow {idx}] exclusive packets: {packets}",
+                    idx=idx,
+                    packets=json.dumps(exclusive_packets, ensure_ascii=False),
+                )
+        logger.info("== CURRENT MITM FLOWS END ==")
+        return rows
+
     def websocket_end(self, flow: http.HTTPFlow):
         # 連線正常關閉
         try:
@@ -252,6 +411,8 @@ class WsAddon:
 
         if peer_key and peer_key in self._flows:
             self._flows.pop(peer_key, None)
+
+        self._flow_packet_stats.pop(id(flow), None)
 
         if getattr(self, "preferred_flow", None) is flow:
             self.preferred_flow = None
