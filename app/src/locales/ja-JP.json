@@ -893,7 +893,8 @@
       "buy_pack": "パック購入",
       "refresh_shop": "ショップ更新",
       "sell_recent": "お守り売却",
-      "select_candidate": "お守り選択"
+      "select_candidate": "お守り選択",
+      "sort_effect": "お守りを並べ替え"
     },
     "stage_unavailable": "現在のステージ {{stage}} ではお守りホットキーを使えません",
     "not_enough_coin_short": "コインが足りません",

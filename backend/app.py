@@ -418,6 +418,27 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         await _hotkey_result(False, "addon-not-ready")
                         continue
 
+                    if action == "sort_effect":
+                        raw_sorted_uid = (data or {}).get("sortedUid") or []
+                        if not isinstance(raw_sorted_uid, list):
+                            await _hotkey_result(False, "invalid-sorted-uid")
+                            continue
+                        try:
+                            sorted_uid = [int(uid) for uid in raw_sorted_uid]
+                        except Exception:
+                            await _hotkey_result(False, "invalid-sorted-uid")
+                            continue
+                        ok, reason, _ = await call_with_1004_retry_async(
+                            bot.sort_effect,
+                            sorted_uid=sorted_uid,
+                            delay_sec=3,
+                            interval=0.4,
+                            timeout=12,
+                            to_thread=True,
+                        )
+                        await _hotkey_result(ok, "" if ok else reason, sortedUid=sorted_uid)
+                        continue
+
                     current_stage = int(getattr(GAME_STATE, "stage", -1) or -1)
                     if current_stage not in {1, 4, 5, 7}:
                         await _hotkey_result(False, "stage-not-allowed", stage=current_stage)

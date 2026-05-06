@@ -1163,7 +1163,9 @@ export default function App() {
                             ? "refresh_shop"
                             : d.action === "sell_recent" || d.action === "sell_effect"
                                 ? "sell_recent"
-                                : "select_candidate";
+                                : d.action === "sort_effect"
+                                    ? "sort_effect"
+                                    : "select_candidate";
                     pushToast(t("amulet_hotkeys.toast_sent", {action: t(`amulet_hotkeys.action.${labelKey}`)}), "success", 1200);
                 } else {
                     const reason = d.reason || "unknown";
@@ -1406,6 +1408,10 @@ export default function App() {
     const sellOwnedAmulet = React.useCallback((item: EffectItem) => {
         setSellConfirmTarget(null);
         sendAmuletHotkeyAction("sell_effect", {uid: item.uid});
+    }, [sendAmuletHotkeyAction]);
+
+    const sortOwnedAmulets = React.useCallback((sortedUid: number[]) => {
+        sendAmuletHotkeyAction("sort_effect", {sortedUid});
     }, [sendAmuletHotkeyAction]);
 
     const handleAmuletHotkey = React.useCallback((event: KeyboardEvent) => {
@@ -1746,7 +1752,12 @@ export default function App() {
                                 <div style={{flex: 1, minWidth: 0, position: "relative"}}>
                                     <div className="panel">
                                         <div className="panel-title">{t("amulet")}</div>
-                                        <AmuletBar items={amulets} scale={0.55} onItemClick={(item) => setSellConfirmTarget(item)}/>
+                                        <AmuletBar
+                                            items={amulets}
+                                            scale={0.55}
+                                            onItemClick={(item) => setSellConfirmTarget(item)}
+                                            onReorder={sortOwnedAmulets}
+                                        />
                                     </div>
 
                                     {(stage === 4 || stage === 5) && (

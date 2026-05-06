@@ -891,7 +891,8 @@
       "buy_pack": "购买卡包",
       "refresh_shop": "刷新商店",
       "sell_recent": "卖出护身符",
-      "select_candidate": "选择护身符"
+      "select_candidate": "选择护身符",
+      "sort_effect": "排序护身符"
     },
     "stage_unavailable": "当前阶段 {{stage}} 不支持护身符快捷键操作",
     "not_enough_coin_short": "金币不足",

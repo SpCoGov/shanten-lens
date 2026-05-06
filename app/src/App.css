@@ -916,6 +916,32 @@ input, textarea, select, code, pre, .selectable {
     pointer-events: none;
 }
 
+.amulet-drag-item {
+    flex: 0 0 auto;
+    border-radius: 10px;
+    touch-action: none;
+}
+
+.amulet-drag-item[data-draggable="true"] {
+    cursor: grab;
+}
+
+.amulet-drag-item[data-draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.amulet-drag-item.is-dragging {
+    opacity: .28;
+}
+
+.amulet-drag-ghost {
+    position: fixed;
+    z-index: 5000;
+    pointer-events: none;
+    opacity: .96;
+    filter: drop-shadow(0 12px 20px color-mix(in srgb, #000 28%, transparent));
+}
+
 .card-upgrade-badge {
     position: absolute;
     z-index: 6;
