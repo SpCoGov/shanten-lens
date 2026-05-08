@@ -452,6 +452,41 @@ class AutoRunner:
             '</div>'
         )
 
+    def _build_badge_target_html(
+            self,
+            badge_id: int,
+            *,
+            status_label: Optional[str] = None,
+            status_ok: Optional[bool] = None,
+    ) -> str:
+        badge = self._get_badge_item(badge_id)
+        name = getattr(badge, "name", None) or f"未知印章 #{badge_id}"
+        status_html = ""
+        if status_label:
+            status_bg = "#16a34a" if status_ok else "#dc2626"
+            status_html = (
+                f'<div style="display:inline-block;margin-bottom:8px;padding:4px 8px;border-radius:999px;'
+                f'background:{status_bg};color:#fff;font-size:12px;font-weight:700;line-height:1.2;">{escape(status_label)}</div>'
+            )
+        icon_html = self._inline_img_tag(
+            self._asset_url("badge", f"badge_{badge_id}.png") if badge_id > 0 else None,
+            name,
+            "display:block;width:96px;height:96px;object-fit:contain;border:1px solid #d0d5dd;border-radius:14px;background:#f8fafc;padding:12px;",
+        )
+        if not icon_html:
+            icon_html = (
+                '<div style="width:96px;height:96px;border:1px solid #d0d5dd;border-radius:14px;'
+                'background:#f8fafc;padding:12px;color:#667085;font-size:12px;line-height:96px;text-align:center;">无图标</div>'
+            )
+        return (
+            '<div style="display:inline-block;vertical-align:top;width:140px;margin:0 12px 16px 0;">'
+            f'{status_html}'
+            f'{icon_html}'
+            f'<div style="margin-top:8px;color:#101828;font-size:14px;font-weight:700;line-height:1.4;">{escape(name)}</div>'
+            f'<div style="margin-top:4px;color:#475467;font-size:12px;">ID {escape(str(badge_id))}</div>'
+            '</div>'
+        )
+
     def _build_success_email_bodies(self, effect_list: List[Dict[str, Any]], elapsed_ms: int) -> Tuple[str, str]:
         plain_body = "\n".join([
             "自动化已完成（达到结束条件）。",
