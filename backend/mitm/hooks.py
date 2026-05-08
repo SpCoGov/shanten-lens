@@ -2314,6 +2314,12 @@ def has_amulet_221(effects: List[Dict[str, Any]]) -> bool:
             continue
         if eid // 10 == 221:
             return True
+        # 不稳定护身符
+        if eid == 2280:
+            store = e.get("store", [])
+            if len(store) >= 1:
+                if int(store[0]) // 10 == 221:
+                    return True
     return False
 
 
