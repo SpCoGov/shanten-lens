@@ -1874,8 +1874,9 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             record = value_changes.get("record", None)
             GAME_STATE.update_record(record)
             if hands and pool:
-                GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, used=used, dora_tiles=dora_tiles, used_desktop=used_desktop, push_gamestate=False)
-                new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, GAME_STATE.effect_list)
+                use_current_hand_for_sections = has_amulet_2250_or_2251(effect_list)
+                GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, used=used, dora_tiles=dora_tiles, used_desktop=used_desktop, use_current_hand_for_sections=use_current_hand_for_sections, push_gamestate=False)
+                new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, effect_list)
                 GAME_STATE.update_wall(new_wall)
                 desktop_remain = round_info.get("desktopRemain", {}).get("value", 0)
                 level = value_changes.get("game", {}).get("level", {}).get("value", 0)
@@ -2045,11 +2046,20 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             chance_tile_count = round_info.get("changeTileCount", None)
             used = round_info.get("used", [])
             used_desktop = round_info.get("usedDesktop", [])
-            GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, push_gamestate=False, used=used, dora_tiles=dora_tiles, used_desktop=used_desktop, reason=".lq.Lobby.fetchAmuletActivityData")
             desktop_remain = round_info.get("desktopRemain", 0)
             point = round_info.get("point", "0")
             target_point = round_info.get("targetPoint", "0")
             stage = game.get("stage", -1)
+            try:
+                change_tile_count_int = int(chance_tile_count or 0)
+            except (TypeError, ValueError):
+                change_tile_count_int = -1
+            use_current_hand_for_sections = (
+                    has_amulet_2250_or_2251(effect_list)
+                    and int(stage or 0) == 2
+                    and change_tile_count_int == 0
+            )
+            GAME_STATE.update_pool(pool, hand_tiles=hands, locked_tiles=locked_tiles, push_gamestate=False, used=used, dora_tiles=dora_tiles, used_desktop=used_desktop, use_current_hand_for_sections=use_current_hand_for_sections, reason=".lq.Lobby.fetchAmuletActivityData")
             ended = game.get("ended", False)
             coin = int(game.get("game", {}).get("coin", ""))
             boss_buff = game.get("game", {}).get("bossBuff", None)
@@ -2320,6 +2330,25 @@ def has_amulet_221(effects: List[Dict[str, Any]]) -> bool:
             if len(store) >= 1:
                 if int(store[0]) // 10 == 221:
                     return True
+    return False
+
+
+def has_amulet_2250_or_2251(effects: List[Dict[str, Any]]) -> bool:
+    for e in effects or []:
+        try:
+            eid = int(e.get("id", -1))
+        except Exception:
+            continue
+        if eid in {2250, 2251}:
+            return True
+        if eid == 2280:
+            store = e.get("store", [])
+            if len(store) >= 1:
+                try:
+                    if int(store[0]) in {2250, 2251}:
+                        return True
+                except (TypeError, ValueError):
+                    continue
     return False
 
 

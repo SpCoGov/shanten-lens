@@ -124,14 +124,14 @@ class GameState:
 
         return list(current_hand_tiles or [])
 
-    def _candidate_pool_ids(self) -> List[int]:
+    def _candidate_pool_ids(self, excluded_hand_tiles: list[int] | None = None) -> List[int]:
         # 从 pool 中剔除开局手牌的 id，剩余顺序与协议保持一致
-        hand_set = set(self.opening_hand_tiles)
+        hand_set = set(self.opening_hand_tiles if excluded_hand_tiles is None else excluded_hand_tiles)
         return [tile_id for tile_id in self.deck_map.keys() if tile_id not in hand_set]
 
-    def _rebuild_sections_from_pool(self):
+    def _rebuild_sections_from_pool(self, excluded_hand_tiles: list[int] | None = None):
         # 协议定义：从 pool 排除 hand 后，前 10 张是 dora，再后 36 张是 wall，剩下的是 replacement
-        ids = self._candidate_pool_ids()
+        ids = self._candidate_pool_ids(excluded_hand_tiles)
         self.dora_tiles = ids[:10]
         self.wall_tiles = ids[10:46]
         self.replacement_tiles = ids[46:]
@@ -144,6 +144,7 @@ class GameState:
             used: list[int],
             dora_tiles: list[int] | None = None,
             used_desktop: list[int] | None = None,
+            use_current_hand_for_sections: bool = False,
             push_gamestate: bool = True,
             reason: str = "",
     ):
@@ -169,7 +170,8 @@ class GameState:
         self.used_desktop_tiles = used_desktop.copy() if used_desktop else []
 
         # 按协议从 pool 中排除手牌后重新切 dora / wall / replacement
-        self._rebuild_sections_from_pool()
+        section_hand_tiles = self.hand_tiles if use_current_hand_for_sections else None
+        self._rebuild_sections_from_pool(section_hand_tiles)
 
         # lockedTile 一定是牌山的子集，但这里仍做容错，避免异常中断整个 hook
         self.locked_tiles = locked_tiles.copy() if locked_tiles else []
