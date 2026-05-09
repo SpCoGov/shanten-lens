@@ -2081,11 +2081,14 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
                     boss_buff = []
             shop = game.get("shop", {})
             free_candidate_effect_list = game.get("effect", {}).get("freeRewardCandidates", None)
+            level_reward_candidates = game.get("effect", {}).get("levelRewardCandidates", None)
             max_effect_volume = game.get("effect", {}).get("maxEffectVolume", 0)
             shop_buff_list = _parse_shop_buff_list(game.get("effect", {}).get("shopBuffList", None))
             candidate_effect_list = shop.get("candidateEffectList", [])
             if free_candidate_effect_list:
                 candidate_effect_list = free_candidate_effect_list
+            if level_reward_candidates:
+                candidate_effect_list = level_reward_candidates
             goods = shop.get("goods", [])
             refresh_price = shop.get("refreshPrice", 0)
             record = game.get("record", None)
