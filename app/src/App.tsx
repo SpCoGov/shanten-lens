@@ -1451,6 +1451,18 @@ export default function App() {
         sendAmuletHotkeyAction("refresh_shop");
     }, [coin, latestGameState?.refresh_price, sendAmuletHotkeyAction, stage, t]);
 
+    const skipCandidateManually = React.useCallback(() => {
+        if (![1, 5, 7].includes(stage)) {
+            pushToast(t("amulet_hotkeys.stage_unavailable", {stage}), "info", 1400);
+            return;
+        }
+        if (stage === 1) {
+            pushToast(t("amulet_hotkeys.free_cannot_skip"), "info", 1400);
+            return;
+        }
+        sendAmuletHotkeyAction("select_candidate", {selectedId: 0});
+    }, [sendAmuletHotkeyAction, stage, t]);
+
     const sellOwnedAmulet = React.useCallback((item: EffectItem) => {
         setSellConfirmTarget(null);
         sendAmuletHotkeyAction("sell_effect", {uid: item.uid});
@@ -1510,11 +1522,7 @@ export default function App() {
 
             if (key === normalizeHotkeyKey(amuletHotkeys.skipCandidate)) {
                 event.preventDefault();
-                if (stage === 1) {
-                    pushToast(t("amulet_hotkeys.free_cannot_skip"), "info", 1400);
-                    return;
-                }
-                sendAmuletHotkeyAction("select_candidate", {selectedId: 0});
+                skipCandidateManually();
                 return;
             }
         }
@@ -1543,6 +1551,7 @@ export default function App() {
         sellConfirmTarget,
         selectCandidateById,
         sendAmuletHotkeyAction,
+        skipCandidateManually,
         stage,
         t,
         usageNotice,
@@ -1835,6 +1844,9 @@ export default function App() {
                                                 >
                                                     <span className="ms" aria-hidden="true">refresh</span>
                                                     <span>{t("amulet_hotkeys.refresh_shop_price", {price: latestGameState?.refresh_price ?? 0})}</span>
+                                                    {amuletHotkeys.enabled ? (
+                                                        <kbd className="panel-title-action-kbd">{displayHotkey(amuletHotkeys.refreshShop)}</kbd>
+                                                    ) : null}
                                                 </button>
                                             </div>
                                             <GoodsBar
@@ -1879,7 +1891,22 @@ export default function App() {
 
                                     {[1, 5, 7].includes(stage) && (
                                         <div className="panel">
-                                            <div className="panel-title">{t("candidate_amulet")}</div>
+                                            <div className="panel-title panel-title-with-action">
+                                                <span>{t("candidate_amulet")}</span>
+                                                {[5, 7].includes(stage) ? (
+                                                    <button
+                                                        className="panel-title-action"
+                                                        onClick={skipCandidateManually}
+                                                        title={t("amulet_hotkeys.skip_amulet")}
+                                                    >
+                                                        <span className="ms" aria-hidden="true">skip_next</span>
+                                                        <span>{t("amulet_hotkeys.skip_amulet")}</span>
+                                                        {amuletHotkeys.enabled ? (
+                                                            <kbd className="panel-title-action-kbd">{displayHotkey(amuletHotkeys.skipCandidate)}</kbd>
+                                                        ) : null}
+                                                    </button>
+                                                ) : null}
+                                            </div>
                                             <CandidateBar
                                                 candidates={candidates}
                                                 ownedAmulets={amulets}
