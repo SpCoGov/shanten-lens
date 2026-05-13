@@ -1,0 +1,95 @@
+name: Release Build
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows portable
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Create virtual environment
+        shell: pwsh
+        run: python -m venv .venv
+
+      - name: Build portable ZIP
+        shell: cmd
+        run: scripts\build_all.bat
+
+      - name: Upload release asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $version = python scripts/get_app_version.py
+          $asset = "Shanten-Lens_${version}_windows-portable.zip"
+          if (!(Test-Path $asset)) {
+            throw "Release asset not found: $asset"
+          }
+          gh release upload $env:RELEASE_TAG $asset --clobber
+
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Create virtual environment
+        run: python3 -m venv .venv
+
+      - name: Build DMG
+        run: scripts/build_macos.sh
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="$(python3 scripts/get_app_version.py)"
+          ASSET="$(find . -maxdepth 1 -type f -name "Shanten-Lens_${VERSION}_macos-*.dmg" | head -n 1)"
+          if [ ! -f "$ASSET" ]; then
+            echo "Release asset not found: Shanten-Lens_${VERSION}_macos-*.dmg" >&2
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" "$ASSET" --clobber

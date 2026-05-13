@@ -39,6 +39,16 @@ require_cmd() {
 if [[ ! -x "${PYTHON}" ]]; then
   fail "venv Python not found: ${PYTHON}"
 fi
+
+APP_VERSION="$("${PYTHON}" scripts/get_app_version.py)"
+case "$(uname -m)" in
+  arm64) MACOS_ARCH="aarch64" ;;
+  x86_64) MACOS_ARCH="x64" ;;
+  *) MACOS_ARCH="$(uname -m)" ;;
+esac
+RELEASE_DMG="${PROJECT_ROOT}/Shanten-Lens_${APP_VERSION}_macos-${MACOS_ARCH}.dmg"
+echo "App version: ${APP_VERSION}"
+
 require_cmd npm "Node.js/npm is not installed or not in PATH"
 require_cmd rustc "Rust is not installed or not in PATH (install via rustup)"
 require_cmd cargo "cargo is not installed or not in PATH"
@@ -87,6 +97,7 @@ echo "Prepared: ${SIDECAR_BIN}"
 
 echo
 echo "[5/6] Building frontend and Tauri..."
+"${PYTHON}" scripts/sync_app_version.py >/dev/null || fail "Failed to sync app versions"
 pushd "${APP_DIR}" >/dev/null
 if [[ -f package-lock.json ]]; then
   npm ci || { popd >/dev/null; fail "npm ci failed"; }
@@ -101,6 +112,9 @@ echo
 echo "[6/6] Checking macOS bundle outputs..."
 [[ -d "${APP_BUNDLE}" ]] || fail "App bundle not found: ${APP_BUNDLE}"
 [[ -d "${DMG_DIR}" ]] || echo "[WARN] DMG output directory not found yet: ${DMG_DIR}"
+DMG_SOURCE="$(find "${DMG_DIR}" -maxdepth 1 -type f -name "*.dmg" | head -n 1 || true)"
+[[ -n "${DMG_SOURCE}" ]] || fail "DMG file not found in: ${DMG_DIR}"
+cp "${DMG_SOURCE}" "${RELEASE_DMG}" || fail "Failed to copy release DMG"
 
 echo
 echo "==========================="
@@ -108,6 +122,7 @@ echo " Build Finished"
 echo "==========================="
 echo "App bundle: ${APP_BUNDLE}"
 echo "DMG directory: ${DMG_DIR}"
+echo "Release DMG: ${RELEASE_DMG}"
 echo
 
 popd >/dev/null

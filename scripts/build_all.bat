@@ -11,7 +11,6 @@ echo ===========================
 echo  Shanten Lens - Build Start
 echo ===========================
 echo Project root: %PROJECT_ROOT%
-echo.
 
 set "PYTHON=.venv\Scripts\python.exe"
 set "APP_DIR=app"
@@ -20,7 +19,6 @@ set "DIST_EXE=dist\shanten-backend.exe"
 set "SIDECAR_DIR=%APP_DIR%\src-tauri\bin"
 set "SIDECAR_EXE=%SIDECAR_DIR%\shanten-backend.exe"
 set "BUNDLE_DIR=%APP_DIR%\src-tauri\target\release\bundle"
-set "PORTABLE_ZIP=%PROJECT_ROOT%\Shanten-Lens-portable.zip"
 set "PRODUCT_NAME=Shanten Lens"
 set "RELEASE_EXE=%APP_DIR%\src-tauri\target\release\shanten-lens.exe"
 set "SIDECAR_SRC=%APP_DIR%\src-tauri\bin\shanten-backend.exe"
@@ -31,6 +29,15 @@ if not exist "%PYTHON%" (
   popd
   exit /b 1
 )
+
+for /f "usebackq delims=" %%v in (`"%PYTHON%" scripts\get_app_version.py`) do set "APP_VERSION=%%v"
+if not defined APP_VERSION (
+  echo [ERROR] Failed to read APP_VERSION from backend\version.py.
+  popd
+  exit /b 1
+)
+set "PORTABLE_ZIP=%PROJECT_ROOT%\Shanten-Lens_%APP_VERSION%_windows-portable.zip"
+echo App version: %APP_VERSION%
 
 where npm >nul 2>nul || (
   echo [ERROR] Node.js/npm not found in PATH.
@@ -105,6 +112,11 @@ echo Copied: %SIDECAR_EXE%
 
 echo.
 echo [5/6] Building frontend and Tauri...
+"%PYTHON%" scripts\sync_app_version.py >nul || (
+  echo [ERROR] Failed to sync app versions.
+  popd
+  exit /b 1
+)
 pushd "%APP_DIR%" || (
   echo [ERROR] Cannot enter app directory.
   popd
