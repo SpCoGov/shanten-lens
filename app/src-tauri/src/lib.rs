@@ -415,6 +415,28 @@ fn get_startup_progress(state: State<StartupProgressState>) -> Result<StartupPro
   state.0.lock().map(|guard| guard.clone()).map_err(|_| "mutex poisoned".to_string())
 }
 
+#[tauri::command]
+fn fetch_latest_release(use_system_proxy: bool) -> Result<String, String> {
+  let mut builder = reqwest::blocking::Client::builder()
+    .user_agent("Shanten-Lens-Updater")
+    .timeout(Duration::from_secs(15));
+  if !use_system_proxy {
+    builder = builder.no_proxy();
+  }
+  let client = builder.build().map_err(|e| e.to_string())?;
+  let response = client
+    .get("https://api.github.com/repos/SpCoGov/shanten-lens/releases/latest")
+    .header("Accept", "application/vnd.github+json")
+    .send()
+    .map_err(|e| e.to_string())?;
+  let status = response.status();
+  let text = response.text().map_err(|e| e.to_string())?;
+  if !status.is_success() {
+    return Err(format!("GitHub Releases API returned {status}: {text}"));
+  }
+  Ok(text)
+}
+
 // Windows 下兜底强杀所有同名后端进程（静默）
 #[cfg(windows)]
 fn kill_all_backends_silently() {
@@ -442,7 +464,8 @@ pub fn run() {
       stop_backend,
       frontend_ready,
       update_startup_progress,
-      get_startup_progress
+      get_startup_progress,
+      fetch_latest_release
     ])
     .setup(|app| {
       let ah = app.handle().clone();

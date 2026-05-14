@@ -47,6 +47,10 @@ h2 {
     margin: 16px 0 8px;
 }
 
+section > h2:first-child {
+    margin-top: 0;
+}
+
 a {
     color: var(--link);
     text-decoration: none;
@@ -114,6 +118,16 @@ summary {
     opacity: .6;
 }
 
+.updateBadge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--accent-green) 48%, var(--border));
+    color: var(--accent-green);
+    background: color-mix(in srgb, var(--accent-green) 10%, transparent);
+    font-size: 12px;
+    font-weight: 700;
+}
+
 @media (prefers-color-scheme: dark) {
     .meta {
         opacity: 0.92;
@@ -148,6 +162,37 @@ summary {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+}
+
+.actionPanelStack {
+    margin-top: 12px;
+    display: grid;
+    gap: 8px;
+}
+
+.aboutActions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+}
+
+.switchRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.switchRow input {
+    accent-color: var(--accent-green);
+}
+
+@media (max-width: 640px) {
+    .aboutActions {
+        align-items: stretch;
+    }
 }
 
 .assetList {

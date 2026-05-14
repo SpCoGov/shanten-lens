@@ -7,6 +7,7 @@ import {type EffectItem} from "../lib/gamestate";
 import Modal from "../components/Modal";
 import Tile from "../components/Tile";
 import {APP_VERSION} from "../lib/version";
+import type {UpdateInfo} from "../lib/updateCheck";
 
 const TILE_GROUPS: Array<{ titleKey: string; tiles: string[] }> = [
     {titleKey: "about.tile_groups.manzu", tiles: ["0m", "1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m"]},
@@ -32,9 +33,19 @@ const ASSET_SOURCES = [
 export default function AboutPage({
                                       onSecretClick,
                                       onShowUsageNotice,
+                                      onCheckUpdate,
+                                      updateAvailable,
+                                      checkingUpdate,
+                                      useSystemProxy,
+                                      onUseSystemProxyChange,
                                   }: {
     onSecretClick: () => void;
     onShowUsageNotice: () => void;
+    onCheckUpdate: () => void;
+    updateAvailable: UpdateInfo | null;
+    checkingUpdate: boolean;
+    useSystemProxy: boolean;
+    onUseSystemProxyChange: (useSystemProxy: boolean) => void;
 }) {
     const {t} = useTranslation();
     const [openTileGallery, setOpenTileGallery] = React.useState(false);
@@ -56,6 +67,9 @@ export default function AboutPage({
                 <span className={styles.sep} aria-hidden>|</span>
                 <span className={styles.version}>v{APP_VERSION}</span>
                 <span className={styles.build}>(build&nbsp;1)</span>
+                {updateAvailable ? (
+                    <span className={styles.updateBadge}>{t("about.update_available", {version: updateAvailable.version})}</span>
+                ) : null}
             </div>
 
             <section>
@@ -73,6 +87,30 @@ You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2
 Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
           </pre>
                 </details>
+
+                <div className={styles.actionPanelStack}>
+                    <div className={styles.aboutActions}>
+                        <button className="nav-btn" onClick={onCheckUpdate} disabled={checkingUpdate}>
+                            {checkingUpdate ? (
+                                <>
+                                    <span className="ms" aria-hidden="true">sync</span>
+                                    {t("about.check_update_loading")}
+                                </>
+                            ) : t("about.check_update")}
+                        </button>
+                        <label className={styles.switchRow}>
+                            <input
+                                type="checkbox"
+                                checked={useSystemProxy}
+                                onChange={(event) => onUseSystemProxyChange(event.currentTarget.checked)}
+                            />
+                            <span>{t("about.use_system_proxy")}</span>
+                        </label>
+                        <button className="nav-btn" onClick={onShowUsageNotice}>
+                            {t("about.show_usage_notice")}
+                        </button>
+                    </div>
+                </div>
             </section>
 
             <section>
@@ -96,9 +134,6 @@ Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
                 <div className={styles.actionRow}>
                     <button className="nav-btn" onClick={() => setOpenTileGallery(true)}>
                         {t("about.view_all_tiles")}
-                    </button>
-                    <button className="nav-btn" onClick={onShowUsageNotice}>
-                        {t("about.show_usage_notice")}
                     </button>
                 </div>
             </section>

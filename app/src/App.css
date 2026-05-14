@@ -183,6 +183,23 @@ input, textarea, select, code, pre, .selectable {
     cursor: pointer;
 }
 
+.update-title-badge {
+    width: 24px;
+    height: 24px;
+    display: inline-grid;
+    place-items: center;
+    margin-right: 8px;
+    border-radius: 50%;
+    color: var(--notice-fg);
+    background: color-mix(in srgb, var(--state-warn) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--state-warn) 48%, transparent);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--state-warn) 16%, transparent);
+}
+
+.update-title-badge .ms {
+    font-size: 17px;
+}
+
 .topbar-left {
     min-width: 0;
     flex: 1 1 auto;
@@ -2284,6 +2301,146 @@ input, textarea, select, code, pre, .selectable {
     line-height: 1.55;
 }
 
+.update-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 5300;
+    display: grid;
+    place-items: center;
+    padding: 32px;
+    background: color-mix(in srgb, var(--bg) 10%, transparent);
+    backdrop-filter: blur(18px) saturate(.9);
+    color: var(--text);
+}
+
+.update-dialog-shell {
+    position: relative;
+    width: min(720px, calc(100vw - 64px));
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 18px 22px;
+    padding: 10px 8px;
+    text-shadow: var(--shadow-text);
+}
+
+.update-dialog-close {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    width: 40px;
+    height: 40px;
+    border: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    color: var(--text);
+    background: transparent;
+    cursor: pointer;
+}
+
+.update-dialog-close:hover {
+    border-color: color-mix(in srgb, var(--accent-green) 52%, var(--border));
+    color: var(--accent-green);
+}
+
+.update-dialog-mark {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: var(--accent-green);
+    border: 1px solid color-mix(in srgb, var(--accent-green) 62%, transparent);
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent-green) 9%, transparent);
+}
+
+.update-dialog-mark .ms {
+    font-size: 42px;
+}
+
+.update-dialog-copy,
+.update-dialog-meta,
+.update-dialog-notes,
+.update-dialog-check,
+.update-dialog-actions {
+    grid-column: 2;
+}
+
+.update-dialog-copy h2 {
+    margin: 0 0 10px;
+    font-size: 26px;
+    line-height: 1.28;
+    letter-spacing: 0;
+}
+
+.update-dialog-copy p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.75;
+}
+
+.update-dialog-meta {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(130px, max-content));
+    gap: 18px;
+}
+
+.update-dialog-meta div {
+    display: grid;
+    gap: 4px;
+    padding-left: 14px;
+    border-left: 2px solid color-mix(in srgb, var(--accent-green) 70%, transparent);
+}
+
+.update-dialog-meta span {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.update-dialog-meta strong {
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.update-dialog-notes {
+    max-height: 180px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    margin: 0;
+    padding: 12px 14px;
+    border-left: 2px solid color-mix(in srgb, var(--color-ring) 65%, transparent);
+    background: color-mix(in srgb, var(--panel-bg) 72%, transparent);
+    color: color-mix(in srgb, var(--text) 88%, transparent);
+    font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.update-dialog-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: -8px;
+}
+
+.update-dialog-check input {
+    accent-color: var(--accent-green);
+}
+
+.update-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.update-dialog-primary {
+    color: var(--accent-green);
+    border-color: color-mix(in srgb, var(--accent-green) 48%, var(--border));
+}
+
 @media (max-width: 560px) {
     .usage-notice-overlay {
         padding: 24px;
@@ -2342,6 +2499,28 @@ input, textarea, select, code, pre, .selectable {
     }
 
     .version-mismatch-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .update-dialog-overlay {
+        padding: 24px;
+    }
+
+    .update-dialog-shell {
+        width: min(460px, calc(100vw - 48px));
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .update-dialog-copy,
+    .update-dialog-meta,
+    .update-dialog-notes,
+    .update-dialog-check,
+    .update-dialog-actions {
+        grid-column: 1;
+    }
+
+    .update-dialog-meta {
         grid-template-columns: 1fr;
     }
 }

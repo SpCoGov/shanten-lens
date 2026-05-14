@@ -49,6 +49,15 @@ import {openMsgBoxWindow} from "./lib/msgbox";
 import type {PlanData} from "./lib/planTypes";
 import {buildDoraCountByTile} from "./lib/tileHighlights";
 import {APP_VERSION} from "./lib/version";
+import {
+    checkForUpdates,
+    ignoreUpdateVersion,
+    readUpdatePrefs,
+    setUpdateAutoCheck,
+    setUpdateUseSystemProxy,
+    type UpdateInfo,
+} from "./lib/updateCheck";
+import {openUrl} from "@tauri-apps/plugin-opener";
 
 type BackendLogPayload =
     | string
@@ -270,6 +279,12 @@ type UsageNoticeState = {
     checked: boolean;
 };
 
+type UpdateDialogState = {
+    update: UpdateInfo;
+    autoCheck: boolean;
+    useSystemProxy: boolean;
+};
+
 const BLACKHOLE_TUTORIAL_SEEN_KEY = "sl-tutorial:blackhole:v1";
 const HOME_TUTORIAL_SEEN_KEY = "sl-tutorial:home:v1";
 const USAGE_NOTICE_ACK_KEY = "sl-ack-usage-notice";
@@ -475,12 +490,14 @@ function Topbar({
                     point,
                     targetPoint,
                     onTutorialClick,
+                    updateAvailable,
                 }: {
     onSecretClick: () => void;
     stage: number;
     point?: string;
     targetPoint?: string;
     onTutorialClick?: () => void;
+    updateAvailable?: boolean;
 }) {
     const {t} = useTranslation();
     const progressMeta = (stage === 2 || stage === 3) ? buildPointProgressMeta(point, targetPoint) : null;
@@ -523,6 +540,11 @@ function Topbar({
                 </div>
             ) : null}
             <div className="topbar-left drag" data-tauri-drag-region>
+                {updateAvailable ? (
+                    <span className="update-title-badge" title={t("update.title_badge")} data-tauri-drag-region>
+                        <span className="ms" aria-hidden="true">system_update_alt</span>
+                    </span>
+                ) : null}
                 <span className="title" onClick={onSecretClick}>{t("app.title")}</span>
             </div>
 
@@ -601,6 +623,11 @@ export default function App() {
     const versionMismatchShownRef = React.useRef(false);
     const [usageNotice, setUsageNotice] = React.useState<UsageNoticeState | null>(null);
     const usageNoticeShownOnStartupRef = React.useRef(false);
+    const [updateDialog, setUpdateDialog] = React.useState<UpdateDialogState | null>(null);
+    const [latestUpdate, setLatestUpdate] = React.useState<UpdateInfo | null>(null);
+    const [updateChecking, setUpdateChecking] = React.useState(false);
+    const [updatePrefs, setUpdatePrefs] = React.useState(() => readUpdatePrefs());
+    const updateCheckStartedRef = React.useRef(false);
     const [activeTutorial, setActiveTutorial] = React.useState<TutorialId | null>(null);
     const [souzuSwitchExecution, setSouzuSwitchExecution] = React.useState<SouzuSwitchExecutionState | null>(null);
 
@@ -852,6 +879,57 @@ export default function App() {
         usageNoticeShownOnStartupRef.current = true;
         setUsageNotice({checked: false});
     }, []);
+
+    const openUpdateUrl = React.useCallback(async (url: string) => {
+        try {
+            await openUrl(url);
+        } catch (err) {
+            console.error("open update url failed", err);
+            pushToast(t("update.open_failed"), "error", 2200);
+        }
+    }, [t]);
+
+    const runUpdateCheck = React.useCallback(async (manual = false) => {
+        if (manual) setUpdateChecking(true);
+        try {
+            const result = await checkForUpdates({manual});
+            if (result.status === "available") {
+                const prefs = readUpdatePrefs();
+                setUpdatePrefs(prefs);
+                setLatestUpdate(result.update);
+                setUpdateDialog({
+                    update: result.update,
+                    autoCheck: prefs.autoCheck,
+                    useSystemProxy: prefs.useSystemProxy,
+                });
+                return;
+            }
+            if (manual && result.status === "current") {
+                pushToast(t("update.no_update", {version: APP_VERSION}), "success", 1800);
+            } else if (manual && result.status === "disabled") {
+                pushToast(t("update.auto_check_disabled"), "info", 1800);
+            }
+        } catch (err) {
+            console.error("update check failed", err);
+            if (manual) pushToast(t("update.check_failed"), "error", 2400);
+        } finally {
+            if (manual) setUpdateChecking(false);
+        }
+    }, [t]);
+
+    const handleUpdateProxyChange = React.useCallback((useSystemProxy: boolean) => {
+        setUpdateUseSystemProxy(useSystemProxy);
+        setUpdatePrefs(readUpdatePrefs());
+    }, []);
+
+    React.useEffect(() => {
+        if (updateCheckStartedRef.current) return;
+        updateCheckStartedRef.current = true;
+        const timer = window.setTimeout(() => {
+            void runUpdateCheck(false);
+        }, 1800);
+        return () => window.clearTimeout(timer);
+    }, [runUpdateCheck]);
 
     React.useEffect(() => {
         if (Math.random() >= HIDDEN_THEME_CHANCE) return;
@@ -1642,6 +1720,7 @@ export default function App() {
                 point={point}
                 targetPoint={targetPoint}
                 onTutorialClick={route === "home" || route === "blackhole" ? openCurrentTutorial : undefined}
+                updateAvailable={Boolean(latestUpdate)}
             />
 
             <div className="shell">
@@ -1986,6 +2065,11 @@ export default function App() {
                             <AboutPage
                                 onSecretClick={onSecretClick}
                                 onShowUsageNotice={openUsageNotice}
+                                onCheckUpdate={() => void runUpdateCheck(true)}
+                                updateAvailable={latestUpdate}
+                                checkingUpdate={updateChecking}
+                                useSystemProxy={updatePrefs.useSystemProxy}
+                                onUseSystemProxyChange={handleUpdateProxyChange}
                             />
                         )}
                     </div>
@@ -2301,6 +2385,96 @@ export default function App() {
                         </div>
 
                         <p className="version-mismatch-hint">{t("app.version_mismatch.hint")}</p>
+                    </div>
+                </div>
+            ) : null}
+            {updateDialog ? (
+                <div
+                    className="update-dialog-overlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="update-dialog-title"
+                    onClick={() => setUpdateDialog(null)}
+                >
+                    <button
+                        className="update-dialog-close"
+                        onClick={() => setUpdateDialog(null)}
+                        aria-label={t("modal.close")}
+                    >
+                        <span className="ms" aria-hidden="true">close</span>
+                    </button>
+                    <div className="update-dialog-shell" onClick={(event) => event.stopPropagation()}>
+                        <div className="update-dialog-mark" aria-hidden="true">
+                            <span className="ms">system_update_alt</span>
+                        </div>
+
+                        <div className="update-dialog-copy">
+                            <h2 id="update-dialog-title">{t("update.dialog_title")}</h2>
+                            <p>{t("update.dialog_body", {version: updateDialog.update.version})}</p>
+                        </div>
+
+                        <div className="update-dialog-meta">
+                            <div>
+                                <span>{t("update.current_version")}</span>
+                                <strong>v{APP_VERSION}</strong>
+                            </div>
+                            <div>
+                                <span>{t("update.latest_version")}</span>
+                                <strong>v{updateDialog.update.version}</strong>
+                            </div>
+                            <div>
+                                <span>{t("update.download_package")}</span>
+                                <strong>{updateDialog.update.downloadAssetName || t("update.release_page")}</strong>
+                            </div>
+                        </div>
+
+                        {updateDialog.update.body ? (
+                            <pre className="update-dialog-notes">{updateDialog.update.body}</pre>
+                        ) : null}
+
+                        <label className={`update-dialog-check ${updateDialog.autoCheck ? "is-on" : ""}`}>
+                            <input
+                                type="checkbox"
+                                checked={updateDialog.autoCheck}
+                                onChange={(event) => {
+                                    const autoCheck = event.currentTarget.checked;
+                                    setUpdateAutoCheck(autoCheck);
+                                    setUpdateDialog((current) => current ? {...current, autoCheck} : current);
+                                }}
+                            />
+                            <span>{t("update.auto_check_label")}</span>
+                        </label>
+                        <label className={`update-dialog-check ${updateDialog.useSystemProxy ? "is-on" : ""}`}>
+                            <input
+                                type="checkbox"
+                                checked={updateDialog.useSystemProxy}
+                                onChange={(event) => {
+                                    const useSystemProxy = event.currentTarget.checked;
+                                    setUpdateUseSystemProxy(useSystemProxy);
+                                    setUpdatePrefs(readUpdatePrefs());
+                                    setUpdateDialog((current) => current ? {...current, useSystemProxy} : current);
+                                }}
+                            />
+                            <span>{t("update.system_proxy_label")}</span>
+                        </label>
+
+                        <div className="update-dialog-actions">
+                            <button
+                                className="nav-btn"
+                                onClick={() => {
+                                    ignoreUpdateVersion(updateDialog.update.version);
+                                    setUpdateDialog(null);
+                                }}
+                            >
+                                {t("update.ignore_version")}
+                            </button>
+                            <button className="nav-btn" onClick={() => void openUpdateUrl(updateDialog.update.releaseUrl)}>
+                                {t("update.open_release")}
+                            </button>
+                            <button className="nav-btn update-dialog-primary" onClick={() => void openUpdateUrl(updateDialog.update.downloadUrl)}>
+                                {t("update.download_update")}
+                            </button>
+                        </div>
                     </div>
                 </div>
             ) : null}
