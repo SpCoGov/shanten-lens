@@ -1,6 +1,7 @@
 export type ToastKind = "info" | "success" | "error";
 
 type ToastPayload = { msg: string; kind?: ToastKind; duration?: number };
+import i18n from "./i18n";
 
 const EVT = "shanten:toast";
 let installedWsBridge = false;
@@ -16,7 +17,25 @@ export function installWsToastBridge(ws: { on: (fn: (pkt: any) => void) => () =>
     ws.on((pkt: any) => {
         if (pkt?.type === "ui_toast") {
             const d = pkt.data || {};
-            pushToast(String(d.msg ?? ""), (d.kind ?? "info") as ToastKind, Number(d.duration ?? 2200));
+            const values = {...(d.msg_values ?? {})};
+            if (values.ssl === "on" || values.ssl === "off") {
+                values.ssl = i18n.t(`autorun.email_error.ssl_${values.ssl}`);
+            }
+            if (values.detail) {
+                values.detail = i18n.t("autorun.email_error.detail", {detail: values.detail});
+            }
+            if (values.reason_key) {
+                const reasonValues = {...(values.reason_values ?? {})};
+                if (reasonValues.ssl === "on" || reasonValues.ssl === "off") {
+                    reasonValues.ssl = i18n.t(`autorun.email_error.ssl_${reasonValues.ssl}`);
+                }
+                if (reasonValues.detail) {
+                    reasonValues.detail = i18n.t("autorun.email_error.detail", {detail: reasonValues.detail});
+                }
+                values.reason = String(i18n.t(String(values.reason_key), reasonValues));
+            }
+            const msg = d.msg_key ? String(i18n.t(String(d.msg_key), values)) : String(d.msg ?? "");
+            pushToast(msg, (d.kind ?? "info") as ToastKind, Number(d.duration ?? 2200));
         }
     });
 }

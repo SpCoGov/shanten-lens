@@ -250,6 +250,23 @@ def post_broadcast(pkt: Dict[str, Any]) -> None:
     post_coro(_broadcast_on_ui_loop(pkt))
 
 
+def broadcast_sync_ui_toast(
+        kind: str,
+        msg: str = "",
+        *,
+        msg_key: str = "",
+        msg_values: Dict[str, Any] | None = None,
+        duration: int = 2200,
+) -> None:
+    data: Dict[str, Any] = {"kind": kind, "duration": duration}
+    if msg_key:
+        data["msg_key"] = msg_key
+        data["msg_values"] = msg_values or {}
+    else:
+        data["msg"] = msg
+    post_broadcast({"type": "ui_toast", "data": data})
+
+
 def _open_dir(path: str):
     if sys.platform.startswith("win"):
         os.startfile(path)  # type: ignore
@@ -742,12 +759,21 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     if ok:
                         await ws_send(ws, {
                             "type": "ui_toast",
-                            "data": {"kind": "success", "msg": "测试邮件已发送", "duration": 1800}
+                            "data": {"kind": "success", "msg_key": "autorun.email_toast.test_success", "duration": 1800}
                         })
                     else:
+                        payload = reason or {}
                         await ws_send(ws, {
                             "type": "ui_toast",
-                            "data": {"kind": "error", "msg": f"发送失败: {reason or ''}", "duration": 2600}
+                            "data": {
+                                "kind": "error",
+                                "msg_key": "autorun.email_toast.test_failed",
+                                "msg_values": {
+                                    "reason_key": payload.get("key", "autorun.email_error.unknown"),
+                                    "reason_values": payload.get("values", {}),
+                                },
+                                "duration": 6000,
+                            }
                         })
             elif t == "souzu_switch_control":
                 action = (data or {}).get("action")

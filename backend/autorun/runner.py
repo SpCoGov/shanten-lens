@@ -38,6 +38,57 @@ NEED_PIONNER_BADGE_COUNT = 4
 EMAIL_ASSETS_BASE_URL = "https://raw.githubusercontent.com/SpCoGov/shanten-lens/refs/heads/2.0/app/public/assets"
 EMAIL_AMULET_ASSETS_BASE_URL = f"{EMAIL_ASSETS_BASE_URL}/amulet"
 EMAIL_BADGE_ASSETS_BASE_URL = f"{EMAIL_ASSETS_BASE_URL}/badge"
+
+
+def _format_smtp_response(error: smtplib.SMTPResponseException) -> str:
+    response = error.smtp_error
+    if isinstance(response, bytes):
+        response = response.decode("utf-8", errors="replace")
+    response_text = str(response or "").strip()
+    code_text = str(error.smtp_code or "").strip()
+    if code_text and response_text:
+        return f"{code_text} {response_text}"
+    return code_text or response_text
+
+
+def _email_error_payload(error: Exception, *, host: str, port: int, use_ssl: bool) -> Dict[str, Any]:
+    target = f"{host}:{port}"
+    values: Dict[str, Any] = {
+        "host": host,
+        "port": port,
+        "target": target,
+        "ssl": "on" if use_ssl else "off",
+    }
+    detail = str(error).strip()
+    if detail:
+        values["detail"] = detail
+    values["error"] = error.__class__.__name__
+
+    if isinstance(error, smtplib.SMTPAuthenticationError):
+        response = _format_smtp_response(error)
+        if response:
+            values["detail"] = response
+        return {"key": "autorun.email_error.auth_failed", "values": values}
+    if isinstance(error, smtplib.SMTPConnectError):
+        response = _format_smtp_response(error)
+        if response:
+            values["detail"] = response
+        return {"key": "autorun.email_error.connect_failed", "values": values}
+    if isinstance(error, smtplib.SMTPRecipientsRefused):
+        return {"key": "autorun.email_error.recipient_refused", "values": values}
+    if isinstance(error, smtplib.SMTPServerDisconnected):
+        return {"key": "autorun.email_error.disconnected", "values": values}
+    if isinstance(error, ssl.SSLError):
+        return {"key": "autorun.email_error.ssl_failed", "values": values}
+    if isinstance(error, socket.gaierror):
+        return {"key": "autorun.email_error.dns_failed", "values": values}
+    if isinstance(error, (socket.timeout, TimeoutError)):
+        return {"key": "autorun.email_error.timeout", "values": values}
+    if isinstance(error, OSError):
+        return {"key": "autorun.email_error.os_error", "values": values}
+    if isinstance(error, smtplib.SMTPException):
+        return {"key": "autorun.email_error.smtp_error", "values": values}
+    return {"key": "autorun.email_error.unknown", "values": values}
 EMAIL_ASSETS_ROOT = Path(__file__).resolve().parents[2] / "app" / "public" / "assets"
 EMAIL_AMULET_ASSETS_ROOT = EMAIL_ASSETS_ROOT / "amulet"
 EMAIL_BADGE_ASSETS_ROOT = EMAIL_ASSETS_ROOT / "badge"
@@ -242,7 +293,18 @@ class AutoRunner:
         ok, reason = self.send_email_notify(subject, plain_body, html_body=html_body)
         if app_mod and hasattr(app_mod, "broadcast_sync_ui_toast"):
             try:
-                app_mod.broadcast_sync_ui_toast("success", "目标已达成，邮件已发送" if ok else f"目标已达成，邮件发送失败：{reason}")
+                if ok:
+                    app_mod.broadcast_sync_ui_toast("success", msg_key="autorun.email_toast.success_done")
+                else:
+                    payload = reason or {}
+                    app_mod.broadcast_sync_ui_toast(
+                        "error",
+                        msg_key="autorun.email_toast.success_notify_failed",
+                        msg_values={
+                            "reason_key": payload.get("key", "autorun.email_error.unknown"),
+                            "reason_values": payload.get("values", {}),
+                        },
+                    )
             except Exception:
                 pass
 
@@ -414,7 +476,18 @@ class AutoRunner:
         ok, reason = self.send_email_notify(subject, plain_body, html_body=html_body)
         if app_mod and hasattr(app_mod, "broadcast_sync_ui_toast"):
             try:
-                app_mod.broadcast_sync_ui_toast("error", "运行中止，邮件已发送" if ok else f"运行中止，邮件发送失败：{reason}")
+                if ok:
+                    app_mod.broadcast_sync_ui_toast("error", msg_key="autorun.email_toast.failure_done")
+                else:
+                    payload = reason or {}
+                    app_mod.broadcast_sync_ui_toast(
+                        "error",
+                        msg_key="autorun.email_toast.failure_notify_failed",
+                        msg_values={
+                            "reason_key": payload.get("key", "autorun.email_error.unknown"),
+                            "reason_values": payload.get("values", {}),
+                        },
+                    )
             except Exception:
                 pass
 
@@ -571,10 +644,10 @@ class AutoRunner:
             to_override: Optional[str] = None,
             html_body: Optional[str] = None,
             inline_images: Optional[Dict[str, Dict[str, Any]]] = None,
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> Tuple[bool, Optional[Dict[str, Any]]]:
         cfg = self.email_notify or {}
         if not cfg.get("enabled"):
-            return False, "email-notify-disabled"
+            return False, {"key": "autorun.email_error.disabled", "values": {}}
 
         host = (cfg.get("host") or "").strip()
         port = int(cfg.get("port") or 0)
@@ -584,13 +657,13 @@ class AutoRunner:
         to_addr = (to_override or cfg.get("to") or "").strip()
 
         if not host or not port:
-            return False, "smtp-host-or-port-missing"
+            return False, {"key": "autorun.email_error.host_or_port_missing", "values": {}}
         if "@" not in (from_addr or ""):
-            return False, "from-address-invalid"
+            return False, {"key": "autorun.email_error.from_invalid", "values": {"email": from_addr}}
         if "@" not in (to_addr or ""):
-            return False, "to-address-invalid"
+            return False, {"key": "autorun.email_error.to_invalid", "values": {"email": to_addr}}
         if not pwd:
-            return False, "smtp-password-missing"
+            return False, {"key": "autorun.email_error.password_missing", "values": {}}
 
         if html_body is None and subject.startswith("Shanten Lens "):
             body, html_body = self.build_test_email_bodies()
@@ -625,18 +698,8 @@ class AutoRunner:
                     s.login(from_addr, pwd)
                     s.sendmail(from_addr, [to_addr], msg.as_string())
             return True, None
-        except smtplib.SMTPAuthenticationError as e:
-            return False, f"smtp-auth-failed:{e.smtp_code or ''}"
-        except smtplib.SMTPConnectError as e:
-            return False, f"smtp-connect-failed:{e.smtp_code or ''}"
-        except smtplib.SMTPServerDisconnected:
-            return False, "smtp-disconnected"
-        except smtplib.SMTPRecipientsRefused:
-            return False, "smtp-recipient-refused"
-        except smtplib.SMTPException as e:
-            return False, f"smtp-error:{e.__class__.__name__}"
         except Exception as e:
-            return False, f"error:{e.__class__.__name__}"
+            return False, _email_error_payload(e, host=host, port=port, use_ssl=use_ssl)
 
     def _classify_probe_reason(self, reason: str) -> str:
         r = (reason or "").lower().strip()

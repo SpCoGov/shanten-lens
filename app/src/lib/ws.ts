@@ -4,6 +4,7 @@ import {setFuseConfig, type FuseConfig} from "./fuseStore";
 import {AutoRunnerConfig, setAutoConfig} from "./autoRunnerStore";
 import {pushToast} from "./toast";
 import {APP_VERSION} from "./version";
+import i18n from "./i18n";
 
 export type UpdateConfigPacket = { type: "update_config"; data: Record<string, Record<string, any>> };
 export type Packet =
@@ -27,6 +28,30 @@ function ts() {
 }
 
 const addFrame = useLogStore.getState().addFrame;
+
+function translateToastMessage(d: any): string {
+    const key = String(d?.msg_key ?? "");
+    if (!key) return String(d?.msg ?? "");
+
+    const values = {...(d?.msg_values ?? {})};
+    if (values.ssl === "on" || values.ssl === "off") {
+        values.ssl = i18n.t(`autorun.email_error.ssl_${values.ssl}`);
+    }
+    if (values.detail) {
+        values.detail = i18n.t("autorun.email_error.detail", {detail: values.detail});
+    }
+    if (values.reason_key) {
+        const reasonValues = {...(values.reason_values ?? {})};
+        if (reasonValues.ssl === "on" || reasonValues.ssl === "off") {
+            reasonValues.ssl = i18n.t(`autorun.email_error.ssl_${reasonValues.ssl}`);
+        }
+        if (reasonValues.detail) {
+            reasonValues.detail = i18n.t("autorun.email_error.detail", {detail: reasonValues.detail});
+        }
+        values.reason = String(i18n.t(String(values.reason_key), reasonValues));
+    }
+    return String(i18n.t(key, values));
+}
 
 class WS {
     private url: string;
@@ -207,7 +232,7 @@ ws.onPacket((pkt) => {
     if (pkt.type === "ui_toast") {
         const d = pkt.data || {};
         console.log("[ui_toast] incoming =>", d);
-        const msg = String(d.msg ?? "");
+        const msg = translateToastMessage(d);
         const kind = (d.kind ?? "info") as "info" | "success" | "error";
         const dur = Number.isFinite(Number(d.duration)) ? Number(d.duration) : 2200;
         if (msg) pushToast(msg, kind, dur);
