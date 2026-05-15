@@ -9,7 +9,6 @@ const LATEST_RELEASE_API_URL = `https://api.github.com/repos/${UPDATE_REPO_OWNER
 
 const PREFS_KEY = "sl-update-check:prefs";
 const LAST_CHECK_KEY = "sl-update-check:last-check";
-const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
 export type UpdateAsset = {
     name: string;
@@ -178,13 +177,6 @@ export async function checkForUpdates(options: {manual?: boolean} = {}): Promise
     const prefs = readUpdatePrefs();
     if (!options.manual && !prefs.autoCheck) return {status: "disabled"};
 
-    if (!options.manual) {
-        const lastCheck = Number(localStorage.getItem(LAST_CHECK_KEY) || "0");
-        if (Number.isFinite(lastCheck) && Date.now() - lastCheck < CHECK_INTERVAL_MS) {
-            return {status: "current", version: APP_VERSION};
-        }
-    }
-
     const update = await parseRelease(await fetchLatestRelease(prefs.useSystemProxy));
     localStorage.setItem(LAST_CHECK_KEY, String(Date.now()));
     if (!update) return {status: "current", version: APP_VERSION};
@@ -199,4 +191,3 @@ export async function checkForUpdates(options: {manual?: boolean} = {}): Promise
 
     return {status: "available", update};
 }
-
