@@ -27,8 +27,6 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: app/package-lock.json
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -57,8 +55,14 @@ jobs:
       - name: Build frontend
         working-directory: app
         run: |
-          npm ci
-          npm run build
+          corepack enable
+          pnpm install --no-frozen-lockfile
+          pnpm run build
+
+      - name: Prepare Tauri check resources
+        run: |
+          mkdir -p app/src-tauri/bin
+          touch app/src-tauri/bin/shanten-backend.exe
 
       - name: Check Tauri backend
         working-directory: app/src-tauri
