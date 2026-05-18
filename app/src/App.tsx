@@ -2,7 +2,6 @@ import React from "react";
 import {createPortal} from "react-dom";
 import "./styles/theme.css";
 import "./App.css";
-import {listen} from "@tauri-apps/api/event";
 import {invoke} from "@tauri-apps/api/core";
 import SettingsPage from "./pages/SettingsPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
@@ -58,6 +57,7 @@ import {
     type UpdateInfo,
 } from "./lib/updateCheck";
 import {openUrl} from "@tauri-apps/plugin-opener";
+import {safeListen} from "./lib/tauriRuntime";
 
 type BackendLogPayload =
     | string
@@ -1374,7 +1374,7 @@ export default function App() {
             };
 
             const sub = async (event: string, level: LogLevel = "INFO") => {
-                const un = await listen<BackendLogPayload>(event, (e) => {
+                const un = await safeListen<BackendLogPayload>(event, (e) => {
                     handleBackendLogPayload(event, level, e.payload);
                 });
                 unsubs.push(un);
@@ -1406,7 +1406,7 @@ export default function App() {
         let un = () => {
         };
         (async () => {
-            un = await listen<{ lng: string }>("i18n:set-language", (e) => {
+            un = await safeListen<{ lng: string }>("i18n:set-language", (e) => {
                 setAppLanguage(e.payload.lng);
             });
         })();
