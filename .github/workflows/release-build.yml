@@ -1,6 +1,9 @@
 name: Release Build
 
 on:
+  push:
+    tags:
+      - "v*.*.*"
   release:
     types: [published]
 
@@ -8,8 +11,25 @@ permissions:
   contents: write
 
 jobs:
+  prepare-release:
+    name: Prepare release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ensure GitHub release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --generate-notes
+          fi
+
   build-windows:
     name: Build Windows portable
+    needs: prepare-release
+    if: ${{ always() && (needs.prepare-release.result == 'success' || needs.prepare-release.result == 'skipped') }}
     runs-on: windows-latest
 
     steps:
@@ -43,7 +63,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
         run: |
           $version = python scripts/get_app_version.py
           $asset = "Shanten-Lens_${version}_windows-portable.zip"
@@ -54,6 +74,8 @@ jobs:
 
   build-macos:
     name: Build macOS DMG
+    needs: prepare-release
+    if: ${{ always() && (needs.prepare-release.result == 'success' || needs.prepare-release.result == 'skipped') }}
     runs-on: macos-14
 
     steps:
@@ -84,7 +106,7 @@ jobs:
       - name: Upload release asset
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
         run: |
           VERSION="$(python3 scripts/get_app_version.py)"
           ASSET="$(find . -maxdepth 1 -type f -name "Shanten-Lens_${VERSION}_macos-*.dmg" | head -n 1)"

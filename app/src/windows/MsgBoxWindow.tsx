@@ -1,10 +1,10 @@
 import React from "react";
 import { getCurrentWindow, LogicalSize, currentMonitor } from "@tauri-apps/api/window";
-import { listen } from "@tauri-apps/api/event";
 import { Trans, useTranslation } from "react-i18next";
 
 import { ws } from "../lib/ws";
 import { setAppLanguage } from "../lib/i18n";
+import { safeListen } from "../lib/tauriRuntime";
 import "../lib/i18n";
 import styles from "./MsgBoxWindow.module.css";
 
@@ -53,7 +53,7 @@ export default function MsgBoxWindow() {
     React.useEffect(() => {
         let un = () => {};
         (async () => {
-            un = await listen<{ lng: string }>("i18n:set-language", (e) => {
+            un = await safeListen<{ lng: string }>("i18n:set-language", (e) => {
                 setAppLanguage(e.payload.lng);
             });
         })();

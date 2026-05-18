@@ -61,6 +61,10 @@
     "maximize": "最大化/復元",
     "close": "閉じる"
   },
+  "number": {
+    "large_units": ["万", "億", "兆", "京", "垓", "秭", "穣", "溝", "澗", "正", "載", "極"],
+    "large_unit_repeat": "極"
+  },
   "update": {
     "title_badge": "新しいバージョンがあります",
     "dialog_title": "新しいバージョンがあります",
