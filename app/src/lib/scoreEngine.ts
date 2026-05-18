@@ -1,4 +1,10 @@
-import {formatLargeNumber, formatLargeScaledNumber, normalizeNumericString} from "./bigNumber";
+import {
+    BASE_UNIT_EXPONENTS,
+    formatLargeNumber,
+    formatLargeScaledNumber,
+    getLargeNumberHumanUnits,
+    normalizeNumericString,
+} from "./bigNumber";
 import type {EffectItem} from "./gamestate";
 import {
     getRegisteredAmuletRule,
@@ -167,27 +173,33 @@ const BADGE_EXTENSION_SEAL_ID = 600160;
 const BADGE_TRANSMISSION_SEAL_ID = 600170;
 const BADGE_ANGEL_SEAL_ID = 600190;
 
-const BASE_UNITS: Array<[number, string]> = [
-    [4, "万"],
-    [8, "亿"],
-    [12, "兆"],
-    [16, "京"],
-    [20, "垓"],
-    [24, "秭"],
-    [28, "穰"],
-    [32, "沟"],
-    [36, "涧"],
-    [40, "正"],
-    [44, "载"],
-    [48, "极"],
-];
+const COMPAT_BASE_UNITS = [
+    ["万", "万"],
+    ["亿", "億"],
+    ["兆", "兆"],
+    ["京", "京"],
+    ["垓", "垓"],
+    ["秭", "秭"],
+    ["穰", "穣"],
+    ["沟", "溝"],
+    ["涧", "澗"],
+    ["正", "正"],
+    ["载", "載"],
+    ["极", "極"],
+] as const;
 
-const UNIT_EXPONENTS = new Map<string, number>();
-for (let repeat = 0; repeat <= 6; repeat += 1) {
-    const suffix = "极".repeat(repeat);
-    for (const [exponent, label] of BASE_UNITS) {
-        UNIT_EXPONENTS.set(`${label}${suffix}`, exponent + repeat * 48);
+function getUnitExponents(): Map<string, number> {
+    const unitExponents = new Map<string, number>(getLargeNumberHumanUnits().map(([exponent, label]) => [label, exponent]));
+    for (let repeat = 0; repeat <= 6; repeat += 1) {
+        for (const [index, exponent] of BASE_UNIT_EXPONENTS.entries()) {
+            for (const label of COMPAT_BASE_UNITS[index]) {
+                for (const repeatLabel of ["极", "極"]) {
+                    unitExponents.set(`${label}${repeatLabel.repeat(repeat)}`, exponent + repeat * 48);
+                }
+            }
+        }
     }
+    return unitExponents;
 }
 
 export const DEFAULT_RULE_CONFIG: AmuletRuleConfig = {
@@ -323,7 +335,7 @@ export function parseTargetPointValue(value: string | number | bigint): bigint |
     if (!unitMatch) return null;
     const numeric = parseFixed2(unitMatch[1]);
     const unit = unitMatch[2].trim();
-    const exponent = UNIT_EXPONENTS.get(unit);
+    const exponent = getUnitExponents().get(unit);
     if (exponent == null) return null;
     return numeric * (10n ** BigInt(exponent));
 }

@@ -1,28 +1,38 @@
-const BASE_UNITS: Array<[number, string]> = [
-    [4, "万"],
-    [8, "亿"],
-    [12, "兆"],
-    [16, "京"],
-    [20, "垓"],
-    [24, "秭"],
-    [28, "穰"],
-    [32, "沟"],
-    [36, "涧"],
-    [40, "正"],
-    [44, "载"],
-    [48, "极"],
-];
+import i18n from "./i18n";
 
-const HUMAN_UNITS: Array<[number, string]> = [];
-for (let repeat = 0; repeat <= 6; repeat += 1) {
-    const suffix = "极".repeat(repeat);
-    for (const [exponent, label] of BASE_UNITS) {
-        const totalExponent = exponent + repeat * 48;
-        if (totalExponent < 8 || totalExponent > 300) continue;
-        HUMAN_UNITS.push([totalExponent, `${label}${suffix}`]);
-    }
+export const BASE_UNIT_EXPONENTS = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48] as const;
+const FALLBACK_BASE_UNITS = ["万", "亿", "兆", "京", "垓", "秭", "穰", "沟", "涧", "正", "载", "极"] as const;
+const FALLBACK_REPEAT_UNIT = "极";
+
+function getBaseUnitLabels(): string[] {
+    return BASE_UNIT_EXPONENTS.map((_, index) => {
+        const translated = i18n.t(`number.large_units.${index}`);
+        return translated && translated !== `number.large_units.${index}`
+            ? translated
+            : FALLBACK_BASE_UNITS[index];
+    });
 }
-HUMAN_UNITS.sort((a, b) => a[0] - b[0]);
+
+function getRepeatUnitLabel(): string {
+    const translated = i18n.t("number.large_unit_repeat");
+    return translated && translated !== "number.large_unit_repeat" ? translated : FALLBACK_REPEAT_UNIT;
+}
+
+export function getLargeNumberHumanUnits(): Array<[number, string]> {
+    const baseLabels = getBaseUnitLabels();
+    const repeatUnit = getRepeatUnitLabel();
+    const units: Array<[number, string]> = [];
+    for (let repeat = 0; repeat <= 6; repeat += 1) {
+        const suffix = repeatUnit.repeat(repeat);
+        for (const [index, exponent] of BASE_UNIT_EXPONENTS.entries()) {
+            const totalExponent = exponent + repeat * 48;
+            if (totalExponent < 8 || totalExponent > 300) continue;
+            units.push([totalExponent, `${baseLabels[index]}${suffix}`]);
+        }
+    }
+    units.sort((a, b) => a[0] - b[0]);
+    return units;
+}
 
 export function normalizeNumericString(value: string | number | bigint): string {
     const text = String(value ?? "").trim();
@@ -168,8 +178,9 @@ export function formatLargeNumber(
         return `${sign}${mantissa}e${exponent}`;
     }
 
-    let chosen = HUMAN_UNITS[0];
-    for (const unit of HUMAN_UNITS) {
+    const humanUnits = getLargeNumberHumanUnits();
+    let chosen = humanUnits[0];
+    for (const unit of humanUnits) {
         if (unit[0] > exponent) break;
         chosen = unit;
     }
@@ -211,8 +222,9 @@ export function formatLargeScaledNumber(
         return `${sign}${mantissa}e${exponent}`;
     }
 
-    let chosen = HUMAN_UNITS[0];
-    for (const unit of HUMAN_UNITS) {
+    const humanUnits = getLargeNumberHumanUnits();
+    let chosen = humanUnits[0];
+    for (const unit of humanUnits) {
         if (unit[0] > exponent) break;
         chosen = unit;
     }

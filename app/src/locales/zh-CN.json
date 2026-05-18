@@ -61,6 +61,10 @@
     "maximize": "最大化/还原",
     "close": "关闭"
   },
+  "number": {
+    "large_units": ["万", "亿", "兆", "京", "垓", "秭", "穰", "沟", "涧", "正", "载", "极"],
+    "large_unit_repeat": "极"
+  },
   "update": {
     "title_badge": "有新版本可用",
     "dialog_title": "发现新版本",
