@@ -11,6 +11,7 @@ export type AutoRunnerConfig = {
     __tick__?: number; // 轻量刷新
     op_interval_ms?: number;
     need_pionner_badge_count?: number;
+    record_detailed_operations?: boolean;
     email_notify?: EmailNotifyConfig;
 };
 
@@ -34,6 +35,22 @@ export type AutoRunnerRemakeRecord = {
     target_value: number;
     amulet_count: number;
     effect_list: any[];
+    operation_count?: number;
+    operation_records?: AutoRunnerOperationRecord[];
+};
+
+export type AutoRunnerOperationRecord = {
+    seq: number;
+    run_index: number;
+    op_index: number;
+    ts: number;
+    stage?: number | null;
+    level?: number | null;
+    step: string;
+    action: string;
+    reason: string;
+    result: string;
+    details?: Record<string, unknown>;
 };
 
 export type AutoRunnerStatus = {
@@ -56,6 +73,9 @@ export type AutoRunnerStatus = {
     preferred_flow_peer?: string;
     remake_records?: AutoRunnerRemakeRecord[];
     best_remake_record?: AutoRunnerRemakeRecord | null;
+    record_detailed_operations?: boolean;
+    operation_records?: AutoRunnerOperationRecord[];
+    operation_count_by_run?: Record<string, number>;
 };
 
 const defaultConfig: AutoRunnerConfig = {
@@ -64,6 +84,7 @@ const defaultConfig: AutoRunnerConfig = {
     cutoff_level: 102,
     op_interval_ms: 1000,
     need_pionner_badge_count: 4,
+    record_detailed_operations: false,
     email_notify: {
         enabled: false,
         host: "",
@@ -92,6 +113,9 @@ const defaultStatus: AutoRunnerStatus = {
     probe_fail_count: 0,
     remake_records: [],
     best_remake_record: null,
+    record_detailed_operations: false,
+    operation_records: [],
+    operation_count_by_run: {},
 };
 
 type State = {

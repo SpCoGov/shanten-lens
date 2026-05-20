@@ -8,6 +8,7 @@ import os
 import platform
 import subprocess
 import sys
+import time
 from pathlib import Path
 from time import monotonic
 from typing import Dict, Set, Any
@@ -696,6 +697,11 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         timeout=20,
                         to_thread=True,
                     )
+                    AUTORUNNER._last_probe_ok = ok
+                    AUTORUNNER._last_probe_reason = reason or ""
+                    AUTORUNNER._last_probe_resp = resp
+                    AUTORUNNER._last_probe_ts = int(time.time() * 1000)
+                    await AUTORUNNER._recompute_ready_flags_from_last_probe()
 
                     if not ok:
                         low = (reason or "").lower()
@@ -705,12 +711,17 @@ async def ws_handler(ws: WebSocketServerProtocol):
                             return await _result(False, "连接超时，请检查游戏/代理")
                         return await _result(False, f"探测失败：{reason or 'unknown'}")
 
-                    has_game = bool((resp or {}).get("data", {}).get("data", {}).get("game"))
+                    resp_data = (resp or {}).get("data") or {}
+                    has_game = bool(resp_data.get("game") or (resp_data.get("data") or {}).get("game"))
                     if has_game and not force:
-                        return await _result(False, "检测到已有对局，是否放弃当前对局并开始？", requires_confirmation=True)
+                        return await _result(
+                            False,
+                            "",
+                            reason_key="autorun.confirm_existing_game",
+                            requires_confirmation=True,
+                        )
 
                     if has_game and force:
-                        logger.info("force start")
                         ok2, reason2, _ = await call_with_1004_retry_async(
                             bot.giveup,
                             delay_sec=8,
@@ -721,13 +732,18 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         if not ok2:
                             return await _result(False, f"放弃当前对局失败：{reason2 or 'unknown'}")
 
-                        await call_with_1004_retry_async(
+                        ok3, reason3, resp3 = await call_with_1004_retry_async(
                             bot.fetch_amulet_activity_data,
                             delay_sec=8,
                             interval=0.6,
                             timeout=10,
                             to_thread=True,
                         )
+                        AUTORUNNER._last_probe_ok = ok3
+                        AUTORUNNER._last_probe_reason = reason3 or ""
+                        AUTORUNNER._last_probe_resp = resp3
+                        AUTORUNNER._last_probe_ts = int(time.time() * 1000)
+                        await AUTORUNNER._recompute_ready_flags_from_last_probe()
 
                     try:
                         await AUTORUNNER.start()
