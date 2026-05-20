@@ -1912,40 +1912,14 @@ def _selected_effect_value(
     if raw_id <= 0:
         return 0
 
-    reg_id = _reg_id_of_raw(raw_id)
     _reg, _is_plus, badge_id = _extract_amulet_signature(effect_item)
-
-    want_badges = set()
-    want_amulet_regs = set()
-    for t in targets or []:
-        k = t.get("kind")
-        if k == "badge":
-            try:
-                want_badges.add(int(t.get("id")))
-            except Exception:
-                pass
-        elif k == "amulet":
-            try:
-                want_amulet_regs.add(int(t.get("id")))
-            except Exception:
-                pass
-
-    if badge_id is not None and badge_id in want_badges:
-        return 99
-
-    if reg_id in want_amulet_regs:
-        required_badges = _required_nonplus_badges_for_reg(targets, reg_id)
-        if required_badges:
-            return 99 if badge_id in required_badges else 0
-        return 99
-
-    if _owned_count_with_badge(effect_list_before_select, 600070) < need_pionner_badge_count and badge_id == 600070:
-        return 2
-
-    if badge_id == 600110:
-        return 1
-
-    return _candidate_value(raw_id, badge_id)
+    _best_raw, _best_bid, value, _sell_uid = select_amulet_from_candidates(
+        [{"id": raw_id, "badgeId": badge_id or 0}],
+        effect_list_before_select,
+        targets,
+        need_pionner_badge_count,
+    )
+    return value
 
 
 def _extract_new_amulets_from_select_resp(resp: Optional[dict]) -> List[Dict[str, Any]]:
@@ -1953,7 +1927,11 @@ def _extract_new_amulets_from_select_resp(resp: Optional[dict]) -> List[Dict[str
     if not isinstance(resp, dict):
         return result
 
-    events = resp.get("event")
+    data = resp.get("data")
+    if isinstance(data, dict):
+        events = data.get("events")
+    else:
+        events = resp.get("events", resp.get("event"))
     if not isinstance(events, list):
         return result
 
