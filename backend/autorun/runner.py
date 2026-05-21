@@ -802,9 +802,16 @@ class AutoRunner:
         return self.game_ready_code in ("",)
 
     async def has_live_game_async(self) -> bool:
-        resp = self._last_probe_resp or {}
-        game = (resp or {}).get("data", {}).get("game")
-        return game is not None
+        return self.probe_has_live_game(self._last_probe_resp)
+
+    @staticmethod
+    def probe_has_live_game(resp: Optional[dict]) -> bool:
+        resp_data = (resp or {}).get("data") or {}
+        game = resp_data.get("game")
+        if game is None:
+            nested_data = resp_data.get("data") or {}
+            game = nested_data.get("game")
+        return isinstance(game, dict) and not bool(game.get("ended", False))
 
     async def set_mode(self, mode: str) -> None:
         if mode not in ("continuous", "step"):

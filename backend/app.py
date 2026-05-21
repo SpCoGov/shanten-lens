@@ -711,8 +711,7 @@ async def ws_handler(ws: WebSocketServerProtocol):
                             return await _result(False, "连接超时，请检查游戏/代理")
                         return await _result(False, f"探测失败：{reason or 'unknown'}")
 
-                    resp_data = (resp or {}).get("data") or {}
-                    has_game = bool(resp_data.get("game") or (resp_data.get("data") or {}).get("game"))
+                    has_game = AUTORUNNER.probe_has_live_game(resp)
                     if has_game and not force:
                         return await _result(
                             False,
