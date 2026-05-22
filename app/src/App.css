@@ -2879,6 +2879,47 @@ input:invalid, textarea:invalid, select:invalid {
     animation: panelEnter .5s ease .12s both;
 }
 
+.right-side-panel > aside {
+    width: 100%;
+    flex-basis: auto;
+}
+
+.dora-indicator-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.dora-indicator-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.dora-indicator-list {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    min-height: 40px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 2px;
+}
+
+.dora-indicator-tile {
+    width: 30px;
+    height: 40px;
+    flex: 0 0 auto;
+}
+
+.dora-indicator-empty {
+    color: var(--color-muted);
+    font-size: 12px;
+    line-height: 1.3;
+}
+
 .right-panel-title-switch {
     display: inline-flex;
     align-items: baseline;

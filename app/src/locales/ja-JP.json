@@ -746,6 +746,10 @@
     "empty": "現在、引ける牌はありません",
     "still_drawable": "残り枚数"
   },
+  "dora_indicator": {
+    "title": "ドラ表示牌",
+    "empty": "ドラ表示牌なし"
+  },
   "tile": {
     "suits": {
       "m": "万",

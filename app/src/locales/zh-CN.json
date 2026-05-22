@@ -762,6 +762,10 @@
     "empty": "当前无可摸牌",
     "still_drawable": "还能摸到"
   },
+  "dora_indicator": {
+    "title": "宝牌指示牌",
+    "empty": "暂无宝牌指示牌"
+  },
   "tile": {
     "suits": {
       "m": "万",

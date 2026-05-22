@@ -16,6 +16,7 @@ import ScorePage from "./pages/ScorePage";
 import {ws, ensureWsStartedOnce} from "./lib/ws";
 import {type LogLevel, useLogStore} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
+import Tile from "./components/Tile";
 import WallStats from "./components/WallStats";
 import ReplacementPanel from "./components/ReplacementPanel";
 import ReplacementStats from "./components/ReplacementStats";
@@ -612,6 +613,7 @@ export default function App() {
     const {config: autoConfig, status: autoStatus} = useAutoRunner();
     const [route, setRoute] = React.useState<Route>("home");
     const sidebarRef = React.useRef<HTMLDivElement | null>(null);
+    const appMainRef = React.useRef<HTMLDivElement | null>(null);
     const navRefs = React.useRef<Partial<Record<Route, HTMLButtonElement | null>>>({});
     const moreButtonRef = React.useRef<HTMLButtonElement | null>(null);
     const moreMenuRef = React.useRef<HTMLDivElement | null>(null);
@@ -1032,6 +1034,13 @@ export default function App() {
 
     const doraCountByTile = React.useMemo(
         () => buildDoraCountByTile(deckMap, latestGameState?.dora_tiles ?? []),
+        [deckMap, latestGameState?.dora_tiles],
+    );
+
+    const doraIndicatorTiles = React.useMemo(
+        () => (latestGameState?.dora_tiles ?? [])
+            .map((id) => deckMap.get(id))
+            .filter((tile): tile is string => Boolean(tile)),
         [deckMap, latestGameState?.dora_tiles],
     );
 
@@ -1642,6 +1651,14 @@ export default function App() {
         return () => document.removeEventListener("keydown", handleAmuletHotkey);
     }, [handleAmuletHotkey]);
 
+    React.useLayoutEffect(() => {
+        if (route !== "home") return;
+        const main = appMainRef.current;
+        if (!main) return;
+        main.scrollTop = 0;
+        main.scrollLeft = 0;
+    }, [route]);
+
     const navigateFromMore = React.useCallback((nextRoute: Route) => {
         setRoute(nextRoute);
         setMoreMenuOpen(false);
@@ -1865,6 +1882,7 @@ export default function App() {
 
                 <main className="main-pane">
                     <div
+                        ref={appMainRef}
                         className={`app-main route-${route}`}
                         style={{padding: `${OUTER_PADDING}px ${OUTER_PADDING}px 0 ${OUTER_PADDING}px`, boxSizing: "border-box"}}
                     >
@@ -2013,6 +2031,26 @@ export default function App() {
 
                                 {(stage === 2 || stage === 3) && (
                                     <div className="right-side-panel">
+                                        <div className="dora-indicator-panel mj-panel">
+                                            <div className="dora-indicator-title">{t("dora_indicator.title")}</div>
+                                            <div className="dora-indicator-list">
+                                                {doraIndicatorTiles.length === 0 ? (
+                                                    <div className="dora-indicator-empty">{t("dora_indicator.empty")}</div>
+                                                ) : (
+                                                    doraIndicatorTiles.map((tile, index) => (
+                                                        <div className="dora-indicator-tile" key={`${tile}-${index}`}>
+                                                            <Tile
+                                                                tile={tile}
+                                                                dim={false}
+                                                                hoveredTile={null}
+                                                                width={30}
+                                                                height={40}
+                                                            />
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
                                         {stage === 2 && rightPanelMode === "replacementStats" ? (
                                             <ReplacementStats replacementTiles={replacementTiles} usedCount={switchUsedCount} headerSlot={statsHeader}/>
                                         ) : (
