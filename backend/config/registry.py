@@ -51,6 +51,7 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         .add("cutoff_level", 0, desc="cutoff level", kind="int")
         .add("op_interval_ms", 1000, desc="operation interval", kind="int")
         .add("need_pionner_badge_count", 4, desc="required pionner badge count", kind="int")
+        .add("record_detailed_operations", False, desc="record detailed operations", kind="bool")
         .add(
             "email_notify",
             {

@@ -10,6 +10,7 @@ import {
     removeTargetAt,
     setTargetValue,
     type AutoRunnerConfig,
+    type AutoRunnerOperationRecord,
     type AutoRunnerRemakeRecord,
     type TargetItem,
     useAutoRunner,
@@ -176,7 +177,6 @@ export default function AutoRunnerPage() {
     const {badgeById, amuletById} = useRegistry();
 
     const [saving, setSaving] = React.useState(false);
-    const [refreshing, setRefreshing] = React.useState(false);
     const [openAmuletEditor, setOpenAmuletEditor] = React.useState(false);
     const [openBadgePicker, setOpenBadgePicker] = React.useState(false);
     const [detailTargetIndex, setDetailTargetIndex] = React.useState<number | null>(null);
@@ -187,6 +187,9 @@ export default function AutoRunnerPage() {
     const [importOpen, setImportOpen] = React.useState(false);
     const [importText, setImportText] = React.useState("");
     const [importError, setImportError] = React.useState("");
+    const [starting, setStarting] = React.useState(false);
+    const [existingGameConfirm, setExistingGameConfirm] = React.useState(false);
+    const [controlError, setControlError] = React.useState("");
 
     const working = Boolean(status.running);
 
@@ -202,8 +205,20 @@ export default function AutoRunnerPage() {
     }, [config.cutoff_level]);
 
     React.useEffect(() => {
-        if (refreshing) setRefreshing(false);
-    }, [status, refreshing]);
+        const off = ws.onPacket((pkt) => {
+            if (pkt.type !== "autorun_control_result") return;
+            const data = pkt.data ?? {};
+            setStarting(false);
+            if (data.requires_confirmation) {
+                setExistingGameConfirm(true);
+                setControlError("");
+                return;
+            }
+            setExistingGameConfirm(false);
+            setControlError(data.ok ? "" : data.reason_key ? String(t(data.reason_key, data.reason_values ?? {})) : String(data.reason ?? ""));
+        });
+        return off;
+    }, [t]);
 
     const onSave = React.useCallback(() => {
         setSaving(true);
@@ -215,11 +230,29 @@ export default function AutoRunnerPage() {
     }, [config]);
 
     const start = React.useCallback(() => {
+        setStarting(true);
+        setExistingGameConfirm(false);
+        setControlError("");
         ws.send({type: "autorun_control", data: {action: "start"}});
     }, []);
 
     const stop = React.useCallback(() => {
+        setExistingGameConfirm(false);
+        setControlError("");
         ws.send({type: "autorun_control", data: {action: "stop"}});
+    }, []);
+
+    const continueExistingGame = React.useCallback(() => {
+        setStarting(true);
+        setExistingGameConfirm(false);
+        setControlError("");
+        ws.send({type: "autorun_control", data: {action: "start", force: true}});
+    }, []);
+
+    const cancelExistingGame = React.useCallback(() => {
+        setStarting(false);
+        setExistingGameConfirm(false);
+        setControlError("");
     }, []);
 
     const openExport = React.useCallback(async () => {
@@ -349,22 +382,17 @@ export default function AutoRunnerPage() {
 
     const elapsedDisplay = formatDuration(status.elapsed_ms ?? 0);
 
-    const disabledReason = React.useMemo(() => {
-        if (working) return t("autorun.disabled_reason_running");
-        if (status.game_ready === false) {
-            if (status.game_ready_code === "GAME_NOT_READY") return t("autorun.disabled_reason_game_not_ready");
-            if (status.game_ready_code === "PROBE_TIMEOUT") return t("autorun.disabled_reason_probe_timeout");
-            return t(status.game_ready_reason ?? "") || t("autorun.disabled_reason_not_ready");
-        }
-        if (status.game_ready === undefined || status.game_ready_code === "NOT_PROBED") return t("autorun.disabled_reason_not_probed");
-        return "";
-    }, [working, status.game_ready, status.game_ready_code, status.game_ready_reason, t]);
-
     const opInterval = Number.isFinite(Number(config.op_interval_ms)) ? Number(config.op_interval_ms) : 1000;
+    const recordDetailedOperations = config.record_detailed_operations === true;
     const remakeRecords = React.useMemo(
         () => [...(status.remake_records ?? [])].sort((a, b) => (b.seq ?? 0) - (a.seq ?? 0)),
         [status.remake_records],
     );
+    const operationRecords = React.useMemo(
+        () => [...(status.operation_records ?? [])].sort((a, b) => (b.seq ?? 0) - (a.seq ?? 0)).slice(0, 80),
+        [status.operation_records],
+    );
+    const operationCounts = status.operation_count_by_run ?? {};
     const bestRecord = status.best_remake_record ?? null;
 
     React.useEffect(() => {
@@ -426,6 +454,170 @@ export default function AutoRunnerPage() {
         );
     };
 
+    const operationDetailsText = React.useCallback((record: AutoRunnerOperationRecord) => {
+        const details = record.details ?? {};
+        if (!details || Object.keys(details).length === 0) return "";
+        try {
+            return JSON.stringify(details, null, 2);
+        } catch {
+            return String(details);
+        }
+    }, []);
+
+    const candidateEffectItem = React.useCallback((item: Record<string, unknown>) => {
+        const rawId = Number(item.raw_id ?? item.selected_raw_id ?? item.id ?? 0);
+        const badgeId = Number(item.badge_id ?? item.selected_badge_id ?? item.badgeId ?? 0);
+        return {
+            id: rawId,
+            volume: badgeId === 600160 ? 2 : 1,
+            badge: badgeId > 0 ? {id: badgeId} : undefined,
+        } as any;
+    }, []);
+
+    const candidateLabel = React.useCallback((item: Record<string, unknown>) => {
+        const rawId = Number(item.raw_id ?? item.selected_raw_id ?? item.id ?? 0);
+        const regId = Number(item.reg_id ?? (rawId > 0 ? Math.floor(rawId / 10) : 0));
+        const amuletName = amuletById.get(regId)?.name ?? `ID ${regId || rawId || "-"}`;
+        const badgeId = Number(item.badge_id ?? item.selected_badge_id ?? item.badgeId ?? 0);
+        const badgeName = badgeId > 0 ? (badgeById.get(badgeId)?.name ?? String(badgeId)) : t("autorun.target_any_badge");
+        return `${amuletName} / ${badgeName}`;
+    }, [amuletById, badgeById, t]);
+
+    const renderCandidateGrid = React.useCallback((items: unknown) => {
+        const list = Array.isArray(items) ? items.filter((item): item is Record<string, unknown> => !!item && typeof item === "object") : [];
+        if (list.length === 0) return null;
+        return (
+            <div
+                style={{
+                    display: "flex",
+                    flexWrap: "nowrap",
+                    gap: 10,
+                    overflowX: "auto",
+                    overflowY: "hidden",
+                    padding: "6px 4px 10px",
+                }}
+            >
+                {list.map((item, idx) => {
+                    const selected = Boolean(item.selected);
+                    return (
+                        <div
+                            key={`${Number(item.raw_id ?? item.id ?? idx)}-${idx}`}
+                            style={{
+                                display: "grid",
+                                gap: 6,
+                                justifyItems: "center",
+                                padding: 8,
+                                border: `1px solid ${selected ? "var(--accent-green)" : "var(--border)"}`,
+                                borderRadius: 8,
+                                background: selected ? "color-mix(in srgb, var(--accent-green) 10%, transparent)" : "transparent",
+                                width: 142,
+                                flex: "0 0 auto",
+                            }}
+                        >
+                            <AmuletCard item={candidateEffectItem(item)} scale={0.62} showPrice/>
+                            <div style={{fontWeight: 700, fontSize: 12, textAlign: "center", width: "100%"}}>{candidateLabel(item)}</div>
+                            <div className="hint" style={{fontSize: 12, display: "grid", gap: 2, width: "100%", textAlign: "left"}}>
+                                <span>{selected ? t("autorun.operation_candidate_selected") : t("autorun.operation_candidate_skipped")}</span>
+                                {"selection_value" in item ? <span>{t("autorun.operation_candidate_value", {value: String(item.selection_value ?? "-")})}</span> : null}
+                                {"price" in item ? <span>{t("autorun.operation_candidate_price", {price: String(item.price ?? "-")})}</span> : null}
+                                {"value_reason" in item ? <span title={String(item.value_reason ?? "")}>{t("autorun.operation_value_reason", {reason: String(item.value_reason ?? "-")})}</span> : null}
+                                {"reason" in item ? <span title={String(item.reason ?? "")}>{t("autorun.operation_reason_label", {reason: String(item.reason ?? "-")})}</span> : null}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }, [candidateEffectItem, candidateLabel, t]);
+
+    const renderOperationDetails = React.useCallback((record: AutoRunnerOperationRecord) => {
+        const details = (record.details ?? {}) as Record<string, unknown>;
+        const considered = renderCandidateGrid(details.considered);
+        const decision = details.decision && typeof details.decision === "object" ? details.decision as Record<string, unknown> : null;
+        const decisionCandidates = decision ? renderCandidateGrid(decision.considered) : null;
+        const selectedRawId = details.selected_raw_id ?? decision?.raw_id;
+        const selectedBadgeId = details.selected_badge_id ?? decision?.badge_id;
+        const newEffect = details.new_effect && typeof details.new_effect === "object" ? details.new_effect as Record<string, unknown> : null;
+        const sellItem = details.sell_item && typeof details.sell_item === "object" ? details.sell_item as Record<string, unknown> : null;
+        const detailsText = operationDetailsText(record);
+
+        return (
+            <div className="hint" style={{display: "grid", gap: 8, marginTop: 8, lineHeight: 1.45}}>
+                <div>{t("autorun.operation_reason_label", {reason: record.reason || "-"})}</div>
+                <div>{t("autorun.operation_step_label", {step: record.step || "-", level: formatAutoLevel(record.level)})}</div>
+                <div>{t("autorun.operation_time_label", {time: record.ts ? new Date(record.ts).toLocaleString() : "-"})}</div>
+                <div style={{display: "flex", gap: 8, flexWrap: "wrap"}}>
+                    {selectedRawId != null ? <span className="badge">{t("autorun.operation_selected_raw", {id: String(selectedRawId)})}</span> : null}
+                    {selectedBadgeId != null ? <span className="badge">{t("autorun.operation_selected_badge", {id: String(selectedBadgeId)})}</span> : null}
+                    {details.selection_value != null ? <span className="badge">{t("autorun.operation_selection_value", {value: String(details.selection_value)})}</span> : null}
+                    {details.sell_uid != null ? <span className="badge">{t("autorun.operation_sell_uid", {uid: String(details.sell_uid)})}</span> : null}
+                    {details.need_space != null ? <span className="badge">{t("autorun.operation_need_space", {value: String(details.need_space)})}</span> : null}
+                    {details.free_space != null ? <span className="badge">{t("autorun.operation_free_space", {value: String(details.free_space)})}</span> : null}
+                </div>
+                {newEffect ? (
+                    <div>
+                        <div style={{fontWeight: 700, marginBottom: 6}}>{t("autorun.operation_new_effect")}</div>
+                        {renderCandidateGrid([newEffect])}
+                    </div>
+                ) : null}
+                {sellItem ? (
+                    <div>
+                        <div style={{fontWeight: 700, marginBottom: 6}}>{t("autorun.operation_sell_item")}</div>
+                        {renderCandidateGrid([sellItem])}
+                    </div>
+                ) : null}
+                {considered ? (
+                    <div>
+                        <div style={{fontWeight: 700, marginBottom: 6}}>{t("autorun.operation_candidates_title")}</div>
+                        {considered}
+                    </div>
+                ) : null}
+                {!considered && decisionCandidates ? (
+                    <div>
+                        <div style={{fontWeight: 700, marginBottom: 6}}>{t("autorun.operation_candidates_title")}</div>
+                        {decisionCandidates}
+                    </div>
+                ) : null}
+                {detailsText ? (
+                    <details>
+                        <summary style={{cursor: "pointer"}}>{t("autorun.operation_raw_details")}</summary>
+                        <pre style={{margin: "8px 0 0", whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 12}}>
+                            {detailsText}
+                        </pre>
+                    </details>
+                ) : null}
+            </div>
+        );
+    }, [operationDetailsText, renderCandidateGrid, t]);
+
+    const renderOperationRecords = React.useCallback((records: AutoRunnerOperationRecord[]) => {
+        if (!records || records.length === 0) {
+            return <div className="hint">{t("autorun.operation_empty")}</div>;
+        }
+        return (
+            <div style={{display: "grid", gap: 8, maxHeight: 420, overflowY: "auto", paddingRight: 4}}>
+                {records.map((record) => {
+                    return (
+                        <details key={record.seq} style={{padding: 10, border: "1px solid var(--border)", borderRadius: 8}}>
+                            <summary style={{cursor: "pointer"}}>
+                                <span className="badge" style={{marginRight: 8}}>#{record.seq}</span>
+                                <span>
+                                    {t("autorun.operation_record_row", {
+                                        run: record.run_index ?? "-",
+                                        op: record.op_index ?? "-",
+                                        action: record.action || "-",
+                                        result: record.result || "-",
+                                    })}
+                                </span>
+                            </summary>
+                            {renderOperationDetails(record)}
+                        </details>
+                    );
+                })}
+            </div>
+        );
+    }, [renderOperationDetails, t]);
+
     return (
         <div className="settings-wrap wide-page" style={{paddingBlock: 16}}>
             <h2 className="title">{t("autorun.title")}</h2>
@@ -451,30 +643,26 @@ export default function AutoRunnerPage() {
                         <div className="panel-title">{t("autorun.section_control_title")}</div>
 
                         <div className="toolbar" style={{gap: 8, flexWrap: "wrap" as const}}>
-                            <button
-                                className="nav-btn"
-                                onClick={start}
-                                disabled={Boolean(disabledReason) || status.mode === "step"}
-                                title={status.mode === "step" ? t("autorun.tip_no_need_start_in_step") : disabledReason || undefined}
-                            >
-                                {working ? t("autorun.btn_start_working") : t("autorun.btn_start")}
-                            </button>
-
-                            <button className="nav-btn" onClick={stop} disabled={!working}>
-                                {t("autorun.btn_stop")}
-                            </button>
-
-                            <button
-                                className="nav-btn"
-                                onClick={() => {
-                                    setRefreshing(true);
-                                    ws.send({type: "autorun_control", data: {action: "probe"}});
-                                }}
-                                disabled={refreshing}
-                                title={t("autorun.tip_probe_now")}
-                            >
-                                {refreshing ? t("autorun.btn_refresh_loading") : t("autorun.btn_refresh")}
-                            </button>
+                            {existingGameConfirm ? (
+                                <div style={{display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap"}}>
+                                    <span className="hint">{t("autorun.confirm_existing_game")}</span>
+                                    <button className="nav-btn" onClick={continueExistingGame} disabled={starting}>
+                                        {starting ? t("autorun.btn_starting") : t("autorun.btn_continue_remake")}
+                                    </button>
+                                    <button className="nav-btn" onClick={cancelExistingGame} disabled={starting}>
+                                        {t("autorun.btn_cancel")}
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    className="nav-btn"
+                                    onClick={working ? stop : start}
+                                    disabled={starting || status.mode === "step"}
+                                    title={status.mode === "step" ? t("autorun.tip_no_need_start_in_step") : undefined}
+                                >
+                                    {working ? t("autorun.btn_pause") : starting ? t("autorun.btn_starting") : t("autorun.btn_start")}
+                                </button>
+                            )}
 
                             <label style={{display: "inline-flex", alignItems: "center", gap: 8, marginLeft: 6}}>
                                 <span>{t("autorun.label_op_interval")}</span>
@@ -496,25 +684,12 @@ export default function AutoRunnerPage() {
                             </label>
 
                             <span className={`badge ${working ? "ok" : "down"}`}>{working ? t("autorun.status_running") : t("autorun.status_stopped")}</span>
-
-                            {(() => {
-                                const ready = status.preferred_flow_ready;
-                                const cls = ready === true ? "ok" : ready === false ? "down" : "";
-                                const text = ready === true ? t("autorun.flow_ready") : ready === false ? t("autorun.flow_not_ready") : t("autorun.flow_unknown");
-                                const tip = status.preferred_flow_peer
-                                    ? t("autorun.flow_tip_peer", {peer: status.preferred_flow_peer})
-                                    : ready === false
-                                        ? t("autorun.flow_tip_unbound")
-                                        : undefined;
-                                return (
-                                    <span className={`badge ${cls}`} title={tip}>{text}</span>
-                                );
-                            })()}
                         </div>
 
                         <p className="hint" style={{marginTop: 8, lineHeight: 1.5}}>
                             {t("autorun.control_note")}
                         </p>
+                        {controlError ? <p className="notice error" style={{marginTop: 8}}>{controlError}</p> : null}
                     </section>
                 </div>
 
@@ -571,14 +746,47 @@ export default function AutoRunnerPage() {
                                     <span className="badge">
                                         {t("autorun.remake_time_label", {time: selectedRecord?.ts ? new Date(selectedRecord.ts).toLocaleString() : "-"})}
                                     </span>
+                                    {recordDetailedOperations ? (
+                                        <span className="badge">
+                                            {t("autorun.remake_operation_count", {count: selectedRecord?.operation_count ?? selectedRecord?.operation_records?.length ?? 0})}
+                                        </span>
+                                    ) : null}
                                 </div>
                                 <div style={{maxHeight: 360, overflowY: "auto", paddingRight: 4}}>
                                     {renderRecordAmulets(selectedRecord)}
                                 </div>
+                                {recordDetailedOperations ? (
+                                    <div style={{display: "grid", gap: 8}}>
+                                        <div className="panel-title" style={{fontSize: 14}}>{t("autorun.remake_operation_records_title")}</div>
+                                        {renderOperationRecords(selectedRecord?.operation_records ?? [])}
+                                    </div>
+                                ) : null}
                             </div>
                         </div>
                     )}
                 </section>
+
+                {recordDetailedOperations ? (
+                    <section className="panel">
+                        <div className="panel-title">{t("autorun.section_operation_records_title")}</div>
+                        <div style={{display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 10}}>
+                            <span className="badge">{t("autorun.operation_record_count", {count: operationRecords.length})}</span>
+                            {Object.entries(operationCounts)
+                                .sort(([a], [b]) => Number(b) - Number(a))
+                                .slice(0, 6)
+                                .map(([run, count]) => (
+                                    <span className="badge" key={run}>
+                                        {t("autorun.operation_count_by_run", {run, count})}
+                                    </span>
+                                ))}
+                        </div>
+                        {operationRecords.length === 0 ? (
+                            <div className="hint">{t("autorun.operation_empty")}</div>
+                        ) : (
+                            renderOperationRecords(operationRecords)
+                        )}
+                    </section>
+                ) : null}
 
                 <section className="panel">
                     <div className="panel-title">{t("autorun.section_goal_title")}</div>
@@ -678,6 +886,15 @@ export default function AutoRunnerPage() {
                             >
                                 {t("autorun.btn_next_step")}
                             </button>
+
+                            <label style={{display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap"}}>
+                                <input
+                                    type="checkbox"
+                                    checked={recordDetailedOperations}
+                                    onChange={(e) => patchAutoConfig({record_detailed_operations: e.target.checked})}
+                                />
+                                <span>{t("autorun.toggle_record_detailed_operations")}</span>
+                            </label>
                         </div>
                         <p className="hint" style={{marginTop: 8, lineHeight: 1.5}}>
                             <Trans i18nKey="autorun.hint_modes"/>

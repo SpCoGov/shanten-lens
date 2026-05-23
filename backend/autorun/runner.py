@@ -12,8 +12,18 @@ from html import escape
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from backend.autorun.util.retry_1004 import call_with_1004_retry_async
-from backend.autorun.util.suannkou_recommender import plan_pure_pinzu_suu_ankou_v2
+from backend.autorun.stages import handle_autorun_tick
+from backend.autorun.strategy import DefaultAutoRunStrategy, default_select_amulet_from_candidates, select_items_to_sell_for_purchase as strategy_select_items_to_sell_for_purchase
+from backend.autorun.value import (
+    calc_candidate_price,
+    calc_target_achievement_value,
+    candidate_badge_id,
+    extract_amulet_signature,
+    is_needed_for_any_target,
+    reg_id_of_raw,
+    target_value,
+    total_volume as calc_total_volume,
+)
 from backend.bot.drivers.packet.packet_bot import PacketBot
 from backend.model.game_state import GameState
 
@@ -125,6 +135,9 @@ class AutoRunner:
         self.best_achieved_count: int = 0
         self.remake_records: List[Dict[str, Any]] = []
         self.best_remake_record: Optional[Dict[str, Any]] = None
+        self.operation_records: List[Dict[str, Any]] = []
+        self.operation_count_by_run: Dict[int, int] = {}
+        self._operation_seq: int = 0
         self.current_step: str = "-"
         self.last_error: Optional[str] = None
         self.need_start_game = False
@@ -148,7 +161,9 @@ class AutoRunner:
         self.cutoff_level: int = 0
         self.op_interval_ms: int = 1000
         self.need_pionner_badge_count: int = NEED_PIONNER_BADGE_COUNT
+        self.record_detailed_operations: bool = False
         self.email_notify: dict = {}
+        self.strategy = DefaultAutoRunStrategy()
 
         self.update_config(self._get_config())
 
@@ -189,16 +204,8 @@ class AutoRunner:
         flow = getattr(addon, "preferred_flow", None)
         peer_key = getattr(addon, "preferred_peer_key", None)
 
-        if flow is None:
-            return False, peer_key  # 可能為 None
-
         if not peer_key:
-            try:
-                cip = flow.client_conn.address[0]
-                sip = flow.server_conn.address[0]
-                peer_key = f"{cip}|{sip}"
-            except Exception:
-                peer_key = None
+            return False, None
 
         try:
             ws = getattr(flow, "websocket", None)
@@ -232,6 +239,11 @@ class AutoRunner:
             )
         except (TypeError, ValueError):
             self.need_pionner_badge_count = NEED_PIONNER_BADGE_COUNT
+        record_detailed_operations = bool((cfg or {}).get("record_detailed_operations", False))
+        if not record_detailed_operations and self.record_detailed_operations:
+            self.operation_records = []
+            self.operation_count_by_run = {}
+        self.record_detailed_operations = record_detailed_operations
         self.email_notify = (cfg or {}).get("email_notify")
         try:
             self.cutoff_level = int((cfg or {}).get("cutoff_level", 0) or 0)
@@ -279,6 +291,12 @@ class AutoRunner:
             return None
         try:
             return app_mod.BADGE_REG.get(int(badge_id))
+        except Exception:
+            return None
+
+    def _get_amulet_registry(self):
+        try:
+            return getattr(app_mod, "AMULET_REG", None)
         except Exception:
             return None
 
@@ -784,9 +802,16 @@ class AutoRunner:
         return self.game_ready_code in ("",)
 
     async def has_live_game_async(self) -> bool:
-        resp = self._last_probe_resp or {}
-        game = (resp or {}).get("data", {}).get("game")
-        return game is not None
+        return self.probe_has_live_game(self._last_probe_resp)
+
+    @staticmethod
+    def probe_has_live_game(resp: Optional[dict]) -> bool:
+        resp_data = (resp or {}).get("data") or {}
+        game = resp_data.get("game")
+        if game is None:
+            nested_data = resp_data.get("data") or {}
+            game = nested_data.get("game")
+        return isinstance(game, dict) and not bool(game.get("ended", False))
 
     async def set_mode(self, mode: str) -> None:
         if mode not in ("continuous", "step"):
@@ -817,6 +842,9 @@ class AutoRunner:
             self.best_achieved_count = 0
             self.remake_records = []
             self.best_remake_record = None
+            self.operation_records = []
+            self.operation_count_by_run = {}
+            self._operation_seq = 0
 
             self.need_start_game = True
 
@@ -896,607 +924,14 @@ class AutoRunner:
         await self.run_tick()
         await self._broadcast_status(safe=True)
 
-    async def _sell_new_useless_amulets_from_resp(
-            self,
-            bot: PacketBot,
-            resp: Optional[dict],
-            effect_list_before_select: List[Dict[str, Any]],
-    ) -> bool:
-        new_items = _extract_new_amulets_from_select_resp(resp)
-        if not new_items:
-            return True
-
-        current_effect_list: List[Dict[str, Any]] = [dict(it) for it in (effect_list_before_select or [])]
-        for item in new_items:
-            current_effect_list.append(dict(item))
-            value = _selected_effect_value(item, effect_list_before_select, self.targets, self.need_pionner_badge_count)
-            if value > 0:
-                continue
-
-            reg_id = _reg_id_of_raw(int(item.get("id", 0) or 0))
-            if reg_id == 146:
-                continue
-
-            uid = _pick_uid_to_sell_same_reg(current_effect_list, reg_id, self.targets)
-
-            logger.info(
-                "[autorun] auto-sell useless selected amulet by same-reg rule: raw_id={} sell_uid={} badge={}",
-                item.get("id"),
-                uid,
-                (item.get("badge") or {}).get("id") if isinstance(item.get("badge"), dict) else None,
-            )
-
-            if uid is None:
-                continue
-
-            current_effect_list = [e for e in current_effect_list if e.get("uid") != uid]
-
-            self.current_step = "game.sell_new_useless_effect"
-            await self._broadcast_status(safe=True)
-            ok, reason, _sell_resp = await call_with_1004_retry_async(
-                bot.sell_effect,
-                uid=uid,
-                delay_sec=3,
-                interval=3,
-                timeout=30,
-                to_thread=True,
-            )
-            if ok:
-                continue
-            if reason == "error code: 2699":
-                bot.fetch_amulet_activity_data()
-                return True
-            self.last_error = reason
-            await self.abort(f"fatal: {reason}")
-            return False
-        return True
-
     async def run_tick(self) -> None:
         try:
             await asyncio.sleep(0.1)
             bot: PacketBot = self._get_packet_bot()
             game_state: GameState = self._get_game_state()
-            if await self._check_and_finish_if_done():
-                return
-            if self.need_start_game:
-                self.current_step = "start_game"
-                await self._broadcast_status(safe=True)
-                ok, reason, resp = await call_with_1004_retry_async(
-                    bot.start_game,
-                    delay_sec=3,
-                    interval=3,
-                    timeout=30,
-                    to_thread=True,
-                )
-                if ok:
-                    self.runs += 1
-                    self.need_start_game = False
-                    return
-                self.last_error = reason
-                await self.abort(f"fatal: {reason}")
-                return
-            if game_state.stage == 1:
-                self.current_step = "game.select_free_effect"
-                await self._broadcast_status(safe=True)
-                first_effect = game_state.candidate_effect_list[0].get("id")
-                ok, reason, resp = await call_with_1004_retry_async(
-                    bot.select_free_effect,
-                    selected_id=first_effect,
-                    delay_sec=3,
-                    interval=3,
-                    timeout=30,
-                    to_thread=True,
-                )
-                if ok:
-                    return
-                self.last_error = reason
-                await self.abort(f"fatal: {reason}")
-                return
-            if game_state.stage == 6:
-                self.current_step = "game.level_confirm"
-                await self._broadcast_status(safe=True)
-                # 这里是游戏开始前 —— 先尝试按 [卡维, 盗印like, 其他] 排序
-                try:
-                    uids = self._sorted_uids_by_mode(game_state.effect_list or [], mode="pre_start")
-                    if uids:
-                        self.current_step = "game.pre_start_sort"
-                        await self._broadcast_status(safe=True)
-                        ok_sort, reason_sort, _ = await call_with_1004_retry_async(
-                            bot.sort_effect,
-                            sorted_uid=uids,
-                            delay_sec=2.0,
-                            interval=0.3,
-                            timeout=10,
-                            to_thread=True,
-                        )
-                        if not ok_sort:
-                            logger.warning(f"pre-start sort_effect failed: {reason_sort}")
-                except Exception as _e:
-                    logger.warning(f"pre-start sort attempt error: {_e}")
-                ok, reason, resp = await call_with_1004_retry_async(
-                    bot.next_level,
-                    delay_sec=3,
-                    interval=3,
-                    timeout=30,
-                    to_thread=True,
-                )
-                if ok:
-                    return
-                self.last_error = reason
-                await self.abort(f"fatal: {reason}")
-                return
-            if game_state.stage == 2:
-                self.current_step = f"game.change_tile({game_state.change_tile_count}/{game_state.total_change_tile_count})"
-                await self._broadcast_status(safe=True)
-                if game_state.change_tile_count >= game_state.total_change_tile_count:
-                    ok, reason, resp = await call_with_1004_retry_async(
-                        bot.op_skip_change,
-                        delay_sec=3,
-                        interval=3,
-                        timeout=30,
-                        to_thread=True,
-                    )
-                    if ok:
-                        return
-                    self.last_error = reason
-                    await self.abort(f"fatal: {reason}")
-                    return
-                prefer_keep = [tid for tid in game_state.hand_tiles if (face := game_state.deck_map.get(tid)) is not None and (face == "bd" or face.endswith("p"))]
-                # 901是每次只能替换三张牌的debuff
-                if 901 in (game_state.boss_buff or []):
-                    keep_target = max(0, len(game_state.hand_tiles) - 3)
-                    if len(prefer_keep) >= keep_target:
-                        filtered_ids = prefer_keep[:keep_target]
-                    else:
-                        rest = [tid for tid in game_state.hand_tiles if tid not in prefer_keep]
-                        take_more = rest[: max(0, keep_target - len(prefer_keep))]
-                        filtered_ids = prefer_keep + take_more
-                else:
-                    filtered_ids = prefer_keep
-                ok, reason, resp = await call_with_1004_retry_async(
-                    bot.op_change,
-                    tile_ids=filtered_ids,
-                    delay_sec=3,
-                    interval=3,
-                    timeout=30,
-                    to_thread=True,
-                )
-                if ok:
-                    return
-                self.last_error = reason
-                await self.abort(f"fatal: {reason}")
-                return
-            if game_state.stage == 3:
-                self.current_step = f"game.discard({game_state.level})"
-                await self._broadcast_status(safe=True)
-                suuannkou = await asyncio.to_thread(
-                    plan_pure_pinzu_suu_ankou_v2,
-                    game_state.hand_tiles,
-                    game_state.wall_tiles,
-                    game_state.deck_map,
-                )
-                if suuannkou["status"] == "impossible":
-                    self.current_step = "game.remake"
-                    await self._broadcast_status(safe=True)
-                    self._record_remake_snapshot("impossible", game_state)
-                    await self._broadcast_status(safe=True)
-                    self.need_start_game = True
-                    ok, reason, resp = await call_with_1004_retry_async(
-                        bot.giveup,
-                        delay_sec=3,
-                        interval=3,
-                        timeout=30,
-                        to_thread=True,
-                    )
-                    if ok:
-                        return
-                    self.last_error = reason
-                    await self.abort(f"fatal: {reason}")
-                    return
-                elif suuannkou["status"] == "win_now":
-                    # 这里是和牌前 —— 先尝试按 [盗印like, 卡维, 其他] 排序
-                    try:
-                        uids = self._sorted_uids_by_mode(game_state.effect_list or [], mode="pre_win")
-                        if uids:
-                            self.current_step = "game.pre_win_sort"
-                            await self._broadcast_status(safe=True)
-                            ok_sort, reason_sort, resp = await call_with_1004_retry_async(
-                                bot.sort_effect,
-                                sorted_uid=uids,
-                                delay_sec=2.0,
-                                interval=0.3,
-                                timeout=10,
-                                to_thread=True,
-                            )
-                            if not ok_sort:
-                                logger.warning(f"pre-win sort_effect failed: {reason_sort}, resp: {resp}")
-                    except Exception as _e:
-                        logger.warning(f"pre-win sort attempt error: {_e}")
-                    self.current_step = "game.tsumo"
-                    await self._broadcast_status(safe=True)
-                    ok, reason, resp = await call_with_1004_retry_async(
-                        bot.op_tsumo,
-                        delay_sec=3,
-                        interval=3,
-                        timeout=30,
-                        to_thread=True,
-                    )
-                    if ok:
-                        return
-                    self.last_error = reason
-                    await self.abort(f"fatal: {reason}")
-                    return
-                elif suuannkou["status"] == "plan":
-                    discard = suuannkou["discards"][0]
-                    ok, reason, resp = await call_with_1004_retry_async(
-                        bot.discard_by_tile_id,
-                        tile_id=discard,
-                        delay_sec=3,
-                        interval=3,
-                        timeout=30,
-                        to_thread=True,
-                    )
-                    if ok:
-                        return
-                    self.last_error = reason
-                    await self.abort(f"fatal: {reason}")
-                    return
-            if game_state.stage == 4:
-                self.current_step = "game.buy_pack"
-                await self._broadcast_status(safe=True)
-                candidates = [g for g in game_state.goods if not g.get("sold", False)]
-                if not candidates:
-                    if game_state.refresh_price > game_state.coin:
-                        # 如果当前已经到了截至关卡、则remake
-                        if self.cutoff_level <= game_state.level:
-                            self.current_step = "game.remake"
-                            await self._broadcast_status(safe=True)
-                            self._record_remake_snapshot("cutoff_no_shop_options", game_state)
-                            await self._broadcast_status(safe=True)
-                            self.need_start_game = True
-                            ok, reason, resp = await call_with_1004_retry_async(
-                                bot.giveup,
-                                delay_sec=3,
-                                interval=3,
-                                timeout=30,
-                                to_thread=True,
-                            )
-                            if ok:
-                                return
-                            self.last_error = reason
-                            await self.abort(f"fatal: {reason}")
-                            return
-                        self.current_step = "game.end_shopping"
-                        await self._broadcast_status(safe=True)
-                        ok, reason, resp = await call_with_1004_retry_async(
-                            bot.end_shopping,
-                            delay_sec=3,
-                            interval=3,
-                            timeout=30,
-                            to_thread=True,
-                        )
-                        if ok:
-                            return
-                        self.last_error = reason
-                        await self.abort(f"fatal: {reason}")
-                        return
-                    self.current_step = "game.refresh_shop"
-                    await self._broadcast_status(safe=True)
-                    ok, reason, resp = await call_with_1004_retry_async(
-                        bot.refresh_shop,
-                        delay_sec=3,
-                        interval=3,
-                        timeout=30,
-                        to_thread=True,
-                    )
-                    if ok:
-                        # 刷新成功后：卖掉“带 600110 印章 且 非目标所需”的任意一个护身符
-                        victim_uid: Optional[int] = None
-                        for it in (game_state.effect_list or []):
-                            bid = None
-                            b = it.get("badge")
-                            if isinstance(b, dict) and "id" in b:
-                                try:
-                                    bid = int(b["id"])
-                                except Exception:
-                                    bid = None
-                            if bid == 600110 and not _is_needed_for_any_target(it, self.targets):
-                                uid = it.get("uid")
-                                if uid is not None:
-                                    try:
-                                        victim_uid = int(uid)
-                                    except Exception:
-                                        victim_uid = None
-                                break  # 只挑一个
-
-                        if victim_uid is not None:
-                            self.current_step = "game.sell_happiness_after_refresh"
-                            await self._broadcast_status(safe=True)
-                            ok2, reason2, _ = await call_with_1004_retry_async(
-                                bot.sell_effect,
-                                uid=victim_uid,
-                                delay_sec=3,
-                                interval=3,
-                                timeout=30,
-                                to_thread=True,
-                            )
-                            if not ok2:
-                                self.last_error = reason2
-                                await self.abort(f"fatal: {reason2}")
-                                return
-                        return
-                    self.last_error = reason
-                    await self.abort(f"fatal: {reason}")
-                    return
-                candidates.sort(key=lambda g: (
-                    int(g.get("price", 1_000_000)),
-                    int(g.get("goodsId", 1_000_000)),
-                    int(g.get("id", 1_000_000)),
-                ))
-                cheapest = candidates[0]
-                if cheapest["price"] > game_state.coin:
-                    # 最便宜的都买不起、刷新商店、刷新商店也没钱就下一关
-                    if game_state.refresh_price > game_state.coin:
-                        if self.cutoff_level <= game_state.level:
-                            self.current_step = "game.remake"
-                            await self._broadcast_status(safe=True)
-                            self._record_remake_snapshot("cutoff_cannot_afford", game_state)
-                            await self._broadcast_status(safe=True)
-                            self.need_start_game = True
-                            ok, reason, resp = await call_with_1004_retry_async(
-                                bot.giveup,
-                                delay_sec=3,
-                                interval=3,
-                                timeout=30,
-                                to_thread=True,
-                            )
-                            if ok:
-                                return
-                            self.last_error = reason
-                            await self.abort(f"fatal: {reason}")
-                            return
-                        self.current_step = "game.end_shopping"
-                        await self._broadcast_status(safe=True)
-                        ok, reason, resp = await call_with_1004_retry_async(
-                            bot.end_shopping,
-                            delay_sec=3,
-                            interval=3,
-                            timeout=30,
-                            to_thread=True,
-                        )
-                        if ok:
-                            return
-                        self.last_error = reason
-                        await self.abort(f"fatal: {reason}")
-                        return
-                    self.current_step = "game.refresh_shop"
-                    await self._broadcast_status(safe=True)
-                    ok, reason, resp = await call_with_1004_retry_async(
-                        bot.refresh_shop,
-                        delay_sec=3,
-                        interval=3,
-                        timeout=30,
-                        to_thread=True,
-                    )
-                    if ok:
-                        # 刷新成功后：卖掉“带 600110 印章 且 非目标所需”的任意一个护身符
-                        victim_uid: Optional[int] = None
-                        for it in (game_state.effect_list or []):
-                            bid = None
-                            b = it.get("badge")
-                            if isinstance(b, dict) and "id" in b:
-                                try:
-                                    bid = int(b["id"])
-                                except Exception:
-                                    bid = None
-                            if bid == 600110 and not _is_needed_for_any_target(it, self.targets):
-                                uid = it.get("uid")
-                                if uid is not None:
-                                    try:
-                                        victim_uid = int(uid)
-                                    except Exception:
-                                        victim_uid = None
-                                break  # 只挑一个
-
-                        if victim_uid is not None:
-                            self.current_step = "game.sell_happiness_after_refresh"
-                            await self._broadcast_status(safe=True)
-                            ok2, reason2, _ = await call_with_1004_retry_async(
-                                bot.sell_effect,
-                                uid=victim_uid,
-                                delay_sec=3,
-                                interval=3,
-                                timeout=30,
-                                to_thread=True,
-                            )
-                            if not ok2:
-                                self.last_error = reason2
-                                await self.abort(f"fatal: {reason2}")
-                                return
-                        return
-                    self.last_error = reason
-                    await self.abort(f"fatal: {reason}")
-                    return
-                ok, reason, resp = await call_with_1004_retry_async(
-                    bot.buy_pack,
-                    good_id=cheapest["id"],
-                    delay_sec=3,
-                    interval=3,
-                    timeout=30,
-                    to_thread=True,
-                )
-                if ok:
-                    return
-                if reason == "error code: 2691":
-                    bot.fetch_amulet_activity_data()
-                    return
-                self.last_error = reason
-                await self.abort(f"fatal: {reason}")
-                return
-            if game_state.stage == 5 or game_state.stage == 7:
-                if game_state.stage == 5:
-                    self.current_step = "game.select_effect"
-                else:
-                    self.current_step = "game.select_reward_effect"
-                await self._broadcast_status(safe=True)
-                # value: 99-目标护身符、2-指引护身符（当前持有的指引护身符未满3个的情况下）、1-幸福护身符、0-普通
-                best_raw, best_bid, value, sell_uid = select_amulet_from_candidates(
-                    game_state.candidate_effect_list,
-                    game_state.effect_list,
-                    self.targets,
-                    self.need_pionner_badge_count,
-                )
-                if sell_uid:
-                    # 先卖掉
-                    ok, reason, resp = await call_with_1004_retry_async(
-                        bot.sell_effect, uid=sell_uid, delay_sec=3, interval=3, timeout=30, to_thread=True
-                    )
-                    if not ok:
-                        self.last_error = reason
-                        await self.abort(f"fatal: {reason}")
-                        return
-                need_space = 1
-                if best_bid == 600160:
-                    need_space = 2
-                used_space = total_volume(game_state.effect_list)
-                free_space = game_state.max_effect_volume - used_space
-                # 如果空间充足、直接选择
-                if free_space >= need_space:
-                    effect_list_before_select = [dict(it) for it in (game_state.effect_list or [])]
-                    if game_state.stage == 5:
-                        ok, reason, resp = await call_with_1004_retry_async(
-                            bot.select_effect,
-                            selected_id=best_raw,
-                            delay_sec=3,
-                            interval=3,
-                            timeout=30,
-                            to_thread=True,
-                        )
-                    else:
-                        ok, reason, resp = await call_with_1004_retry_async(
-                            bot.select_reward_effect,
-                            selected_id=best_raw,
-                            delay_sec=3,
-                            interval=3,
-                            timeout=30,
-                            to_thread=True,
-                        )
-                    if ok:
-                        if not await self._sell_new_useless_amulets_from_resp(bot, resp, effect_list_before_select):
-                            return
-                        if value == 0:
-                            reg_id = _reg_id_of_raw(best_raw)
-                            if reg_id == 146:
-                                return
-                            uid = _pick_uid_to_sell_same_reg(game_state.effect_list, reg_id, self.targets)
-                            if uid:
-                                self.current_step = "game.sell_useless_effect"
-                                await self._broadcast_status(safe=True)
-                                ok, reason, resp = await call_with_1004_retry_async(
-                                    bot.sell_effect,
-                                    uid=uid,
-                                    delay_sec=3,
-                                    interval=3,
-                                    timeout=30,
-                                    to_thread=True,
-                                )
-                                if ok:
-                                    return
-                                if reason == "error code: 2699":
-                                    bot.fetch_amulet_activity_data()
-                                    return
-                                self.last_error = reason
-                                await self.abort(f"fatal: {reason}")
-                            return
-                        return
-                    if reason == "error code: 2691":
-                        bot.fetch_amulet_activity_data()
-                        return
-                    self.last_error = reason
-                    await self.abort(f"fatal: {reason}")
-                    return
-                if value >= 99:
-                    # 护身符是目标所需的护身符、但是空间不足、卖掉其他不重要的以换取空间
-                    # sort_sell_priority会按照优先级列出可以卖的护身符列表：List[Dict[str, Any]]，其中每个字典包含一个体积（volume）字段，卖掉这个护身符即可获得对应体积字段的空间。按照优先级选出要卖的护身符、以便剩余的空间充足足以买下新护身符，如果卖掉所有的可以卖的护身符列表里的护身符的都没办法腾出足够的空间的时候、跳过购买
-                    sell_list = sort_sell_priority(game_state.effect_list, self.targets, self.need_pionner_badge_count)
-                    to_sell, freed, enough = select_items_to_sell_for_purchase(
-                        free_space=free_space,
-                        need_space=need_space,
-                        sell_candidates=sell_list,
-                    )
-                    if enough:
-                        for it in to_sell:
-                            uid = it.get("uid")
-                            if uid is None:
-                                continue
-                            self.current_step = "game.selling_to_make_space"
-                            await self._broadcast_status(safe=True)
-                            ok, reason, resp = await call_with_1004_retry_async(
-                                bot.sell_effect,
-                                uid=uid,
-                                delay_sec=3,
-                                interval=0.6,
-                                timeout=30,
-                                to_thread=True,
-                            )
-                            if ok:
-                                continue
-                            self.last_error = reason
-                            await self.abort(f"fatal: {reason}")
-                            return
-                    else:
-                        self.current_step = "game.skip_buy_insufficient_space0"
-                        await self._broadcast_status(safe=True)
-                        if game_state.stage == 5:
-                            ok, reason, resp = await call_with_1004_retry_async(
-                                bot.select_effect,
-                                selected_id=0,
-                                delay_sec=3,
-                                interval=3,
-                                timeout=30,
-                                to_thread=True,
-                            )
-                        else:
-                            ok, reason, resp = await call_with_1004_retry_async(
-                                bot.select_reward_effect,
-                                selected_id=0,
-                                delay_sec=3,
-                                interval=3,
-                                timeout=30,
-                                to_thread=True,
-                            )
-                        if ok:
-                            return
-                        self.last_error = reason
-                        await self.abort(f"fatal: {reason}")
-                    return
-                # 又不重要、空间还不够、直接不买、跳过
-                logger.debug(f"not enough space to buy 1: max: {game_state.max_effect_volume}, used: {used_space}, free: {free_space}")
-                self.current_step = "game.skip_buy_insufficient_space1"
-                await self._broadcast_status(safe=True)
-                if game_state.stage == 5:
-                    ok, reason, resp = await call_with_1004_retry_async(
-                        bot.select_effect,
-                        selected_id=0,
-                        delay_sec=3,
-                        interval=3,
-                        timeout=30,
-                        to_thread=True,
-                    )
-                else:
-                    ok, reason, resp = await call_with_1004_retry_async(
-                        bot.select_reward_effect,
-                        selected_id=0,
-                        delay_sec=3,
-                        interval=3,
-                        timeout=30,
-                        to_thread=True,
-                    )
-                if ok:
-                    return
-                self.last_error = reason
-                await self.abort(f"fatal: {reason}")
-                return
+            if hasattr(self.strategy, "clear_trace"):
+                self.strategy.clear_trace()
+            await handle_autorun_tick(self, bot, game_state)
         except Exception as e:
             logger.opt(exception=e).exception("run_tick error")
             full_tb = traceback.format_exc()
@@ -1571,7 +1006,8 @@ class AutoRunner:
 
     async def status_payload_async(self) -> Dict[str, Any]:
         resp = self._last_probe_resp or {}
-        has_live_game = (resp or {}).get("data", {}).get("game") is not None
+        resp_data = (resp or {}).get("data") or {}
+        has_live_game = (resp_data.get("game") or (resp_data.get("data") or {}).get("game")) is not None
         await self._recompute_ready_flags_from_last_probe()
         pf_ready, pf_peer = self._preferred_flow_status()
         try:
@@ -1601,6 +1037,10 @@ class AutoRunner:
             "preferred_flow_peer": pf_peer,
             "remake_records": self.remake_records,
             "best_remake_record": self.best_remake_record,
+            "record_detailed_operations": self.record_detailed_operations,
+            "operation_records": self.operation_records if self.record_detailed_operations else [],
+            "operation_count_by_run": self.operation_count_by_run if self.record_detailed_operations else {},
+            "decision_trace": [entry.__dict__ for entry in getattr(self.strategy, "decision_trace", [])],
         }
 
     async def _broadcast_status(self, safe: bool = False) -> None:
@@ -1637,62 +1077,17 @@ class AutoRunner:
         return reg_id, is_plus, badge_id
 
     def amulet_matches_target(self, effect_item: Dict[str, Any], target: Dict[str, Any]) -> bool:
-        reg_id, is_plus, badge_id = self._extract_amulet_signature(effect_item)
-        kind = target.get("kind")
+        from backend.autorun.value import amulet_matches_target
 
-        if kind == "badge":
-            try:
-                need_badge = int(target.get("id"))
-            except Exception:
-                return False
-            return (badge_id is not None) and (badge_id == need_badge)
-
-        if kind == "amulet":
-            try:
-                need_reg = int(target.get("id"))
-            except Exception:
-                return False
-            if reg_id != need_reg:
-                return False
-
-            need_plus = bool(target.get("plus", False))
-            tb = target.get("badge", None)
-            need_badge = None
-            if tb is not None and tb != "":
-                try:
-                    need_badge = int(tb)
-                except Exception:
-                    need_badge = None
-
-            if need_badge is None:
-                return is_plus is True if need_plus else is_plus is False
-
-            if badge_id != need_badge:
-                return False
-            return is_plus is True if need_plus else is_plus is False
-
-        return False
+        return amulet_matches_target(effect_item, target)
 
     def match_targets_for_amulet(self, effect_item: Dict[str, Any], targets: List[Dict[str, Any]]) -> List[int]:
-        hits: List[int] = []
-        for i, t in enumerate(targets or []):
-            if self.amulet_matches_target(effect_item, t):
-                hits.append(i)
-        return hits
+        from backend.autorun.value import match_targets_for_amulet
+
+        return match_targets_for_amulet(effect_item, targets)
 
     def count_achieved_for_effect_list(self, eff_list: List[Dict[str, Any]]) -> int:
-        hit: set[int] = set()
-        for item in eff_list:
-            for idx in self.match_targets_for_amulet(item, self.targets):
-                hit.add(idx)
-        total_value = 0
-        for idx in hit:
-            try:
-                t = self.targets[idx]
-            except Exception:
-                continue
-            total_value += _target_value(t)
-        return total_value
+        return calc_target_achievement_value(eff_list, self.targets)
 
     def count_achieved_now(self) -> int:
         gs = self._get_game_state()
@@ -1719,22 +1114,90 @@ class AutoRunner:
                 item["badge"] = compact_badge
         return item
 
+    @staticmethod
+    def _json_safe(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {str(k): AutoRunner._json_safe(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [AutoRunner._json_safe(v) for v in value]
+        if isinstance(value, tuple):
+            return [AutoRunner._json_safe(v) for v in value]
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return str(value)
+
+    def record_operation(
+            self,
+            action: str,
+            *,
+            reason: str = "",
+            result: Optional[str] = None,
+            details: Optional[Dict[str, Any]] = None,
+            game_state: Optional[GameState] = None,
+            run_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        if not self.record_detailed_operations:
+            return {}
+
+        gs = game_state
+        if gs is None:
+            try:
+                gs = self._get_game_state()
+            except Exception:
+                gs = None
+
+        if run_index is None:
+            run_index = int(self.runs or 0)
+            if action == "start_game" and self.need_start_game:
+                run_index += 1
+        run_index = max(0, int(run_index or 0))
+
+        current_count = int(self.operation_count_by_run.get(run_index, 0)) + 1
+        self.operation_count_by_run[run_index] = current_count
+        self._operation_seq += 1
+
+        record = {
+            "seq": self._operation_seq,
+            "run_index": run_index,
+            "op_index": current_count,
+            "ts": _now_wall_ms(),
+            "stage": getattr(gs, "stage", None),
+            "level": getattr(gs, "level", None),
+            "step": self.current_step or "-",
+            "action": action,
+            "reason": reason or "",
+            "result": result or "",
+            "details": self._json_safe(details or {}),
+        }
+        self.operation_records.append(record)
+        if len(self.operation_records) > 500:
+            del self.operation_records[:-500]
+        return record
+
     def _record_remake_snapshot(self, reason: str, game_state: GameState) -> None:
         effect_list = [self._compact_effect_item(dict(it)) for it in (getattr(game_state, "effect_list", None) or [])]
         try:
-            target_value = self.count_achieved_for_effect_list(effect_list)
+            achieved_value = self.count_achieved_for_effect_list(effect_list)
         except Exception:
-            target_value = 0
+            achieved_value = 0
+        run_index = int(self.runs or 0)
+        run_operation_records = [
+            dict(item)
+            for item in (self.operation_records or [])
+            if int(item.get("run_index") or 0) == run_index
+        ] if self.record_detailed_operations else []
         record = {
             "seq": len(self.remake_records) + 1,
-            "run_index": self.runs,
+            "run_index": run_index,
             "ts": _now_wall_ms(),
             "reason": reason or "remake",
             "stage": getattr(game_state, "stage", None),
             "level": getattr(game_state, "level", None),
-            "target_value": target_value,
+            "target_value": achieved_value,
             "amulet_count": len(effect_list),
             "effect_list": effect_list,
+            "operation_count": len(run_operation_records) if self.record_detailed_operations else 0,
+            "operation_records": self._json_safe(run_operation_records) if self.record_detailed_operations else [],
         }
         self.remake_records.append(record)
         best = self.best_remake_record
@@ -1765,141 +1228,32 @@ class AutoRunner:
             return True
         return False
 
-    @staticmethod
-    def _base(raw: Any) -> int:
-        try:
-            return int(raw or 0) // 10
-        except Exception:
-            return 0
-
-    @staticmethod
-    def _first_src_base(row: Dict[str, Any]) -> Optional[int]:
-        if not isinstance(row, dict):
-            return None
-        store = row.get("store")
-        if not isinstance(store, list) or not store:
-            return None
-        try:
-            return int(store[0]) // 10
-        except Exception:
-            return None
-
-    @staticmethod
-    def _is_theft_like(row: Dict[str, Any]) -> bool:
-        # 盗印 229；黑客 232 / 不稳定 228 若来源是盗印，也算 theft-like
-        ID_UNSTABLE, ID_THEFT, ID_HACKER = 228, 229, 232
-        b = AutoRunner._base(row.get("id"))
-        if b == ID_THEFT:
-            return True
-        if b in (ID_HACKER, ID_UNSTABLE) and AutoRunner._first_src_base(row) == ID_THEFT:
-            return True
-        return False
-
-    @staticmethod
-    def _is_kavi(row: Dict[str, Any]) -> bool:
-        return AutoRunner._base(row.get("id")) == 230
-
-    def _sorted_uids_by_mode(self, effect_list: List[Dict[str, Any]], mode: str) -> Optional[List[int]]:
-        if not isinstance(effect_list, list):
-            return None
-
-        kavi, theftlike, others = [], [], []
-        for row in effect_list:
-            if self._is_kavi(row):
-                kavi.append(row)
-            elif self._is_theft_like(row):
-                theftlike.append(row)
-            else:
-                others.append(row)
-
-        if mode == "pre_start":
-            new_order = kavi + theftlike + others
-        elif mode == "pre_win":
-            new_order = theftlike + kavi + others
-        else:
-            return None
-
-        def _uids(arr: List[Dict[str, Any]]) -> List[int]:
-            out = []
-            for r in arr:
-                try:
-                    out.append(int(r.get("uid")))
-                except Exception:
-                    pass
-            return out
-
-        new_uids = _uids(new_order)
-        old_uids = _uids(effect_list)
-
-        if len(new_uids) != len(old_uids) or set(new_uids) != set(old_uids):
-            return None
-        if new_uids == old_uids:
-            return None
-        return new_uids
-
-
 def _target_value(t: Dict[str, Any]) -> int:
-    try:
-        v = int(t.get("value", 1))
-        return max(0, v)
-    except Exception:
-        return 1
+    return target_value(t)
 
 
 def _reg_id_of_raw(raw_id: int) -> int:
-    return int(raw_id) // 10
+    return reg_id_of_raw(raw_id)
 
 
 def _candidate_badge_id(c: Dict[str, Any]) -> Optional[int]:
-    try:
-        bid = int(c.get("badgeId", 0))
-        return bid if bid > 0 else None
-    except Exception:
-        return None
+    return candidate_badge_id(c)
 
 
 def _owned_badge_ids(effect_list: List[Dict[str, Any]]) -> List[Optional[int]]:
     res: List[Optional[int]] = []
     for e in effect_list or []:
-        b = e.get("badge")
-        if isinstance(b, dict) and "id" in b:
-            try:
-                res.append(int(b["id"]))
-            except Exception:
-                res.append(None)
-        else:
-            res.append(None)
+        _reg, _plus, badge_id = extract_amulet_signature(e)
+        res.append(badge_id)
     return res
 
 
 def _owned_count_with_badge(effect_list: List[Dict[str, Any]], want_badge: int) -> int:
-    cnt = 0
-    for e in effect_list or []:
-        b = e.get("badge")
-        if isinstance(b, dict) and "id" in b:
-            try:
-                if int(b["id"]) == int(want_badge):
-                    cnt += 1
-            except Exception:
-                pass
-    return cnt
+    return sum(1 for badge_id in _owned_badge_ids(effect_list) if badge_id == int(want_badge))
 
 
-def _candidate_value(raw_id: int, badge_id: Optional[int]) -> int:
-    reg_id = _reg_id_of_raw(raw_id)
-    base = 0
-    try:
-        amulet_reg = app_mod.AMULET_REG
-        if amulet_reg is not None:
-            item = amulet_reg.get(reg_id)
-            if item and getattr(item, "rarity", None) is not None:
-                rarity_val = int(getattr(item.rarity, "value", 0))
-                base = rarity_val * 3
-    except Exception:
-        base = 0
-    if badge_id == 600050:
-        base *= 3
-    return base
+def _candidate_price(raw_id: int, badge_id: Optional[int]) -> int:
+    return calc_candidate_price({"id": raw_id, "badgeId": badge_id or 0}, amulet_registry=getattr(app_mod, "AMULET_REG", None))
 
 
 def _selected_effect_value(
@@ -1911,92 +1265,21 @@ def _selected_effect_value(
     raw_id = int(effect_item.get("id", 0) or 0)
     if raw_id <= 0:
         return 0
-
-    reg_id = _reg_id_of_raw(raw_id)
-    _reg, _is_plus, badge_id = _extract_amulet_signature(effect_item)
-
-    want_badges = set()
-    want_amulet_regs = set()
-    for t in targets or []:
-        k = t.get("kind")
-        if k == "badge":
-            try:
-                want_badges.add(int(t.get("id")))
-            except Exception:
-                pass
-        elif k == "amulet":
-            try:
-                want_amulet_regs.add(int(t.get("id")))
-            except Exception:
-                pass
-
-    if badge_id is not None and badge_id in want_badges:
-        return 99
-
-    if reg_id in want_amulet_regs:
-        required_badges = _required_nonplus_badges_for_reg(targets, reg_id)
-        if required_badges:
-            return 99 if badge_id in required_badges else 0
-        return 99
-
-    if _owned_count_with_badge(effect_list_before_select, 600070) < need_pionner_badge_count and badge_id == 600070:
-        return 2
-
-    if badge_id == 600110:
-        return 1
-
-    return _candidate_value(raw_id, badge_id)
+    _reg, _is_plus, badge_id = extract_amulet_signature(effect_item)
+    decision = default_select_amulet_from_candidates(
+        [{"id": raw_id, "badgeId": badge_id or 0}],
+        effect_list_before_select,
+        targets,
+        need_pionner_badge_count=need_pionner_badge_count,
+        amulet_registry=getattr(app_mod, "AMULET_REG", None),
+    )
+    return decision.selection_value
 
 
 def _extract_new_amulets_from_select_resp(resp: Optional[dict]) -> List[Dict[str, Any]]:
-    result: List[Dict[str, Any]] = []
-    if not isinstance(resp, dict):
-        return result
+    from backend.autorun.stages import _extract_new_amulets_from_select_resp as extract_new
 
-    events = resp.get("event")
-    if not isinstance(events, list):
-        return result
-
-    for event in events:
-        if not isinstance(event, dict):
-            continue
-        try:
-            event_type = int(event.get("type", -1))
-        except Exception:
-            continue
-        if event_type != 14:
-            continue
-
-        hooks = event.get("effectedHooks")
-        if not isinstance(hooks, list):
-            continue
-
-        for hook in hooks:
-            if not isinstance(hook, dict):
-                continue
-            try:
-                hook_id = int(hook.get("id", -1))
-            except Exception:
-                continue
-            if hook_id != 1631:
-                continue
-
-            hook_result = hook.get("result")
-            if not isinstance(hook_result, dict):
-                continue
-
-            transform_effects = hook_result.get("transformEffect")
-            if not isinstance(transform_effects, list):
-                continue
-
-            for transform in transform_effects:
-                if not isinstance(transform, dict):
-                    continue
-                add_result = transform.get("addResult")
-                if isinstance(add_result, dict):
-                    result.append(add_result)
-
-    return result
+    return extract_new(resp)
 
 
 def _required_nonplus_badges_for_reg(targets: List[Dict[str, Any]], reg_id: int) -> set[int]:
@@ -2008,15 +1291,14 @@ def _required_nonplus_badges_for_reg(targets: List[Dict[str, Any]], reg_id: int)
             tid = int(t.get("id"))
         except Exception:
             continue
-        if tid != reg_id:
+        if tid != reg_id or bool(t.get("plus", False)):
             continue
-        if not bool(t.get("plus", False)):
-            tb = t.get("badge", None)
-            if tb not in (None, "",):
-                try:
-                    req.add(int(tb))
-                except Exception:
-                    pass
+        tb = t.get("badge", None)
+        if tb not in (None, ""):
+            try:
+                req.add(int(tb))
+            except Exception:
+                pass
     return req
 
 
@@ -2033,34 +1315,16 @@ def _find_owned_uid_for_reg(effect_list: List[Dict[str, Any]], reg_id: int) -> O
 
 
 def _owned_effect_value_for_selling(e: Dict[str, Any], targets: List[Dict[str, Any]]) -> int:
-    if _is_needed_for_any_target(e, targets):
-        return 10 ** 9  # 目标需要，绝不卖
-
-    reg_id, is_plus, bid = _extract_amulet_signature(e)
-
-    # 基础价值
-    base = 0
-    try:
-        amulet_reg = app_mod.AMULET_REG
-        if amulet_reg is not None:
-            item = amulet_reg.get(reg_id)
-            if item and getattr(item, "rarity", None) is not None:
-                rarity_val = int(getattr(item.rarity, "value", 0))
-                base = rarity_val * 3
-    except Exception:
-        base = 0
-
-    if bid == 600050:
-        base *= 3
-
-    # 提升重要护身符与关键印章
-    if bid == 600070:  # 指引
+    if is_needed_for_any_target(e, targets):
+        return 10 ** 9
+    reg_id, _is_plus, badge_id = extract_amulet_signature(e)
+    base = _candidate_price(int(e.get("id", 0) or 0), badge_id)
+    if badge_id == 600070:
         base += 10000
-    if bid == 600110:  # 幸福
+    if badge_id == 600110:
         base += 1000
-    if reg_id == 146:  # 车轮
+    if reg_id == 146:
         base += 10000
-
     return base
 
 
@@ -2068,19 +1332,13 @@ def _pick_uid_to_sell_same_reg(effect_list: List[Dict[str, Any]], reg_id: int, t
     cands: List[Dict[str, Any]] = []
     for e in effect_list or []:
         try:
-            rid = int(e.get("id", 0)) // 10
-            if rid == reg_id:
+            if int(e.get("id", 0)) // 10 == reg_id:
                 cands.append(e)
         except Exception:
             continue
-
     if not cands:
         return None
-
-    worst = min(
-        cands,
-        key=lambda x: (_owned_effect_value_for_selling(x, targets), int(x.get("uid") or 1_000_000_000))
-    )
+    worst = min(cands, key=lambda x: (_owned_effect_value_for_selling(x, targets), int(x.get("uid") or 1_000_000_000)))
     uid = worst.get("uid")
     try:
         return int(uid) if uid is not None else None
@@ -2094,116 +1352,18 @@ def select_amulet_from_candidates(
         targets: List[Dict[str, Any]],
         need_pionner_badge_count: int = NEED_PIONNER_BADGE_COUNT,
 ) -> Tuple[Optional[int], Optional[int], Optional[int], Optional[int]]:
-    if not candidate_effect_list:
-        return None, None, None, None
-
-    want_badges = set()
-    want_amulet_regs = set()
-    for t in targets or []:
-        k = t.get("kind")
-        if k == "badge":
-            try:
-                want_badges.add(int(t.get("id")))
-            except Exception:
-                pass
-        elif k == "amulet":
-            try:
-                want_amulet_regs.add(int(t.get("id")))
-            except Exception:
-                pass
-
-    zero_raw_ids: set[int] = set()
-
-    for c in candidate_effect_list:
-        raw_id = int(c.get("id", 0))
-        if raw_id <= 0:
-            continue
-        reg_id = _reg_id_of_raw(raw_id)
-        bid = _candidate_badge_id(c)
-
-        # 命中“目标印章”直接 99
-        if bid is not None and bid in want_badges:
-            return raw_id, bid, 99, None
-
-        # 命中“目标护身符 reg”
-        if reg_id in want_amulet_regs:
-            required_badges = _required_nonplus_badges_for_reg(targets, reg_id)
-            if required_badges:
-                # 非 plus 且目标指定 badge，候选必须匹配该 badge，否则这张候选记为 0 分
-                if bid in required_badges:
-                    return raw_id, bid, 99, None
-                else:
-                    zero_raw_ids.add(raw_id)
-            else:
-                # 无额外 badge 要求，直接 99
-                return raw_id, bid, 99, None
-
-    # 指引 600070 未满 3 个
-    WANT_BADGE_STACK = 600070
-    if _owned_count_with_badge(effect_list, WANT_BADGE_STACK) < need_pionner_badge_count:
-        for c in candidate_effect_list:
-            bid = _candidate_badge_id(c)
-            if bid == WANT_BADGE_STACK:
-                return int(c["id"]), bid, 2, None
-
-    # 幸福 600110
-    for c in candidate_effect_list:
-        bid = _candidate_badge_id(c)
-        if bid == 600110:
-            return int(c["id"]), bid, 1, None
-
-    # 按价值挑最好；同时，当某候选被标记为 zero_raw_ids 时，尝试给出 sell_uid
-    best_raw: Optional[int] = None
-    best_bid: Optional[int] = None
-    best_val = -10 ** 9
-    best_sell_uid: Optional[int] = None
-
-    for c in candidate_effect_list:
-        try:
-            raw_id = int(c.get("id", 0))
-        except Exception:
-            continue
-        if raw_id <= 0:
-            continue
-
-        bid = _candidate_badge_id(c)
-        reg_id = _reg_id_of_raw(raw_id)
-
-        if raw_id in zero_raw_ids:
-            # 价值强制为 0；若背包已有同 reg 且该已拥有并非目标需要，建议先卖
-            val = 0
-            uid = _find_owned_uid_for_reg(effect_list, reg_id)
-            if uid is not None:
-                # 确认这件现有的不被目标需要
-                owned_item = next((e for e in effect_list if e.get("uid") == uid), None)
-                if owned_item is not None and not _is_needed_for_any_target(owned_item, targets):
-                    sell_uid = uid
-                else:
-                    sell_uid = None
-            else:
-                sell_uid = None
-        else:
-            val = _candidate_value(raw_id, bid)
-            sell_uid = None
-
-        if val > best_val:
-            best_val = val
-            best_raw = raw_id
-            best_bid = bid
-            best_sell_uid = sell_uid
-
-    return best_raw, best_bid, 0 if best_raw is not None and best_raw in zero_raw_ids else (0 if best_val <= 0 else 0), best_sell_uid
+    decision = default_select_amulet_from_candidates(
+        candidate_effect_list,
+        effect_list,
+        targets,
+        need_pionner_badge_count=need_pionner_badge_count,
+        amulet_registry=getattr(app_mod, "AMULET_REG", None),
+    )
+    return decision.raw_id, decision.badge_id, decision.selection_value, decision.sell_uid
 
 
 def total_volume(effect_list: List[Dict[str, Any]]) -> int:
-    s = 0
-    for it in effect_list or []:
-        try:
-            v = int(it.get("volume", 0))
-        except Exception:
-            v = 0
-        s += max(0, v)
-    return s
+    return calc_total_volume(effect_list)
 
 
 def find_uid_for_raw_or_plus(effect_list: List[Dict[str, Any]], best_raw: int) -> Optional[int]:
@@ -2214,7 +1374,7 @@ def find_uid_for_raw_or_plus(effect_list: List[Dict[str, Any]], best_raw: int) -
     if raw <= 0:
         return None
     reg = raw // 10
-    target_ids = {raw, reg * 10 + 1}  # 同号非plus/plus都匹配
+    target_ids = {raw, reg * 10 + 1}
     for it in effect_list or []:
         try:
             if int(it.get("id", -1)) in target_ids:
@@ -2226,45 +1386,11 @@ def find_uid_for_raw_or_plus(effect_list: List[Dict[str, Any]], best_raw: int) -
 
 
 def _extract_amulet_signature(effect_item: Dict[str, Any]) -> Tuple[int, bool, Optional[int]]:
-    try:
-        raw_id = int(effect_item.get("id", 0))
-    except Exception:
-        raw_id = 0
-    reg_id = raw_id // 10
-    is_plus = (raw_id % 10 == 1)
-
-    badge = effect_item.get("badge")
-    if isinstance(badge, dict) and "id" in badge:
-        try:
-            badge_id = int(badge["id"])
-        except Exception:
-            badge_id = None
-    else:
-        badge_id = None
-
-    return reg_id, is_plus, badge_id
+    return extract_amulet_signature(effect_item)
 
 
 def _is_needed_for_any_target(effect_item: Dict[str, Any], targets: List[Dict[str, Any]]) -> bool:
-    reg_id, _is_plus, badge_id = _extract_amulet_signature(effect_item)
-
-    for t in targets or []:
-        k = t.get("kind")
-        if k == "badge":
-            try:
-                need_badge = int(t.get("id"))
-            except Exception:
-                continue
-            if badge_id is not None and badge_id == need_badge:
-                return True
-        elif k == "amulet":
-            try:
-                need_reg = int(t.get("id"))
-            except Exception:
-                continue
-            if reg_id == need_reg:
-                return True
-    return False
+    return is_needed_for_any_target(effect_item, targets)
 
 
 def sort_sell_priority(
@@ -2272,27 +1398,21 @@ def sort_sell_priority(
         targets: List[Dict[str, Any]],
         need_pionner_badge_count: int = NEED_PIONNER_BADGE_COUNT,
 ) -> List[Dict[str, Any]]:
-    if not effect_list:
-        return []
+    class _State:
+        pass
 
-    KEEP_BADGE = 600070
-    demoted: List[Dict[str, Any]] = []
-    normal: List[Dict[str, Any]] = []
-    demoted_taken = 0
-
-    for it in effect_list:
-        if _is_needed_for_any_target(it, targets):
-            continue  # 目标需要的护身符：移出结果
-
-        _, __, badge_id = _extract_amulet_signature(it)
-        if badge_id == KEEP_BADGE and demoted_taken < need_pionner_badge_count:
-            demoted.append(it)  # 降权：排在最后
-            demoted_taken += 1
-        else:
-            normal.append(it)  # 照常顺序
-
-    # 正常项在前，降权项在后（降权＝卖得更晚）
-    return normal + demoted
+    state = _State()
+    state.effect_list = effect_list
+    state.candidate_effect_list = []
+    strategy = DefaultAutoRunStrategy()
+    from backend.autorun.strategy import AutoRunStrategyContext
+    ranked = strategy.rank_sell_candidates(AutoRunStrategyContext(
+        game_state=state,
+        targets=targets,
+        need_pionner_badge_count=need_pionner_badge_count,
+        amulet_registry=getattr(app_mod, "AMULET_REG", None),
+    ))
+    return [candidate.item for candidate in ranked]
 
 
 def select_items_to_sell_for_purchase(
@@ -2300,18 +1420,4 @@ def select_items_to_sell_for_purchase(
         need_space: int,
         sell_candidates: List[Dict[str, Any]],
 ) -> Tuple[List[Dict[str, Any]], int, bool]:
-    if need_space <= free_space:
-        return [], 0, True
-
-    gap = need_space - max(0, free_space)
-    chosen: List[Dict[str, Any]] = []
-    freed = 0
-    for it in sell_candidates:
-        v = int(it.get("volume", 0) or 0)
-        if v <= 0:
-            continue
-        chosen.append(it)
-        freed += v
-        if freed >= gap:
-            return chosen, freed, True
-    return chosen, freed, False
+    return strategy_select_items_to_sell_for_purchase(free_space, need_space, sell_candidates)
