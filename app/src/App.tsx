@@ -157,7 +157,7 @@ function keyboardCodeKey(event: KeyboardEvent): string {
 
 function keyboardEventKey(event: KeyboardEvent): string {
     if (["Control", "Alt", "Shift", "Meta"].includes(event.key)) return "";
-    let key = "";
+    let key: string;
     const codeKey = keyboardCodeKey(event);
     if (codeKey) key = codeKey;
     else if (event.key === "Dead" && event.code === "Backquote") key = "`";

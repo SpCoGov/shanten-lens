@@ -9,6 +9,7 @@ from backend.autorun.value import (
     candidate_badge_id,
     extract_amulet_signature,
     is_needed_for_any_target,
+    match_targets_for_amulet,
     reg_id_of_raw,
 )
 
@@ -175,6 +176,46 @@ class DefaultAutoRunStrategy(AutoRunStrategy):
     def _candidate_item(considered: List[Dict[str, Any]], raw_id: int) -> Optional[Dict[str, Any]]:
         return next((item for item in considered if item.get("raw_id") == raw_id), None)
 
+    @staticmethod
+    def _candidate_effect_item(raw_id: int, badge_id: Optional[int]) -> Dict[str, Any]:
+        item: Dict[str, Any] = {"id": raw_id}
+        if badge_id is not None:
+            item["badge"] = {"id": badge_id}
+        return item
+
+    def _candidate_target_score(
+            self,
+            raw_id: int,
+            badge_id: Optional[int],
+            targets: List[Dict[str, Any]],
+    ) -> Tuple[int, str]:
+        effect_item = self._candidate_effect_item(raw_id, badge_id)
+        matched_indexes = match_targets_for_amulet(effect_item, targets)
+        has_badge_target = False
+        has_amulet_target = False
+        has_amulet_badge_target = False
+        for index in matched_indexes:
+            try:
+                target = targets[index]
+            except Exception:
+                continue
+            if target.get("kind") == "badge":
+                has_badge_target = True
+            elif target.get("kind") == "amulet":
+                has_amulet_target = True
+                if target.get("badge") not in (None, ""):
+                    has_amulet_badge_target = True
+
+        if has_amulet_badge_target:
+            reason = "target_amulet_badge"
+        elif has_amulet_target:
+            reason = "target_amulet"
+        elif has_badge_target:
+            reason = "target_badge"
+        else:
+            reason = ""
+        return len(matched_indexes), reason
+
     def _annotate_candidate_values(
             self,
             considered: List[Dict[str, Any]],
@@ -318,6 +359,10 @@ class DefaultAutoRunStrategy(AutoRunStrategy):
         self._annotate_candidate_values(considered, context, want_badges, want_amulet_regs, effect_list)
 
         zero_raw_ids: set[int] = set()
+        best_target_raw: Optional[int] = None
+        best_target_badge: Optional[int] = None
+        best_target_score = 0
+        best_target_reason = ""
         for candidate in candidate_effect_list:
             try:
                 raw_id = int(candidate.get("id", 0))
@@ -328,61 +373,48 @@ class DefaultAutoRunStrategy(AutoRunStrategy):
             reg_id = reg_id_of_raw(raw_id)
             badge_id = candidate_badge_id(candidate)
 
-            if badge_id is not None and badge_id in want_badges:
-                decision = CandidateDecision(
-                    raw_id,
-                    badge_id,
-                    99,
-                    None,
-                    "target_badge",
-                    self._mark_candidate(
-                        considered,
-                        raw_id,
-                        selected_reason="matched_target_badge",
-                        default_reject_reason="lower_priority_than_target_badge",
-                    ),
-                )
-                self.trace_decision("choose_candidate", {"candidate_count": len(candidate_effect_list)}, decision.__dict__)
-                return decision
+            target_score, target_reason = self._candidate_target_score(raw_id, badge_id, context.targets)
+            if target_score > best_target_score:
+                best_target_raw = raw_id
+                best_target_badge = badge_id
+                best_target_score = target_score
+                best_target_reason = target_reason
 
             if reg_id in want_amulet_regs:
                 required_badges = _required_nonplus_badges_for_reg(context.targets, reg_id)
-                if not required_badges:
-                    decision = CandidateDecision(
-                        raw_id,
-                        badge_id,
-                        99,
-                        None,
-                        "target_amulet",
-                        self._mark_candidate(
-                            considered,
-                            raw_id,
-                            selected_reason="matched_target_amulet",
-                            default_reject_reason="lower_priority_than_target_amulet",
-                        ),
-                    )
-                    self.trace_decision("choose_candidate", {"candidate_count": len(candidate_effect_list)}, decision.__dict__)
-                    return decision
-                if badge_id in required_badges:
-                    decision = CandidateDecision(
-                        raw_id,
-                        badge_id,
-                        99,
-                        None,
-                        "target_amulet_badge",
-                        self._mark_candidate(
-                            considered,
-                            raw_id,
-                            selected_reason="matched_target_amulet_required_badge",
-                            default_reject_reason="lower_priority_than_target_amulet_badge",
-                        ),
-                    )
-                    self.trace_decision("choose_candidate", {"candidate_count": len(candidate_effect_list)}, decision.__dict__)
-                    return decision
-                zero_raw_ids.add(raw_id)
-                item = self._candidate_item(considered, raw_id)
-                if item is not None:
-                    item["reason"] = "target_amulet_badge_mismatch"
+                if required_badges and badge_id not in required_badges and target_score <= 0:
+                    zero_raw_ids.add(raw_id)
+                    item = self._candidate_item(considered, raw_id)
+                    if item is not None:
+                        item["reason"] = "target_amulet_badge_mismatch"
+
+        if best_target_raw is not None:
+            selected_reason = "matched_target"
+            default_reject_reason = "lower_target_count_than_selected"
+            if best_target_reason == "target_badge":
+                selected_reason = "matched_target_badge"
+                default_reject_reason = "lower_priority_than_target_badge"
+            elif best_target_reason == "target_amulet":
+                selected_reason = "matched_target_amulet"
+                default_reject_reason = "lower_priority_than_target_amulet"
+            elif best_target_reason == "target_amulet_badge":
+                selected_reason = "matched_target_amulet_required_badge"
+                default_reject_reason = "lower_priority_than_target_amulet_badge"
+            decision = CandidateDecision(
+                best_target_raw,
+                best_target_badge,
+                99,
+                None,
+                best_target_reason,
+                self._mark_candidate(
+                    considered,
+                    best_target_raw,
+                    selected_reason=selected_reason,
+                    default_reject_reason=default_reject_reason,
+                ),
+            )
+            self.trace_decision("choose_candidate", {"candidate_count": len(candidate_effect_list)}, decision.__dict__)
+            return decision
 
         if _owned_count_with_badge(effect_list, PIONNER_BADGE_ID) < context.need_pionner_badge_count:
             for candidate in candidate_effect_list:

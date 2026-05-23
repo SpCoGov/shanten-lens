@@ -121,6 +121,24 @@ class AutorunStrategyTests(unittest.TestCase):
         self.assertEqual(decision.selection_value, 99)
         self.assertEqual(decision.reason, "target_amulet_badge")
 
+    def test_choose_candidate_uses_highest_target_count(self) -> None:
+        strategy = DefaultAutoRunStrategy()
+        decision = strategy.choose_candidate(self.context(
+            candidates=[
+                {"id": 1000, "badgeId": 600120},
+                {"id": 1010, "badgeId": 600070},
+            ],
+            targets=[
+                {"kind": "amulet", "id": 100, "plus": False, "value": 1},
+                {"kind": "amulet", "id": 101, "plus": False, "badge": 600070, "value": 1},
+                {"kind": "badge", "id": 600070, "value": 1},
+            ],
+        ))
+        self.assertEqual(decision.raw_id, 1010)
+        self.assertEqual(decision.badge_id, 600070)
+        self.assertEqual(decision.selection_value, 99)
+        self.assertEqual(decision.reason, "target_amulet_badge")
+
     def test_rank_sell_candidates_protects_targets_and_demotes_kept_badges(self) -> None:
         strategy = DefaultAutoRunStrategy()
         effects = [
