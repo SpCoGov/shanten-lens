@@ -29,7 +29,7 @@ import {
 import {buildDoraCountByTile} from "../lib/tileHighlights";
 
 type CustomRuleMap = Record<string, Partial<AmuletRuleConfig>>;
-type LevelTargetEntry = { label: string; level: number; target: string };
+export type LevelTargetEntry = { label: string; level: number; target: string };
 type TileScoreEntry = { tile: string; score: bigint };
 type DriverFilter = "all" | "code" | "config" | "unconfigured";
 
@@ -272,7 +272,7 @@ function parseLevelKeyToId(key: string): number | null {
     return null;
 }
 
-function formatLevelIdToLabel(level: number): string {
+export function formatLevelIdToLabel(level: number): string {
     if (level >= 1001) return `Ex${level - 1000}`;
     const chapter = Math.trunc(level / 100);
     const stage = level % 10;
@@ -323,7 +323,7 @@ const BASE_LEVEL_TARGETS: LevelTargetEntry[] = Object.entries(LEVEL_TARGETS)
     })
     .filter((item): item is LevelTargetEntry => item != null);
 
-const ORDERED_LEVEL_TARGETS: LevelTargetEntry[] = Array.from(
+export const ORDERED_LEVEL_TARGETS: LevelTargetEntry[] = Array.from(
     new Map<number, LevelTargetEntry>([
         ...BASE_LEVEL_TARGETS.map((item) => [item.level, item] as const),
         ...Object.entries(FUTURE_POINT_TARGETS).map(([levelText, target]) => {
@@ -333,7 +333,7 @@ const ORDERED_LEVEL_TARGETS: LevelTargetEntry[] = Array.from(
     ]).values(),
 ).sort((left, right) => left.level - right.level);
 
-const LEVEL_TARGETS_BY_ID = ORDERED_LEVEL_TARGETS.reduce<Record<number, string>>((acc, item) => {
+export const LEVEL_TARGETS_BY_ID = ORDERED_LEVEL_TARGETS.reduce<Record<number, string>>((acc, item) => {
     acc[item.level] = item.target;
     return acc;
 }, {});

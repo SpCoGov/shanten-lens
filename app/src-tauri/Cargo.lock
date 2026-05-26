@@ -3844,6 +3844,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-os",
  "tauri-plugin-shell",
+ "windows",
 ]
 
 [[package]]

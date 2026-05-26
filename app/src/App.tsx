@@ -13,6 +13,7 @@ import AboutPage from "./pages/AboutPage";
 import BlackHolePage from "./pages/BlackHolePage";
 import SouzuSwitchDebugPage from "./pages/SouzuSwitchDebugPage";
 import ScorePage from "./pages/ScorePage";
+import OverlayPage from "./pages/OverlayPage";
 import {ws, ensureWsStartedOnce} from "./lib/ws";
 import {type LogLevel, useLogStore} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
@@ -263,7 +264,7 @@ async function openSettingsWindow() {
     }
 }
 
-type Route = "home" | "score" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "diagnostics" | "packet-test" | "frontend-test" | "about";
+type Route = "home" | "score" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "overlay" | "diagnostics" | "packet-test" | "frontend-test" | "about";
 type TutorialId = "home" | "blackhole";
 type TutorialStep = {
     title: string;
@@ -308,6 +309,7 @@ function writeTutorialSeen(key: string) {
 
 function isMoreRoute(route: Route) {
     return route === "fuse"
+        || route === "overlay"
         || route === "souzu-debug"
         || route === "diagnostics"
         || route === "frontend-test"
@@ -1786,6 +1788,14 @@ export default function App() {
                                     <span>{t("nav.fuse")}</span>
                                 </button>
                                 <button
+                                    className={`more-menu-item ${route === "overlay" ? "active" : ""}`}
+                                    role="menuitem"
+                                    onClick={() => navigateFromMore("overlay")}
+                                >
+                                    <span className="ms">picture_in_picture</span>
+                                    <span>{t("nav.overlay")}</span>
+                                </button>
+                                <button
                                     className={`more-menu-item ${route === "diagnostics" ? "active" : ""}`}
                                     role="menuitem"
                                     onClick={() => navigateFromMore("diagnostics")}
@@ -2096,6 +2106,7 @@ export default function App() {
                         )}
                         {route === "autorun" && <AutoRunnerPage/>}
                         {route === "settings" && <SettingsPage/>}
+                        {route === "overlay" && <OverlayPage/>}
                         {route === "diagnostics" && <DiagnosticsPage/>}
                         {route === "frontend-test" && <FrontendTestPage/>}
                         {route === "packet-test" && debugEnabled && <PacketTestPage/>}
