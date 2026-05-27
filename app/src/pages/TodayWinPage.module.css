@@ -1,0 +1,511 @@
+.wrap {
+    padding-block: 16px;
+    overflow: visible;
+}
+
+.layout {
+    display: grid;
+    gap: 12px;
+    min-height: calc(100vh - 118px);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.hardToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 10px;
+    background: color-mix(in srgb, var(--panel-bg) 82%, transparent);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.hardToggle input {
+    margin: 0;
+}
+
+.hardToggle.isOn {
+    color: var(--text);
+    border-color: color-mix(in srgb, var(--state-warn) 56%, var(--border));
+    background: color-mix(in srgb, var(--state-warn) 12%, var(--panel-bg));
+}
+
+.title {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.2;
+}
+
+.dateBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 10px;
+    background: color-mix(in srgb, var(--panel-bg) 82%, transparent);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.datePicker {
+    position: relative;
+}
+
+.dateBadge {
+    appearance: none;
+    font: inherit;
+}
+
+.calendarPanel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    z-index: 20;
+    width: 278px;
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 12px;
+    border: var(--panel-border);
+    background: var(--panel-bg);
+    box-shadow: var(--panel-shadow);
+}
+
+.calendarHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.calendarTitle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 132px;
+    justify-content: center;
+}
+
+.calendarTitle strong {
+    font-size: 14px;
+}
+
+.calendarTitle span {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.titleStep {
+    width: 24px;
+    height: 24px;
+    border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--panel-bg) 78%, var(--bg));
+    color: var(--text);
+    cursor: pointer;
+    line-height: 1;
+}
+
+.titleStep:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+}
+
+.calendarHeader :global(.nav-btn) {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-grid;
+    place-items: center;
+}
+
+.calendarGrid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.calendarWeek {
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+.calendarDay {
+    position: relative;
+    height: 30px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.calendarDay:disabled {
+    opacity: .36;
+    cursor: not-allowed;
+}
+
+.selectedDay {
+    border-color: color-mix(in srgb, var(--color-ring) 64%, var(--border));
+    background: color-mix(in srgb, var(--color-ring) 10%, transparent);
+}
+
+.day_won::after,
+.day_failed::after,
+.day_played::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 3px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    transform: translateX(-50%);
+}
+
+.day_won::after {
+    background: var(--state-ok);
+}
+
+.day_failed::after {
+    background: var(--state-warn);
+}
+
+.day_played::after {
+    background: var(--muted);
+}
+
+.calendarLegend {
+    display: flex;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.calendarLegend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.legendWon,
+.legendFailed,
+.legendPlayed {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+
+.legendWon {
+    background: var(--state-ok);
+}
+
+.legendFailed {
+    background: var(--state-warn);
+}
+
+.legendPlayed {
+    background: var(--muted);
+}
+
+.panel {
+    display: grid;
+    gap: 6px;
+}
+
+.gameGrid {
+    display: grid;
+    grid-template-columns: minmax(680px, 1fr) minmax(420px, 560px);
+    align-items: stretch;
+    gap: 10px;
+    min-height: 0;
+}
+
+.boardColumn,
+.controlColumn {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    align-content: start;
+}
+
+.panelTitle {
+    font-weight: 700;
+    color: var(--text);
+}
+
+.handRow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 44px;
+    flex-wrap: wrap;
+}
+
+.winGap {
+    width: 14px;
+    height: 1px;
+    flex: 0 0 14px;
+}
+
+.tileSlot {
+    width: 30px;
+    height: 40px;
+    border: 2px dashed color-mix(in srgb, var(--color-ring) 58%, var(--border));
+    border-radius: 8px;
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--color-ring) 10%, transparent) 0%, transparent 42%),
+        color-mix(in srgb, var(--panel-bg) 72%, var(--bg));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, white 18%, transparent);
+}
+
+.guessGrid {
+    display: grid;
+    gap: 5px;
+}
+
+.guessRow {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 5px;
+    border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--panel-bg) 72%, transparent);
+}
+
+.currentGuessRow {
+    border-color: color-mix(in srgb, var(--color-ring) 48%, var(--border));
+    background: color-mix(in srgb, var(--color-ring) 7%, var(--panel-bg));
+}
+
+.guessIndex {
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+}
+
+.waitHint {
+    grid-column: 2;
+    min-width: 0;
+    color: var(--state-warn);
+    font-size: 12px;
+    line-height: 1;
+}
+
+.inputRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 8px;
+}
+
+.inputHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.controls :global(.nav-btn) {
+    width: 34px;
+    height: 34px;
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+}
+
+.picker {
+    display: grid;
+    gap: 5px;
+}
+
+.pickerGroup {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.tileButton {
+    appearance: none;
+    border: 0;
+    padding: 2px;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+.pickerMarked {
+    background: color-mix(in srgb, var(--muted) 18%, transparent);
+}
+
+.tileButton:disabled {
+    cursor: not-allowed;
+    opacity: .45;
+}
+
+.feedback {
+    padding: 3px;
+    border-radius: 9px;
+}
+
+.green {
+    background: color-mix(in srgb, var(--state-ok) 34%, transparent);
+}
+
+.yellow {
+    background: color-mix(in srgb, var(--state-warn) 34%, transparent);
+}
+
+.gray {
+    background: color-mix(in srgb, var(--muted) 24%, transparent);
+}
+
+.message {
+    grid-column: 1 / -1;
+    min-height: 22px;
+    color: var(--state-warn);
+    font-size: 14px;
+}
+
+.success {
+    color: var(--state-ok);
+}
+
+.answerMeta {
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+.resultOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    display: grid;
+    place-items: center;
+    padding: 22px;
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    backdrop-filter: blur(16px);
+}
+
+.resultDialog {
+    width: min(1120px, 100%);
+    max-height: calc(100vh - 44px);
+    overflow: auto;
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 16px;
+    background: var(--panel-bg);
+    border: var(--panel-border);
+    box-shadow: var(--panel-shadow);
+}
+
+.resultHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.resultHeader h2 {
+    margin: 0;
+    font-size: 24px;
+}
+
+.resultHeader p {
+    margin: 4px 0 0;
+    color: var(--muted);
+}
+
+.resultStats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.resultStats div {
+    display: grid;
+    gap: 4px;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+    background: color-mix(in srgb, var(--panel-bg) 70%, var(--bg));
+}
+
+.resultStats span {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.resultStats strong {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+}
+
+.resultSection {
+    display: grid;
+    gap: 8px;
+}
+
+.resultRecords {
+    display: grid;
+    gap: 8px;
+}
+
+.resultRecord {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+}
+
+@media (max-width: 760px) {
+    .gameGrid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .guessRow {
+        grid-template-columns: 22px minmax(0, 1fr);
+    }
+
+    .waitHint {
+        grid-column: 2;
+    }
+
+    .inputRow {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .resultStats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

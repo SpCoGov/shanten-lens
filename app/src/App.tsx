@@ -14,6 +14,7 @@ import BlackHolePage from "./pages/BlackHolePage";
 import SouzuSwitchDebugPage from "./pages/SouzuSwitchDebugPage";
 import ScorePage from "./pages/ScorePage";
 import OverlayPage from "./pages/OverlayPage";
+import TodayWinPage from "./pages/TodayWinPage";
 import {ws, ensureWsStartedOnce} from "./lib/ws";
 import {type LogLevel, useLogStore} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
@@ -264,7 +265,7 @@ async function openSettingsWindow() {
     }
 }
 
-type Route = "home" | "score" | "blackhole" | "souzu-debug" | "fuse" | "autorun" | "settings" | "overlay" | "diagnostics" | "packet-test" | "frontend-test" | "about";
+type Route = "home" | "score" | "blackhole" | "souzu-debug" | "fuse" | "today-win" | "autorun" | "settings" | "overlay" | "diagnostics" | "packet-test" | "frontend-test" | "about";
 type TutorialId = "home" | "blackhole";
 type TutorialStep = {
     title: string;
@@ -309,6 +310,7 @@ function writeTutorialSeen(key: string) {
 
 function isMoreRoute(route: Route) {
     return route === "fuse"
+        || route === "today-win"
         || route === "overlay"
         || route === "souzu-debug"
         || route === "diagnostics"
@@ -897,6 +899,7 @@ export default function App() {
         if (manual) setUpdateChecking(true);
         try {
             const result = await checkForUpdates({manual});
+            console.info("[update-check]", manual ? "manual" : "auto", result);
             if (result.status === "available") {
                 const prefs = readUpdatePrefs();
                 setUpdatePrefs(prefs);
@@ -914,7 +917,7 @@ export default function App() {
                 pushToast(t("update.auto_check_disabled"), "info", 1800);
             }
         } catch (err) {
-            console.error("update check failed", err);
+            console.error("[update-check]", manual ? "manual" : "auto", "failed", err);
             if (manual) pushToast(t("update.check_failed"), "error", 2400);
         } finally {
             if (manual) setUpdateChecking(false);
@@ -927,9 +930,13 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
-        if (updateCheckStartedRef.current) return;
-        updateCheckStartedRef.current = true;
+        console.info("[update-check]", "auto", "scheduled");
         const timer = window.setTimeout(() => {
+            if (updateCheckStartedRef.current) {
+                console.info("[update-check]", "auto", "skipped: already started");
+                return;
+            }
+            updateCheckStartedRef.current = true;
             void runUpdateCheck(false);
         }, 1800);
         return () => window.clearTimeout(timer);
@@ -1812,6 +1819,17 @@ export default function App() {
                                     <span>{t("nav.about")}</span>
                                 </button>
 
+                                <div className="more-menu-divider" role="separator" aria-hidden="true"/>
+
+                                <button
+                                    className={`more-menu-item ${route === "today-win" ? "active" : ""}`}
+                                    role="menuitem"
+                                    onClick={() => navigateFromMore("today-win")}
+                                >
+                                    <span className="ms">extension</span>
+                                    <span>{t("nav.todayWin")}</span>
+                                </button>
+
                                 {debugEnabled && (
                                     <div className="more-menu-divider" role="separator" aria-hidden="true"/>
                                 )}
@@ -2085,6 +2103,7 @@ export default function App() {
                             />
                         )}
                         {route === "fuse" && <FusePage/>}
+                        {route === "today-win" && <TodayWinPage/>}
                         {route === "blackhole" && (
                             <BlackHolePage
                                 stage={stage}
