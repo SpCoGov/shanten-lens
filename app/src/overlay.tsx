@@ -22,8 +22,10 @@ import {
 } from "./lib/scoreEngine";
 import {formatLevelIdToLabel, LEVEL_TARGETS_BY_ID, ORDERED_LEVEL_TARGETS} from "./pages/ScorePage";
 import {
+    readHudEnabled,
     readHudShowBlackhole,
     readHudShowScoreProjection,
+    HUD_ENABLED_KEY,
     HUD_SHOW_BLACKHOLE_KEY,
     HUD_SHOW_SCORE_PROJECTION_KEY,
 } from "./lib/hudSettings";
@@ -79,6 +81,8 @@ function HudOverlay() {
 
     React.useEffect(() => {
         ws.connect();
+        invoke("set_overlay_enabled", {enabled: readHudEnabled()}).catch(() => {
+        });
         const off = ws.onPacket((pkt: any) => {
             if (pkt.type === "update_gamestate") {
                 setStage(Number(pkt.data?.stage ?? 0));
@@ -108,7 +112,10 @@ function HudOverlay() {
 
     React.useEffect(() => {
         const onStorage = (event: StorageEvent) => {
-            if (event.key === HUD_SHOW_BLACKHOLE_KEY) {
+            if (event.key === HUD_ENABLED_KEY) {
+                invoke("set_overlay_enabled", {enabled: readHudEnabled()}).catch(() => {
+                });
+            } else if (event.key === HUD_SHOW_BLACKHOLE_KEY) {
                 setShowBlackhole(readHudShowBlackhole());
             } else if (event.key === HUD_SHOW_SCORE_PROJECTION_KEY) {
                 setShowScoreProjection(readHudShowScoreProjection());

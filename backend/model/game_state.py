@@ -5,6 +5,7 @@ import json
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Dict, List
+from loguru import logger
 
 
 @dataclass
@@ -12,7 +13,7 @@ class GameState:
     """
     表示游戏状态（可序列化为 JSON）
     """
-    stage: int = -1  # 1=选择免费卡包、2=换牌阶段、3=打牌阶段、4=卡包购买、5=卡包选择、6=关卡确认阶段、7=选择关卡奖励卡包
+    stage: int = -1  # 1=开局选择角色、2=选择免费卡包、3=选择关卡、4/5=换牌？、6=打牌、7=苦战、9=购买卡包|选择护身符、11=购买遗迹石、12=交换护身符、13=火、13=转盘、16=选择奖励护身符
     deck_map: OrderedDict[int, str] = field(default_factory=OrderedDict)  # 牌山：id→牌面
     hand_tiles: List[int] = field(default_factory=list)  # 手牌
     dora_tiles: List[int] = field(default_factory=list)  # 宝牌指示牌（包含未翻开的）
@@ -28,6 +29,8 @@ class GameState:
     point: int = field(default_factory=int)
     target_point: int = field(default_factory=int)
     level: int = field(default_factory=int)
+    node: int = field(default_factory=int)
+    map_nodes: List[Dict] = field(default_factory=list)
     effect_list: List[Dict] = field(default_factory=list)
     candidate_effect_list: List[Dict] = field(default_factory=list)
     record: Dict = field(default_factory=dict)
@@ -42,6 +45,7 @@ class GameState:
     boss_buff: List[int] = field(default_factory=list)
     shop_buff_list: Dict[int, int] = field(default_factory=dict)
     tile_score_map: Dict[str, str] = field(default_factory=dict)
+    fan_value_map: Dict[str, str] = field(default_factory=dict)
     opening_hand_tiles: List[int] = field(default_factory=list)
     used_desktop_tiles: List[int] = field(default_factory=list)
 
@@ -68,6 +72,8 @@ class GameState:
             "point": str(self.point),
             "target_point": str(self.target_point),
             "level": self.level,
+            "node": self.node,
+            "map_nodes": self.map_nodes,
             "effect_list": self.effect_list,
             "candidate_effect_list": self.candidate_effect_list,
             "record": self.record,
@@ -81,6 +87,7 @@ class GameState:
             "boss_buff": self.boss_buff,
             "shop_buff_list": self.shop_buff_list,
             "tile_score_map": self.tile_score_map,
+            "fan_value_map": self.fan_value_map,
 
             "update_reason": self.update_reason,
         }
@@ -132,9 +139,10 @@ class GameState:
     def _rebuild_sections_from_pool(self, excluded_hand_tiles: list[int] | None = None):
         # 协议定义：从 pool 排除 hand 后，前 10 张是 dora，再后 36 张是 wall，剩下的是 replacement
         ids = self._candidate_pool_ids(excluded_hand_tiles)
+        wall_end = 28 if 926 in self.boss_buff else 46
         self.dora_tiles = ids[:10]
-        self.wall_tiles = ids[10:46]
-        self.replacement_tiles = ids[46:]
+        self.wall_tiles = ids[10:wall_end]
+        self.replacement_tiles = ids[wall_end:]
 
     def update_pool(
             self,
@@ -245,7 +253,7 @@ class GameState:
     def update_switch_used_tiles(
             self, used: list[int], push_gamestate: bool = True, reason: str = ""
     ):
-        if self.stage == 2:
+        if self.stage == 4 or self.stage == 5:
             self.switch_used_tiles = used.copy()
 
         self.update_reason.append(reason)
@@ -262,6 +270,8 @@ class GameState:
             point: int = None,
             target_point: int = None,
             level: int = None,
+            node: int = None,
+            map_nodes: List[Dict] = None,
             effect_list: List[Dict] = None,
             candidate_effect_list: List[Dict] = None,
             ting_list: List[Dict] = None,
@@ -271,9 +281,9 @@ class GameState:
             change_tile_count: int = None,
             total_change_tile_count: int = None,
             max_effect_volume: int = None,
-            boss_buff: List[int] = None,
             shop_buff_list: Dict[int, int] = None,
             tile_score_map: Dict[str, str] = None,
+            fan_value_map: Dict[str, str] = None,
             tian_dora_tiles: List[str] = None,
             ming: List[Dict] = None,
             push_gamestate: bool = True,
@@ -285,7 +295,7 @@ class GameState:
             self.stage = stage
         if ended is not None:
             self.ended = ended
-        if coin is not None:
+        if coin is not None and coin != -1:
             self.coin = coin
         if point is not None:
             self.point = point
@@ -293,6 +303,11 @@ class GameState:
             self.target_point = target_point
         if level is not None:
             self.level = level
+        if map_nodes is not None:
+            self.map_nodes = map_nodes.copy()
+        if node is not None:
+            self.node = node
+            self.boss_buff = self.get_current_boss_buff()
         if effect_list is not None:
             self.effect_list = effect_list.copy()
             # for e in self.effect_list:
@@ -318,12 +333,12 @@ class GameState:
             self.change_tile_count = change_tile_count
         if max_effect_volume is not None:
             self.max_effect_volume = max_effect_volume
-        if boss_buff is not None:
-            self.boss_buff = boss_buff
         if shop_buff_list is not None:
             self.shop_buff_list = shop_buff_list.copy()
         if tile_score_map is not None:
             self.tile_score_map = tile_score_map.copy()
+        if fan_value_map is not None:
+            self.fan_value_map = fan_value_map.copy()
         if tian_dora_tiles is not None:
             self.tian_dora_tiles = tian_dora_tiles.copy()
         if ming is not None:
@@ -352,6 +367,8 @@ class GameState:
         self.point = 0
         self.target_point = 0
         self.level = 0
+        self.node = 0
+        self.map_nodes.clear()
         self.effect_list.clear()
         self.candidate_effect_list.clear()
         self.record = {}
@@ -364,6 +381,7 @@ class GameState:
         self.boss_buff.clear()
         self.shop_buff_list.clear()
         self.tile_score_map.clear()
+        self.fan_value_map.clear()
 
         self.update_reason.clear()
         self.update_reason.append(".lq.Lobby.amuletActivityGiveup")
@@ -383,3 +401,9 @@ class GameState:
                     self.record[k] = v.get("value")
             return
         self.record = record
+
+    def get_current_boss_buff(self) -> list[int]:
+        if self.map_nodes and self.node > 0:
+            args = self.map_nodes[self.node - 1]["args"]
+            return list(args)
+        return []

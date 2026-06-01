@@ -6,6 +6,7 @@ const RARITY_BASE_PRICE: Record<string, number> = {
     BLUE: 6,
     ORANGE: 9,
     PURPLE: 12,
+    GRAY: 0,
 };
 
 export function calcAmuletPrice(item: Pick<EffectItem, "id" | "badge">): number {

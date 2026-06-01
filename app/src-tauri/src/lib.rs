@@ -363,6 +363,15 @@ fn stop_backend(state: State<BackendState>) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn shutdown_app(app: AppHandle, state: State<BackendState>) -> Result<(), String> {
+  let st = state.0.clone();
+  let _ = stop_backend_with(st);
+  kill_all_backends_silently();
+  app.exit(0);
+  Ok(())
+}
+
+#[tauri::command]
 fn frontend_ready(app: AppHandle, gate: State<SharedGate>) {
   if let Some(progress_state) = app.try_state::<StartupProgressState>() {
     let backend_ready = gate.0.backend_ready.load(Ordering::SeqCst);
@@ -517,6 +526,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       start_backend,
       stop_backend,
+      shutdown_app,
       frontend_ready,
       update_startup_progress,
       get_startup_progress,

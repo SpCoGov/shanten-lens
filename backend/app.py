@@ -142,6 +142,55 @@ _load_registries()
 CLIENTS: Set[WebSocketServerProtocol] = set()
 PACKET_MONITOR_ENABLED = False
 PACKET_MONITOR_BLOCKED_METHODS: Set[str] = {".lq.Route.heartbeat"}
+TSUMO_LOOP_TASK: asyncio.Task | None = None
+TSUMO_LOOP_STOP: asyncio.Event | None = None
+TSUMO_LOOP_LAST_REASON = ""
+TSUMO_LOOP_WIN_COUNT = 0
+
+
+def tsumo_loop_status_payload() -> Dict[str, Any]:
+    return {
+        "running": TSUMO_LOOP_TASK is not None and not TSUMO_LOOP_TASK.done(),
+        "lastReason": TSUMO_LOOP_LAST_REASON,
+        "winCount": TSUMO_LOOP_WIN_COUNT,
+    }
+
+
+async def _tsumo_loop(interval_sec: float) -> None:
+    global TSUMO_LOOP_TASK, TSUMO_LOOP_STOP, TSUMO_LOOP_LAST_REASON, TSUMO_LOOP_WIN_COUNT
+    try:
+        while TSUMO_LOOP_STOP is not None and not TSUMO_LOOP_STOP.is_set():
+            bot = globals().get("PACKET_BOT")
+            if not bot:
+                TSUMO_LOOP_LAST_REASON = "addon-not-ready"
+                await asyncio.sleep(interval_sec)
+                continue
+
+            ok, reason, _ = await call_with_1004_retry_async(
+                bot.op_tsumo,
+                delay_sec=3,
+                interval=0.4,
+                timeout=12,
+                to_thread=True,
+            )
+            TSUMO_LOOP_LAST_REASON = "" if ok else reason
+            if ok:
+                TSUMO_LOOP_WIN_COUNT += 1
+                await broadcast({"type": "tsumo_loop_status", "data": tsumo_loop_status_payload()})
+
+            try:
+                await asyncio.wait_for(TSUMO_LOOP_STOP.wait(), timeout=interval_sec)
+            except asyncio.TimeoutError:
+                pass
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        TSUMO_LOOP_LAST_REASON = f"exception:{e}"
+        logger.exception("tsumo loop failed")
+    finally:
+        TSUMO_LOOP_TASK = None
+        TSUMO_LOOP_STOP = None
+        await broadcast({"type": "tsumo_loop_status", "data": tsumo_loop_status_payload()})
 
 
 def packet_monitor_settings_payload() -> Dict[str, Any]:
@@ -291,6 +340,7 @@ async def ws_handler(ws: WebSocketServerProtocol):
     await ws_send(ws, {"type": "update_config", "data": MANAGER.to_payload()})
     await ws_send(ws, {"type": "update_gamestate", "data": GAME_STATE.to_dict()})
     await ws_send(ws, {"type": "autorun_status", "data": await AUTORUNNER.status_payload_async()})
+    await ws_send(ws, {"type": "tsumo_loop_status", "data": tsumo_loop_status_payload()})
     await ws_send(ws, {"type": "packet_monitor_settings", "data": packet_monitor_settings_payload()})
     await ws_send(ws, {"type": "packet_monitor_snapshot", "data": packet_monitor_snapshot_payload()})
 
@@ -338,10 +388,40 @@ async def ws_handler(ws: WebSocketServerProtocol):
                 await ws_send(ws, {"type": "update_config", "data": MANAGER.to_payload()})
                 await ws_send(ws, {"type": "update_gamestate", "data": GAME_STATE.to_dict()})
                 await ws_send(ws, {"type": "update_registry", "data": _registry_payload()})
+                await ws_send(ws, {"type": "tsumo_loop_status", "data": tsumo_loop_status_payload()})
+
+            elif t == "tsumo_loop_control":
+                global TSUMO_LOOP_TASK, TSUMO_LOOP_STOP, TSUMO_LOOP_LAST_REASON, TSUMO_LOOP_WIN_COUNT
+                action = str((data or {}).get("action") or "")
+                if action == "start":
+                    if bool((data or {}).get("resetCount", False)):
+                        TSUMO_LOOP_WIN_COUNT = 0
+                    if TSUMO_LOOP_TASK is None or TSUMO_LOOP_TASK.done():
+                        interval_ms = int((data or {}).get("intervalMs", 400) or 400)
+                        interval_sec = max(0.2, min(10.0, interval_ms / 1000))
+                        TSUMO_LOOP_STOP = asyncio.Event()
+                        TSUMO_LOOP_LAST_REASON = ""
+                        TSUMO_LOOP_TASK = asyncio.create_task(_tsumo_loop(interval_sec))
+                    await broadcast({"type": "tsumo_loop_status", "data": tsumo_loop_status_payload()})
+                elif action == "stop":
+                    if TSUMO_LOOP_STOP is not None:
+                        TSUMO_LOOP_STOP.set()
+                    if TSUMO_LOOP_TASK is not None:
+                        TSUMO_LOOP_TASK.cancel()
+                        with contextlib.suppress(asyncio.CancelledError):
+                            await TSUMO_LOOP_TASK
+                    TSUMO_LOOP_TASK = None
+                    TSUMO_LOOP_STOP = None
+                    await broadcast({"type": "tsumo_loop_status", "data": tsumo_loop_status_payload()})
+                else:
+                    await ws_send(ws, {
+                        "type": "tsumo_loop_status",
+                        "data": {**tsumo_loop_status_payload(), "lastReason": "unknown-action"},
+                    })
 
             elif t == "fetch_amulet_activity_data":
                 try:
-                    activity_id = int((data or {}).get("activityId", getattr(PACKET_BOT, "activity_id", 250811)))
+                    activity_id = int((data or {}).get("activityId", getattr(PACKET_BOT, "activity_id", 260511)))
 
                     addon = PACKET_BOT.get_addon()
                     if not addon:
@@ -360,9 +440,53 @@ async def ws_handler(ws: WebSocketServerProtocol):
                 except Exception as e:
                     await ws_send(ws, {"type": "ui_toast", "data": {"kind": "error", "msg": f"注入异常：{e}"}})
 
+            elif t == "discard_tile_by_id":
+                try:
+                    tile_id = int((data or {}).get("tileId", 0) or 0)
+                    if tile_id <= 0:
+                        await ws_send(ws, {
+                            "type": "discard_tile_by_id_result",
+                            "data": {"ok": False, "reason": "invalid-tile-id", "tileId": tile_id},
+                        })
+                        continue
+
+                    bot = globals().get("PACKET_BOT")
+                    if not bot:
+                        await ws_send(ws, {
+                            "type": "discard_tile_by_id_result",
+                            "data": {"ok": False, "reason": "addon-not-ready", "tileId": tile_id},
+                        })
+                        continue
+
+                    ok, reason, _ = await call_with_1004_retry_async(
+                        bot.discard_by_tile_id,
+                        tile_id=tile_id,
+                        delay_sec=3,
+                        interval=0.4,
+                        timeout=12,
+                        to_thread=True,
+                    )
+                    await ws_send(ws, {
+                        "type": "discard_tile_by_id_result",
+                        "data": {"ok": ok, "reason": "" if ok else reason, "tileId": tile_id},
+                    })
+                    await ws_send(ws, {
+                        "type": "ui_toast",
+                        "data": {
+                            "kind": "success" if ok else "error",
+                            "msg_key": "tile_grid.discard_success" if ok else "tile_grid.discard_failed",
+                            "msg_values": {"id": tile_id, "reason": reason or "unknown"},
+                        },
+                    })
+                except Exception as e:
+                    await ws_send(ws, {
+                        "type": "discard_tile_by_id_result",
+                        "data": {"ok": False, "reason": f"exception:{e}", "tileId": (data or {}).get("tileId")},
+                    })
+
             elif t == "upgrade_shop_buff":
                 try:
-                    activity_id = int((data or {}).get("activityId", getattr(PACKET_BOT, "activity_id", 250811)))
+                    activity_id = int((data or {}).get("activityId", getattr(PACKET_BOT, "activity_id", 260511)))
                     buff_id = int((data or {}).get("id", 0))
                     upgrade_costs = [5, 10, 15, 20, 50, 100, 150, 200]
                     current_level = int((GAME_STATE.shop_buff_list or {}).get(buff_id, 0))
@@ -458,12 +582,12 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         continue
 
                     current_stage = int(getattr(GAME_STATE, "stage", -1) or -1)
-                    if current_stage not in {1, 4, 5, 7}:
+                    if current_stage in {1, 4, 6, 7}:
                         await _hotkey_result(False, "stage-not-allowed", stage=current_stage)
                         continue
 
                     if action == "buy_pack":
-                        if current_stage != 4:
+                        if current_stage != 9:
                             await _hotkey_result(False, "stage-not-allowed", stage=current_stage)
                             continue
                         good_id = int((data or {}).get("goodId", 0) or 0)
@@ -479,7 +603,7 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         continue
 
                     if action == "refresh_shop":
-                        if current_stage != 4:
+                        if current_stage != 9 and len(GAME_STATE.goods) != 0:
                             await _hotkey_result(False, "stage-not-allowed", stage=current_stage)
                             continue
                         ok, reason, _ = await call_with_1004_retry_async(
@@ -492,16 +616,66 @@ async def ws_handler(ws: WebSocketServerProtocol):
                         await _hotkey_result(ok, "" if ok else reason)
                         continue
 
+                    if action == "skip":
+                        if current_stage == 2:
+                            await _hotkey_result(False, "skip-not-allowed", stage=current_stage)
+                            continue
+                        if current_stage == 9:
+                            ok, reason, _ = await call_with_1004_retry_async(
+                                bot.skip_effect,
+                                delay_sec=3,
+                                interval=0.4,
+                                timeout=12,
+                                to_thread=True,
+                            )
+                        elif current_stage == 16:
+                            ok, reason, _ = await call_with_1004_retry_async(
+                                bot.select_reward_effect,
+                                selected_id=0,
+                                delay_sec=3,
+                                interval=0.4,
+                                timeout=12,
+                                to_thread=True,
+                            )
+                        else:
+                            await _hotkey_result(False, "stage-not-allowed", stage=current_stage)
+                            continue
+                        await _hotkey_result(ok, "" if ok else reason)
+                        continue
+
                     if action == "select_candidate":
-                        selected_id = int((data or {}).get("selectedId", 0) or 0)
-                        if current_stage == 1:
-                            if selected_id == 0:
-                                await _hotkey_result(False, "skip-not-allowed", stage=current_stage)
+                        selected_index_raw = (data or {}).get("selectedIndex")
+                        selected_index = None
+                        if selected_index_raw is not None:
+                            selected_index = int(selected_index_raw)
+                        if current_stage == 2:
+                            candidates = list(GAME_STATE.candidate_effect_list or [])
+                            if selected_index is not None:
+                                if selected_index < 0 or selected_index >= len(candidates):
+                                    await _hotkey_result(False, "unknown id")
+                                    continue
+                                selected_id = int(candidates[selected_index].get("id", 0) or 0)
+                            else:
+                                selected_id = int((data or {}).get("selectedId", 0) or 0)
+                            if selected_id <= 0:
+                                await _hotkey_result(False, "unknown id")
                                 continue
                             fn = bot.select_free_effect
-                        elif current_stage == 5:
+                        elif current_stage == 9:
+                            selected_id = selected_index if selected_index is not None else int((data or {}).get("selectedId", 0) or 0)
+                            if selected_id < 0:
+                                await _hotkey_result(False, "unknown id")
+                                continue
                             fn = bot.select_effect
-                        elif current_stage == 7:
+                        elif current_stage == 16:
+                            candidates = list(GAME_STATE.candidate_effect_list or [])
+                            if selected_index is not None:
+                                if selected_index < 0 or selected_index >= len(candidates):
+                                    await _hotkey_result(False, "unknown id")
+                                    continue
+                                selected_id = int(candidates[selected_index].get("id", 0) or 0)
+                            else:
+                                selected_id = int((data or {}).get("selectedId", 0) or 0)
                             fn = bot.select_reward_effect
                         else:
                             await _hotkey_result(False, "stage-not-allowed", stage=current_stage)

@@ -2,8 +2,10 @@ import React from "react";
 import {invoke} from "@tauri-apps/api/core";
 import {t} from "i18next";
 import {
+    readHudEnabled,
     readHudShowBlackhole,
     readHudShowScoreProjection,
+    writeHudEnabled,
     writeHudShowBlackhole,
     writeHudShowScoreProjection,
 } from "../lib/hudSettings";
@@ -28,12 +30,17 @@ export default function OverlayPage() {
     }, []);
 
     React.useEffect(() => {
+        const savedEnabled = readHudEnabled();
+        invoke<OverlayStatus>("set_overlay_enabled", {enabled: savedEnabled})
+            .then(setStatus)
+            .catch(() => setStatus({enabled: false, supported: false, found: false, pid: null}));
         refresh();
         const timer = window.setInterval(refresh, 800);
         return () => window.clearInterval(timer);
     }, [refresh]);
 
     const toggleEnabled = async (enabled: boolean) => {
+        writeHudEnabled(enabled);
         setSaving(true);
         try {
             const next = await invoke<OverlayStatus>("set_overlay_enabled", {enabled});

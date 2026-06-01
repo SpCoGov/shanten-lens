@@ -1,0 +1,129 @@
+.wrap {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+}
+
+.header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.title {
+    margin: 0;
+}
+
+.summaryGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+}
+
+.summaryItem {
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--text-muted) 7%, transparent);
+}
+
+.summaryLabel {
+    color: var(--color-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.summaryValue {
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.sectionTitle {
+    margin: 0 0 10px;
+}
+
+.rawJson,
+.tree {
+    min-height: 420px;
+    max-height: calc(100vh - 300px);
+    overflow: auto;
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--log-bg);
+    color: var(--log-fg);
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre;
+}
+
+.tree {
+    display: block;
+    white-space: normal;
+}
+
+.treeNode {
+    min-width: max-content;
+}
+
+.treeRow,
+.treeRowButton {
+    min-height: 26px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-width: max-content;
+    border: 0;
+    background: transparent;
+    color: var(--log-fg);
+    font: inherit;
+    text-align: left;
+}
+
+.treeRowButton {
+    cursor: pointer;
+}
+
+.treeRowButton:hover {
+    background: color-mix(in srgb, var(--log-fg) 8%, transparent);
+}
+
+.treeChevron,
+.treeSpacer {
+    width: 18px;
+    flex: 0 0 18px;
+    color: var(--color-muted);
+    font-size: 18px;
+    line-height: 1;
+}
+
+.treeKey {
+    color: color-mix(in srgb, var(--color-ring) 38%, var(--log-fg));
+    font-weight: 700;
+}
+
+.treeColon {
+    color: color-mix(in srgb, var(--log-fg) 62%, transparent);
+}
+
+.treePrimitive {
+    color: color-mix(in srgb, var(--accent-green) 28%, var(--log-fg));
+    overflow-wrap: anywhere;
+}
+
+.treeType {
+    color: color-mix(in srgb, var(--log-fg) 56%, transparent);
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}

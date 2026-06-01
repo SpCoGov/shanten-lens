@@ -11,13 +11,16 @@ import AutoRunnerPage from "./pages/AutoRunnerPage";
 import FusePage from "./pages/FusePage";
 import AboutPage from "./pages/AboutPage";
 import BlackHolePage from "./pages/BlackHolePage";
+import WanxiangSwitchPage from "./pages/WanxiangSwitchPage";
 import SouzuSwitchDebugPage from "./pages/SouzuSwitchDebugPage";
 import ScorePage from "./pages/ScorePage";
 import OverlayPage from "./pages/OverlayPage";
 import TodayWinPage from "./pages/TodayWinPage";
+import GameStatePage from "./pages/GameStatePage";
 import {ws, ensureWsStartedOnce} from "./lib/ws";
 import {type LogLevel, useLogStore} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
+import Modal from "./components/Modal";
 import Tile from "./components/Tile";
 import WallStats from "./components/WallStats";
 import ReplacementPanel from "./components/ReplacementPanel";
@@ -73,6 +76,14 @@ type BackendLogPayload =
     total?: number;
     text?: string;
 };
+
+const MAX_BACKEND_LOG_CHARS = 12000;
+const BACKEND_LOG_TRUNCATED_SUFFIX = "\n... [truncated in diagnostics view]";
+
+function limitBackendLogLine(line: string) {
+    if (line.length <= MAX_BACKEND_LOG_CHARS) return line;
+    return line.slice(0, MAX_BACKEND_LOG_CHARS) + BACKEND_LOG_TRUNCATED_SUFFIX;
+}
 
 type SouzuSwitchExecutionState = {
     status: "running" | "completed" | "failed";
@@ -265,7 +276,7 @@ async function openSettingsWindow() {
     }
 }
 
-type Route = "home" | "score" | "blackhole" | "souzu-debug" | "fuse" | "today-win" | "autorun" | "settings" | "overlay" | "diagnostics" | "packet-test" | "frontend-test" | "about";
+type Route = "home" | "score" | "blackhole" | "wanxiang" | "souzu-debug" | "fuse" | "today-win" | "gamestate" | "autorun" | "settings" | "overlay" | "diagnostics" | "packet-test" | "frontend-test" | "about";
 type TutorialId = "home" | "blackhole";
 type TutorialStep = {
     title: string;
@@ -281,6 +292,21 @@ type VersionMismatch = {
 type UsageNoticeState = {
     checked: boolean;
 };
+
+type TsumoLoopStatus = {
+    running: boolean;
+    lastReason: string;
+    winCount: number;
+};
+
+function isWanxiangSwitchPlan(data: PlanData | null | undefined) {
+    if (!data) return false;
+    return data.search_algorithm === "wanxiang_four_meld_switch"
+        || data.mode === "wanxiang-four-meld-switch"
+        || String(data.plan_signature || "").startsWith("wanxiang|")
+        || data.reason === "wanxiang-not-in-hand"
+        || data.reason === "cannot-form-four-melds-with-wanxiang";
+}
 
 type UpdateDialogState = {
     update: UpdateInfo;
@@ -310,7 +336,9 @@ function writeTutorialSeen(key: string) {
 
 function isMoreRoute(route: Route) {
     return route === "fuse"
+        || route === "wanxiang"
         || route === "today-win"
+        || route === "gamestate"
         || route === "overlay"
         || route === "souzu-debug"
         || route === "diagnostics"
@@ -505,7 +533,7 @@ function Topbar({
     updateAvailable?: boolean;
 }) {
     const {t} = useTranslation();
-    const progressMeta = (stage === 2 || stage === 3) ? buildPointProgressMeta(point, targetPoint) : null;
+    const progressMeta = (stage === 4 || stage === 5 || stage === 6 || stage === 7) ? buildPointProgressMeta(point, targetPoint) : null;
     const onMin = async () => {
         const appWindow = getAppWindowSafe();
         if (!appWindow) return;
@@ -526,11 +554,15 @@ function Topbar({
     };
     const onClose = async () => {
         const appWindow = getAppWindowSafe();
-        if (!appWindow) return;
         try {
-            await appWindow.close();
+            await invoke("shutdown_app");
         } catch (e) {
-            console.error("close failed", e);
+            console.error("shutdown failed", e);
+            try {
+                await appWindow?.close();
+            } catch (closeError) {
+                console.error("close failed", closeError);
+            }
         }
     };
 
@@ -610,6 +642,140 @@ function HomeSideTabs({
     );
 }
 
+function formatMapNodeValue(value: unknown) {
+    if (value === null || value === undefined || value === "") return "-";
+    if (typeof value === "object") {
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return String(value);
+        }
+    }
+    return String(value);
+}
+
+function formatGameMapLevel(level: unknown) {
+    const value = Number(level ?? 0);
+    if (!Number.isFinite(value) || value <= 0) return "-";
+    if (value >= 1000) return `Ex${value - 1000}`;
+    const chapter = Math.trunc(value / 100);
+    const stage = value % 100;
+    if (chapter > 0 && stage > 0) return `${chapter}-${stage}`;
+    return String(value);
+}
+
+function getGameMapNodeLabel(level: unknown, index: number, count: number) {
+    const prefix = formatGameMapLevel(level);
+    if (index === 0) return `${prefix}-START`;
+    if (index === count - 1 && count > 1) return `${prefix}-BOSS`;
+    return `${prefix}-${index}`;
+}
+
+function getGameMapNodePosition(index: number, count: number): React.CSSProperties {
+    const safeCount = Math.max(1, count);
+    const x = safeCount === 1 ? 50 : 8 + (84 * index) / (safeCount - 1);
+    const y = index % 2 === 0 ? 68 : 24;
+    return {
+        "--x": `${x}%`,
+        "--y": `${y}%`,
+    } as React.CSSProperties;
+}
+
+function getGameMapNodeIconSrc(type: unknown, subType: unknown) {
+    if (type === null || type === undefined || subType === null || subType === undefined) return null;
+    const typeText = String(type).trim();
+    const subTypeText = String(subType).trim();
+    if (!typeText || !subTypeText) return null;
+    return `/assets/node/${encodeURIComponent(typeText)}-${encodeURIComponent(subTypeText)}.png`;
+}
+
+function GameMapModal({
+                          open,
+                          onClose,
+                          currentState,
+                      }: {
+    open: boolean;
+    onClose: () => void;
+    currentState: GameStateData | null;
+}) {
+    const {t} = useTranslation();
+    const mapNodes = Array.isArray(currentState?.map_nodes) ? currentState.map_nodes : [];
+    const currentNode = Number(currentState?.node ?? 0);
+    const displayNodes = mapNodes.length > 0 ? mapNodes : [];
+
+    return (
+        <Modal
+            open={open}
+            onClose={onClose}
+            title={t("game_map.title")}
+            width={780}
+            className="game-map-modal"
+        >
+            {displayNodes.length > 0 ? (
+                <div className="game-map-board">
+                    <svg className="game-map-route" viewBox="0 0 1000 360" preserveAspectRatio="none" aria-hidden="true">
+                        <path d="M70 250 C145 90 230 105 295 185 S420 280 485 165 S620 70 690 160 S820 285 920 105"/>
+                    </svg>
+                    <div className="game-map-level-pill">
+                        <span>{t("game_map.level")}</span>
+                        <strong>{formatGameMapLevel(currentState?.level)}</strong>
+                    </div>
+                    <div className="game-map-node-pill">
+                        <span>{t("game_map.node")}</span>
+                        <strong>{formatMapNodeValue(currentState?.node)} / {displayNodes.length}</strong>
+                    </div>
+                    {displayNodes.map((mapNode, index) => {
+                        const args = Array.isArray(mapNode.args) ? mapNode.args : [];
+                        const isCurrent = currentNode === index + 1;
+                        const iconSrc = getGameMapNodeIconSrc(mapNode.type, mapNode.subType);
+                        const showTypeInfo = !iconSrc;
+                        const showNodeDetails = showTypeInfo || args.length > 0;
+                        return (
+                            <div
+                                className={`game-map-point ${isCurrent ? "is-current" : ""}`}
+                                style={getGameMapNodePosition(index, displayNodes.length)}
+                                key={index}
+                            >
+                                <div className={`game-map-marker ${iconSrc ? "has-icon" : ""}`}>
+                                    {iconSrc ? (
+                                        <img
+                                            src={iconSrc}
+                                            alt=""
+                                            onError={(event) => {
+                                                event.currentTarget.style.display = "none";
+                                                event.currentTarget.nextElementSibling?.removeAttribute("hidden");
+                                            }}
+                                        />
+                                    ) : null}
+                                    <span hidden={Boolean(iconSrc)}>{index + 1}</span>
+                                </div>
+                                <div className="game-map-label">{getGameMapNodeLabel(currentState?.level, index, displayNodes.length)}</div>
+                                {showNodeDetails ? (
+                                    <div className="game-map-node-card">
+                                        {showTypeInfo ? (
+                                            <>
+                                                <div><b>{t("game_map.type")}</b>: {formatMapNodeValue(mapNode.type)}</div>
+                                                <div><b>{t("game_map.sub_type")}</b>: {formatMapNodeValue(mapNode.subType)}</div>
+                                            </>
+                                        ) : null}
+                                        {args.length > 0 ? (
+                                            <div className="game-map-node-card-args">
+                                                <b>{t("game_map.args")}</b>: {args.map(formatMapNodeValue).join(", ")}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                <div className="empty">{t("game_map.empty")}</div>
+            )}
+        </Modal>
+    );
+}
+
 export default function App() {
     const {t} = useTranslation();
     type ThemeMode = "auto" | "dark" | "dark-green" | "dark-purple";
@@ -633,6 +799,7 @@ export default function App() {
     const [latestUpdate, setLatestUpdate] = React.useState<UpdateInfo | null>(null);
     const [updateChecking, setUpdateChecking] = React.useState(false);
     const [updatePrefs, setUpdatePrefs] = React.useState(() => readUpdatePrefs());
+    const [tsumoLoopStatus, setTsumoLoopStatus] = React.useState<TsumoLoopStatus>({running: false, lastReason: "", winCount: 0});
     const updateCheckStartedRef = React.useRef(false);
     const [activeTutorial, setActiveTutorial] = React.useState<TutorialId | null>(null);
     const [souzuSwitchExecution, setSouzuSwitchExecution] = React.useState<SouzuSwitchExecutionState | null>(null);
@@ -768,9 +935,11 @@ export default function App() {
     const [planSuuAnkou, setPlanSuuAnkou] = React.useState<PlanData | null>(null);
     const [planChiitoi, setPlanChiitoi] = React.useState<PlanData | null>(null);
     const [planSouzuSwitch, setPlanSouzuSwitch] = React.useState<PlanData | null>(null);
+    const [planWanxiangSwitch, setPlanWanxiangSwitch] = React.useState<PlanData | null>(null);
     const [debugSouzuSwitch, setDebugSouzuSwitch] = React.useState<PlanData | null>(null);
     const [latestGameState, setLatestGameState] = React.useState<GameStateData | null>(null);
     const [amuletHotkeys, setAmuletHotkeys] = React.useState<AmuletHotkeySettings>(() => readAmuletHotkeySettings());
+    const [gameMapOpen, setGameMapOpen] = React.useState(false);
     const [hotkeyEditorOpen, setHotkeyEditorOpen] = React.useState(false);
     const [sellConfirmTarget, setSellConfirmTarget] = React.useState<EffectItem | null>(null);
     const [lastSelectedCandidateId, setLastSelectedCandidateId] = React.useState<number | null>(null);
@@ -843,7 +1012,7 @@ export default function App() {
 
     const closeProgram = React.useCallback(async () => {
         try {
-            await getCurrentWindow().close();
+            await invoke("shutdown_app");
         } catch {
             window.close();
         }
@@ -968,7 +1137,7 @@ export default function App() {
     );
 
     const handleUpgradeExchangeShopBuff = React.useCallback(() => {
-        if (stage !== 4) {
+        if (stage !== 9) {
             pushToast(t("shop_buff_upgrade.stage_not_allowed"), "info", 1800);
             return;
         }
@@ -987,9 +1156,16 @@ export default function App() {
         }
         ws.send({
             type: "upgrade_shop_buff",
-            data: {activityId: 250811, id: SHOP_BUFF_EXCHANGE_ID},
+            data: {activityId: 260511, id: SHOP_BUFF_EXCHANGE_ID},
         } as any);
     }, [coin, nextExchangeShopBuffCost, stage, t]);
+
+    const toggleTsumoLoop = React.useCallback(() => {
+        ws.send({
+            type: "tsumo_loop_control",
+            data: {action: tsumoLoopStatus.running ? "stop" : "start", intervalMs: 400},
+        } as any);
+    }, [tsumoLoopStatus.running]);
 
     const onSecretClick = React.useCallback(() => {
         hiddenThemeClicksRef.current += 1;
@@ -1123,8 +1299,8 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
-        if (stage === 2) return;
-        if (stage === 3) {
+        if (stage === 4 || stage === 5) return;
+        if (stage === 6 || stage === 7) {
             setRightPanelMode("wall");
             return;
         }
@@ -1207,7 +1383,7 @@ export default function App() {
                 setWallTileIds(Array.isArray(d.wall_tiles) ? d.wall_tiles : []);
                 setWallStatsTiles(wallList);
 
-                if (!(d.stage === 2 || d.stage === 3)) {
+                if (!(d.stage === 4 || d.stage === 5 || d.stage === 6 || stage === 7)) {
                     setPlanSuuAnkou(null);
                     setPlanChiitoi(null);
                 }
@@ -1225,6 +1401,7 @@ export default function App() {
                     else if (item.yaku === "souzu_switch") {
                         const source = (item.data as any)?.request_source;
                         if (source === "debug") setDebugSouzuSwitch(item.data ?? null);
+                        else if (isWanxiangSwitchPlan(item.data)) setPlanWanxiangSwitch(item.data ?? null);
                         else setPlanSouzuSwitch(item.data ?? null);
                     }
                 }
@@ -1270,6 +1447,13 @@ export default function App() {
                 }
             } else if (pkt.type === "autorun_status" && pkt.data) {
                 setAutoStatus(pkt.data as AutoRunnerStatus);
+            } else if (pkt.type === "tsumo_loop_status" && pkt.data) {
+                const d = pkt.data as Partial<TsumoLoopStatus>;
+                setTsumoLoopStatus({
+                    running: Boolean(d.running),
+                    lastReason: String(d.lastReason || ""),
+                    winCount: Math.max(0, Number(d.winCount || 0)),
+                });
             } else if (pkt.type === "upgrade_shop_buff_result") {
                 const d = (pkt.data ?? {}) as {
                     ok?: boolean;
@@ -1353,23 +1537,29 @@ export default function App() {
         const addLogs = useLogStore.getState().addLogs;
         let unsubs: Array<() => void> = [];
         (async () => {
-            const chunkBuffers = new Map<string, { total: number; parts: string[] }>();
+            const chunkBuffers = new Map<string, {
+                total: number;
+                parts: string[];
+                received: boolean[];
+                chars: number;
+                truncated: boolean;
+            }>();
 
             const handleBackendLogPayload = (event: string, level: LogLevel, payload: BackendLogPayload) => {
                 if (typeof payload === "string") {
-                    addLog(level, `${event}: ${payload}`);
+                    addLog(level, `${event}: ${limitBackendLogLine(payload)}`);
                     return;
                 }
 
                 if (Array.isArray(payload)) {
-                    addLogs(level, payload.map((line) => `${event}: ${line}`));
+                    addLogs(level, payload.map((line) => `${event}: ${limitBackendLogLine(line)}`));
                     return;
                 }
 
                 if (!payload || typeof payload !== "object") return;
 
                 if (payload.kind === "lines" && Array.isArray(payload.lines)) {
-                    addLogs(level, payload.lines.map((line) => `${event}: ${line}`));
+                    addLogs(level, payload.lines.map((line) => `${event}: ${limitBackendLogLine(line)}`));
                     return;
                 }
 
@@ -1378,15 +1568,26 @@ export default function App() {
                     const bucket = chunkBuffers.get(key) ?? {
                         total: payload.total,
                         parts: Array.from({length: payload.total}, () => ""),
+                        received: Array.from({length: payload.total}, () => false),
+                        chars: 0,
+                        truncated: false,
                     };
                     bucket.total = payload.total;
                     if (typeof payload.index === "number" && payload.index >= 0 && payload.index < bucket.parts.length) {
-                        bucket.parts[payload.index] = payload.text ?? "";
+                        const text = payload.text ?? "";
+                        const remaining = Math.max(0, MAX_BACKEND_LOG_CHARS - bucket.chars);
+                        bucket.parts[payload.index] = remaining > 0 ? text.slice(0, remaining) : "";
+                        bucket.received[payload.index] = true;
+                        bucket.chars += bucket.parts[payload.index].length;
+                        if (text.length > remaining) bucket.truncated = true;
                     }
                     chunkBuffers.set(key, bucket);
-                    if (bucket.parts.every((part) => part !== "")) {
+                    if (bucket.received.every(Boolean)) {
                         chunkBuffers.delete(key);
-                        addLog(level, `${event}: ${bucket.parts.join("")}`);
+                        addLog(
+                            level,
+                            `${event}: ${bucket.parts.join("")}${bucket.truncated ? BACKEND_LOG_TRUNCATED_SUFFIX : ""}`,
+                        );
                     }
                 }
             };
@@ -1431,7 +1632,7 @@ export default function App() {
         return () => un();
     }, []);
 
-    const statsHeader = stage === 2 ? (
+    const statsHeader = (stage === 4 || stage === 5) ? (
         <div className="right-panel-title-switch" role="tablist" aria-label={t("right_panel.title")}>
             {rightPanelMode === "replacementStats" ? (
                 <>
@@ -1457,7 +1658,7 @@ export default function App() {
         </div>
     ) : undefined;
 
-    const canUseAmuletHotkeys = React.useMemo(() => [1, 4, 5, 7].includes(stage), [stage]);
+    const canUseAmuletHotkeys = React.useMemo(() => [2, 9, 16].includes(stage), [stage]);
     const amuletHotkeyConflicts = React.useMemo(() => {
         const byKey = new Map<string, string[]>();
         for (const entry of collectAmuletHotkeyEntries(amuletHotkeys)) {
@@ -1519,21 +1720,22 @@ export default function App() {
     const sendAmuletHotkeyAction = React.useCallback((action: string, payload: Record<string, unknown> = {}) => {
         ws.send({
             type: "amulet_hotkey_action",
-            data: {activityId: 250811, action, ...payload},
+            data: {activityId: 260511, action, ...payload},
         } as any);
     }, []);
 
-    const selectCandidateById = React.useCallback((selectedId: number) => {
-        if (![1, 5, 7].includes(stage)) {
+    const selectCandidateByIndex = React.useCallback((selectedIndex: number) => {
+        if (![2, 9, 16].includes(stage)) {
             pushToast(t("amulet_hotkeys.stage_unavailable", {stage}), "info", 1400);
             return;
         }
-        setLastSelectedCandidateId(selectedId);
-        sendAmuletHotkeyAction("select_candidate", {selectedId});
-    }, [sendAmuletHotkeyAction, stage, t]);
+        const candidate = (candidates ?? [])[selectedIndex];
+        setLastSelectedCandidateId(candidate?.id ?? null);
+        sendAmuletHotkeyAction("select_candidate", {selectedIndex});
+    }, [candidates, sendAmuletHotkeyAction, stage, t]);
 
     const refreshShopManually = React.useCallback(() => {
-        if (stage !== 4) {
+        if (stage !== 9) {
             pushToast(t("amulet_hotkeys.stage_unavailable", {stage}), "info", 1400);
             return;
         }
@@ -1548,15 +1750,15 @@ export default function App() {
     }, [coin, latestGameState?.refresh_price, sendAmuletHotkeyAction, stage, t]);
 
     const skipCandidateManually = React.useCallback(() => {
-        if (![1, 5, 7].includes(stage)) {
+        if (![2, 9, 16].includes(stage)) {
             pushToast(t("amulet_hotkeys.stage_unavailable", {stage}), "info", 1400);
             return;
         }
-        if (stage === 1) {
+        if (stage === 2) {
             pushToast(t("amulet_hotkeys.free_cannot_skip"), "info", 1400);
             return;
         }
-        sendAmuletHotkeyAction("select_candidate", {selectedId: 0});
+        sendAmuletHotkeyAction("skip");
     }, [sendAmuletHotkeyAction, stage, t]);
 
     const sellOwnedAmulet = React.useCallback((item: EffectItem) => {
@@ -1578,7 +1780,7 @@ export default function App() {
         const currentCoin = Number.parseInt(String(coin ?? "0"), 10);
         const safeCoin = Number.isFinite(currentCoin) ? currentCoin : 0;
 
-        if (stage === 4) {
+        if (stage === 9) {
             const buyIndex = amuletHotkeys.buyPack.findIndex((item) => normalizeHotkeyKey(item) === key);
             if (buyIndex >= 0) {
                 event.preventDefault();
@@ -1603,7 +1805,7 @@ export default function App() {
             }
         }
 
-        if (stage === 1 || stage === 5 || stage === 7) {
+        if (stage === 2 || stage === 9 || stage === 16) {
             const candidateIndex = amuletHotkeys.selectCandidate.findIndex((item) => normalizeHotkeyKey(item) === key);
             if (candidateIndex >= 0) {
                 event.preventDefault();
@@ -1612,7 +1814,7 @@ export default function App() {
                     pushToast(t("amulet_hotkeys.no_amulet_slot", {slot: candidateIndex + 1}), "info", 1200);
                     return;
                 }
-                selectCandidateById(candidate.id);
+                selectCandidateByIndex(candidateIndex);
                 return;
             }
 
@@ -1645,7 +1847,7 @@ export default function App() {
         lastSelectedCandidateId,
         refreshShopManually,
         sellConfirmTarget,
-        selectCandidateById,
+        selectCandidateByIndex,
         sendAmuletHotkeyAction,
         skipCandidateManually,
         stage,
@@ -1767,11 +1969,11 @@ export default function App() {
                     }} className={`nav-icon ${route === "blackhole" ? "active" : ""}`} data-tutorial="nav-blackhole" title={t("nav.blackhole")} onClick={() => setRoute("blackhole")}>
                         <span className="ms">deblur</span>
                     </button>
-                    <button ref={(el) => {
+                    {false && (<button ref={(el) => {
                         navRefs.current.autorun = el;
                     }} className={`nav-icon ${route === "autorun" ? "active" : ""}`} data-tutorial="nav-autorun" title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
                         <span className="ms">autoplay</span>
-                    </button>
+                    </button>)}
                     <div className="more-nav">
                         <button
                             ref={moreButtonRef}
@@ -1793,6 +1995,14 @@ export default function App() {
                                 >
                                     <span className="ms">gpp_maybe</span>
                                     <span>{t("nav.fuse")}</span>
+                                </button>
+                                <button
+                                    className={`more-menu-item ${route === "wanxiang" ? "active" : ""}`}
+                                    role="menuitem"
+                                    onClick={() => navigateFromMore("wanxiang")}
+                                >
+                                    <span className="ms">all_inclusive</span>
+                                    <span>{t("nav.wanxiang")}</span>
                                 </button>
                                 <button
                                     className={`more-menu-item ${route === "overlay" ? "active" : ""}`}
@@ -1828,6 +2038,14 @@ export default function App() {
                                 >
                                     <span className="ms">extension</span>
                                     <span>{t("nav.todayWin")}</span>
+                                </button>
+                                <button
+                                    className={`more-menu-item ${route === "gamestate" ? "active" : ""}`}
+                                    role="menuitem"
+                                    onClick={() => navigateFromMore("gamestate")}
+                                >
+                                    <span className="ms">data_object</span>
+                                    <span>{t("nav.gamestate")}</span>
                                 </button>
 
                                 {debugEnabled && (
@@ -1884,7 +2102,7 @@ export default function App() {
                             className="nav-icon"
                             data-tutorial="nav-refresh"
                             title={t("nav.refreshGame")}
-                            onClick={() => ws.send({type: "fetch_amulet_activity_data", data: {activityId: 250811}})}
+                            onClick={() => ws.send({type: "fetch_amulet_activity_data", data: {activityId: 260511}})}
                         >
                             <span className="ms">refresh</span>
                         </button>
@@ -1946,7 +2164,34 @@ export default function App() {
 
                                 <div style={{flex: 1, minWidth: 0, position: "relative"}}>
                                     <div className="panel">
-                                        <div className="panel-title">{t("amulet")}</div>
+                                        <div className="panel-title panel-title-with-action">
+                                            <span>{t("amulet")}</span>
+                                            <div className="panel-title-actions">
+                                                <button
+                                                    className="panel-title-action"
+                                                    onClick={() => setGameMapOpen(true)}
+                                                    title={t("game_map.open")}
+                                                >
+                                                    <span className="ms" aria-hidden="true">map</span>
+                                                    <span>{t("game_map.button")}</span>
+                                                </button>
+                                                <button
+                                                    className={`panel-title-action ${tsumoLoopStatus.running ? "active" : ""}`}
+                                                    onClick={toggleTsumoLoop}
+                                                    title={tsumoLoopStatus.running
+                                                        ? t("manual_tsumo.stop_hint")
+                                                        : t("manual_tsumo.start_hint")}
+                                                >
+                                                    <span className="ms" aria-hidden="true">
+                                                        {tsumoLoopStatus.running ? "pause" : "play_arrow"}
+                                                    </span>
+                                                    <span>{tsumoLoopStatus.running ? t("manual_tsumo.stop") : t("manual_tsumo.start")}</span>
+                                                    <span className="panel-title-action-count">
+                                                        {t("manual_tsumo.win_count", {count: tsumoLoopStatus.winCount})}
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        </div>
                                         <AmuletBar
                                             items={amulets}
                                             scale={0.55}
@@ -1955,14 +2200,14 @@ export default function App() {
                                         />
                                     </div>
 
-                                    {(stage === 4 || stage === 5) && (
+                                    {(stage === 9) && (
                                         <div className="panel">
                                             <div className="panel-title panel-title-with-action">
                                                 <span>{t("goods")}</span>
                                                 <button
                                                     className="panel-title-action"
                                                     onClick={refreshShopManually}
-                                                    disabled={stage !== 4}
+                                                    disabled={stage !== 9}
                                                     title={t("amulet_hotkeys.refresh_shop_hint", {
                                                         price: latestGameState?.refresh_price ?? 0,
                                                     })}
@@ -1982,7 +2227,7 @@ export default function App() {
                                         </div>
                                     )}
 
-                                    {stage === 4 && (
+                                    {stage === 9 && false && (
                                         <div className="panel">
                                             <div className="panel-title">{t("shop_buff_upgrade.panel_title")}</div>
                                             <div style={{display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center"}}>
@@ -2014,11 +2259,11 @@ export default function App() {
                                         </div>
                                     )}
 
-                                    {[1, 5, 7].includes(stage) && (
+                                    {[2, 9, 16].includes(stage) && (
                                         <div className="panel">
                                             <div className="panel-title panel-title-with-action">
                                                 <span>{t("candidate_amulet")}</span>
-                                                {[5, 7].includes(stage) ? (
+                                                {[9, 16].includes(stage) ? (
                                                     <button
                                                         className="panel-title-action"
                                                         onClick={skipCandidateManually}
@@ -2037,13 +2282,13 @@ export default function App() {
                                                 ownedAmulets={amulets}
                                                 scale={0.55}
                                                 max={3}
-                                                onCandidateClick={(candidate) => selectCandidateById(candidate.id)}
+                                                onCandidateClick={(_candidate, index) => selectCandidateByIndex(index)}
                                                 hotkeyLabels={amuletHotkeys.enabled ? amuletHotkeys.selectCandidate.map(displayHotkey) : undefined}
                                             />
                                         </div>
                                     )}
 
-                                    {(stage === 2 || stage === 3) && (
+                                    {(stage === 4 || stage === 5 || stage === 6 || stage === 7) && (
                                         <TileGrid
                                             cells={cells}
                                             tianDoraTiles={tianDoraTiles}
@@ -2051,13 +2296,13 @@ export default function App() {
                                         />
                                     )}
 
-                                    {stage === 2 && replacementTiles.length > 0 && (
+                                    {(stage === 5 || stage === 4) && replacementTiles.length > 0 && (
                                         <ReplacementPanel replacementTiles={replacementTiles} usedCount={switchUsedCount}/>
                                     )}
 
                                 </div>
 
-                                {(stage === 2 || stage === 3) && (
+                                {(stage === 5 || stage === 4 || stage == 6 || stage === 7) && (
                                     <div className="right-side-panel">
                                         <div className="dora-indicator-panel mj-panel">
                                             <div className="dora-indicator-title">{t("dora_indicator.title")}</div>
@@ -2079,7 +2324,7 @@ export default function App() {
                                                 )}
                                             </div>
                                         </div>
-                                        {stage === 2 && rightPanelMode === "replacementStats" ? (
+                                        {(stage === 5 || stage === 4) && rightPanelMode === "replacementStats" ? (
                                             <ReplacementStats replacementTiles={replacementTiles} usedCount={switchUsedCount} headerSlot={statsHeader}/>
                                         ) : (
                                             <WallStats wallTiles={wallStatsTiles} headerSlot={statsHeader}/>
@@ -2104,6 +2349,7 @@ export default function App() {
                         )}
                         {route === "fuse" && <FusePage/>}
                         {route === "today-win" && <TodayWinPage/>}
+                        {route === "gamestate" && <GameStatePage currentState={latestGameState}/>}
                         {route === "blackhole" && (
                             <BlackHolePage
                                 stage={stage}
@@ -2114,6 +2360,18 @@ export default function App() {
                                 wallIds={wallTileIds}
                                 currentState={latestGameState}
                                 onClear={() => setPlanSouzuSwitch(null)}
+                            />
+                        )}
+                        {route === "wanxiang" && (
+                            <WanxiangSwitchPage
+                                stage={stage}
+                                data={planWanxiangSwitch}
+                                resolveFace={(id) => deckMap.get(id) ?? null}
+                                handIds={handTileIds}
+                                replacementIds={replacementTileIds}
+                                wallIds={wallTileIds}
+                                currentState={latestGameState}
+                                onClear={() => setPlanWanxiangSwitch(null)}
                             />
                         )}
                         {route === "souzu-debug" && (
@@ -2143,6 +2401,12 @@ export default function App() {
                     </div>
                 </main>
             </div>
+
+            <GameMapModal
+                open={gameMapOpen}
+                onClose={() => setGameMapOpen(false)}
+                currentState={latestGameState}
+            />
 
             <footer className="statusbar" role="status">
                 <div className="sb-left">

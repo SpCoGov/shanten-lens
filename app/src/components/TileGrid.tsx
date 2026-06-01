@@ -3,6 +3,9 @@ import "../styles/theme.css";
 import Tile from "./Tile";
 import "./TileGrid.module.css";
 import type {Cell} from "../lib/gamestate";
+import Modal from "./Modal";
+import {t} from "i18next";
+import {ws} from "../lib/ws";
 
 const ROWS = 4;
 const COLS = 9;
@@ -25,9 +28,9 @@ export default function TileGrid({
 }) {
     const [hovered, setHovered] = useState<string | null>(null);
     const [scale, setScale] = useState(1);
+    const [selectedCell, setSelectedCell] = useState<Cell | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
 
-    // 侧栏/其它处发出的单值 hover 事件（例如 "5p" 或 "0p"）
     React.useEffect(() => {
         const onHover = (e: Event) => {
             const ce = e as CustomEvent<string | null>;
@@ -36,6 +39,7 @@ export default function TileGrid({
         window.addEventListener("shanten:hover-tile", onHover as EventListener);
         return () => window.removeEventListener("shanten:hover-tile", onHover as EventListener);
     }, []);
+
     React.useEffect(() => {
         window.dispatchEvent(new CustomEvent("shanten:hover-tile", {detail: hovered}));
     }, [hovered]);
@@ -63,7 +67,6 @@ export default function TileGrid({
         };
     }, []);
 
-    // 截断到 36 张
     const data = useMemo(() => cells.slice(0, ROWS * COLS), [cells]);
 
     const tileW = Math.round(BASE_TILE_W * scale);
@@ -72,72 +75,129 @@ export default function TileGrid({
     const gapY = Math.round(BASE_GAP_Y * scale);
 
     const totalSlots = ROWS * COLS;
+    const selectedTileId = selectedCell?.id;
+
+    const discardSelectedTile = () => {
+        if (typeof selectedTileId !== "number") return;
+        ws.send({type: "discard_tile_by_id", data: {tileId: selectedTileId}});
+        setSelectedCell(null);
+    };
 
     return (
-        <section
-            className="mj-panel card tilegrid-card"
-            style={{
-                width: "100%",
-                boxSizing: "border-box",
-                overflow: "hidden",
-            }}
-        >
-            <div ref={containerRef} style={{width: "100%"}}>
-                <div
-                    className="tilegrid-grid"
-                    style={{
-                        position: "relative",
-                        display: "grid",
-                        gridTemplateColumns: `repeat(${COLS}, ${tileW}px)`,
-                        gridTemplateRows: `repeat(${ROWS}, ${tileH}px)`,
-                        columnGap: gapX,
-                        rowGap: gapY,
-                        justifyContent: "center",
-                        width: "100%",
-                        minHeight: ROWS * tileH + (ROWS - 1) * gapY,
-                    }}
-                >
-                    {data.length === 0 ? (
-                        <div
-                            style={{
-                                position: "absolute",
-                                inset: 0,
-                                display: "grid",
-                                placeItems: "center",
-                                color: "var(--muted)",
-                                fontSize: 14,
-                            }}
-                        >
-                            牌山为空
-                        </div>
-                    ) : (
-                        data.map((c, i) => {
-                            // 让第 0 个元素落在右下角；随后依次向左、向上回填
-                            const posIndex = totalSlots - 1 - i;
-                            const r = Math.floor(posIndex / COLS);
-                            const cIdx = posIndex % COLS;
+        <>
+            <section
+                className="mj-panel card tilegrid-card"
+                style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    overflow: "hidden",
+                }}
+            >
+                <div ref={containerRef} style={{width: "100%"}}>
+                    <div
+                        className="tilegrid-grid"
+                        style={{
+                            position: "relative",
+                            display: "grid",
+                            gridTemplateColumns: `repeat(${COLS}, ${tileW}px)`,
+                            gridTemplateRows: `repeat(${ROWS}, ${tileH}px)`,
+                            columnGap: gapX,
+                            rowGap: gapY,
+                            justifyContent: "center",
+                            width: "100%",
+                            minHeight: ROWS * tileH + (ROWS - 1) * gapY,
+                        }}
+                    >
+                        {data.length === 0 ? (
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    inset: 0,
+                                    display: "grid",
+                                    placeItems: "center",
+                                    color: "var(--muted)",
+                                    fontSize: 14,
+                                }}
+                            >
+                                {t("tile_grid.empty")}
+                            </div>
+                        ) : (
+                            data.map((cell, i) => {
+                                const posIndex = totalSlots - 1 - i;
+                                const row = Math.floor(posIndex / COLS);
+                                const col = posIndex % COLS;
+                                const hasTileId = typeof cell.id === "number";
 
-                            return (
-                                <div
-                                    key={`${c.tile}-${c.dim ? "d" : "n"}-${i}`}
-                                    style={{gridRow: r + 1, gridColumn: cIdx + 1}}
-                                >
-                                    <Tile
-                                        tile={c.tile}
-                                        dim={c.dim}
-                                        hoveredTile={hovered}
-                                        setHoveredTile={setHovered}
-                                        tianDoraTiles={tianDoraTiles}
-                                        doraCountByTile={doraCountByTile}
-                                        width={tileW}
-                                        height={tileH}
-                                    />
-                                </div>
-                            );
-                        })
-                    )}
+                                return (
+                                    <div
+                                        key={`${cell.tile}-${cell.id ?? i}-${cell.dim ? "d" : "n"}`}
+                                        style={{
+                                            gridRow: row + 1,
+                                            gridColumn: col + 1,
+                                            cursor: hasTileId ? "pointer" : undefined,
+                                        }}
+                                        role={hasTileId ? "button" : undefined}
+                                        tabIndex={hasTileId ? 0 : undefined}
+                                        title={hasTileId ? t("tile_grid.discard_tile_title", {id: cell.id}) : undefined}
+                                        onClick={hasTileId ? () => setSelectedCell(cell) : undefined}
+                                        onKeyDown={hasTileId ? (e) => {
+                                            if (e.key === "Enter" || e.key === " ") {
+                                                e.preventDefault();
+                                                setSelectedCell(cell);
+                                            }
+                                        } : undefined}
+                                    >
+                                        <Tile
+                                            tile={cell.tile}
+                                            dim={cell.dim}
+                                            hoveredTile={hovered}
+                                            setHoveredTile={setHovered}
+                                            tianDoraTiles={tianDoraTiles}
+                                            doraCountByTile={doraCountByTile}
+                                            width={tileW}
+                                            height={tileH}
+                                        />
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
                 </div>
-            </div>
-        </section>
+            </section>
+
+            <Modal
+                open={selectedCell !== null}
+                onClose={() => setSelectedCell(null)}
+                title={t("tile_grid.discard_confirm_title")}
+                width={360}
+                actions={
+                    <button className="btn primary" onClick={discardSelectedTile}>
+                        {t("tile_grid.discard_confirm_action")}
+                    </button>
+                }
+            >
+                <div style={{display: "grid", gap: 12}}>
+                    <div style={{display: "flex", alignItems: "center", gap: 12}}>
+                        {selectedCell ? (
+                            <Tile
+                                tile={selectedCell.tile}
+                                dim={selectedCell.dim}
+                                hoveredTile={null}
+                                width={44}
+                                height={58}
+                            />
+                        ) : null}
+                        <div>
+                            <div style={{fontWeight: 700}}>
+                                {t("tile_grid.tile_id", {id: selectedTileId ?? "-"})}
+                            </div>
+                            <div style={{color: "var(--muted)", fontSize: 13}}>
+                                {t("tile_grid.tile_face", {tile: selectedCell?.tile ?? "-"})}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Modal>
+        </>
     );
 }

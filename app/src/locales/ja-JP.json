@@ -62,7 +62,20 @@
     "close": "閉じる"
   },
   "number": {
-    "large_units": ["万", "億", "兆", "京", "垓", "秭", "穣", "溝", "澗", "正", "載", "極"],
+    "large_units": [
+      "万",
+      "億",
+      "兆",
+      "京",
+      "垓",
+      "秭",
+      "穣",
+      "溝",
+      "澗",
+      "正",
+      "載",
+      "極"
+    ],
     "large_unit_repeat": "極"
   },
   "update": {
@@ -155,6 +168,7 @@
     "home": "ホーム",
     "score": "点数",
     "blackhole": "花火ガイド",
+    "wanxiang": "万象交換",
     "blackholeDebug": "ガイドテスト",
     "fuse": "ヒューズ",
     "todayWin": "今日和了",
@@ -164,7 +178,8 @@
     "settings": "設定",
     "diagnostics": "ログ",
     "packetTest": "パケットテスト",
-    "about": "情報"
+    "about": "情報",
+    "gamestate": "GameState"
   },
   "today_win": {
     "title": "今日和了",
@@ -198,6 +213,15 @@
     "history_won": "クリア済み",
     "history_failed": "6 回終了",
     "history_played": "挑戦中",
+    "weekdays": {
+      "0": "日",
+      "1": "月",
+      "2": "火",
+      "3": "水",
+      "4": "木",
+      "5": "金",
+      "6": "土"
+    },
     "success": "和了！",
     "current_waits": "現在の待ち：{{waits}}",
     "wait_mismatch_badge": "待ち違い",
@@ -456,12 +480,18 @@
     "title": "ヒューズ",
     "section_shop_guard_title": "購入ガード",
     "section_shop_guard_desc": "監視リストを整備すると、購入時に次の2ルールを適用します：<br/>1）監視項目が出たら<strong>「スキップ」禁止</strong>（下の「スキップ禁止」を有効にする）；<br/>2）監視項目があるのに<strong>そのいずれも選ばない</strong>場合はブロック（下の「監視項目の強制選択」を有効にする）。",
+    "section_activity_skip_guard_title": "スキップヒューズ",
+    "section_activity_skip_guard_desc": "活動スキップ要求をブロックし、確認ダイアログまたはサイレントブロックを選べます。",
     "btn_add_amulet": "お守りを追加",
     "btn_add_badge": "スタンプを追加",
     "btn_delete_selected": "選択を削除",
     "btn_clear_selection": "選択を解除",
+    "toggle_activity_skip_guard": "スキップヒューズを有効化（活動スキップ要求をブロック）",
     "toggle_skip_guard": "スキップ禁止（監視項目がある場合は「スキップ」を禁止）",
     "toggle_force_pick": "監視項目の強制選択（監視項目があるのに未選択ならブロック）",
+    "toggle_silent_fuse": "サイレントヒューズ（確認なしで直接ブロック）",
+    "label_activity_skip_guard_stages": "ヒューズ対象ステージ",
+    "placeholder_activity_skip_guard_stages": "空なら全ステージ。例：2, 9, 16",
     "section_conduction_title": "伝導チェーン・ガード",
     "section_conduction_desc": "伝導お守りが閾値に達し、かつエンチャンターカーヴィの配置が規則に反している場合、対局開始をブロックします（お守りへの「伝導」付与忘れによる断鎖を防ぐため）。",
     "toggle_conduction": "伝導チェーン・ガードを有効化",
@@ -486,7 +516,7 @@
     "btn_save": "ヒューズ設定を保存",
     "btn_saving": "保存中…",
     "bar": {
-      "empty": "何もありません。下のボタンから守り札／スタンプを追加してください…",
+      "empty": "牌山が空です",
       "kind": {
         "amulet": "お守り",
         "badge": "スタンプ"
@@ -529,6 +559,10 @@
         "title": "ヒューズ確認：監視対象から選択が必須",
         "message": "<b>監視対象を検出しました</b><br/>候補に監視対象のお守り／スタンプが含まれていますが、現在の選択は監視対象ではありません。<br/><br/>現在の選択：お守りID={{selBaseId}}（raw={{selRawId}}）<br/><br/>このまま続行しますか？"
       },
+      "activitySkip": {
+        "title": "ヒューズ確認：活動操作のスキップ",
+        "message": "活動スキップ要求を検出しました：activityId=260511、type=3、args=[]。<br/><br/>このままスキップしますか？"
+      },
       "skipPack": {
         "title": "ヒューズ確認：監視対象を含むパックです",
         "message": "<b>監視対象を検出しました</b><br/>このパックには監視対象のお守り／スタンプが含まれています。<br/>お守りヒット：{{amuletHitCount}}、スタンプヒット：{{badgeHitCount}}。<br/><br/>このままスキップしますか？"
@@ -547,6 +581,8 @@
         "modify_announcement_desc": "向聴レンズの起動成功を知らせるお知らせを追加",
         "public_all": "公開山牌",
         "public_all_desc": "ゲーム内のすべての牌を公開にする",
+        "unlock_illustrated_book": "図鑑を全解放",
+        "unlock_illustrated_book_desc": "お守りイベント図鑑にすべてのお守り、スタンプ、ルーンストーンを表示する",
         "auto_tsumo": "自動ツモ",
         "auto_tsumo_desc": "ツモ可能なとき自動でツモ（パケット送信）"
       },
@@ -562,7 +598,11 @@
         "port": "バックエンドポート",
         "port_desc": "バックエンドポート",
         "mitm_port": "MITM ポート",
-        "port_port": "MITM サーバーポート"
+        "port_port": "MITM サーバーポート",
+        "enable_upstream_proxy": "MITM 上流プロキシを有効化",
+        "enable_upstream_proxy_desc": "指定した上流プロキシ経由で MITM からサーバーへ接続する",
+        "upstream_proxy": "MITM 上流プロキシ",
+        "upstream_proxy_desc": "上流プロキシアドレス。例: http://127.0.0.1:7890。プロトコル省略時は http:// を使用"
       }
     },
     "title": "設定",
@@ -651,11 +691,15 @@
     "reason_stopped-by-user": "探索は手動で停止されました。",
     "reason_no-reliable-plan-found": "検証済みの信頼できる案だけを返すようにしています。今回は条件を満たす信頼できる交換案が見つかりませんでした。",
     "reason_stage-not-switch": "このガイドは交換段階でのみ表示されます。",
+    "reason_wanxiang-not-in-hand": "現在の手牌に万象がないため、万象交換案を計算できません。",
+    "reason_cannot-form-four-melds-with-wanxiang": "残りの交換順では、万象と四面子の形を作れません。",
     "reason_unknown": "利用できる結果がまだありません。"
   },
   "blackhole": {
     "title": "花火ガイド",
+    "wanxiang_title": "万象交換",
     "card_title": "花火ガイド案",
+    "wanxiang_card_title": "万象四面子案",
     "start": "検索開始",
     "stop": "検索停止",
     "continue": "続けて検索",
@@ -718,8 +762,10 @@
     "search_algorithm": "探索アルゴリズム",
     "algorithm_target_enum": "目標牌型列挙探索",
     "stage_ready": "現在は交換段階なので、手動で検索を始められます。",
+    "wanxiang_stage_ready": "現在は交換段階なので、万象四面子の交換案を検索できます。",
     "stage_not_ready": "現在は交換段階ではありません。開始前に止めます。",
     "need_switch_stage": "現在は交換段階ではないため、花火ガイドを開始できません。",
+    "wanxiang_need": "現在の手牌に万象がないため、万象交換検索を開始できません。",
     "export_current": "現在の局面をエクスポート",
     "export_empty": "エクスポートできる局面がありません",
     "export_success": "現在の局面をエクスポートしました",
@@ -727,6 +773,7 @@
     "quad_drawer_title": "見えているカン一覧",
     "considered_tiles_title": "使用可能な牌",
     "draws_needed_label": "何巡目でテンパイ",
+    "wanxiang_draws_needed_label": "交換深度",
     "params_title": "現在のパラメータ",
     "params_max_change_count": "最大交換回数",
     "params_per_change_limit": "交換制限",
@@ -771,7 +818,8 @@
       "PURPLE": "紫",
       "ORANGE": "橙",
       "BLUE": "青",
-      "GREEN": "緑"
+      "GREEN": "緑",
+      "GRAY": "灰"
     },
     "action_confirm": "確定",
     "action_confirm_hint": "お守りを選択してから確定してください",
@@ -921,6 +969,7 @@
     "rarity_blue": "ブルー",
     "rarity_orange": "オレンジ",
     "rarity_purple": "パープル",
+    "rarity_gray": "グレー",
     "active_on_win_label": "和了時に発動",
     "active_on_win_yes": "はい",
     "active_on_win_no": "いいえ",
@@ -1018,6 +1067,13 @@
     "continue": "続行",
     "cancel": "キャンセル"
   },
+  "manual_tsumo": {
+    "start": "連続ツモ",
+    "stop": "ツモ停止",
+    "start_hint": "op_tsumo を繰り返し実行します",
+    "stop_hint": "op_tsumo の繰り返し実行を停止します",
+    "win_count": "{{count}} 和了"
+  },
   "right_panel": {
     "title": "右側統計",
     "replacement": "交換牌統計",
@@ -1091,5 +1147,42 @@
     "sell_confirm_action": "売却",
     "conflict_hint": "同じキーが割り当てられています。赤く表示されたホットキーを変更してください。"
   },
-  "candidate_amulet_empty": "候補のお守りはありません"
+  "tile_grid": {
+    "empty": "牌山が空です",
+    "discard_tile_title": "牌 ID {{id}} を打つ",
+    "discard_confirm_title": "この牌を打ちますか？",
+    "discard_confirm_action": "打つ",
+    "tile_id": "牌 ID {{id}}",
+    "tile_face": "牌面 {{tile}}",
+    "discard_success": "牌 ID {{id}} の打牌をリクエストしました",
+    "discard_failed": "牌 ID {{id}} の打牌に失敗しました: {{reason}}"
+  },
+  "candidate_amulet_empty": "候補のお守りはありません",
+  "gamestate": {
+    "title": "GameState",
+    "subtitle_live": "フロントエンドが保持している現在の game_state スナップショットを表示します。",
+    "subtitle_empty": "バックエンドから game_state をまだ受信していません。",
+    "summary_title": "状態サマリー",
+    "raw_title": "Raw JSON",
+    "copy_json": "JSONをコピー",
+    "copied": "コピーしました",
+    "empty": "game_state データがありません。対局に入るか、対局を更新してください。",
+    "boolean_true": "はい",
+    "boolean_false": "いいえ"
+  },
+  "game_map": {
+    "button": "マップ",
+    "open": "マップを表示",
+    "title": "マップ",
+    "level": "ステージ",
+    "node": "現在ノード",
+    "node_count": "ノード数",
+    "map_node": "マップノード {{index}}",
+    "current": "現在",
+    "type": "type",
+    "sub_type": "subType",
+    "args": "args",
+    "args_empty": "空",
+    "empty": "マップノードデータがありません。"
+  }
 }

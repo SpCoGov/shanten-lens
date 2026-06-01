@@ -4,7 +4,7 @@ import Modal from "./Modal";
 import {useRegistry} from "../lib/registryStore";
 import {useTranslation} from "react-i18next";
 
-const RARITIES = ["ALL", "PURPLE", "ORANGE", "BLUE", "GREEN"] as const;
+const RARITIES = ["ALL", "PURPLE", "ORANGE", "BLUE", "GREEN", "GRAY"] as const;
 type RarityKey = typeof RARITIES[number];
 
 export default function AmuletPickerModal({

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-export type Amulet = { id: number; icon_id: number; name: string; rarity: "GREEN"|"BLUE"|"ORANGE"|"PURPLE" };
+export type Amulet = { id: number; icon_id: number; name: string; rarity: "GREEN"|"BLUE"|"ORANGE"|"PURPLE"|"GRAY" };
 export type Badge  = { id: number; icon_id: number; name: string; rarity: "BROWN"|"BLUE"|"RED" };
 
 export type RegistryPayload = {

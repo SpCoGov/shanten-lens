@@ -24,7 +24,7 @@ type GuessRecord = {
 
 type DateHistory = Record<string, "won" | "failed" | "played">;
 
-const SUIT_GROUPS: Array<{label: string; tiles: TodayTile[]}> = [
+const SUIT_GROUPS: Array<{ label: string; tiles: TodayTile[] }> = [
     {label: "m", tiles: ["1m", "2m", "3m", "4m", "5m", "0m", "6m", "7m", "8m", "9m"]},
     {label: "p", tiles: ["1p", "2p", "3p", "4p", "5p", "0p", "6p", "7p", "8p", "9p"]},
     {label: "s", tiles: ["1s", "2s", "3s", "4s", "5s", "0s", "6s", "7s", "8s", "9s"]},
@@ -285,144 +285,148 @@ export default function TodayWinPage() {
                 <div className={styles.header}>
                     <h2 className={styles.title}>{t("today_win.title")}</h2>
                     <div className={styles.headerActions}>
-                    <label className={`${styles.hardToggle} ${hardMode ? styles.isOn : ""}`}>
-                        <input
-                            type="checkbox"
-                            checked={hardMode}
-                            disabled={guesses.length > 0}
-                            onChange={(event) => setHardMode(event.currentTarget.checked)}
-                        />
-                        <span>{t("today_win.hard_mode")}</span>
-                    </label>
-                    <div className={styles.datePicker} ref={calendarRef}>
-                        <button
-                            className={styles.dateBadge}
-                            title={t("today_win.pick_date")}
-                            onClick={() => setCalendarOpen((open) => !open)}
-                        >
-                            <span className="ms" aria-hidden="true">calendar_month</span>
-                            <span>{dateKey}</span>
-                        </button>
-                        {calendarOpen ? (
-                            <div className={styles.calendarPanel}>
-                                <div className={styles.calendarHeader}>
-                                    <button className="nav-btn" onClick={() => setVisibleMonth((current) => addMonths(current, -1))} aria-label={t("today_win.prev_month")}>
-                                        <span className="ms" aria-hidden="true">chevron_left</span>
-                                    </button>
-                                    <div className={styles.calendarTitle}>
-                                        <button className={styles.titleStep} onClick={() => setVisibleMonth((current) => addYears(current, -1))} aria-label={t("today_win.prev_year")}>-</button>
-                                        <strong>{visibleYear}</strong>
-                                        <button className={styles.titleStep} onClick={() => setVisibleMonth((current) => addYears(current, 1))} disabled={visibleYear >= currentYear} aria-label={t("today_win.next_year")}>+</button>
-                                        <span>{monthLabel}</span>
+                        <label className={`${styles.hardToggle} ${hardMode ? styles.isOn : ""}`}>
+                            <input
+                                type="checkbox"
+                                checked={hardMode}
+                                disabled={guesses.length > 0}
+                                onChange={(event) => setHardMode(event.currentTarget.checked)}
+                            />
+                            <span>{t("today_win.hard_mode")}</span>
+                        </label>
+                        <div className={styles.datePicker} ref={calendarRef}>
+                            <button
+                                className={styles.dateBadge}
+                                title={t("today_win.pick_date")}
+                                onClick={() => setCalendarOpen((open) => !open)}
+                            >
+                                <span className="ms" aria-hidden="true">calendar_month</span>
+                                <span>{dateKey}</span>
+                            </button>
+                            {calendarOpen ? (
+                                <div className={styles.calendarPanel}>
+                                    <div className={styles.calendarHeader}>
+                                        <button className="nav-btn" onClick={() => setVisibleMonth((current) => addMonths(current, -1))} aria-label={t("today_win.prev_month")}>
+                                            <span className="ms" aria-hidden="true">chevron_left</span>
+                                        </button>
+                                        <div className={styles.calendarTitle}>
+                                            <button className={styles.titleStep} onClick={() => setVisibleMonth((current) => addYears(current, -1))} aria-label={t("today_win.prev_year")}>-</button>
+                                            <strong>{visibleYear}</strong>
+                                            <button className={styles.titleStep} onClick={() => setVisibleMonth((current) => addYears(current, 1))} disabled={visibleYear >= currentYear} aria-label={t("today_win.next_year")}>+</button>
+                                            <span>{monthLabel}</span>
+                                        </div>
+                                        <button className="nav-btn" onClick={() => setVisibleMonth((current) => addMonths(current, 1))} disabled={visibleMonth >= monthKey(todayKey)} aria-label={t("today_win.next_month")}>
+                                            <span className="ms" aria-hidden="true">chevron_right</span>
+                                        </button>
                                     </div>
-                                    <button className="nav-btn" onClick={() => setVisibleMonth((current) => addMonths(current, 1))} disabled={visibleMonth >= monthKey(todayKey)} aria-label={t("today_win.next_month")}>
-                                        <span className="ms" aria-hidden="true">chevron_right</span>
-                                    </button>
+                                    <div className={styles.calendarGrid}>
+                                    {Array.from({length: 7}, (_, index) => (
+                                        <span key={index} className={styles.calendarWeek}>
+                                            {t(`today_win.weekdays.${index}`, {defaultValue: ["日", "一", "二", "三", "四", "五", "六"][index]})}
+                                        </span>
+                                    ))}
+                                        {monthDays.map((day, index) => {
+                                            const status = day ? history[day] : undefined;
+                                            return day ? (
+                                                <button
+                                                    key={day}
+                                                    className={`${styles.calendarDay} ${day === dateKey ? styles.selectedDay : ""} ${status ? styles[`day_${status}`] : ""}`}
+                                                    disabled={day > todayKey}
+                                                    onClick={() => setDateKey(day)}
+                                                    title={status ? t(`today_win.history_${status}`) : day}
+                                                >
+                                                    <span>{Number(day.slice(8))}</span>
+                                                </button>
+                                            ) : <span key={`blank-${index}`}/>;
+                                        })}
+                                    </div>
+                                    <div className={styles.calendarLegend}>
+                                        <span><i className={styles.legendWon}/> {t("today_win.history_won")}</span>
+                                        <span><i className={styles.legendFailed}/> {t("today_win.history_failed")}</span>
+                                        <span><i className={styles.legendPlayed}/> {t("today_win.history_played")}</span>
+                                    </div>
                                 </div>
-                                <div className={styles.calendarGrid}>
-                                    {["日", "一", "二", "三", "四", "五", "六"].map((day) => <span key={day} className={styles.calendarWeek}>{day}</span>)}
-                                    {monthDays.map((day, index) => {
-                                        const status = day ? history[day] : undefined;
-                                        return day ? (
-                                            <button
-                                                key={day}
-                                                className={`${styles.calendarDay} ${day === dateKey ? styles.selectedDay : ""} ${status ? styles[`day_${status}`] : ""}`}
-                                                disabled={day > todayKey}
-                                                onClick={() => setDateKey(day)}
-                                                title={status ? t(`today_win.history_${status}`) : day}
-                                            >
-                                                <span>{Number(day.slice(8))}</span>
-                                            </button>
-                                        ) : <span key={`blank-${index}`}/>;
-                                    })}
-                                </div>
-                                <div className={styles.calendarLegend}>
-                                    <span><i className={styles.legendWon}/> {t("today_win.history_won")}</span>
-                                    <span><i className={styles.legendFailed}/> {t("today_win.history_failed")}</span>
-                                    <span><i className={styles.legendPlayed}/> {t("today_win.history_played")}</span>
-                                </div>
-                            </div>
-                        ) : null}
-                    </div>
+                            ) : null}
+                        </div>
                     </div>
                 </div>
 
                 <div className={styles.gameGrid}>
-                <div className={styles.boardColumn}>
-                <section className={`panel ${styles.panel}`}>
-                    <div className={styles.panelTitle}>{t("today_win.answer_title")}</div>
-                    <TileRun tiles={answerDisplayTiles} hidden={!answerShown}/>
-                    {answerShown ? (
-                        <div className={styles.answerMeta}>
-                            {t("today_win.answer_yaku", {yaku: answerYaku})}
-                        </div>
-                    ) : null}
-                </section>
-
-                <section className={`panel ${styles.panel}`}>
-                    <div className={styles.panelTitle}>{t("today_win.history_title")}</div>
-                    <div className={styles.guessGrid}>
-                        {Array.from({length: 6}).map((_, index) => {
-                            const guess = guesses[index];
-                            const isCurrent = !guess && index === guesses.length && !gameOver;
-                            return (
-                                <div className={`${styles.guessRow} ${isCurrent ? styles.currentGuessRow : ""}`} key={index}>
-                                    <div className={styles.guessIndex}>{index + 1}</div>
-                                    {guess ? (
-                                        <TileRun tiles={guess.tiles} colors={guess.colors}/>
-                                    ) : isCurrent ? (
-                                        <TileRun tiles={inputTiles}/>
-                                    ) : (
-                                        <TileRun tiles={[]}/>
-                                    )}
-                                    <div className={styles.waitHint}>
-                                        {guess && !guess.waitMatches && guess.winTileMatches ? t("today_win.wait_mismatch_badge") : ""}
-                                    </div>
+                    <div className={styles.boardColumn}>
+                        <section className={`panel ${styles.panel}`}>
+                            <div className={styles.panelTitle}>{t("today_win.answer_title")}</div>
+                            <TileRun tiles={answerDisplayTiles} hidden={!answerShown}/>
+                            {answerShown ? (
+                                <div className={styles.answerMeta}>
+                                    {t("today_win.answer_yaku", {yaku: answerYaku})}
                                 </div>
-                            );
-                        })}
-                    </div>
-                </section>
+                            ) : null}
+                        </section>
 
-                </div>
-                <aside className={styles.controlColumn}>
-                <section className={`panel ${styles.panel}`}>
-                    <div className={styles.inputHeader}>
-                        <div className={styles.panelTitle}>{t("today_win.picker_title")}</div>
-                        <div className={styles.controls}>
-                            <button className="nav-btn" onClick={deleteTile} disabled={gameOver || inputTiles.length === 0} title={t("today_win.delete")} aria-label={t("today_win.delete")}>
-                                <span className="ms" aria-hidden="true">backspace</span>
-                            </button>
-                            <button className="nav-btn" onClick={clearInput} disabled={gameOver || inputTiles.length === 0} title={t("today_win.clear")} aria-label={t("today_win.clear")}>
-                                <span className="ms" aria-hidden="true">delete_sweep</span>
-                            </button>
-                            <button className="nav-btn" onClick={submit} disabled={gameOver} title={t("today_win.submit")} aria-label={t("today_win.submit")}>
-                                <span className="ms" aria-hidden="true">check</span>
-                            </button>
-                        </div>
+                        <section className={`panel ${styles.panel}`}>
+                            <div className={styles.panelTitle}>{t("today_win.history_title")}</div>
+                            <div className={styles.guessGrid}>
+                                {Array.from({length: 6}).map((_, index) => {
+                                    const guess = guesses[index];
+                                    const isCurrent = !guess && index === guesses.length && !gameOver;
+                                    return (
+                                        <div className={`${styles.guessRow} ${isCurrent ? styles.currentGuessRow : ""}`} key={index}>
+                                            <div className={styles.guessIndex}>{index + 1}</div>
+                                            {guess ? (
+                                                <TileRun tiles={guess.tiles} colors={guess.colors}/>
+                                            ) : isCurrent ? (
+                                                <TileRun tiles={inputTiles}/>
+                                            ) : (
+                                                <TileRun tiles={[]}/>
+                                            )}
+                                            <div className={styles.waitHint}>
+                                                {guess && !guess.waitMatches && guess.winTileMatches ? t("today_win.wait_mismatch_badge") : ""}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+
                     </div>
-                    <div className={styles.picker}>
-                        {SUIT_GROUPS.map((group) => (
-                            <div className={styles.pickerGroup} key={group.label}>
-                                {group.tiles.map((tile) => (
-                                    <button
-                                        key={tile}
-                                        className={`${styles.tileButton} ${tilePickerMarks.get(tile) ? `${styles.pickerMarked} ${styles[tilePickerMarks.get(tile)!]}` : ""}`}
-                                        onClick={() => addTile(tile)}
-                                        disabled={gameOver || hasTileOverflow([...inputTiles, tile])}
-                                        title={tile}
-                                    >
-                                        <Tile tile={tile} width={30} height={40}/>
+                    <aside className={styles.controlColumn}>
+                        <section className={`panel ${styles.panel}`}>
+                            <div className={styles.inputHeader}>
+                                <div className={styles.panelTitle}>{t("today_win.picker_title")}</div>
+                                <div className={styles.controls}>
+                                    <button className="nav-btn" onClick={deleteTile} disabled={gameOver || inputTiles.length === 0} title={t("today_win.delete")} aria-label={t("today_win.delete")}>
+                                        <span className="ms" aria-hidden="true">backspace</span>
                                     </button>
+                                    <button className="nav-btn" onClick={clearInput} disabled={gameOver || inputTiles.length === 0} title={t("today_win.clear")} aria-label={t("today_win.clear")}>
+                                        <span className="ms" aria-hidden="true">delete_sweep</span>
+                                    </button>
+                                    <button className="nav-btn" onClick={submit} disabled={gameOver} title={t("today_win.submit")} aria-label={t("today_win.submit")}>
+                                        <span className="ms" aria-hidden="true">check</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div className={styles.picker}>
+                                {SUIT_GROUPS.map((group) => (
+                                    <div className={styles.pickerGroup} key={group.label}>
+                                        {group.tiles.map((tile) => (
+                                            <button
+                                                key={tile}
+                                                className={`${styles.tileButton} ${tilePickerMarks.get(tile) ? `${styles.pickerMarked} ${styles[tilePickerMarks.get(tile)!]}` : ""}`}
+                                                onClick={() => addTile(tile)}
+                                                disabled={gameOver || hasTileOverflow([...inputTiles, tile])}
+                                                title={tile}
+                                            >
+                                                <Tile tile={tile} width={30} height={40}/>
+                                            </button>
+                                        ))}
+                                    </div>
                                 ))}
                             </div>
-                        ))}
-                    </div>
-                    <div className={`${styles.message} ${won ? styles.success : ""}`}>
-                        {messageKey ? t(messageKey) : ""}
-                    </div>
-                </section>
-                </aside>
+                            <div className={`${styles.message} ${won ? styles.success : ""}`}>
+                                {messageKey ? t(messageKey) : ""}
+                            </div>
+                        </section>
+                    </aside>
                 </div>
             </div>
             {resultOpen ? (

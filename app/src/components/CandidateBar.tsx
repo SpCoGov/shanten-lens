@@ -29,7 +29,7 @@ export default function CandidateBar({
     ownedAmulets?: EffectItem[];
     scale?: number;
     max?: number;
-    onCandidateClick?: (candidate: CandidateEffectRef) => void;
+    onCandidateClick?: (candidate: CandidateEffectRef, index: number) => void;
     hotkeyLabels?: string[];
 }) {
     const list = Array.isArray(candidates) ? candidates.slice(0, max) : [];
@@ -78,7 +78,7 @@ export default function CandidateBar({
                         key={`cand-${c.id}-${c.badgeId}`}
                         item={eff}
                         scale={scale}
-                        onClick={onCandidateClick ? () => onCandidateClick(c) : undefined}
+                        onClick={onCandidateClick ? () => onCandidateClick(c, index) : undefined}
                         hotkeyLabel={hotkeyLabels?.[index]}
                         upgradeBadge={ownedRegIds.has(Math.floor(Number(c.id ?? 0) / 10))}
                         showPrice

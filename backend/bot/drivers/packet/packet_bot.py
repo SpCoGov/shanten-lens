@@ -11,8 +11,9 @@ class PacketBot(GameBot):
     def __init__(
             self,
             addon_getter: Callable[[], WsAddon],
-            activity_id: int = 250811,
+            activity_id: int = 260511,
             op_code_map: Optional[Dict[str, int]] = None,
+            game_op_code_map: Optional[Dict[str, int]] = None,
             default_timeout: float = 5.0,
             state_getter: Optional[Callable[[], Any]] = None,
     ):
@@ -22,14 +23,29 @@ class PacketBot(GameBot):
         self._get_state = state_getter
 
         self.op_code = {
-            "discard": 1,
-            "tsumo": 8,
-            "kan": 4,
-            "skip_replace": 100,
-            "replace": 101,
+            "select_character": 1,
+            "start_level": 2,
+            "quit": 3,
+            "buy_pack": 4,
+            "sell_effect": 5,
+            "upgrade_shop_buff": 6,
+            "sort_effect": 8,
+            "refresh_shop": 9,
+
+            "gamble": 15,
+            "select_effect": 16,
         }
         if op_code_map:
             self.op_code.update(op_code_map)
+
+        self.game_op_code = {
+            "discard": 1,
+            "tsumo": 8,
+            "kan": 4,
+            "replace": 101,
+        }
+        if game_op_code_map:
+            self.game_op_code.update(game_op_code_map)
 
     def bind(self) -> bool:
         return True
@@ -53,7 +69,7 @@ class PacketBot(GameBot):
             logger.error("failed to get peer key")
             return None
 
-    def _ops_allow(self, t: int) -> bool:
+    def _game_ops_allow(self, t: int) -> bool:
         st = self._state()
         if not st:
             return True
@@ -142,11 +158,21 @@ class PacketBot(GameBot):
             return False, f"wait-error:{e}", None
 
     def _operate(
-            self, *, pkt_type: int, tile_list: List[int],
+            self, *, pkt_type: int, args: List[int],
             delay_sec: float, timeout: Optional[float] = None
     ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
         return self._inject_and_wait(
             method=".lq.Lobby.amuletActivityOperate",
+            data={"activityId": self.activity_id, "type": pkt_type, "args": args},
+            delay_sec=delay_sec, timeout=timeout
+        )
+
+    def _game_operate(
+            self, *, pkt_type: int, tile_list: List[int],
+            delay_sec: float, timeout: Optional[float] = None
+    ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        return self._inject_and_wait(
+            method=".lq.Lobby.amuletActivityGameOperate",
             data={"activityId": self.activity_id, "type": pkt_type, "tileList": tile_list},
             delay_sec=delay_sec, timeout=timeout
         )
@@ -176,43 +202,40 @@ class PacketBot(GameBot):
         return ok, reason, resp
 
     def op_tsumo(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        t = self.op_code.get("tsumo")
+        t = self.game_op_code.get("tsumo")
         if t is None:
             raise NotImplementedError("PacketBot.op_tsumo: no op_code 'tsumo'")
-        if not self._ops_allow(t):
+        if not self._game_ops_allow(t):
             logger.error("gamestate disallow tsumo")
             return False, "gamestate disallow discard", None
-        ok, reason, resp = self._operate(pkt_type=t, tile_list=[], delay_sec=delay_sec)
+        ok, reason, resp = self._game_operate(pkt_type=t, tile_list=[], delay_sec=delay_sec)
         return ok, reason, resp
 
     def op_skip_change(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        t = self.op_code.get("skip_replace")
+        t = self.op_code.get("quit")
         if t is None:
             raise NotImplementedError("PacketBot.op_skip_replace: no op_code 'skip_replace'")
-        if not self._ops_allow(t):
-            logger.error("gamestate disallow skip-replace")
-            return False, "gamestate disallow discard", None
-        ok, reason, resp = self._operate(pkt_type=t, tile_list=[], delay_sec=delay_sec)
+        ok, reason, resp = self._operate(pkt_type=t, args=[], delay_sec=delay_sec)
         return ok, reason, resp
 
     def op_change(self, tile_ids: List[int], delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        t = self.op_code.get("replace")
+        t = self.game_op_code.get("replace")
         if t is None:
             raise NotImplementedError("PacketBot.op_replace: no op_code 'replace'")
-        if not self._ops_allow(t):
+        if not self._game_ops_allow(t):
             logger.error("gamestate disallow replace")
             return False, "gamestate disallow replace", None
-        ok, reason, resp = self._operate(pkt_type=t, tile_list=tile_ids, delay_sec=delay_sec)
+        ok, reason, resp = self._game_operate(pkt_type=t, tile_list=tile_ids, delay_sec=delay_sec)
         return ok, reason, resp
 
     def op_kan(self, tile_ids: List[int], delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        t = self.op_code.get("kan")
+        t = self.game_op_code.get("kan")
         if t is None:
             raise NotImplementedError("PacketBot.op_replace: no op_code 'kan'")
-        if not self._ops_allow(t):
+        if not self._game_ops_allow(t):
             logger.error("gamestate disallow kan")
             return False, "gamestate disallow kan", None
-        ok, reason, resp = self._operate(pkt_type=t, tile_list=tile_ids, delay_sec=delay_sec)
+        ok, reason, resp = self._game_operate(pkt_type=t, tile_list=tile_ids, delay_sec=delay_sec)
         return ok, reason, resp
 
     def discard_by_tile_id(
@@ -221,48 +244,66 @@ class PacketBot(GameBot):
             allow_tsumogiri: bool = True,
             delay_sec: float = 3,
     ) -> Tuple[bool, str, Optional[dict]]:
-        t = self.op_code.get("discard", 1)
-        if not self._ops_allow(t):
+        t = self.game_op_code.get("discard", 1)
+        if not self._game_ops_allow(t):
             logger.error("gamestate disallow discard")
             return False, "gamestate disallow discard", None
-        ok, reason, resp = self._operate(pkt_type=t, tile_list=[tile_id], delay_sec=delay_sec)
+        ok, reason, resp = self._game_operate(pkt_type=t, tile_list=[tile_id], delay_sec=delay_sec)
         return ok, reason, resp
 
     def select_free_effect(self, selected_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        if not self._ensure_stage_with_refresh(1, delay_sec=delay_sec):
+        if not self._ensure_stage_with_refresh(2, delay_sec=delay_sec):
             return False, "in the illegal stage", None
         st = self._state()
         if not st:
             return False, "state-unavailable", None
         if any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
-            ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySelectFreeEffect", data={"activityId": self.activity_id, "selectedId": selected_id}, delay_sec=delay_sec)
+            t = self.op_code.get("select_effect")
+            if t is None:
+                raise NotImplementedError("PacketBot.select_effect: no op_code 'select_effect'")
+            ok, reason, resp = self._operate(pkt_type=t, args=[selected_id], delay_sec=delay_sec)
             return ok, reason, resp
         return False, "unknown id", None
 
     def select_reward_effect(self, selected_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        if not self._ensure_stage_with_refresh(7, delay_sec=delay_sec):
+        if not self._ensure_stage_with_refresh(16, delay_sec=delay_sec):
             return False, "in the illegal stage", None
         st = self._state()
         if not st:
             return False, "state-unavailable", None
         if int(selected_id) == 0 or any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
-            ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySelectRewardPack", data={"activityId": self.activity_id, "id": selected_id}, delay_sec=delay_sec)
+            t = self.op_code.get("select_effect")
+            if t is None:
+                raise NotImplementedError("PacketBot.select_effect: no op_code 'select_effect'")
+            ok, reason, resp = self._operate(pkt_type=t, args=[selected_id], delay_sec=delay_sec)
             return ok, reason, resp
         return False, "unknown id", None
 
     def select_effect(self, selected_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        if not self._ensure_stage_with_refresh(5, delay_sec=delay_sec):
+        if not self._ensure_stage_with_refresh(9, delay_sec=delay_sec):
             return False, "in the illegal stage", None
         st = self._state()
         if not st:
             return False, "state-unavailable", None
-        if int(selected_id) == 0 or any(effect.get("id") == selected_id for effect in st.candidate_effect_list):
-            ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySelectPack", data={"activityId": self.activity_id, "id": selected_id}, delay_sec=delay_sec)
+        if st.candidate_effect_list and len(st.candidate_effect_list) >= selected_id + 1:
+            t = self.op_code.get("select_effect")
+            if t is None:
+                raise NotImplementedError("PacketBot.select_effect: no op_code 'select_effect'")
+            ok, reason, resp = self._operate(pkt_type=t, args=[selected_id], delay_sec=delay_sec)
             return ok, reason, resp
         return False, "unknown id", None
 
+    def skip_effect(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
+        if not self._ensure_stage_with_refresh(9, 16, delay_sec=delay_sec):
+            return False, "in the illegal stage", None
+        t = self.op_code.get("select_effect")
+        if t is None:
+            raise NotImplementedError("PacketBot.skip_effect: no op_code 'select_effect'")
+        ok, reason, resp = self._operate(pkt_type=t, args=[], delay_sec=delay_sec)
+        return ok, reason, resp
+
     def buy_pack(self, good_id: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        if not self._ensure_stage_with_refresh(4, delay_sec=delay_sec):
+        if not self._ensure_stage_with_refresh(9, delay_sec=delay_sec):
             return False, "in the illegal buy pack stage", None
         st = self._state()
         if not st:
@@ -270,30 +311,35 @@ class PacketBot(GameBot):
         good = next((g for g in st.goods if g.get("id") == good_id and g.get("sold") is False), None)
         if good:
             if good.get("price", 0) <= st.coin:
-                ok, reason, resp = self._inject_and_wait(
-                    method=".lq.Lobby.amuletActivityBuy",
-                    data={"activityId": self.activity_id, "id": good_id},
-                    delay_sec=delay_sec
-                )
+                t = self.op_code.get("buy_pack")
+                if t is None:
+                    raise NotImplementedError("PacketBot.buy_pack: no op_code 'buy_pack'")
+                ok, reason, resp = self._operate(pkt_type=t, args=[good_id], delay_sec=delay_sec)
                 return ok, reason, resp
             return False, "coin not enough", None
         return False, "unknown id", None
 
     def refresh_shop(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        if not self._ensure_stage_with_refresh(4, delay_sec=delay_sec):
+        if not self._ensure_stage_with_refresh(9, delay_sec=delay_sec):
             return False, "in the illegal refresh stage", None
         st = self._state()
         if not st:
             return False, "state-unavailable", None
         if st.coin >= st.refresh_price:
-            ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivityRefreshShop", data={"activityId": self.activity_id}, delay_sec=delay_sec)
+            t = self.op_code.get("refresh_shop")
+            if t is None:
+                raise NotImplementedError("PacketBot.refresh_shop: no op_code 'refresh_shop'")
+            ok, reason, resp = self._operate(pkt_type=t, args=[], delay_sec=delay_sec)
             return ok, reason, resp
         return False, "coin not enough", None
 
     def sell_effect(self, uid: int, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
         st = self._state()
         if any(effect.get("uid") == uid for effect in st.effect_list):
-            ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivitySellEffect", data={"activityId": self.activity_id, "id": uid}, delay_sec=delay_sec)
+            t = self.op_code.get("sell_effect")
+            if t is None:
+                raise NotImplementedError("PacketBot.sell_effect: no op_code 'sell_effect'")
+            ok, reason, resp = self._operate(pkt_type=t, args=[uid], delay_sec=delay_sec)
             return ok, reason, resp
         return False, "unknown id", None
 
@@ -315,23 +361,28 @@ class PacketBot(GameBot):
             return False, "sorted_uid-mismatch-current-effects", None
         if in_uids == cur_uids:
             return True, "already sorted", None
-        ok, reason, resp = self._inject_and_wait(
-            method=".lq.Lobby.amuletActivityEffectSort",
-            data={"activityId": self.activity_id, "sortedId": in_uids},
-            delay_sec=delay_sec
-        )
+        t = self.op_code.get("sort_effect")
+        if t is None:
+            raise NotImplementedError("PacketBot.sort_effect: no op_code 'sort_effect'")
+        ok, reason, resp = self._operate(pkt_type=t, args=in_uids, delay_sec=delay_sec)
         return ok, reason, resp
 
     def end_shopping(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        if not self._ensure_stage_with_refresh(4, delay_sec=delay_sec):
+        if not self._ensure_stage_with_refresh(9, delay_sec=delay_sec):
             return False, "in the illegal end shopping stage", None
-        ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivityEndShopping", data={"activityId": self.activity_id}, delay_sec=delay_sec)
+        t = self.op_code.get("quit")
+        if t is None:
+            raise NotImplementedError("PacketBot.end_shopping: no op_code 'quit'")
+        ok, reason, resp = self._operate(pkt_type=t, args=[], delay_sec=delay_sec)
         return ok, reason, resp
 
     def next_level(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        if not self._ensure_stage_with_refresh(6, delay_sec=delay_sec):
+        if not self._ensure_stage_with_refresh(3, delay_sec=delay_sec):
             return False, "in the illegal stage", None
-        ok, reason, resp = self._inject_and_wait(method=".lq.Lobby.amuletActivityUpgrade", data={"activityId": self.activity_id}, delay_sec=delay_sec)
+        t = self.op_code.get("next_level")
+        if t is None:
+            raise NotImplementedError("PacketBot.next_level: no op_code 'start_level'")
+        ok, reason, resp = self._operate(pkt_type=t, args=[], delay_sec=delay_sec)
         return ok, reason, resp
 
     def fetch_amulet_activity_data(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
