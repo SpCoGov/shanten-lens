@@ -22,13 +22,16 @@ async def main():
     if args.data_root:
         set_data_root(Path(args.data_root))
 
-    bridge = MitmBridge(MANAGER.get("backend.mitm_port", 10999))
+    upstream_proxy = ""
+    if MANAGER.get("backend.enable_upstream_proxy", False):
+        upstream_proxy = str(MANAGER.get("backend.upstream_proxy", "") or "")
+    bridge = MitmBridge(MANAGER.get("backend.mitm_port", 10999), upstream_proxy=upstream_proxy)
     bridge.set_hooks(on_outbound=hooks.on_outbound, on_inbound=hooks.on_inbound)
 
     from backend import app as _app
     _app.PACKET_BOT = PacketBot(
         addon_getter=lambda: bridge.addon,  # 直接闭包引用，不用 globals hack
-        activity_id=250811,
+        activity_id=260511,
         state_getter=lambda: GAME_STATE,
     )
 

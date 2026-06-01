@@ -10,6 +10,7 @@ class AmuletRarity(Enum):
     BLUE = 2
     ORANGE = 3
     PURPLE = 4
+    GRAY = 5
 
 
 class BadgeRarity(Enum):

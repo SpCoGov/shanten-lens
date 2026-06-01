@@ -8,6 +8,7 @@ RARITY_BASE_PRICE = {
     "BLUE": 6,
     "ORANGE": 9,
     "PURPLE": 12,
+    "GRAY": 0,
 }
 
 GOLD_BADGE_ID = 600050
@@ -160,7 +161,7 @@ def calc_amulet_price(
 
     base_price = RARITY_BASE_PRICE.get(_rarity_name_for_reg(amulet_registry, reg_id), 0)
     if badge_id == GOLD_BADGE_ID:
-        base_price *= 3
+        base_price *= 2
     return base_price
 
 

@@ -15,6 +15,8 @@ use std::os::windows::process::CommandExt;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
+mod overlay;
+
 const LOG_BATCH_MAX_LINES: usize = 64;
 const LOG_BATCH_MAX_BYTES: usize = 64 * 1024;
 const LOG_CHUNK_MAX_BYTES: usize = 16 * 1024;
@@ -361,6 +363,15 @@ fn stop_backend(state: State<BackendState>) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn shutdown_app(app: AppHandle, state: State<BackendState>) -> Result<(), String> {
+  let st = state.0.clone();
+  let _ = stop_backend_with(st);
+  kill_all_backends_silently();
+  app.exit(0);
+  Ok(())
+}
+
+#[tauri::command]
 fn frontend_ready(app: AppHandle, gate: State<SharedGate>) {
   if let Some(progress_state) = app.try_state::<StartupProgressState>() {
     let backend_ready = gate.0.backend_ready.load(Ordering::SeqCst);
@@ -416,6 +427,59 @@ fn get_startup_progress(state: State<StartupProgressState>) -> Result<StartupPro
 }
 
 #[tauri::command]
+fn is_overlay_supported() -> bool {
+  overlay::is_overlay_supported()
+}
+
+#[cfg(windows)]
+#[tauri::command]
+fn get_overlay_status(state: State<overlay::OverlayState>) -> overlay::OverlayStatus {
+  overlay::get_status(state)
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn get_overlay_status() -> overlay::OverlayStatus {
+  overlay::get_status()
+}
+
+#[cfg(windows)]
+#[tauri::command]
+fn set_overlay_enabled(state: State<overlay::OverlayState>, enabled: bool) -> overlay::OverlayStatus {
+  overlay::set_enabled(state, enabled)
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn set_overlay_enabled(enabled: bool) -> overlay::OverlayStatus {
+  overlay::set_enabled(enabled)
+}
+
+#[cfg(windows)]
+#[tauri::command]
+fn set_overlay_interactive(state: State<overlay::OverlayState>, interactive: bool) {
+  overlay::set_interactive(state, interactive)
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn set_overlay_interactive(interactive: bool) {
+  overlay::set_interactive(interactive)
+}
+
+#[cfg(windows)]
+#[tauri::command]
+fn set_overlay_panel_regions(state: State<overlay::OverlayState>, regions: Vec<overlay::PanelRegion>) {
+  overlay::set_panel_regions(state, regions)
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn set_overlay_panel_regions(regions: Vec<overlay::PanelRegion>) {
+  overlay::set_panel_regions(regions)
+}
+
+#[tauri::command]
 fn fetch_latest_release(use_system_proxy: bool) -> Result<String, String> {
   let mut builder = reqwest::blocking::Client::builder()
     .user_agent("Shanten-Lens-Updater")
@@ -462,9 +526,15 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       start_backend,
       stop_backend,
+      shutdown_app,
       frontend_ready,
       update_startup_progress,
       get_startup_progress,
+      is_overlay_supported,
+      get_overlay_status,
+      set_overlay_enabled,
+      set_overlay_interactive,
+      set_overlay_panel_regions,
       fetch_latest_release
     ])
     .setup(|app| {
@@ -500,6 +570,8 @@ pub fn run() {
       {
         let _ = start_backend_with(ah.clone(), st.clone());
       }
+
+      overlay::start(&ah);
 
       if let Some(win) = app.get_webview_window("main") {
         let st2 = st.clone();

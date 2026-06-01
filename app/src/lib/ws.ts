@@ -29,6 +29,14 @@ function ts() {
 
 const addFrame = useLogStore.getState().addFrame;
 
+function shouldTraceWs() {
+    try {
+        return import.meta.env.DEV && localStorage.getItem("shanten-lens:trace-ws") === "1";
+    } catch {
+        return false;
+    }
+}
+
 function translateToastMessage(d: any): string {
     const key = String(d?.msg_key ?? "");
     if (!key) return String(d?.msg ?? "");
@@ -106,7 +114,7 @@ class WS {
 
         ws.onopen = () => {
             this.connected = true;
-            console.log(`[WS ${ts()}] connected`);
+            if (shouldTraceWs()) console.log(`[WS ${ts()}] connected`);
             this._startKeepAlive();
             this.send({type: "frontend_hello", data: {version: APP_VERSION}});
             // 通知所有 onOpen 订阅者
@@ -142,7 +150,7 @@ class WS {
                         console.warn("packet handler error:", e);
                     }
                 });
-                console.log(`[WS ${ts()}] recv:`, pkt);
+                if (shouldTraceWs()) console.log(`[WS ${ts()}] recv:`, pkt);
             } catch {
                 console.warn(`[WS ${ts()}] recv (non-JSON):`, raw);
             }
@@ -150,7 +158,7 @@ class WS {
 
         ws.onclose = () => {
             this.connected = false;
-            console.log(`[WS ${ts()}] closed`);
+            if (shouldTraceWs()) console.log(`[WS ${ts()}] closed`);
             this.ws = null;
             this._stopKeepAlive();
 
@@ -179,7 +187,7 @@ class WS {
     send(pkt: Packet) {
         const data = JSON.stringify(pkt);
         addFrame("out", data);
-        console.log(`[WS ${ts()}] send:`, data);
+        if (shouldTraceWs()) console.log(`[WS ${ts()}] send:`, data);
         if (this.ws && this.connected) {
             try {
                 this.ws.send(data);
@@ -231,7 +239,7 @@ ws.onPacket((pkt) => {
 ws.onPacket((pkt) => {
     if (pkt.type === "ui_toast") {
         const d = pkt.data || {};
-        console.log("[ui_toast] incoming =>", d);
+        if (shouldTraceWs()) console.log("[ui_toast] incoming =>", d);
         const msg = translateToastMessage(d);
         const kind = (d.kind ?? "info") as "info" | "success" | "error";
         const dur = Number.isFinite(Number(d.duration)) ? Number(d.duration) : 2200;

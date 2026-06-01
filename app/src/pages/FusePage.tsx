@@ -8,6 +8,21 @@ import FuseBar from "../components/FuseBar";
 import {t} from "i18next";
 import {Trans} from "react-i18next";
 
+function formatStageList(values: number[] | undefined) {
+    return (values ?? []).join(", ");
+}
+
+function parseStageList(text: string) {
+    const out: number[] = [];
+    for (const part of text.split(/[,，\s]+/)) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        const n = Number.parseInt(trimmed, 10);
+        if (Number.isFinite(n) && !out.includes(n)) out.push(n);
+    }
+    return out;
+}
+
 export default function FusePage() {
     const {config, selected} = useFuse();
     const [openA, setOpenA] = React.useState(false);
@@ -90,6 +105,45 @@ export default function FusePage() {
                                 />
                                 <span>{t("fuse.toggle_force_pick")}</span>
                             </label>
+                        </div>
+                    </section>
+
+                    <section className="panel">
+                        <div className="panel-title">{t("fuse.section_activity_skip_guard_title")}</div>
+                        <p className="hint" style={{marginTop: 0, lineHeight: 1.5}}>
+                            <Trans i18nKey="fuse.section_activity_skip_guard_desc"/>
+                        </p>
+
+                        <div className="rows" style={{marginTop: 12}}>
+                            <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                                <input
+                                    className="form-checkbox"
+                                    type="checkbox"
+                                    checked={Boolean(config.enable_activity_skip_guard)}
+                                    onChange={(e) => patchFuseConfig({enable_activity_skip_guard: e.target.checked})}
+                                />
+                                <span>{t("fuse.toggle_activity_skip_guard")}</span>
+                            </label>
+
+                            <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                                <input
+                                    className="form-checkbox"
+                                    type="checkbox"
+                                    checked={Boolean(config.enable_silent_fuse)}
+                                    onChange={(e) => patchFuseConfig({enable_silent_fuse: e.target.checked})}
+                                />
+                                <span>{t("fuse.toggle_silent_fuse")}</span>
+                            </label>
+
+                            <div className="row" style={{gridTemplateColumns: "auto minmax(120px, 1fr)"}}>
+                                <span>{t("fuse.label_activity_skip_guard_stages")}</span>
+                                <input
+                                    className="form-input"
+                                    value={formatStageList(config.activity_skip_guard_stages)}
+                                    placeholder={t("fuse.placeholder_activity_skip_guard_stages")}
+                                    onChange={(e) => patchFuseConfig({activity_skip_guard_stages: parseStageList(e.target.value)})}
+                                />
+                            </div>
                         </div>
                     </section>
 

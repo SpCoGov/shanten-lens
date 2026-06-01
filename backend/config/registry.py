@@ -12,7 +12,7 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         ConfigTable("game", file=conf_dir / "game.json")
         .add("modify_announcement", True, desc="modify announcement", kind="bool")
         .add("public_all", False, desc="public all tiles", kind="bool")
-        # .add("auto_tsumo", False, desc="auto tsumo", kind="bool")
+        .add("unlock_illustrated_book", False, desc="unlock illustrated book", kind="bool")
     )
     mgr.add_table(
         ConfigTable("general", file=conf_dir / "general.json")
@@ -24,6 +24,8 @@ def build_manager(conf_dir: Path) -> ConfigManager:
         .add("host", "127.0.0.1", kind="string")
         .add("port", 8787, kind="number")
         .add("mitm_port", 10999, kind="number")
+        .add("enable_upstream_proxy", False, desc="enable mitm upstream proxy", kind="bool")
+        .add("upstream_proxy", "", desc="mitm upstream proxy URL", kind="string")
     )
     mgr.add_table(
         ConfigTable("fuse", file=conf_dir / "fuse.json")
@@ -34,6 +36,9 @@ def build_manager(conf_dir: Path) -> ConfigManager:
             kind="object",
         )
         .add("enable_skip_guard", True, kind="bool")
+        .add("enable_activity_skip_guard", True, kind="bool")
+        .add("activity_skip_guard_stages", [], kind="object")
+        .add("enable_silent_fuse", False, kind="bool")
         .add("enable_shop_force_pick", False, kind="bool")
         .add("enable_prestart_kavi_guard", True, kind="bool")
         .add("conduction_min_count", 3, kind="int")

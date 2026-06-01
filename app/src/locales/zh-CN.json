@@ -62,7 +62,20 @@
     "close": "关闭"
   },
   "number": {
-    "large_units": ["万", "亿", "兆", "京", "垓", "秭", "穰", "沟", "涧", "正", "载", "极"],
+    "large_units": [
+      "万",
+      "亿",
+      "兆",
+      "京",
+      "垓",
+      "秭",
+      "穰",
+      "沟",
+      "涧",
+      "正",
+      "载",
+      "极"
+    ],
     "large_unit_repeat": "极"
   },
   "update": {
@@ -155,14 +168,76 @@
     "home": "主页",
     "score": "点数",
     "blackhole": "花火指导",
+    "wanxiang": "万象换牌",
     "blackholeDebug": "指导测试",
     "fuse": "熔断",
+    "todayWin": "今日和了",
+    "overlay": "HUD",
     "autorun": "自动化",
     "refreshGame": "刷新对局",
     "settings": "设置",
     "diagnostics": "日志",
     "packetTest": "封包测试",
-    "about": "关于"
+    "about": "关于",
+    "gamestate": "GameState"
+  },
+  "today_win": {
+    "title": "今日和了",
+    "answer_title": "今日答案",
+    "answer_yaku": "役种：{{yaku}}",
+    "guesses_title": "猜测结果",
+    "history_title": "猜测历史",
+    "input_title": "当前输入",
+    "actions_title": "操作",
+    "picker_title": "牌选择器",
+    "delete": "删除",
+    "clear": "清空",
+    "submit": "提交",
+    "pick_date": "切换日期",
+    "hard_mode": "困难模式",
+    "hard_mode_on": "困难",
+    "hard_mode_off": "普通",
+    "result_title": "通关结果",
+    "result_subtitle": "{{count}} 次猜中",
+    "result_date": "日期",
+    "result_count": "次数",
+    "result_mode": "模式",
+    "result_yaku": "役",
+    "result_answer": "最终结果",
+    "result_records": "猜测记录",
+    "prev_month": "上一月",
+    "next_month": "下一月",
+    "prev_year": "上一年",
+    "next_year": "下一年",
+    "month_label": "{{month}} 月",
+    "history_won": "已通关",
+    "history_failed": "已猜满",
+    "history_played": "已尝试",
+    "weekdays": {
+      "0": "日",
+      "1": "一",
+      "2": "二",
+      "3": "三",
+      "4": "四",
+      "5": "五",
+      "6": "六"
+    },
+    "success": "和了！",
+    "current_waits": "当前听牌：{{waits}}",
+    "wait_mismatch_badge": "等待不同",
+    "errors": {
+      "short_hand": "手牌不足 13 张",
+      "too_many_hand": "手牌已满",
+      "missing_win": "缺少和牌",
+      "tile_overflow": "这张牌已经有 4 张",
+      "not_win": "这不是合法和牌",
+      "no_yaku": "该和牌没有役",
+      "bad_win_tile": "最后一张不是这 13 张手牌的合法和牌",
+      "wait_mismatch": "等待形与今日答案不同",
+      "hard_green": "困难模式要求绿色和牌保留在最后一张",
+      "hard_marked": "困难模式要求上一回合标记过的牌继续出现",
+      "hard_gray": "困难模式不能使用超过上一回合确认数量的灰色牌"
+    }
   },
   "amulet_editor": {
     "title": "编辑护身符",
@@ -405,12 +480,18 @@
     "title": "熔断",
     "section_shop_guard_title": "购物守护",
     "section_shop_guard_desc": "维护监控列表后，在购物时应用两条规则：<br/>1）出现监控项时<strong>禁止“跳过”</strong>（启用下方“禁止跳过”）；<br/>2）出现监控项但你<strong>没有选择监控项之一</strong>则阻止（启用下方“强制选择监控项”）。",
+    "section_activity_skip_guard_title": "跳过熔断",
+    "section_activity_skip_guard_desc": "拦截活动跳过请求，可选择弹窗确认或静默阻止。",
     "btn_add_amulet": "添加护身符",
     "btn_add_badge": "添加印章",
     "btn_delete_selected": "删除选中",
     "btn_clear_selection": "取消选择",
+    "toggle_activity_skip_guard": "启用跳过熔断（拦截活动跳过请求）",
     "toggle_skip_guard": "禁止跳过（出现监控项时阻止“跳过”）",
     "toggle_force_pick": "强制选择监控项（出现监控项但未选其一时阻止）",
+    "toggle_silent_fuse": "静默熔断（不弹窗，直接阻止）",
+    "label_activity_skip_guard_stages": "熔断阶段",
+    "placeholder_activity_skip_guard_stages": "留空表示所有阶段，例如：2, 9, 16",
     "section_conduction_title": "传导链守护",
     "section_conduction_desc": "若传导卡数量达到阈值，且卡维未按规则摆放，将阻止开始对局，以避免忘记给护身符上「传导」而导致断链。",
     "toggle_conduction": "启用传导链守护",
@@ -435,7 +516,7 @@
     "btn_save": "保存熔断配置",
     "btn_saving": "保存中…",
     "bar": {
-      "empty": "空空如也，点击下方按钮添加护身符/印章…",
+      "empty": "牌山为空",
       "kind": {
         "amulet": "护身符",
         "badge": "印章"
@@ -478,6 +559,10 @@
         "title": "熔断确认：必须选择监控项",
         "message": "<b>检测到监控项</b><br/>候选中包含监控护身符/印章，但当前选择不在监控项内。<br/><br/>当前选择：护身符ID={{selBaseId}}（raw={{selRawId}}）<br/><br/>是否继续？"
       },
+      "activitySkip": {
+        "title": "熔断确认：跳过活动操作",
+        "message": "检测到活动跳过请求：activityId=260511，type=3，args=[]。<br/><br/>是否仍然继续跳过？"
+      },
       "skipPack": {
         "title": "熔断确认：卡包包含监控项",
         "message": "<b>检测到监控项</b><br/>当前卡包包含监控的护身符/印章。<br/>护身符命中：{{amuletHitCount}}；印章命中：{{badgeHitCount}}。<br/><br/>仍要跳过卡包吗？"
@@ -496,6 +581,8 @@
         "modify_announcement_desc": "添加一条公告以提示向听镜启动成功",
         "public_all": "公开牌山",
         "public_all_desc": "让游戏中所有牌成为公开牌",
+        "unlock_illustrated_book": "解锁全图鉴",
+        "unlock_illustrated_book_desc": "在护身符活动图鉴中显示全部护身符、印章和符石",
         "auto_tsumo": "自动自摸",
         "auto_tsumo_desc": "在可以自摸的时候自动自摸（发送封包）"
       },
@@ -511,7 +598,11 @@
         "port": "后端端口",
         "port_desc": "后端端口",
         "mitm_port": "MITM端口",
-        "port_port": "MITM服务器端口"
+        "port_port": "MITM服务器端口",
+        "enable_upstream_proxy": "启用 MITM 上游代理",
+        "enable_upstream_proxy_desc": "让 MITM 通过指定的上游代理连接服务器",
+        "upstream_proxy": "MITM 上游代理",
+        "upstream_proxy_desc": "上游代理地址，例如 http://127.0.0.1:7890；省略协议时默认使用 http://"
       }
     },
     "title": "设置",
@@ -531,6 +622,29 @@
     "toast_discard": "已放弃未保存更改",
     "toast_open_config_ok": "已请求打开配置目录",
     "toast_open_config_fail": "打开失败：{{error}}"
+  },
+  "overlay": {
+    "title": "HUD",
+    "windows_only": "HUD Overlay currently supports Windows only",
+    "enabled": "启用 HUD",
+    "process_status": "雀魂进程",
+    "show_blackhole": "展示花火指导",
+    "status_checking": "检查中",
+    "process_found": "已找到，PID {{pid}}",
+    "process_not_found": "未找到 Jantama_MahjongSoul.exe",
+    "blackhole_panel": "花火指导",
+    "blackhole_progress": "进度",
+    "blackhole_draws_needed": "第几张听牌",
+    "blackhole_executing": "执行中",
+    "blackhole_execution_done": "执行完成",
+    "blackhole_execution_failed": "执行失败",
+    "show_score_projection": "展示点数预测",
+    "score_projection_panel": "点数预测",
+    "score_projection_current_level": "当前关卡",
+    "score_projection_current_point": "当前点数",
+    "score_projection_final_level": "最终可达",
+    "collapse_panel": "折叠板块",
+    "expand_panel": "展开板块"
   },
   "advisor": {
     "title_souzu_switch": "换牌指导",
@@ -577,11 +691,15 @@
     "reason_stopped-by-user": "搜索已由你主动停止。",
     "reason_no-reliable-plan-found": "这次只保留经过验证的可靠方案；当前没有找到满足条件的可靠换牌指导。",
     "reason_stage-not-switch": "该指导只在换牌阶段显示。",
+    "reason_wanxiang-not-in-hand": "当前手牌中没有万象，无法计算万象换牌方案。",
+    "reason_cannot-form-four-melds-with-wanxiang": "按剩余换牌顺序无法组成万象加四个面子的方案。",
     "reason_unknown": "暂时没有可用结果。"
   },
   "blackhole": {
     "title": "花火指导",
+    "wanxiang_title": "万象换牌",
     "card_title": "花火指导方案",
+    "wanxiang_card_title": "万象四面子方案",
     "start": "启动搜索",
     "stop": "停止搜索",
     "continue": "继续搜索",
@@ -644,8 +762,10 @@
     "search_algorithm": "搜索算法",
     "algorithm_target_enum": "目标牌型枚举搜索",
     "stage_ready": "当前在换牌阶段，可以手动启动搜索。",
+    "wanxiang_stage_ready": "当前在换牌阶段，可以搜索万象四面子换牌方案。",
     "stage_not_ready": "当前不在换牌阶段，启动前会先拦下。",
     "need_switch_stage": "当前不在换牌阶段，无法启动花火指导。",
+    "wanxiang_need": "当前手牌中没有万象，无法启动万象换牌搜索。",
     "export_current": "导出当前局面",
     "export_empty": "当前没有可导出的局面",
     "export_success": "已导出当前局面",
@@ -653,6 +773,7 @@
     "quad_drawer_title": "所有可见杠",
     "considered_tiles_title": "可使用的牌",
     "draws_needed_label": "第几张听牌",
+    "wanxiang_draws_needed_label": "换牌深度",
     "params_title": "当前参数",
     "params_max_change_count": "最大换牌次数",
     "params_per_change_limit": "换牌限制",
@@ -697,7 +818,8 @@
       "PURPLE": "紫",
       "ORANGE": "橙",
       "BLUE": "蓝",
-      "GREEN": "绿"
+      "GREEN": "绿",
+      "GRAY": "灰"
     },
     "action_confirm": "确认",
     "action_confirm_hint": "请选择一个护身符后再确认",
@@ -863,6 +985,7 @@
     "rarity_blue": "蓝色",
     "rarity_orange": "橙色",
     "rarity_purple": "紫色",
+    "rarity_gray": "灰色",
     "active_on_win_label": "和牌时发动",
     "active_on_win_yes": "是",
     "active_on_win_no": "否",
@@ -960,6 +1083,13 @@
     "continue": "继续",
     "cancel": "取消"
   },
+  "manual_tsumo": {
+    "start": "连续自摸",
+    "stop": "停止自摸",
+    "start_hint": "开始不断执行 op_tsumo",
+    "stop_hint": "停止不断执行 op_tsumo",
+    "win_count": "{{count}} 和"
+  },
   "replacement_stats": {
     "title": "替换牌区统计",
     "empty": "当前无可替换牌",
@@ -1015,5 +1145,42 @@
     "sell_confirm_action": "卖出",
     "conflict_hint": "存在重复键位，请修改标红的快捷键。"
   },
-  "candidate_amulet_empty": "暂无候选护身符"
+  "tile_grid": {
+    "empty": "牌山为空",
+    "discard_tile_title": "打出牌 ID {{id}}",
+    "discard_confirm_title": "打出这张牌？",
+    "discard_confirm_action": "打出",
+    "tile_id": "牌 ID {{id}}",
+    "tile_face": "牌面 {{tile}}",
+    "discard_success": "已请求打出牌 ID {{id}}",
+    "discard_failed": "打出牌 ID {{id}} 失败：{{reason}}"
+  },
+  "candidate_amulet_empty": "暂无候选护身符",
+  "gamestate": {
+    "title": "GameState",
+    "subtitle_live": "展示前端当前维护的 game_state 快照。",
+    "subtitle_empty": "尚未收到后端推送的 game_state。",
+    "summary_title": "状态摘要",
+    "raw_title": "原始 JSON",
+    "copy_json": "复制 JSON",
+    "copied": "已复制",
+    "empty": "暂无 game_state 数据。请先进入对局，或点击刷新对局。",
+    "boolean_true": "是",
+    "boolean_false": "否"
+  },
+  "game_map": {
+    "button": "地图",
+    "open": "查看地图",
+    "title": "地图",
+    "level": "关卡",
+    "node": "当前节点",
+    "node_count": "节点数",
+    "map_node": "地图节点 {{index}}",
+    "current": "当前",
+    "type": "type",
+    "sub_type": "subType",
+    "args": "args",
+    "args_empty": "空",
+    "empty": "暂无地图节点数据。"
+  }
 }

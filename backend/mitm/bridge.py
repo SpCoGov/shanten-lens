@@ -13,17 +13,28 @@ from backend.mitm.codec import LiqiCodec
 
 
 class MitmBridge:
-    def __init__(self, port, liqi_json_path=None):
+    def __init__(self, port, liqi_json_path=None, upstream_proxy: str | None = None):
         self.host = "0.0.0.0"
         self.port = port
+        self.upstream_proxy = self._normalize_upstream_proxy(upstream_proxy)
         self.codec = LiqiCodec(liqi_json_path)
         self.addon = WsAddon(self.codec)
         self._master: Optional[DumpMaster] = None
         self._listeners: List[Callable[[Dict[str, Any]], None]] = []
 
+    @staticmethod
+    def _normalize_upstream_proxy(upstream_proxy: str | None) -> str | None:
+        proxy = (upstream_proxy or "").strip()
+        if not proxy:
+            return None
+        if "://" not in proxy:
+            proxy = f"http://{proxy}"
+        return proxy
+
     async def start(self):
         try:
-            opts = Options(listen_host=self.host, listen_port=self.port, ssl_insecure=True)
+            mode = [f"upstream:{self.upstream_proxy}"] if self.upstream_proxy else ["regular"]
+            opts = Options(listen_host=self.host, listen_port=self.port, ssl_insecure=True, mode=mode)
             self._master = DumpMaster(opts)
             try:
                 self.addon.set_master(self._master)
@@ -58,7 +69,8 @@ class MitmBridge:
                 except Exception:
                     pass
 
-            logger.info(f"MitmBridge starting on {self.host}:{self.port}")
+            upstream_suffix = f" upstream={self.upstream_proxy}" if self.upstream_proxy else ""
+            logger.info(f"MitmBridge starting on {self.host}:{self.port}{upstream_suffix}")
 
             run_task = asyncio.create_task(self._run_master())
             try:

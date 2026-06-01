@@ -4,6 +4,8 @@ export interface GameStateData {
     point?: string;
     target_point?: string;
     level?: number;
+    node?: number;
+    map_nodes?: MapNodeItem[];
     deck_map: Record<string, string>;
     hand_tiles: number[];
     dora_tiles: number[];
@@ -25,12 +27,19 @@ export interface GameStateData {
     total_change_tile_count?: number;
     max_effect_volume?: number;
     tile_score_map?: Record<string, string>;
+    fan_value_map?: Record<string, string>;
     update_reason?: string[];
 }
 
 export interface MingItem {
     type: number;
     tileList: number[];
+}
+
+export interface MapNodeItem {
+    type?: number;
+    subType?: number;
+    args?: unknown[];
 }
 
 export interface BadgeAffix {
@@ -73,7 +82,7 @@ export function toDeckMap(dict: Record<string, string>): Map<number, string> {
     return m;
 }
 
-export type Cell = { tile: string; dim: boolean };
+export type Cell = { tile: string; dim: boolean; id?: number };
 
 /**
  * 生成展示列表（仅负责“先 locked 尾→头，再 wall 尾→头”的拼接）
@@ -84,13 +93,13 @@ export function buildCells(deck: Map<number, string>, locked: number[], wall: nu
     if (Array.isArray(locked)) {
         for (let i = locked.length - 1; i >= 0; i--) {
             const id = locked[i];
-            out.push({tile: deck.get(id) ?? "5m", dim: true});
+            out.push({tile: deck.get(id) ?? "5m", dim: true, id});
         }
     }
     if (Array.isArray(wall)) {
         for (let i = wall.length - 1; i >= 0; i--) {
             const id = wall[i];
-            out.push({tile: deck.get(id) ?? "5m", dim: false});
+            out.push({tile: deck.get(id) ?? "5m", dim: false, id});
         }
     }
     return out.slice(0, cap);

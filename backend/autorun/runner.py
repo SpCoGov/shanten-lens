@@ -107,6 +107,7 @@ EMAIL_RARITY_BG_INDEX = {
     "ORANGE": 2,
     "BLUE": 3,
     "GREEN": 4,
+    "GRAY": 5,
 }
 
 
@@ -341,7 +342,7 @@ class AutoRunner:
             volume = int(effect_item.get("volume") or 1)
         except Exception:
             volume = 1
-        bg_file = f"fu_widen_bg{bg_index}.jpg" if volume == 2 else f"fu_bg{bg_index}.jpg"
+        bg_file = f"fu_bg{bg_index}_widen.png" if volume == 2 else f"fu_bg{bg_index}.png"
         icon_id = getattr(amulet, "icon_id", 0) if amulet else 0
         icon_file = f"fu_{self._pad4(icon_id)}.png" if amulet else None
         return {

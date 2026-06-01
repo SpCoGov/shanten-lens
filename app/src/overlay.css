@@ -1,0 +1,150 @@
+html,
+body,
+#root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: transparent;
+    pointer-events: none;
+}
+
+body {
+    user-select: none;
+}
+
+.hud-root {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+}
+
+.hud-panel {
+    position: fixed;
+    min-width: 320px;
+    min-height: 118px;
+    max-width: calc(100vw - 8px);
+    max-height: calc(100vh - 8px);
+    pointer-events: auto;
+    overflow: hidden;
+}
+
+.hud-blackhole,
+.hud-score-projection {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 7px;
+    padding: 10px;
+    border: 1px solid rgba(80, 208, 255, 0.55);
+    border-radius: 8px;
+    background: rgba(4, 12, 22, 0.58);
+    color: rgba(239, 251, 255, 0.96);
+    font: 13px/1.35 "Segoe UI", system-ui, sans-serif;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.72);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), 0 0 18px rgba(58, 179, 255, 0.16);
+}
+
+.hud-score-projection {
+    grid-template-rows: auto minmax(0, 1fr);
+}
+
+.hud-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+    color: rgba(239, 251, 255, 0.96);
+    font-weight: 800;
+    cursor: move;
+}
+
+.hud-panel-collapse {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border: 1px solid rgba(80, 208, 255, 0.45);
+    border-radius: 6px;
+    background: rgba(18, 42, 64, 0.72);
+    color: rgba(239, 251, 255, 0.96);
+    font: inherit;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.hud-panel.is-collapsed {
+    min-height: 0;
+    padding-bottom: 10px;
+}
+
+.hud-blackhole-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.hud-blackhole-actions button {
+    min-width: 0;
+    height: 30px;
+    border: 1px solid rgba(80, 208, 255, 0.56);
+    border-radius: 6px;
+    background: rgba(18, 42, 64, 0.78);
+    color: rgba(239, 251, 255, 0.96);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.hud-blackhole-actions button:disabled {
+    cursor: default;
+    opacity: 0.42;
+}
+
+.hud-blackhole-body {
+    display: grid;
+    gap: 4px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.hud-line {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 8px;
+    align-items: baseline;
+}
+
+.hud-line span {
+    color: rgba(185, 225, 238, 0.82);
+}
+
+.hud-line strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hud-panel-resize {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 18px;
+    height: 18px;
+    cursor: nwse-resize;
+}
+
+.hud-panel-resize::before {
+    content: "";
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    width: 10px;
+    height: 10px;
+    border-right: 2px solid rgba(185, 225, 238, 0.7);
+    border-bottom: 2px solid rgba(185, 225, 238, 0.7);
+}

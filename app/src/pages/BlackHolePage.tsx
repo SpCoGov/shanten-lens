@@ -115,18 +115,18 @@ export default function BlackHolePage({
         setSeenSignatures((prev) => prev.includes(mainData.plan_signature!) ? prev : [...prev, mainData.plan_signature!]);
     }, [mainData?.plan_signature]);
     React.useEffect(() => {
-        if (stage === 2) return;
+        if (stage === 4 || stage === 5) return;
         setSeenSignatures([]);
     }, [stage]);
     React.useEffect(() => {
-        if (stage === 2) return;
+        if (stage === 5 || stage === 4) return;
         if (mainData?.status === "searching") {
             ws.send({type: "souzu_switch_control", data: {action: "stop", notify: false}} as any);
         }
     }, [stage, mainData?.status]);
 
     const planSignature = mainData?.plan_signature || "";
-    const canOperate = stage === 2;
+    const canOperate = stage === 5 || stage === 4;
     const isSearching = mainData?.status === "searching";
     const canResume = !!planSignature && !isSearching;
     const hasExecutablePlan = !!(

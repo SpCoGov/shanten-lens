@@ -10,6 +10,7 @@ const RAR_BG_INDEX: Record<string, number> = {
     ORANGE: 2,
     BLUE: 3,
     GREEN: 4,
+    GRAY: 5,
 };
 
 function pad4(n: number) {
@@ -50,21 +51,21 @@ export default function AmuletCard({
     }
 
     const isWide = item.volume === 2;
-    const bgPath = isWide ? `/assets/amulet/fu_widen_bg${bgIndex}.jpg` : `/assets/amulet/fu_bg${bgIndex}.jpg`;
+    const bgPath = isWide ? `/assets/amulet/fu_bg${bgIndex}_widen.png` : `/assets/amulet/fu_bg${bgIndex}.png`;
     const iconPath = amu ? `/assets/amulet/fu_${pad4(amu.icon_id)}.png` : null;
     const badgePath = item.badge ? `/assets/badge/badge_${item.badge.id}.png` : null;
 
     // 原始尺寸
-    const W0 = isWide ? 320 : 160;
-    const H0 = 220;
-    const ICON0 = isWide ? 200 : 180;
+    const W0 = isWide ? 316 : 152;
+    const H0 = 213;
+    const ICON0 = isWide ? 316 : 152;
     const PLUS0 = 50;
     const BADGE0 = 76;
 
     // 缩放后尺寸
     const W = Math.round(W0 * scale);
     const H = Math.round(H0 * scale);
-    const ICON = Math.round(ICON0 * scale);
+    const ICON = Math.round(ICON0 * scale * 0.9);
     const PLUS = Math.round(PLUS0 * scale);
     const BADGE = Math.round(BADGE0 * scale);
     const RADIUS = Math.max(8, Math.round(12 * scale));
