@@ -25,9 +25,11 @@ import {
     readHudEnabled,
     readHudShowBlackhole,
     readHudShowScoreProjection,
+    readHudShowWanxiang,
     HUD_ENABLED_KEY,
     HUD_SHOW_BLACKHOLE_KEY,
     HUD_SHOW_SCORE_PROJECTION_KEY,
+    HUD_SHOW_WANXIANG_KEY,
 } from "./lib/hudSettings";
 
 type ExecutionState = {
@@ -39,7 +41,9 @@ type ExecutionState = {
 };
 
 const DEFAULT_SEARCH_ALGORITHM = "target_enumeration_search";
+const WANXIANG_SEARCH_ALGORITHM = "wanxiang_four_meld_switch";
 const BLACKHOLE_PANEL_STORAGE_KEY = "sl-hud-panel:blackhole";
+const WANXIANG_PANEL_STORAGE_KEY = "sl-hud-panel:wanxiang";
 const SCORE_PROJECTION_PANEL_STORAGE_KEY = "sl-hud-panel:score-projection";
 const SCORE_FAN_STORAGE_KEY = "shanten:point-fan:v1";
 const SCORE_WIN_COUNT_STORAGE_KEY = "shanten:point-win-count:v1";
@@ -65,19 +69,35 @@ function sendSouzuAction(action: string) {
     } as any);
 }
 
+function sendWanxiangAction(action: string) {
+    ws.send({
+        type: "souzu_switch_control",
+        data: {
+            action,
+            options: action === "start"
+                ? {wall_limit: 36, search_algorithm: WANXIANG_SEARCH_ALGORITHM}
+                : undefined,
+        },
+    } as any);
+}
+
 function HudOverlay() {
     const [showBlackhole, setShowBlackhole] = React.useState(() => readHudShowBlackhole());
+    const [showWanxiang, setShowWanxiang] = React.useState(() => readHudShowWanxiang());
     const [showScoreProjection, setShowScoreProjection] = React.useState(() => readHudShowScoreProjection());
     const [stage, setStage] = React.useState(0);
     const [gameState, setGameState] = React.useState<GameStateData | null>(null);
     const [plan, setPlan] = React.useState<PlanData | null>(null);
+    const [wanxiangPlan, setWanxiangPlan] = React.useState<PlanData | null>(null);
     const [execution, setExecution] = React.useState<ExecutionState | null>(null);
     const blackholePanelRef = React.useRef<HTMLDivElement | null>(null);
+    const wanxiangPanelRef = React.useRef<HTMLDivElement | null>(null);
     const scoreProjectionPanelRef = React.useRef<HTMLDivElement | null>(null);
     const visiblePanels = React.useCallback(() => [
         showBlackhole ? blackholePanelRef.current : null,
+        showWanxiang ? wanxiangPanelRef.current : null,
         showScoreProjection ? scoreProjectionPanelRef.current : null,
-    ], [showBlackhole, showScoreProjection]);
+    ], [showBlackhole, showScoreProjection, showWanxiang]);
 
     React.useEffect(() => {
         ws.connect();
@@ -91,7 +111,11 @@ function HudOverlay() {
                 const arr = Array.isArray(pkt.data) ? pkt.data : [];
                 for (const item of arr) {
                     if (item?.yaku === "souzu_switch" && item.data?.request_source !== "debug") {
-                        setPlan(item.data ?? null);
+                        if (isWanxiangPlanData(item.data ?? null)) {
+                            setWanxiangPlan(item.data ?? null);
+                        } else {
+                            setPlan(item.data ?? null);
+                        }
                     }
                 }
             } else if (pkt.type === "souzu_switch_execution" && pkt.data) {
@@ -117,6 +141,8 @@ function HudOverlay() {
                 });
             } else if (event.key === HUD_SHOW_BLACKHOLE_KEY) {
                 setShowBlackhole(readHudShowBlackhole());
+            } else if (event.key === HUD_SHOW_WANXIANG_KEY) {
+                setShowWanxiang(readHudShowWanxiang());
             } else if (event.key === HUD_SHOW_SCORE_PROJECTION_KEY) {
                 setShowScoreProjection(readHudShowScoreProjection());
             }
@@ -126,7 +152,7 @@ function HudOverlay() {
     }, []);
 
     React.useEffect(() => {
-        const interactive = showBlackhole || showScoreProjection;
+        const interactive = showBlackhole || showWanxiang || showScoreProjection;
         invoke("set_overlay_interactive", {interactive}).catch(() => {
         });
         reportPanelRegions(visiblePanels());
@@ -135,10 +161,10 @@ function HudOverlay() {
             });
             reportPanelRegions([]);
         };
-    }, [showBlackhole, showScoreProjection, visiblePanels]);
+    }, [showBlackhole, showScoreProjection, showWanxiang, visiblePanels]);
 
     React.useEffect(() => {
-        if (!showBlackhole && !showScoreProjection) return;
+        if (!showBlackhole && !showWanxiang && !showScoreProjection) return;
         const report = () => reportPanelRegions(visiblePanels());
         report();
         window.addEventListener("resize", report);
@@ -147,15 +173,19 @@ function HudOverlay() {
             window.removeEventListener("resize", report);
             window.clearInterval(timer);
         };
-    }, [showBlackhole, showScoreProjection, visiblePanels]);
+    }, [showBlackhole, showScoreProjection, showWanxiang, visiblePanels]);
 
-    if (!showBlackhole && !showScoreProjection) {
+    if (!showBlackhole && !showWanxiang && !showScoreProjection) {
         return <div className="hud-root" aria-hidden="true"/>;
     }
 
     const isSearching = plan?.status === "searching";
     const hasPlan = plan?.status === "plan" && Array.isArray(plan.switch_discards) && plan.switch_discards.length > 0;
+    const wanxiangSearching = wanxiangPlan?.status === "searching";
+    const hasWanxiangPlan = wanxiangPlan?.status === "plan" && Array.isArray(wanxiangPlan.switch_discards) && wanxiangPlan.switch_discards.length > 0;
     const canOperate = stage === 2;
+    const canWanxiangOperate = stage === 4 || stage === 5;
+    const hasWanxiang = hasWanxiangInState(gameState);
     const scoreProjection = getScoreProjection(gameState);
 
     return (
@@ -191,6 +221,39 @@ function HudOverlay() {
                         <div className="hud-line">
                             <span>{t("overlay.blackhole_draws_needed")}</span>
                             <strong>{plan?.draws_needed ?? "-"}</strong>
+                        </div>
+                    </div>
+                </HudPanel>
+            ) : null}
+
+            {showWanxiang ? (
+                <HudPanel
+                    id="wanxiang"
+                    className="hud-blackhole"
+                    storageKey={WANXIANG_PANEL_STORAGE_KEY}
+                    defaultBounds={defaultWanxiangBounds()}
+                    panelRef={wanxiangPanelRef}
+                    onBoundsChange={() => reportPanelRegions(visiblePanels())}
+                    ariaLabel={t("overlay.wanxiang_panel")}
+                    title={t("overlay.wanxiang_panel")}
+                >
+                    <div className="hud-blackhole-actions">
+                        <button onClick={() => sendWanxiangAction("start")} disabled={!canWanxiangOperate || !hasWanxiang || wanxiangSearching}>
+                            {t("blackhole.start")}
+                        </button>
+                        <button onClick={() => sendWanxiangAction("execute_plan")} disabled={!canWanxiangOperate || !hasWanxiangPlan || wanxiangSearching}>
+                            {t("blackhole.execute_plan")}
+                        </button>
+                    </div>
+
+                    <div className="hud-blackhole-body">
+                        <div className="hud-line">
+                            <span>{t("overlay.blackhole_progress")}</span>
+                            <strong>{progressText(wanxiangPlan, execution)}</strong>
+                        </div>
+                        <div className="hud-line">
+                            <span>{t("blackhole.wanxiang_draws_needed_label")}</span>
+                            <strong>{wanxiangPlan?.draws_needed ?? "-"}</strong>
                         </div>
                     </div>
                 </HudPanel>
@@ -357,6 +420,18 @@ function defaultBlackholeBounds(): PanelBounds {
     };
 }
 
+function defaultWanxiangBounds(): PanelBounds {
+    const width = Math.min(620, Math.max(320, window.innerWidth - 32));
+    const height = 188;
+    return {
+        x: Math.max(16, Math.round((window.innerWidth - width) / 2)),
+        y: Math.max(16, window.innerHeight - height * 2 - 30),
+        width,
+        height,
+        collapsed: false,
+    };
+}
+
 function defaultScoreProjectionBounds(): PanelBounds {
     const width = Math.min(420, Math.max(320, window.innerWidth - 32));
     const height = 138;
@@ -442,6 +517,21 @@ function progressText(plan: PlanData | null, execution: ExecutionState | null) {
     if (plan?.status === "plan") return t("advisor.badge_switch_plan");
     if (plan?.status === "impossible") return t("advisor.impossible");
     return t("advisor.awaiting_backend");
+}
+
+function isWanxiangPlanData(data: PlanData | null) {
+    if (!data) return false;
+    return data.search_algorithm === WANXIANG_SEARCH_ALGORITHM
+        || data.mode === "wanxiang-four-meld-switch"
+        || String(data.plan_signature || "").startsWith("wanxiang|")
+        || data.reason === "wanxiang-not-in-hand"
+        || data.reason === "cannot-form-four-melds-with-wanxiang";
+}
+
+function hasWanxiangInState(gameState: GameStateData | null) {
+    if (!gameState) return false;
+    const deckMap = toDeckMap(gameState.deck_map ?? {});
+    return (gameState.hand_tiles ?? []).some((tileId) => tileId === 1000 || deckMap.get(tileId) === "bd");
 }
 
 function getScoreProjection(gameState: GameStateData | null) {

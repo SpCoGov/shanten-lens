@@ -5,9 +5,11 @@ import {
     readHudEnabled,
     readHudShowBlackhole,
     readHudShowScoreProjection,
+    readHudShowWanxiang,
     writeHudEnabled,
     writeHudShowBlackhole,
     writeHudShowScoreProjection,
+    writeHudShowWanxiang,
 } from "../lib/hudSettings";
 
 type OverlayStatus = {
@@ -21,6 +23,7 @@ export default function OverlayPage() {
     const [status, setStatus] = React.useState<OverlayStatus | null>(null);
     const [saving, setSaving] = React.useState(false);
     const [showBlackhole, setShowBlackhole] = React.useState(() => readHudShowBlackhole());
+    const [showWanxiang, setShowWanxiang] = React.useState(() => readHudShowWanxiang());
     const [showScoreProjection, setShowScoreProjection] = React.useState(() => readHudShowScoreProjection());
 
     const refresh = React.useCallback(() => {
@@ -60,6 +63,11 @@ export default function OverlayPage() {
     const toggleShowScoreProjection = (enabled: boolean) => {
         setShowScoreProjection(enabled);
         writeHudShowScoreProjection(enabled);
+    };
+
+    const toggleShowWanxiang = (enabled: boolean) => {
+        setShowWanxiang(enabled);
+        writeHudShowWanxiang(enabled);
     };
 
     return (
@@ -102,6 +110,15 @@ export default function OverlayPage() {
                             className="form-checkbox"
                             checked={showBlackhole}
                             onChange={(event) => toggleShowBlackhole(event.currentTarget.checked)}
+                        />
+                    </div>
+                    <div className="row">
+                        <label>{t("overlay.show_wanxiang")}</label>
+                        <input
+                            type="checkbox"
+                            className="form-checkbox"
+                            checked={showWanxiang}
+                            onChange={(event) => toggleShowWanxiang(event.currentTarget.checked)}
                         />
                     </div>
                     <div className="row">

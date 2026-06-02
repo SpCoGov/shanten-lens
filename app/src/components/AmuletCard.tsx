@@ -58,14 +58,13 @@ export default function AmuletCard({
     // 原始尺寸
     const W0 = isWide ? 316 : 152;
     const H0 = 213;
-    const ICON0 = isWide ? 316 : 152;
     const PLUS0 = 50;
     const BADGE0 = 76;
 
     // 缩放后尺寸
     const W = Math.round(W0 * scale);
     const H = Math.round(H0 * scale);
-    const ICON = Math.round(ICON0 * scale * 0.9);
+    const ICON_INSET = Math.max(4, Math.round(8 * scale));
     const PLUS = Math.round(PLUS0 * scale);
     const BADGE = Math.round(BADGE0 * scale);
     const RADIUS = Math.max(8, Math.round(12 * scale));
@@ -133,11 +132,10 @@ export default function AmuletCard({
                     alt={amu!.name}
                     style={{
                         position: "absolute",
-                        left: "50%",
-                        top: "50%",
-                        transform: "translate(-50%, -50%)",
-                        width: ICON,
-                        height: "auto",
+                        inset: ICON_INSET,
+                        width: `calc(100% - ${ICON_INSET * 2}px)`,
+                        height: `calc(100% - ${ICON_INSET * 2}px)`,
+                        objectFit: "contain",
                         pointerEvents: "none",
                     }}
                     draggable={false}
