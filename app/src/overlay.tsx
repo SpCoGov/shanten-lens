@@ -183,8 +183,7 @@ function HudOverlay() {
     const hasPlan = plan?.status === "plan" && Array.isArray(plan.switch_discards) && plan.switch_discards.length > 0;
     const wanxiangSearching = wanxiangPlan?.status === "searching";
     const hasWanxiangPlan = wanxiangPlan?.status === "plan" && Array.isArray(wanxiangPlan.switch_discards) && wanxiangPlan.switch_discards.length > 0;
-    const canOperate = stage === 2;
-    const canWanxiangOperate = stage === 4 || stage === 5;
+    const canOperate = stage === 4 || stage === 5;
     const hasWanxiang = hasWanxiangInState(gameState);
     const scoreProjection = getScoreProjection(gameState);
 
@@ -238,10 +237,10 @@ function HudOverlay() {
                     title={t("overlay.wanxiang_panel")}
                 >
                     <div className="hud-blackhole-actions">
-                        <button onClick={() => sendWanxiangAction("start")} disabled={!canWanxiangOperate || !hasWanxiang || wanxiangSearching}>
+                        <button onClick={() => sendWanxiangAction("start")} disabled={!canOperate || !hasWanxiang || wanxiangSearching}>
                             {t("blackhole.start")}
                         </button>
-                        <button onClick={() => sendWanxiangAction("execute_plan")} disabled={!canWanxiangOperate || !hasWanxiangPlan || wanxiangSearching}>
+                        <button onClick={() => sendWanxiangAction("execute_plan")} disabled={!canOperate || !hasWanxiangPlan || wanxiangSearching}>
                             {t("blackhole.execute_plan")}
                         </button>
                     </div>

@@ -21,6 +21,7 @@ import BadgePickerModal from "../components/BadgePickerModal";
 import AmuletCard from "../components/AmuletCard";
 import Modal from "../components/Modal";
 import {Trans, useTranslation} from "react-i18next";
+import {formatLevelIdToLabel} from "../lib/levelFormat";
 
 function formatDuration(ms: number): string {
     if (!ms || ms < 0) ms = 0;
@@ -30,13 +31,6 @@ function formatDuration(ms: number): string {
     const ss = s % 60;
     const pad = (n: number) => n.toString().padStart(2, "0");
     return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
-}
-
-function formatAutoLevel(level?: number | null): string {
-    if (!level || level <= 0) return "-";
-    const a = Math.floor(level / 100);
-    const b = level % 100;
-    return `${a}-${b}`;
 }
 
 const DENSE_ALPHABET = Array.from({length: 94}, (_, i) => String.fromCharCode(i + 33))
@@ -423,7 +417,7 @@ export default function AutoRunnerPage() {
             run: record.run_index ?? "-",
             value: record.target_value ?? 0,
             count: record.amulet_count ?? 0,
-            level: formatAutoLevel(record.level),
+            level: formatLevelIdToLabel(record.level),
         });
     }, [t]);
 
@@ -544,7 +538,7 @@ export default function AutoRunnerPage() {
         return (
             <div className="hint" style={{display: "grid", gap: 8, marginTop: 8, lineHeight: 1.45}}>
                 <div>{t("autorun.operation_reason_label", {reason: record.reason || "-"})}</div>
-                <div>{t("autorun.operation_step_label", {step: record.step || "-", level: formatAutoLevel(record.level)})}</div>
+                <div>{t("autorun.operation_step_label", {step: record.step || "-", level: formatLevelIdToLabel(record.level)})}</div>
                 <div>{t("autorun.operation_time_label", {time: record.ts ? new Date(record.ts).toLocaleString() : "-"})}</div>
                 <div style={{display: "flex", gap: 8, flexWrap: "wrap"}}>
                     {selectedRawId != null ? <span className="badge">{t("autorun.operation_selected_raw", {id: String(selectedRawId)})}</span> : null}
@@ -730,7 +724,7 @@ export default function AutoRunnerPage() {
                                                 {t("autorun.remake_record_row", {
                                                     run: record.run_index ?? "-",
                                                     value: record.target_value ?? 0,
-                                                    level: formatAutoLevel(record.level),
+                                                    level: formatLevelIdToLabel(record.level),
                                                 })}
                                             </span>
                                             {isBest ? <span className="badge ok">{t("autorun.remake_best_marker")}</span> : null}

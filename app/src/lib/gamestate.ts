@@ -13,7 +13,7 @@ export interface GameStateData {
     ming?: MingItem[];
     replacement_tiles: number[];
     wall_tiles: number[];
-    ended: boolean;
+    ended?: boolean;
     desktop_remain: number;
     locked_tiles: number[];
     switch_used_tiles: number[];
@@ -28,7 +28,14 @@ export interface GameStateData {
     max_effect_volume?: number;
     tile_score_map?: Record<string, string>;
     fan_value_map?: Record<string, string>;
+    character?: CharacterState;
     update_reason?: string[];
+}
+
+export interface CharacterState {
+    characterId?: number | string;
+    hp?: number | string;
+    maxHp?: number | string;
 }
 
 export interface MingItem {

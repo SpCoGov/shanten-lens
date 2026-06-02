@@ -28,6 +28,15 @@ export default function ReplacementPanel({
     const rafRef = React.useRef<number | null>(null);
     const targetRef = React.useRef(0);
 
+    const stopAnimation = React.useCallback(() => {
+        if (rafRef.current != null) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+        }
+        const el = scrollRef.current;
+        if (el) targetRef.current = el.scrollLeft;
+    }, []);
+
     const animate = React.useCallback(() => {
         const el = scrollRef.current;
         if (!el) return;
@@ -56,6 +65,12 @@ export default function ReplacementPanel({
         e.preventDefault();
     };
 
+    const onScroll = () => {
+        const el = scrollRef.current;
+        if (!el || rafRef.current != null) return;
+        targetRef.current = el.scrollLeft;
+    };
+
     React.useEffect(() => {
         const el = scrollRef.current;
         if (el) targetRef.current = el.scrollLeft;
@@ -81,6 +96,9 @@ export default function ReplacementPanel({
             <div
                 ref={scrollRef}
                 onWheel={onWheel}
+                onMouseDown={stopAnimation}
+                onTouchStart={stopAnimation}
+                onScroll={onScroll}
                 style={{
                     display: "grid",
                     gridAutoFlow: "column",

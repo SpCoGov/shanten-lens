@@ -13,7 +13,7 @@ class GameState:
     """
     表示游戏状态（可序列化为 JSON）
     """
-    stage: int = -1  # 1=开局选择角色、2=选择免费卡包、3=选择关卡、4/5=换牌？、6=打牌、7=苦战、9=购买卡包|选择护身符、11=购买遗迹石、12=交换护身符、13=火、13=转盘、16=选择奖励护身符
+    stage: int = -1  # 1=开局选择角色、2=选择免费卡包、3=选择关卡、4/5=换牌？、6=打牌、7=苦战、9=购买卡包|选择护身符、11=购买遗迹石、12=交换护身符、13=火、13=转盘、16=选择奖励护身符、100=已结束
     deck_map: OrderedDict[int, str] = field(default_factory=OrderedDict)  # 牌山：id→牌面
     hand_tiles: List[int] = field(default_factory=list)  # 手牌
     dora_tiles: List[int] = field(default_factory=list)  # 宝牌指示牌（包含未翻开的）
@@ -35,6 +35,7 @@ class GameState:
     candidate_effect_list: List[Dict] = field(default_factory=list)
     record: Dict = field(default_factory=dict)
     ting_list: List[Dict] = field(default_factory=dict)
+    character: Dict = field(default_factory=dict)
     # nextOperationType: 1=打牌、4=杠、8=自摸、100=跳过换牌、101=换牌（杠的时候会显示被杠的牌"gang": [{"tiles": [22,49,76,103]}]）
     next_operation: List[Dict] = field(default_factory=dict)
     goods: List[Dict] = field(default_factory=dict)
@@ -78,6 +79,7 @@ class GameState:
             "candidate_effect_list": self.candidate_effect_list,
             "record": self.record,
             "ting_list": self.ting_list,
+            "character": self.character,
             "next_operation": self.next_operation,
             "goods": self.goods,
             "refresh_price": self.refresh_price,
@@ -275,6 +277,7 @@ class GameState:
             effect_list: List[Dict] = None,
             candidate_effect_list: List[Dict] = None,
             ting_list: List[Dict] = None,
+            character: Dict = None,
             next_operation: List[Dict] = None,
             goods: List[Dict] = None,
             refresh_price: int = None,
@@ -321,6 +324,8 @@ class GameState:
             self.candidate_effect_list = candidate_effect_list.copy()
         if ting_list is not None:
             self.ting_list = ting_list
+        if character is not None:
+            self.character = character
         if next_operation is not None:
             self.next_operation = next_operation
         if goods is not None:
@@ -378,6 +383,7 @@ class GameState:
         self.goods.clear()
         self.next_operation.clear()
         self.ting_list.clear()
+        self.character.clear()
         self.boss_buff.clear()
         self.shop_buff_list.clear()
         self.tile_score_map.clear()

@@ -36,10 +36,8 @@ def build_manager(conf_dir: Path) -> ConfigManager:
             kind="object",
         )
         .add("enable_skip_guard", True, kind="bool")
-        .add("enable_activity_skip_guard", True, kind="bool")
-        .add("activity_skip_guard_stages", [], kind="object")
-        .add("enable_silent_fuse", False, kind="bool")
         .add("enable_shop_force_pick", False, kind="bool")
+        .add("enable_ting_ready_skip_guard", True, kind="bool")
         .add("enable_prestart_kavi_guard", True, kind="bool")
         .add("conduction_min_count", 3, kind="int")
         .add("enable_anti_steal_eat", True, kind="bool")

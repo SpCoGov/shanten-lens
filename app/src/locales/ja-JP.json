@@ -480,18 +480,15 @@
     "title": "ヒューズ",
     "section_shop_guard_title": "購入ガード",
     "section_shop_guard_desc": "監視リストを整備すると、購入時に次の2ルールを適用します：<br/>1）監視項目が出たら<strong>「スキップ」禁止</strong>（下の「スキップ禁止」を有効にする）；<br/>2）監視項目があるのに<strong>そのいずれも選ばない</strong>場合はブロック（下の「監視項目の強制選択」を有効にする）。",
-    "section_activity_skip_guard_title": "スキップヒューズ",
-    "section_activity_skip_guard_desc": "活動スキップ要求をブロックし、確認ダイアログまたはサイレントブロックを選べます。",
     "btn_add_amulet": "お守りを追加",
     "btn_add_badge": "スタンプを追加",
     "btn_delete_selected": "選択を削除",
     "btn_clear_selection": "選択を解除",
-    "toggle_activity_skip_guard": "スキップヒューズを有効化（活動スキップ要求をブロック）",
     "toggle_skip_guard": "スキップ禁止（監視項目がある場合は「スキップ」を禁止）",
     "toggle_force_pick": "監視項目の強制選択（監視項目があるのに未選択ならブロック）",
-    "toggle_silent_fuse": "サイレントヒューズ（確認なしで直接ブロック）",
-    "label_activity_skip_guard_stages": "ヒューズ対象ステージ",
-    "placeholder_activity_skip_guard_stages": "空なら全ステージ。例：2, 9, 16",
+    "section_switch_guard_title": "交換牌ガード",
+    "section_switch_guard_desc": "未聴牌のまま交換牌ステージをスキップしないよう確認します。",
+    "toggle_ting_ready_skip_guard": "未聴牌スキップヒューズを有効化",
     "section_conduction_title": "伝導チェーン・ガード",
     "section_conduction_desc": "伝導お守りが閾値に達し、かつエンチャンターカーヴィの配置が規則に反している場合、対局開始をブロックします（お守りへの「伝導」付与忘れによる断鎖を防ぐため）。",
     "toggle_conduction": "伝導チェーン・ガードを有効化",
@@ -559,9 +556,9 @@
         "title": "ヒューズ確認：監視対象から選択が必須",
         "message": "<b>監視対象を検出しました</b><br/>候補に監視対象のお守り／スタンプが含まれていますが、現在の選択は監視対象ではありません。<br/><br/>現在の選択：お守りID={{selBaseId}}（raw={{selRawId}}）<br/><br/>このまま続行しますか？"
       },
-      "activitySkip": {
-        "title": "ヒューズ確認：活動操作のスキップ",
-        "message": "活動スキップ要求を検出しました：activityId=260511、type=3、args=[]。<br/><br/>このままスキップしますか？"
+      "tingReadySkip": {
+        "title": "ヒューズ確認：交換牌ガード",
+        "message": "現在、聴牌リストがありません。交換牌ステージでスキップしようとしています。<br/><br/>このまま続行しますか？"
       },
       "skipPack": {
         "title": "ヒューズ確認：監視対象を含むパックです",
@@ -1038,6 +1035,10 @@
   "candidate_amulet": "候補のお守り",
   "goods": "商品",
   "noAmulet": "お守りなし",
+  "character_health": {
+    "title": "キャラHP",
+    "portrait_alt": "キャラ {{id}}"
+  },
   "status": {
     "backendConnected": "バックエンド：接続済み",
     "backendDisconnected": "バックエンド：未接続",
@@ -1088,6 +1089,7 @@
     "level_label": "ステージ {{level}}",
     "avg_souzu_score": "索子平均スコア",
     "max_souzu_score": "索子最高スコア",
+    "haitei_fan": "海底摸月",
     "amulet_229_data0": "スタンプ盗み",
     "amulet_227_data0": "月光の加護",
     "amulet_157_data0": "ウエイトトレーニング",

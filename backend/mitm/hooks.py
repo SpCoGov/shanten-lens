@@ -125,10 +125,11 @@ def _handle_type10_draw_event(event: Dict[str, Any], reason: str) -> None:
     stage = state.get("current", -1)
     value_changes = event.get("valueChanges", {})
     round_info = value_changes.get("round", {})
-    desktop_remain = round_info.get("desktopRemain", {}).get("value", 0)
+    desktop_remain = round_info.get("desktopRemain", {}).get("value", None)
     effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
     ting_list = round_info.get("tingList", {}).get("value", None)
     next_operation = round_info.get("nextOperation", {}).get("value", None)
+    character = value_changes.get("character", {}).get("value", None)
     after_draw_hands = round_info.get("hands", {}).get("value", None)
     if after_draw_hands:
         GAME_STATE.on_draw_tile(after_draw_hands, after_draw_hands[len(after_draw_hands) - 1], push_gamestate=False)
@@ -138,6 +139,7 @@ def _handle_type10_draw_event(event: Dict[str, Any], reason: str) -> None:
         stage=stage,
         effect_list=effect_list,
         ting_list=ting_list,
+        character=character,
         next_operation=next_operation,
         reason=reason,
     )
@@ -1562,8 +1564,6 @@ def _must_pick_guard(selected_raw_id: int) -> tuple[bool, bool, dict]:
 
 
 def _confirm_fuse_or_drop(cfg: dict, *, title_key: str, message_key: str, values: dict) -> bool:
-    if bool(cfg.get("enable_silent_fuse", False)):
-        return False
     return _ui_confirm_blocking(
         title_key=title_key,
         message_key=message_key,
@@ -1573,40 +1573,27 @@ def _confirm_fuse_or_drop(cfg: dict, *, title_key: str, message_key: str, values
         timeout=45.0,
     )
 
-
-def _stage_in_configured_stages(current_stage: Any, stages: Any) -> bool:
-    stage_list = _coerce_int_list(stages)
-    if not stage_list:
-        return True
-    try:
-        stage = int(current_stage)
-    except (TypeError, ValueError):
-        return False
-    return stage in set(stage_list)
-
-
 # MARK: on_outbound
 def on_outbound(view: Dict) -> Tuple[str, Any]:
     if backend.app.AUTORUNNER.running:
         return "pass", None
     try:
         if view.get("type") == "Req" and view.get("method") == ".lq.Lobby.amuletActivityOperate":
-            logger.info("1 {}", view)
             data = view.get("data")
             type = data.get("type")
             args = data.get("args")
             cfg = MANAGER.to_table_payload("fuse") or {}
+            # 换牌守护：换牌阶段未听牌时，拦截跳过操作。
             if (
-                    bool(cfg.get("enable_activity_skip_guard", True))
-                    and _stage_in_configured_stages(GAME_STATE.stage, cfg.get("activity_skip_guard_stages", []))
-                    and str(data.get("activityId", "")) == "260511"
+                    bool(cfg.get("enable_ting_ready_skip_guard", True))
                     and type == 3
-                    and args == []
+                    and GAME_STATE.stage in [4, 5]
+                    and len(GAME_STATE.ting_list or []) == 0
             ):
                 ok = _confirm_fuse_or_drop(
                     cfg,
-                    title_key="fuse.guard.activitySkip.title",
-                    message_key="fuse.guard.activitySkip.message",
+                    title_key="fuse.guard.tingReadySkip.title",
+                    message_key="fuse.guard.tingReadySkip.message",
                     values={},
                 )
                 return ("pass", None) if ok else ("drop", None)
@@ -2313,6 +2300,7 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             enemy = round_info.get("enemy", {})
             point = enemy.get("hp", "0")
             target_point = enemy.get("maxHp", "0")
+            character = game.get("character", None)
             state = game.get("state", {})
             stage = state.get("current", -1)
             try:
@@ -2350,16 +2338,16 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             next_operation = round_info.get("nextOperation", None)
             GAME_STATE.update_record(record)
             if is_redeal_stage:
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, shop_buff_list=shop_buff_list, tile_score_map=tile_score_map, fan_value_map=fan_value_map, target_point=target_point, point=point, tian_dora_tiles=tian_dora_tiles, ming=ming, push_gamestate=True)
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, character=character, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, shop_buff_list=shop_buff_list, tile_score_map=tile_score_map, fan_value_map=fan_value_map, target_point=target_point, point=point, tian_dora_tiles=tian_dora_tiles, ming=ming, push_gamestate=True)
             elif desktop_remain < 36:
                 new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, effect_list)
                 GAME_STATE.update_wall(new_wall)
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, shop_buff_list=shop_buff_list, tile_score_map=tile_score_map, fan_value_map=fan_value_map, target_point=target_point, point=point, tian_dora_tiles=tian_dora_tiles, ming=ming, push_gamestate=False)
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, character=character, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, shop_buff_list=shop_buff_list, tile_score_map=tile_score_map, fan_value_map=fan_value_map, target_point=target_point, point=point, tian_dora_tiles=tian_dora_tiles, ming=ming, push_gamestate=False)
                 GAME_STATE.refresh_wall_by_remaning()
             else:
                 new_wall = reorder_wall_tiles_by_amulet221(GAME_STATE.deck_map, GAME_STATE.wall_tiles, effect_list)
                 GAME_STATE.update_wall(new_wall)
-                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, shop_buff_list=shop_buff_list, tile_score_map=tile_score_map, fan_value_map=fan_value_map, target_point=target_point, point=point, tian_dora_tiles=tian_dora_tiles, ming=ming, push_gamestate=True)
+                GAME_STATE.update_other_info(desktop_remain=desktop_remain, stage=stage, effect_list=effect_list, candidate_effect_list=candidate_effect_list, coin=coin, ting_list=ting_list, character=character, next_operation=next_operation, goods=goods, refresh_price=refresh_price, total_change_tile_count=total_chance_tile_count, change_tile_count=chance_tile_count, max_effect_volume=max_effect_volume, shop_buff_list=shop_buff_list, tile_score_map=tile_score_map, fan_value_map=fan_value_map, target_point=target_point, point=point, tian_dora_tiles=tian_dora_tiles, ming=ming, push_gamestate=True)
             error_number_test = MANAGER.get("general.error_code_test")
             if error_number_test != 0:
                 return "modify", dict({"error": {"code": error_number_test, "u32Params": [], "strParams": [], "jsonParam": ""}})

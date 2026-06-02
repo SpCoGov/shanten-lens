@@ -32,6 +32,7 @@ import {setAppLanguage} from "./lib/i18n";
 import {
     buildCells,
     CandidateEffectRef,
+    type CharacterState,
     type Cell,
     type EffectItem,
     type GameStateData,
@@ -64,6 +65,7 @@ import {
 } from "./lib/updateCheck";
 import {openUrl} from "@tauri-apps/plugin-opener";
 import {safeListen} from "./lib/tauriRuntime";
+import {formatLevelIdToLabel} from "./lib/levelFormat";
 
 type BackendLogPayload =
     | string
@@ -120,6 +122,13 @@ const DEFAULT_AMULET_HOTKEYS: AmuletHotkeySettings = {
 };
 
 type HomeSideMode = "records" | "advisor";
+
+type CharacterHealthInfo = {
+    characterId: number;
+    hp: number;
+    maxHp: number;
+    percent: number;
+};
 
 function normalizeHotkeyKey(value: string): string {
     if (value === " ") return " ";
@@ -654,18 +663,8 @@ function formatMapNodeValue(value: unknown) {
     return String(value);
 }
 
-function formatGameMapLevel(level: unknown) {
-    const value = Number(level ?? 0);
-    if (!Number.isFinite(value) || value <= 0) return "-";
-    if (value >= 1000) return `Ex${value - 1000}`;
-    const chapter = Math.trunc(value / 100);
-    const stage = value % 100;
-    if (chapter > 0 && stage > 0) return `${chapter}-${stage}`;
-    return String(value);
-}
-
 function getGameMapNodeLabel(level: unknown, index: number, count: number) {
-    const prefix = formatGameMapLevel(level);
+    const prefix = formatLevelIdToLabel(level);
     if (index === 0) return `${prefix}-START`;
     if (index === count - 1 && count > 1) return `${prefix}-BOSS`;
     return `${prefix}-${index}`;
@@ -679,6 +678,50 @@ function getGameMapNodePosition(index: number, count: number): React.CSSProperti
         "--x": `${x}%`,
         "--y": `${y}%`,
     } as React.CSSProperties;
+}
+
+function parseFiniteNumber(value: unknown): number | null {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getCharacterHealthInfo(character?: CharacterState | null): CharacterHealthInfo | null {
+    if (!character) return null;
+    const characterId = parseFiniteNumber(character.characterId);
+    const hp = parseFiniteNumber(character.hp);
+    const maxHp = parseFiniteNumber(character.maxHp);
+    if (characterId == null || characterId <= 0 || hp == null || maxHp == null || maxHp <= 0) return null;
+    const safeHp = Math.max(0, hp);
+    return {
+        characterId: Math.trunc(characterId),
+        hp: safeHp,
+        maxHp,
+        percent: Math.max(0, Math.min(100, (safeHp / maxHp) * 100)),
+    };
+}
+
+function CharacterHealthPanel({info}: {info: CharacterHealthInfo}) {
+    const {t} = useTranslation();
+    const hpText = `${Math.trunc(info.hp)} / ${Math.trunc(info.maxHp)}`;
+    return (
+        <div className="character-health-panel" title={t("character_health.title")}>
+            <img
+                className="character-health-portrait"
+                src={`/assets/character/character_${info.characterId}.png`}
+                alt={t("character_health.portrait_alt", {id: info.characterId})}
+                draggable={false}
+            />
+            <div className="character-health-content">
+                <div className="character-health-header">
+                    <span>{t("character_health.title")}</span>
+                    <strong>{hpText}</strong>
+                </div>
+                <div className="character-health-bar" aria-label={t("character_health.title")}>
+                    <i style={{width: `${info.percent}%`}}/>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function getGameMapNodeIconSrc(type: unknown, subType: unknown) {
@@ -718,7 +761,7 @@ function GameMapModal({
                     </svg>
                     <div className="game-map-level-pill">
                         <span>{t("game_map.level")}</span>
-                        <strong>{formatGameMapLevel(currentState?.level)}</strong>
+                        <strong>{formatLevelIdToLabel(currentState?.level)}</strong>
                     </div>
                     <div className="game-map-node-pill">
                         <span>{t("game_map.node")}</span>
@@ -810,7 +853,6 @@ export default function App() {
     const [point, setPoint] = React.useState<string>("0");
     const [targetPoint, setTargetPoint] = React.useState<string>("0");
     const [level, setLevel] = React.useState<number>(0);
-    const [ended, setEnded] = React.useState<boolean>(false);
     const [remain, setRemain] = React.useState<number>(0);
     const [hasGame, setHasGame] = React.useState<boolean>(false);
     const [bossBuff, setBossBuff] = React.useState<number[]>([]);
@@ -818,6 +860,7 @@ export default function App() {
 
     const [wallStatsTiles, setWallStatsTiles] = React.useState<string[]>([]);
     const [handTileIds, setHandTileIds] = React.useState<number[]>([]);
+    const gameEnded = stage === 100;
 
     const [replacementTiles, setReplacementTiles] = React.useState<string[]>([]);
     const [replacementTileIds, setReplacementTileIds] = React.useState<number[]>([]);
@@ -948,11 +991,16 @@ export default function App() {
     const [goods, setGoods] = React.useState<GoodsItem[]>([]);
     const [candidates, setCandidates] = React.useState<CandidateEffectRef[]>([]);
     const [tileScoreMap, setTileScoreMap] = React.useState<Record<string, string>>({});
+    const [fanValueMap, setFanValueMap] = React.useState<Record<string, string>>({});
     const [homeSideMode, setHomeSideMode] = React.useState<HomeSideMode>("records");
-    const levelRecordItems = useLevelRecordItems({level, tileScoreMap, amulets});
+    const levelRecordItems = useLevelRecordItems({level, tileScoreMap, fanValueMap, amulets});
     const hasLevelRecords = levelRecordItems.length > 0;
+    const characterHealthInfo = React.useMemo(
+        () => getCharacterHealthInfo(latestGameState?.character),
+        [latestGameState?.character],
+    );
     const isAdvisorStage = stage === 2 || stage === 3;
-    const showHomeSidePanel = isAdvisorStage || hasLevelRecords;
+    const showHomeSidePanel = isAdvisorStage || hasLevelRecords || characterHealthInfo != null;
     const effectiveHomeSideMode: HomeSideMode = isAdvisorStage && !hasLevelRecords ? "advisor" : homeSideMode;
 
     const THEME_ORDER: ThemeMode[] = ["auto", "dark", "dark-green"];
@@ -1362,9 +1410,8 @@ export default function App() {
                 setPoint(typeof d.point === "string" ? d.point : String(d.point ?? "0"));
                 setTargetPoint(typeof d.target_point === "string" ? d.target_point : String(d.target_point ?? "0"));
                 setLevel(typeof d.level === "number" ? d.level : Number(d.level ?? 0));
-                setEnded(d.ended);
                 setRemain(d.desktop_remain ?? 0);
-                setHasGame(d.stage !== undefined && d.ended !== undefined && d.stage >= 0);
+                setHasGame(d.stage !== undefined && d.stage >= 0);
                 setBossBuff(Array.isArray((d as any).boss_buff) ? (d as any).boss_buff : []);
                 setShopBuffList((d as any).shop_buff_list && typeof (d as any).shop_buff_list === "object"
                     ? (d as any).shop_buff_list
@@ -1392,6 +1439,7 @@ export default function App() {
                 setGoods(d.goods ?? []);
                 setCandidates(d.candidate_effect_list ?? []);
                 setTileScoreMap(d.tile_score_map ?? {});
+                setFanValueMap(d.fan_value_map ?? {});
             } else if (pkt.type === "discard_recommendation" && pkt.data) {
                 const arr = (Array.isArray(pkt.data) ? pkt.data : []) as Array<{ yaku: string; data: PlanData }>;
                 for (const item of arr) {
@@ -2130,7 +2178,10 @@ export default function App() {
                     <div
                         ref={appMainRef}
                         className={`app-main route-${route}`}
-                        style={{padding: `${OUTER_PADDING}px ${OUTER_PADDING}px 0 ${OUTER_PADDING}px`, boxSizing: "border-box"}}
+                        style={{
+                            padding: `${OUTER_PADDING}px ${OUTER_PADDING}px ${route === "home" ? OUTER_PADDING : 0}px ${OUTER_PADDING}px`,
+                            boxSizing: "border-box",
+                        }}
                     >
                         {route === "home" && (
                             <div
@@ -2155,14 +2206,22 @@ export default function App() {
                                                 ) : (
                                                     <LevelRecordPanel level={level} items={levelRecordItems}/>
                                                 )}
+                                                {characterHealthInfo ? (
+                                                    <CharacterHealthPanel info={characterHealthInfo}/>
+                                                ) : null}
                                             </>
                                         ) : (
-                                            <LevelRecordPanel level={level} items={levelRecordItems}/>
+                                            <>
+                                                <LevelRecordPanel level={level} items={levelRecordItems}/>
+                                                {characterHealthInfo ? (
+                                                    <CharacterHealthPanel info={characterHealthInfo}/>
+                                                ) : null}
+                                            </>
                                         )}
                                     </div>
                                 ) : null}
 
-                                <div style={{flex: 1, minWidth: 0, position: "relative"}}>
+                                <div style={{flex: 1, minWidth: 0, minHeight: 0, maxHeight: "100%", position: "relative"}}>
                                     <div className="panel">
                                         <div className="panel-title panel-title-with-action">
                                             <span>{t("amulet")}</span>
@@ -2433,7 +2492,7 @@ export default function App() {
                             {bossBuff.length > 0 ? (
                                 <span className="badge">{t("status.bossBuff", {buffs: bossBuff.join(", ")})}</span>
                             ) : null}
-                            <span className={`badge ${ended ? "down" : "ok"}`}>{ended ? t("status.ended") : t("status.running")}</span>
+                            <span className={`badge ${gameEnded ? "down" : "ok"}`}>{gameEnded ? t("status.ended") : t("status.running")}</span>
                         </>
                     ) : (
                         <span className="badge down">{t("status.noGame")}</span>

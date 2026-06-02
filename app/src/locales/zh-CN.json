@@ -480,18 +480,15 @@
     "title": "熔断",
     "section_shop_guard_title": "购物守护",
     "section_shop_guard_desc": "维护监控列表后，在购物时应用两条规则：<br/>1）出现监控项时<strong>禁止“跳过”</strong>（启用下方“禁止跳过”）；<br/>2）出现监控项但你<strong>没有选择监控项之一</strong>则阻止（启用下方“强制选择监控项”）。",
-    "section_activity_skip_guard_title": "跳过熔断",
-    "section_activity_skip_guard_desc": "拦截活动跳过请求，可选择弹窗确认或静默阻止。",
     "btn_add_amulet": "添加护身符",
     "btn_add_badge": "添加印章",
     "btn_delete_selected": "删除选中",
     "btn_clear_selection": "取消选择",
-    "toggle_activity_skip_guard": "启用跳过熔断（拦截活动跳过请求）",
     "toggle_skip_guard": "禁止跳过（出现监控项时阻止“跳过”）",
     "toggle_force_pick": "强制选择监控项（出现监控项但未选其一时阻止）",
-    "toggle_silent_fuse": "静默熔断（不弹窗，直接阻止）",
-    "label_activity_skip_guard_stages": "熔断阶段",
-    "placeholder_activity_skip_guard_stages": "留空表示所有阶段，例如：2, 9, 16",
+    "section_switch_guard_title": "换牌守护",
+    "section_switch_guard_desc": "防止在未听牌的情况下跳过换牌阶段。",
+    "toggle_ting_ready_skip_guard": "启用未听牌跳过熔断",
     "section_conduction_title": "传导链守护",
     "section_conduction_desc": "若传导卡数量达到阈值，且卡维未按规则摆放，将阻止开始对局，以避免忘记给护身符上「传导」而导致断链。",
     "toggle_conduction": "启用传导链守护",
@@ -559,9 +556,9 @@
         "title": "熔断确认：必须选择监控项",
         "message": "<b>检测到监控项</b><br/>候选中包含监控护身符/印章，但当前选择不在监控项内。<br/><br/>当前选择：护身符ID={{selBaseId}}（raw={{selRawId}}）<br/><br/>是否继续？"
       },
-      "activitySkip": {
-        "title": "熔断确认：跳过活动操作",
-        "message": "检测到活动跳过请求：activityId=260511，type=3，args=[]。<br/><br/>是否仍然继续跳过？"
+      "tingReadySkip": {
+        "title": "熔断确认：换牌守护",
+        "message": "检测到当前还没有听牌列表，且正在换牌阶段执行跳过。<br/><br/>是否仍然继续？"
       },
       "skipPack": {
         "title": "熔断确认：卡包包含监控项",
@@ -875,6 +872,7 @@
     "level_label": "关卡 {{level}}",
     "avg_souzu_score": "平均索分数",
     "max_souzu_score": "最高索分数",
+    "haitei_fan": "海底摸月",
     "amulet_229_data0": "盗印大盗",
     "amulet_227_data0": "月光守护",
     "amulet_157_data0": "负重前行",
@@ -1054,6 +1052,10 @@
   "candidate_amulet": "候补护身符",
   "goods": "商品",
   "noAmulet": "暂无护身符",
+  "character_health": {
+    "title": "角色血量",
+    "portrait_alt": "角色 {{id}}"
+  },
   "status": {
     "backendConnected": "后端：已连接",
     "backendDisconnected": "后端：未连接",

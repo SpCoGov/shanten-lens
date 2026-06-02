@@ -27,6 +27,9 @@ import {
     type ResolvedAmuletRule,
 } from "../lib/scoreEngine";
 import {buildDoraCountByTile} from "../lib/tileHighlights";
+import {formatLevelIdToLabel, parseLevelLabelToId} from "../lib/levelFormat";
+
+export {formatLevelIdToLabel} from "../lib/levelFormat";
 
 type CustomRuleMap = Record<string, Partial<AmuletRuleConfig>>;
 export type LevelTargetEntry = { label: string; level: number; target: string };
@@ -264,22 +267,6 @@ function getRuleKey(item: EffectItem) {
     return `${item.uid}:${item.id}`;
 }
 
-function parseLevelKeyToId(key: string): number | null {
-    const normal = key.match(/^(\d+)-(\d+)$/);
-    if (normal) return Number(`${normal[1]}0${normal[2]}`);
-    const ex = key.match(/^Ex(\d+)$/i);
-    if (ex) return 1000 + Number(ex[1]);
-    return null;
-}
-
-export function formatLevelIdToLabel(level: number): string {
-    if (level >= 1001) return `Ex${level - 1000}`;
-    const chapter = Math.trunc(level / 100);
-    const stage = level % 10;
-    if (chapter > 0 && stage > 0) return `${chapter}-${stage}`;
-    return String(level);
-}
-
 function formatTargetText(target: string | undefined): string {
     if (!target) return target ?? "";
     const parsed = parseTargetPointValue(target);
@@ -317,7 +304,7 @@ function isPinzuTile(tile: string | undefined): boolean {
 
 const BASE_LEVEL_TARGETS: LevelTargetEntry[] = Object.entries(LEVEL_TARGETS)
     .map(([label, target]) => {
-        const level = parseLevelKeyToId(label);
+        const level = parseLevelLabelToId(label);
         if (level == null) return null;
         return {label, level, target};
     })

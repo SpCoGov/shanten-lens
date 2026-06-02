@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "version": 6,
+  "version": 7,
   "items": [
     { "id": 3, "icon_id": 4, "name": "点鉄成金", "rarity": "GREEN" },
     { "id": 6, "icon_id": 7, "name": "赤の城砦", "rarity": "GREEN" },
@@ -58,6 +58,7 @@
     { "id": 68, "icon_id": 77, "name": "四君子：菊", "rarity": "GREEN" },
     { "id": 55, "icon_id": 64, "name": "幻覚キノコ", "rarity": "GREEN" },
     { "id": 73, "icon_id": 82, "name": "ワンの財宝", "rarity": "GREEN" },
+    { "id": 130, "icon_id": 118, "name": "既読無視", "rarity": "GREEN" },
     
     { "id": 1, "icon_id": 1, "name": "嶺上の花", "rarity": "BLUE" },
     { "id": 2, "icon_id": 2,   "name": "海底皓月", "rarity": "BLUE" },
@@ -74,7 +75,6 @@
     { "id": 217, "icon_id": 179, "name": "硝子のロケット", "rarity": "BLUE" },
     { "id": 214, "icon_id": 176, "name": "シーソーゲーム", "rarity": "BLUE" },
     { "id": 205, "icon_id": 167, "name": "瓶詰めの雨雲", "rarity": "BLUE" },
-    { "id": 130, "icon_id": 118, "name": "既読無視", "rarity": "BLUE" },
     { "id": 62, "icon_id": 71, "name": "ワンと魚", "rarity": "BLUE" },
     { "id": 136, "icon_id": 124, "name": "快速急行", "rarity": "BLUE" },
     { "id": 71, "icon_id": 80, "name": "一目惚れ", "rarity": "BLUE" },

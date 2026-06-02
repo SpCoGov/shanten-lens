@@ -6,10 +6,8 @@ export type FuseConfig = {
         badges: number[];
     };
     enable_skip_guard?: boolean;
-    enable_activity_skip_guard?: boolean;
-    activity_skip_guard_stages?: number[];
-    enable_silent_fuse?: boolean;
     enable_shop_force_pick?: boolean;
+    enable_ting_ready_skip_guard?: boolean;
     enable_prestart_kavi_guard?: boolean;
     conduction_min_count?: number;
     enable_anti_steal_eat?: boolean;

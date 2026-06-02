@@ -4,10 +4,12 @@ import type {EffectItem} from "../lib/gamestate";
 import {compareNumericStrings, formatLargeScaledNumber} from "../lib/bigNumber";
 import {parseFixed2} from "../lib/scoreEngine";
 import {useRegistry} from "../lib/registryStore";
+import {formatLevelIdToLabel} from "../lib/levelFormat";
 
 const LEVEL_RECORDS_STORAGE_KEY = "sl-level-metric-records-v1";
 const AVG_SOUZU_SCORE_METRIC_KEY = "avg_souzu_score";
 const MAX_SOUZU_SCORE_METRIC_KEY = "max_souzu_score";
+const HAITEI_FAN_METRIC_KEY = "fan_5_haitei";
 const AMULET_DATA_METRICS = [
     {regId: 229, key: "amulet_229_data0", labelKey: "level_records.amulet_229_data0"},
     {regId: 227, key: "amulet_227_data0", labelKey: "level_records.amulet_227_data0"},
@@ -21,6 +23,7 @@ type CurrentLevelMetric = {
     label: string;
     current: string | null;
     amuletRegId?: number;
+    scale?: number;
 };
 
 export type LevelRecordItem = {
@@ -32,6 +35,7 @@ export type LevelRecordItem = {
     delta: string | null;
     state: "meetsBest" | "below";
     amuletRegId?: number;
+    scale?: number;
 };
 
 function readLevelMetricStore(): LevelMetricStore {
@@ -51,14 +55,6 @@ function writeLevelMetricStore(store: LevelMetricStore) {
         localStorage.setItem(LEVEL_RECORDS_STORAGE_KEY, JSON.stringify(store));
     } catch {
     }
-}
-
-function formatLevelLabel(level: number): string {
-    if (level >= 1001) return `Ex${level - 1000}`;
-    const chapter = Math.trunc(level / 100);
-    const stage = level % 10;
-    if (chapter > 0 && stage > 0) return `${chapter}-${stage}`;
-    return String(level || "-");
 }
 
 function lookupTileScore(tileScoreMap: Record<string, string>, tile: string): string | null {
@@ -122,23 +118,33 @@ function getAmuletData0Metric(amulets: EffectItem[], regId: number): string | nu
     return best == null ? null : best.toString();
 }
 
-function formatRecordValue(value: string | null): string {
+function readFanValue(fanValueMap: Record<string, string>, fanId: number): string | null {
+    const raw = fanValueMap[String(fanId)];
+    if (raw == null) return null;
+    try {
+        return BigInt(String(raw)).toString();
+    } catch {
+        return null;
+    }
+}
+
+function formatRecordValue(value: string | null, scale = 2): string {
     if (value == null) return "-";
     try {
-        return formatLargeScaledNumber(BigInt(value), 2, {humanDecimals: 2, scientificDecimals: 4});
+        return formatLargeScaledNumber(BigInt(value), scale, {humanDecimals: 2, scientificDecimals: 4});
     } catch {
         return "-";
     }
 }
 
-function formatRecordDelta(value: string | null): string | null {
+function formatRecordDelta(value: string | null, scale = 2): string | null {
     if (value == null) return null;
     try {
         const parsed = BigInt(value);
         if (parsed === 0n) return null;
         const sign = parsed > 0n ? "+" : "-";
         const abs = parsed > 0n ? parsed : -parsed;
-        return `${sign}${formatLargeScaledNumber(abs, 2, {humanDecimals: 2, scientificDecimals: 4})}`;
+        return `${sign}${formatLargeScaledNumber(abs, scale, {humanDecimals: 2, scientificDecimals: 4})}`;
     } catch {
         return null;
     }
@@ -151,10 +157,12 @@ function pad4(n: number) {
 export function useLevelRecordItems({
     level,
     tileScoreMap,
+    fanValueMap,
     amulets,
 }: {
     level: number;
     tileScoreMap: Record<string, string>;
+    fanValueMap: Record<string, string>;
     amulets: EffectItem[];
 }) {
     const {t} = useTranslation();
@@ -170,13 +178,19 @@ export function useLevelRecordItems({
             label: t("level_records.max_souzu_score"),
             current: computeMaxSouzuScore(tileScoreMap),
         },
+        {
+            key: HAITEI_FAN_METRIC_KEY,
+            label: t("level_records.haitei_fan"),
+            current: readFanValue(fanValueMap, 5),
+            scale: 0,
+        },
         ...AMULET_DATA_METRICS.map((metric) => ({
             key: metric.key,
             label: t(metric.labelKey),
             current: getAmuletData0Metric(amulets, metric.regId),
             amuletRegId: metric.regId,
         })),
-    ], [amulets, tileScoreMap, t]);
+    ], [amulets, fanValueMap, tileScoreMap, t]);
 
     const [items, setItems] = React.useState<LevelRecordItem[]>([]);
 
@@ -200,6 +214,7 @@ export function useLevelRecordItems({
                     delta: null,
                     state: "meetsBest",
                     amuletRegId: metric.amuletRegId,
+                    scale: metric.scale,
                 });
                 continue;
             }
@@ -231,6 +246,7 @@ export function useLevelRecordItems({
                 delta,
                 state,
                 amuletRegId: metric.amuletRegId,
+                scale: metric.scale,
             });
         }
 
@@ -258,7 +274,7 @@ export default function LevelRecordPanel({
 
     return (
         <aside className="home-record-panel">
-            <div className="home-record-kicker">{t("level_records.level_label", {level: formatLevelLabel(level)})}</div>
+            <div className="home-record-kicker">{t("level_records.level_label", {level: formatLevelIdToLabel(level)})}</div>
             <div className="home-record-list">
                 {items.map((item) => {
                     const amulet = item.amuletRegId != null ? registry.amuletById.get(item.amuletRegId) : null;
@@ -278,14 +294,14 @@ export default function LevelRecordPanel({
                             <div className="home-record-content">
                                 <div className="home-record-label">{item.label}</div>
                                 <div className="home-record-value-line">
-                                    <span className="home-record-value">{formatRecordValue(item.current)}</span>
-                                    {formatRecordDelta(item.delta) ? (
-                                        <span className="home-record-delta">{formatRecordDelta(item.delta)}</span>
+                                    <span className="home-record-value">{formatRecordValue(item.current, item.scale)}</span>
+                                    {formatRecordDelta(item.delta, item.scale) ? (
+                                        <span className="home-record-delta">{formatRecordDelta(item.delta, item.scale)}</span>
                                     ) : null}
                                 </div>
                                 {showBest ? (
                                     <div className="home-record-meta">
-                                        <span>{t("level_records.best_label", {value: formatRecordValue(item.best)})}</span>
+                                        <span>{t("level_records.best_label", {value: formatRecordValue(item.best, item.scale)})}</span>
                                     </div>
                                 ) : null}
                             </div>

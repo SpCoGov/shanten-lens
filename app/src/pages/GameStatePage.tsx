@@ -2,6 +2,7 @@ import React from "react";
 import {useTranslation} from "react-i18next";
 import type {GameStateData} from "../lib/gamestate";
 import styles from "./GameStatePage.module.css";
+import {formatLevelIdToLabel} from "../lib/levelFormat";
 
 type SummaryItem = {
     key: string;
@@ -128,12 +129,12 @@ export default function GameStatePage({currentState}: { currentState: GameStateD
         if (!currentState) return [];
         return [
             {key: "stage", value: valueOrDash(currentState.stage)},
-            {key: "level", value: valueOrDash(currentState.level)},
+            {key: "level", value: formatLevelIdToLabel(currentState.level)},
             {key: "coin", value: valueOrDash(currentState.coin)},
             {key: "point", value: valueOrDash(currentState.point)},
             {key: "target_point", value: valueOrDash(currentState.target_point)},
             {key: "desktop_remain", value: valueOrDash(currentState.desktop_remain)},
-            {key: "ended", value: currentState.ended ? t("gamestate.boolean_true") : t("gamestate.boolean_false")},
+            {key: "ended", value: currentState.stage === 100 ? t("gamestate.boolean_true") : t("gamestate.boolean_false")},
             {key: "hand_tiles", value: countOf(currentState.hand_tiles)},
             {key: "wall_tiles", value: countOf(currentState.wall_tiles)},
             {key: "locked_tiles", value: countOf(currentState.locked_tiles)},

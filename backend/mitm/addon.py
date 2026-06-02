@@ -442,7 +442,6 @@ class WsAddon:
           - force_id: 可选，强制使用某个 msg_id（不传则用 last_req_id+偏移）
         返回: (ok: bool, detail: str, msg_id: int|-1)
         """
-
         def _ctx(extra: str = "") -> str:
             pf = self.preferred_flow
             try:
