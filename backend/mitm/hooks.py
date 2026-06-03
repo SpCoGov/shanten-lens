@@ -129,7 +129,7 @@ def _handle_type10_draw_event(event: Dict[str, Any], reason: str) -> None:
     effect_list = value_changes.get("effect", {}).get("effectList", {}).get("value", None)
     ting_list = round_info.get("tingList", {}).get("value", None)
     next_operation = round_info.get("nextOperation", {}).get("value", None)
-    character = value_changes.get("character", {}).get("value", None)
+    character = value_changes.get("character", None)
     after_draw_hands = round_info.get("hands", {}).get("value", None)
     if after_draw_hands:
         GAME_STATE.on_draw_tile(after_draw_hands, after_draw_hands[len(after_draw_hands) - 1], push_gamestate=False)
@@ -2077,6 +2077,19 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
                                 for tile in show_desktop_tiles:
                                     tile_list.append(tile)
                     modify = True
+        select_character = next((e for e in events if e.get("type") == 2), None)
+        if select_character:
+            value_changes = select_character.get("valueChanges", {})
+            character = value_changes.get("character", {})
+            character_id = _value_change_value(character, "characterId", None)
+            hp = _value_change_value(character, "hp", None)
+            max_hp = _value_change_value(character, "maxHp", None)
+            game = value_changes.get("game", {})
+            tile_score_map = _parse_tile_score_map(game.get("tileScoreMap", {}).get("value", None))
+            round_info = value_changes.get("round", {})
+            tian_dora_tiles = round_info.get("tianDora", {}).get("value", None)
+            GAME_STATE.update_other_info(hp=hp, max_hp=max_hp, character_id=character_id, tile_score_map=tile_score_map, tian_dora_tiles=tian_dora_tiles,
+                                         reason=".lq.Lobby.amuletActivityOperate:2")
         # 跳过换牌
         skip_switch = next((e for e in events if e.get("type") == 10), None)
         if skip_switch:
@@ -2137,6 +2150,24 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             node = _value_change_value(map_info, "node", None)
             map_nodes = _value_change_value(map_info, "mapNodes", None)
             GAME_STATE.update_other_info(stage=stage, node=node, level=level, map_nodes=map_nodes, reason=".lq.Lobby.amuletActivityGameOperate:3")
+        fire = next((e for e in events if e.get("type") == 41), None)
+        if fire:
+            value_changes = fire.get("valueChanges", {})
+            character = value_changes.get("character", {})
+            hp = _value_change_value(character, "hp", None)
+            max_hp = _value_change_value(character, "maxHp", None)
+            GAME_STATE.update_other_info(hp=hp, max_hp=max_hp,
+                                         reason=".lq.Lobby.amuletActivityOperate:41")
+        gamble = next((e for e in events if e.get("type") == 47), None)
+        if gamble:
+            value_changes = gamble.get("valueChanges", {})
+            game = value_changes.get("game", {})
+            character = value_changes.get("character", {})
+            hp = _value_change_value(character, "hp", None)
+            max_hp = _value_change_value(character, "maxHp", None)
+            coin = _value_change_value(game, "coin", None)
+            GAME_STATE.update_other_info(hp=hp, max_hp=max_hp, coin=coin,
+                                         reason=".lq.Lobby.amuletActivityOperate:47")
         sell_effect = next((e for e in events if e.get("type") == 27), None)
         if sell_effect:
             value_changes = sell_effect.get("valueChanges", {})
@@ -2228,6 +2259,13 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
         draw_event = next((e for e in events if e.get("type") == 10), None)
         if draw_event:
             _handle_type10_draw_event(draw_event, ".lq.Lobby.amuletActivityGameOperate:10")
+        health_event = next((e for e in events if e.get("type") == 11), None)
+        if health_event:
+            value_changes = health_event.get("valueChanges", {})
+            character = value_changes.get("character", {})
+            hp = _value_change_value(character, "hp", None)
+            GAME_STATE.update_other_info(hp=hp,
+                                         reason=".lq.Lobby.amuletActivityGameOperate:11")
         # type = 15: 杠牌
         kang_event = next((e for e in events if e.get("type") == 15), None)
         if kang_event:
@@ -2244,7 +2282,10 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             coin = _value_change_value(game, "coin")
             tile_score_map = _parse_tile_score_map(game.get("tileScoreMap", {}).get("value", None))
             fan_value_map = _parse_fan_value_map(game.get("fanValueMap", {}).get("value", None))
-            GAME_STATE.update_other_info(coin=coin, tile_score_map=tile_score_map, fan_value_map=fan_value_map,
+            character = value_changes.get("character", {})
+            hp = _value_change_value(character, "hp", None)
+            max_hp = _value_change_value(character, "max_hp", None)
+            GAME_STATE.update_other_info(coin=coin, tile_score_map=tile_score_map, fan_value_map=fan_value_map, hp=hp, max_hp=max_hp,
                                          reason=".lq.Lobby.amuletActivityGameOperate:18")
         # coin_event = next((e for e in events if e.get("type") == 11), None)
         # if coin_event:

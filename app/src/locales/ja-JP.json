@@ -1068,14 +1068,21 @@
   "common": {
     "ok": "OK",
     "continue": "続行",
-    "cancel": "キャンセル"
+    "cancel": "キャンセル",
+    "save": "保存"
   },
   "manual_tsumo": {
     "start": "連続ツモ",
     "stop": "ツモ停止",
     "start_hint": "op_tsumo を繰り返し実行します",
     "stop_hint": "op_tsumo の繰り返し実行を停止します",
-    "win_count": "{{count}} 和了"
+    "win_count": "{{count}} 和了",
+    "settings_title": "連続ツモ設定",
+    "settings_hint": "連続ツモの間隔を設定",
+    "interval_label": "実行間隔",
+    "interval_unit": "ミリ秒",
+    "interval_value": "{{value}} ms",
+    "interval_hint": "各ツモの待機時間です。範囲は {{min}}-{{max}}。"
   },
   "right_panel": {
     "title": "右側統計",

@@ -28,14 +28,10 @@ export interface GameStateData {
     max_effect_volume?: number;
     tile_score_map?: Record<string, string>;
     fan_value_map?: Record<string, string>;
-    character?: CharacterState;
-    update_reason?: string[];
-}
-
-export interface CharacterState {
-    characterId?: number | string;
+    character_id?: number | string;
     hp?: number | string;
-    maxHp?: number | string;
+    max_hp?: number | string;
+    update_reason?: string[];
 }
 
 export interface MingItem {

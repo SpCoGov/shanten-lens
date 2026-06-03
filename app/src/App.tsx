@@ -32,7 +32,6 @@ import {setAppLanguage} from "./lib/i18n";
 import {
     buildCells,
     CandidateEffectRef,
-    type CharacterState,
     type Cell,
     type EffectItem,
     type GameStateData,
@@ -128,6 +127,7 @@ type CharacterHealthInfo = {
     hp: number;
     maxHp: number;
     percent: number;
+    color: string;
 };
 
 function normalizeHotkeyKey(value: string): string {
@@ -358,8 +358,33 @@ function isMoreRoute(route: Route) {
 
 const OUTER_PADDING = 16;
 const MAIN_GAP = 12;
+const TSUMO_LOOP_INTERVAL_STORAGE_KEY = "sl-tsumo-loop-interval-ms";
+const DEFAULT_TSUMO_LOOP_INTERVAL_MS = 400;
+const MIN_TSUMO_LOOP_INTERVAL_MS = 0;
+const MAX_TSUMO_LOOP_INTERVAL_MS = 10_000;
 const SHOP_BUFF_EXCHANGE_ID = 8001;
 const SHOP_BUFF_UPGRADE_COSTS = [5, 10, 15, 20, 50, 100, 150, 200];
+
+function clampTsumoLoopIntervalMs(value: unknown) {
+    const parsed = Number.parseInt(String(value ?? ""), 10);
+    if (!Number.isFinite(parsed)) return DEFAULT_TSUMO_LOOP_INTERVAL_MS;
+    return Math.max(MIN_TSUMO_LOOP_INTERVAL_MS, Math.min(MAX_TSUMO_LOOP_INTERVAL_MS, parsed));
+}
+
+function readTsumoLoopIntervalMs() {
+    try {
+        return clampTsumoLoopIntervalMs(localStorage.getItem(TSUMO_LOOP_INTERVAL_STORAGE_KEY));
+    } catch {
+        return DEFAULT_TSUMO_LOOP_INTERVAL_MS;
+    }
+}
+
+function writeTsumoLoopIntervalMs(value: number) {
+    try {
+        localStorage.setItem(TSUMO_LOOP_INTERVAL_STORAGE_KEY, String(clampTsumoLoopIntervalMs(value)));
+    } catch {
+    }
+}
 
 function getAppWindowSafe() {
     try {
@@ -685,18 +710,21 @@ function parseFiniteNumber(value: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null;
 }
 
-function getCharacterHealthInfo(character?: CharacterState | null): CharacterHealthInfo | null {
-    if (!character) return null;
-    const characterId = parseFiniteNumber(character.characterId);
-    const hp = parseFiniteNumber(character.hp);
-    const maxHp = parseFiniteNumber(character.maxHp);
+function getCharacterHealthInfo(state?: GameStateData | null): CharacterHealthInfo | null {
+    if (!state) return null;
+    const characterId = parseFiniteNumber(state.character_id);
+    const hp = parseFiniteNumber(state.hp);
+    const maxHp = parseFiniteNumber(state.max_hp);
     if (characterId == null || characterId <= 0 || hp == null || maxHp == null || maxHp <= 0) return null;
     const safeHp = Math.max(0, hp);
+    const percent = Math.max(0, Math.min(100, (safeHp / maxHp) * 100));
+    const hue = Math.round((percent / 100) * 120);
     return {
         characterId: Math.trunc(characterId),
         hp: safeHp,
         maxHp,
-        percent: Math.max(0, Math.min(100, (safeHp / maxHp) * 100)),
+        percent,
+        color: `hsl(${hue} 72% 42%)`,
     };
 }
 
@@ -716,7 +744,11 @@ function CharacterHealthPanel({info}: {info: CharacterHealthInfo}) {
                     <span>{t("character_health.title")}</span>
                     <strong>{hpText}</strong>
                 </div>
-                <div className="character-health-bar" aria-label={t("character_health.title")}>
+                <div
+                    className="character-health-bar"
+                    aria-label={t("character_health.title")}
+                    style={{"--character-health-color": info.color} as React.CSSProperties}
+                >
                     <i style={{width: `${info.percent}%`}}/>
                 </div>
             </div>
@@ -843,6 +875,9 @@ export default function App() {
     const [updateChecking, setUpdateChecking] = React.useState(false);
     const [updatePrefs, setUpdatePrefs] = React.useState(() => readUpdatePrefs());
     const [tsumoLoopStatus, setTsumoLoopStatus] = React.useState<TsumoLoopStatus>({running: false, lastReason: "", winCount: 0});
+    const [tsumoLoopIntervalMs, setTsumoLoopIntervalMs] = React.useState(() => readTsumoLoopIntervalMs());
+    const [tsumoLoopSettingsOpen, setTsumoLoopSettingsOpen] = React.useState(false);
+    const [tsumoLoopIntervalDraft, setTsumoLoopIntervalDraft] = React.useState(() => String(readTsumoLoopIntervalMs()));
     const updateCheckStartedRef = React.useRef(false);
     const [activeTutorial, setActiveTutorial] = React.useState<TutorialId | null>(null);
     const [souzuSwitchExecution, setSouzuSwitchExecution] = React.useState<SouzuSwitchExecutionState | null>(null);
@@ -996,8 +1031,8 @@ export default function App() {
     const levelRecordItems = useLevelRecordItems({level, tileScoreMap, fanValueMap, amulets});
     const hasLevelRecords = levelRecordItems.length > 0;
     const characterHealthInfo = React.useMemo(
-        () => getCharacterHealthInfo(latestGameState?.character),
-        [latestGameState?.character],
+        () => getCharacterHealthInfo(latestGameState),
+        [latestGameState],
     );
     const isAdvisorStage = stage === 2 || stage === 3;
     const showHomeSidePanel = isAdvisorStage || hasLevelRecords || characterHealthInfo != null;
@@ -1044,6 +1079,10 @@ export default function App() {
     React.useEffect(() => {
         localStorage.setItem(AMULET_HOTKEY_STORAGE_KEY, JSON.stringify(amuletHotkeys));
     }, [amuletHotkeys]);
+
+    React.useEffect(() => {
+        writeTsumoLoopIntervalMs(tsumoLoopIntervalMs);
+    }, [tsumoLoopIntervalMs]);
 
     const activateHiddenTheme = React.useCallback(() => {
         if (theme === "dark-purple") return;
@@ -1211,9 +1250,23 @@ export default function App() {
     const toggleTsumoLoop = React.useCallback(() => {
         ws.send({
             type: "tsumo_loop_control",
-            data: {action: tsumoLoopStatus.running ? "stop" : "start", intervalMs: 400},
+            data: {action: tsumoLoopStatus.running ? "stop" : "start", intervalMs: clampTsumoLoopIntervalMs(tsumoLoopIntervalMs)},
         } as any);
-    }, [tsumoLoopStatus.running]);
+    }, [tsumoLoopIntervalMs, tsumoLoopStatus.running]);
+
+    const openTsumoLoopSettings = React.useCallback(() => {
+        setTsumoLoopIntervalDraft(String(tsumoLoopIntervalMs));
+        setTsumoLoopSettingsOpen(true);
+    }, [tsumoLoopIntervalMs]);
+
+    const saveTsumoLoopSettings = React.useCallback(() => {
+        setTsumoLoopIntervalMs(clampTsumoLoopIntervalMs(tsumoLoopIntervalDraft));
+        setTsumoLoopSettingsOpen(false);
+    }, [tsumoLoopIntervalDraft]);
+
+    const handleTsumoLoopIntervalDraftChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+        setTsumoLoopIntervalDraft(event.currentTarget.value);
+    }, []);
 
     const onSecretClick = React.useCallback(() => {
         hiddenThemeClicksRef.current += 1;
@@ -2249,6 +2302,14 @@ export default function App() {
                                                         {t("manual_tsumo.win_count", {count: tsumoLoopStatus.winCount})}
                                                     </span>
                                                 </button>
+                                                <button
+                                                    className="panel-title-action"
+                                                    onClick={openTsumoLoopSettings}
+                                                    title={t("manual_tsumo.settings_hint")}
+                                                >
+                                                    <span className="ms" aria-hidden="true">settings</span>
+                                                    <span>{t("manual_tsumo.interval_value", {value: tsumoLoopIntervalMs})}</span>
+                                                </button>
                                             </div>
                                         </div>
                                         <AmuletBar
@@ -2466,6 +2527,39 @@ export default function App() {
                 onClose={() => setGameMapOpen(false)}
                 currentState={latestGameState}
             />
+
+            <Modal
+                open={tsumoLoopSettingsOpen}
+                onClose={() => setTsumoLoopSettingsOpen(false)}
+                title={t("manual_tsumo.settings_title")}
+                width={420}
+                actions={(
+                    <button className="nav-btn" onClick={saveTsumoLoopSettings}>
+                        {t("common.save")}
+                    </button>
+                )}
+            >
+                <div className="manual-tsumo-settings">
+                    <label className="manual-tsumo-settings-field">
+                        <span>{t("manual_tsumo.interval_label")}</span>
+                        <div className="manual-tsumo-settings-input-row">
+                            <input
+                                type="number"
+                                min={MIN_TSUMO_LOOP_INTERVAL_MS}
+                                max={MAX_TSUMO_LOOP_INTERVAL_MS}
+                                step={100}
+                                value={tsumoLoopIntervalDraft}
+                                onChange={handleTsumoLoopIntervalDraftChange}
+                            />
+                            <span>{t("manual_tsumo.interval_unit")}</span>
+                        </div>
+                    </label>
+                    <p>{t("manual_tsumo.interval_hint", {
+                        min: MIN_TSUMO_LOOP_INTERVAL_MS,
+                        max: MAX_TSUMO_LOOP_INTERVAL_MS,
+                    })}</p>
+                </div>
+            </Modal>
 
             <footer className="statusbar" role="status">
                 <div className="sb-left">

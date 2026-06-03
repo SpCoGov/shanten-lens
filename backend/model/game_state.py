@@ -35,7 +35,9 @@ class GameState:
     candidate_effect_list: List[Dict] = field(default_factory=list)
     record: Dict = field(default_factory=dict)
     ting_list: List[Dict] = field(default_factory=dict)
-    character: Dict = field(default_factory=dict)
+    character_id: int = field(default_factory=int)
+    hp: int = field(default_factory=int)
+    max_hp: int = field(default_factory=int)
     # nextOperationType: 1=打牌、4=杠、8=自摸、100=跳过换牌、101=换牌（杠的时候会显示被杠的牌"gang": [{"tiles": [22,49,76,103]}]）
     next_operation: List[Dict] = field(default_factory=dict)
     goods: List[Dict] = field(default_factory=dict)
@@ -79,7 +81,9 @@ class GameState:
             "candidate_effect_list": self.candidate_effect_list,
             "record": self.record,
             "ting_list": self.ting_list,
-            "character": self.character,
+            "character_id": self.character_id,
+            "hp": self.hp,
+            "max_hp": self.max_hp,
             "next_operation": self.next_operation,
             "goods": self.goods,
             "refresh_price": self.refresh_price,
@@ -289,6 +293,9 @@ class GameState:
             fan_value_map: Dict[str, str] = None,
             tian_dora_tiles: List[str] = None,
             ming: List[Dict] = None,
+            max_hp: int = None,
+            hp: int = None,
+            character_id: int = None,
             push_gamestate: bool = True,
             reason: str = "",
     ):
@@ -325,7 +332,13 @@ class GameState:
         if ting_list is not None:
             self.ting_list = ting_list
         if character is not None:
-            self.character = character
+            self._update_character(character)
+        if hp is not None:
+            self.hp = hp
+        if max_hp is not None:
+            self.max_hp = max_hp
+        if character_id is not None:
+            self.character_id = character_id
         if next_operation is not None:
             self.next_operation = next_operation
         if goods is not None:
@@ -383,7 +396,9 @@ class GameState:
         self.goods.clear()
         self.next_operation.clear()
         self.ting_list.clear()
-        self.character.clear()
+        self.character_id = 0
+        self.hp = 0
+        self.max_hp = 0
         self.boss_buff.clear()
         self.shop_buff_list.clear()
         self.tile_score_map.clear()
@@ -393,6 +408,39 @@ class GameState:
         self.update_reason.append(".lq.Lobby.amuletActivityGiveup")
         loop = asyncio.get_running_loop()
         loop.create_task(self.on_gamestage_change())
+
+    @staticmethod
+    def _patch_value(data: Dict, *keys: str):
+        for key in keys:
+            if key not in data:
+                continue
+            value = data.get(key)
+            if isinstance(value, dict) and "value" in value:
+                return value.get("value")
+            return value
+        return None
+
+    @staticmethod
+    def _parse_int(value) -> int | None:
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _update_character(self, character: Dict) -> None:
+        if not isinstance(character, dict):
+            return
+        character_id = self._parse_int(self._patch_value(character, "character_id", "characterId"))
+        hp = self._parse_int(self._patch_value(character, "hp"))
+        max_hp = self._parse_int(self._patch_value(character, "max_hp", "maxHp"))
+        if character_id is not None:
+            self.character_id = character_id
+        if hp is not None:
+            self.hp = hp
+        if max_hp is not None:
+            self.max_hp = max_hp
 
     def update_record(self, record: dict):
         if not record or not isinstance(record, dict):

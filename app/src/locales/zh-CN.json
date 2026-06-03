@@ -1085,14 +1085,21 @@
   "common": {
     "ok": "确定",
     "continue": "继续",
-    "cancel": "取消"
+    "cancel": "取消",
+    "save": "保存"
   },
   "manual_tsumo": {
     "start": "连续自摸",
     "stop": "停止自摸",
     "start_hint": "开始不断执行 op_tsumo",
     "stop_hint": "停止不断执行 op_tsumo",
-    "win_count": "{{count}} 和"
+    "win_count": "{{count}} 和",
+    "settings_title": "连续自摸设置",
+    "settings_hint": "设置连续自摸间隔",
+    "interval_label": "执行间隔",
+    "interval_unit": "毫秒",
+    "interval_value": "{{value}} ms",
+    "interval_hint": "每次自摸之间的等待，范围 {{min}}-{{max}}。"
   },
   "replacement_stats": {
     "title": "替换牌区统计",

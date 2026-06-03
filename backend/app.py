@@ -397,8 +397,8 @@ async def ws_handler(ws: WebSocketServerProtocol):
                     if bool((data or {}).get("resetCount", False)):
                         TSUMO_LOOP_WIN_COUNT = 0
                     if TSUMO_LOOP_TASK is None or TSUMO_LOOP_TASK.done():
-                        interval_ms = int((data or {}).get("intervalMs", 400) or 400)
-                        interval_sec = max(0.2, min(10.0, interval_ms / 1000))
+                        interval_ms = int((data or {}).get("intervalMs", 400))
+                        interval_sec = max(0.0, min(10.0, interval_ms / 1000))
                         TSUMO_LOOP_STOP = asyncio.Event()
                         TSUMO_LOOP_LAST_REASON = ""
                         TSUMO_LOOP_TASK = asyncio.create_task(_tsumo_loop(interval_sec))
