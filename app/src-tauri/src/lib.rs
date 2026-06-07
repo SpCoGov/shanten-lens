@@ -13,6 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::os::windows::process::CommandExt;
 
 use serde::Serialize;
+use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 mod overlay;
@@ -21,6 +22,8 @@ const LOG_BATCH_MAX_LINES: usize = 64;
 const LOG_BATCH_MAX_BYTES: usize = 64 * 1024;
 const LOG_CHUNK_MAX_BYTES: usize = 16 * 1024;
 const STARTUP_PROGRESS_EVENT: &str = "startup:progress";
+const DEFAULT_BACKEND_HOST: &str = "127.0.0.1";
+const DEFAULT_BACKEND_PORT: u16 = 8787;
 
 #[derive(Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -54,6 +57,13 @@ struct StartupProgressPayload {
 }
 
 struct StartupProgressState(pub Arc<Mutex<StartupProgressPayload>>);
+
+#[derive(Clone, Serialize)]
+struct BackendEndpoint {
+  host: String,
+  port: u16,
+  ws_url: String,
+}
 
 fn default_startup_progress() -> StartupProgressPayload {
   StartupProgressPayload {
@@ -260,6 +270,46 @@ fn resolve_backend_path(app: &AppHandle) -> Option<PathBuf> {
   None
 }
 
+fn backend_config_path() -> Option<PathBuf> {
+  let local_app_data = env::var_os("LOCALAPPDATA")?;
+  Some(
+    PathBuf::from(local_app_data)
+      .join("Shanten Lens")
+      .join("Shanten Lens")
+      .join("configs")
+      .join("backend.json")
+  )
+}
+
+fn read_backend_endpoint() -> BackendEndpoint {
+  let mut host = DEFAULT_BACKEND_HOST.to_string();
+  let mut port = DEFAULT_BACKEND_PORT;
+
+  if let Some(path) = backend_config_path() {
+    if let Ok(text) = std::fs::read_to_string(path) {
+      if let Ok(value) = serde_json::from_str::<Value>(&text) {
+        if let Some(config_host) = value.get("host").and_then(Value::as_str) {
+          let trimmed = config_host.trim();
+          if !trimmed.is_empty() {
+            host = trimmed.to_string();
+          }
+        }
+        if let Some(config_port) = value.get("port").and_then(Value::as_u64) {
+          if (1..=65535).contains(&config_port) {
+            port = config_port as u16;
+          }
+        }
+      }
+    }
+  }
+
+  BackendEndpoint {
+    ws_url: format!("ws://{}:{}", host, port),
+    host,
+    port,
+  }
+}
+
 fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Result<String, String> {
   {
     let mut g = st.lock().map_err(|_| "mutex poisoned".to_string())?;
@@ -290,10 +340,12 @@ fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Resul
     },
   );
 
+  let endpoint = read_backend_endpoint();
+  let port_arg = endpoint.port.to_string();
   let mut cmd = Command::new(&exe);
   cmd.args([
-      "--host", "127.0.0.1",
-      "--port", "8787"
+      "--host", endpoint.host.as_str(),
+      "--port", port_arg.as_str()
     ])
     .stdin(Stdio::null())
     .stdout(Stdio::piped())
@@ -354,6 +406,11 @@ fn stop_backend_with(st: Arc<Mutex<BackendProcState>>) -> Result<String, String>
 fn start_backend(app: AppHandle, state: State<BackendState>) -> Result<String, String> {
   let st = state.0.clone();
   start_backend_with(app, st)
+}
+
+#[tauri::command]
+fn get_backend_endpoint() -> BackendEndpoint {
+  read_backend_endpoint()
 }
 
 #[tauri::command]
@@ -527,6 +584,7 @@ pub fn run() {
       start_backend,
       stop_backend,
       shutdown_app,
+      get_backend_endpoint,
       frontend_ready,
       update_startup_progress,
       get_startup_progress,

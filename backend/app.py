@@ -208,10 +208,10 @@ def should_emit_packet_monitor(method: str) -> bool:
 
 def packet_monitor_snapshot_payload() -> Dict[str, Any]:
     if not PACKET_MONITOR_ENABLED:
-        return {"packets": []}
+        return {"packets": [], "flowEvents": []}
     blocked = PACKET_MONITOR_BLOCKED_METHODS
     packets = [pkt for pkt in PACKET_MONITOR.snapshot() if str(pkt.get("method") or "") not in blocked]
-    return {"packets": packets}
+    return {"packets": packets, "flowEvents": PACKET_MONITOR.flow_events_snapshot()}
 
 
 async def _broadcast_on_ui_loop(pkt: Dict[str, Any]) -> None:
@@ -232,23 +232,27 @@ async def _ui_services_main(host: str, ws_port: int):
     watcher_cfg = asyncio.create_task(_watch_configs())
     watcher_reg = asyncio.create_task(_watch_data_tables())
 
-    async with serve(
-            ws_handler,
-            host,
-            ws_port,
-            max_size=2 ** 20,
-            ping_interval=20,
-            ping_timeout=60,
-    ):
-        logger.info(f"Websocket listening on ws://{host}:{ws_port}/")
-        try:
-            await UI_STOP.wait()
-        except asyncio.CancelledError:
-            pass
-        finally:
-            for t in (watcher_cfg, watcher_reg):
-                t.cancel()
-            await asyncio.gather(watcher_cfg, watcher_reg, return_exceptions=True)
+    try:
+        async with serve(
+                ws_handler,
+                host,
+                ws_port,
+                max_size=2 ** 20,
+                ping_interval=20,
+                ping_timeout=60,
+        ):
+            logger.info(f"Websocket listening on ws://{host}:{ws_port}/")
+            try:
+                await UI_STOP.wait()
+            except asyncio.CancelledError:
+                pass
+    except Exception as e:
+        logger.exception(f"Websocket failed to listen on ws://{host}:{ws_port}/: {e}")
+        raise
+    finally:
+        for t in (watcher_cfg, watcher_reg):
+            t.cancel()
+        await asyncio.gather(watcher_cfg, watcher_reg, return_exceptions=True)
 
 
 _UI_TASK_FUT = None
@@ -260,6 +264,16 @@ def start_ui_services(host: str = "127.0.0.1", ws_port: int = 8787) -> None:
     loop = start_ui_loop_once()
     global _UI_TASK_FUT
     _UI_TASK_FUT = asyncio.run_coroutine_threadsafe(_ui_services_main(host, ws_port), loop)
+
+    def _log_ui_services_result(fut):
+        try:
+            fut.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.exception("UI services stopped unexpectedly")
+
+    _UI_TASK_FUT.add_done_callback(_log_ui_services_result)
 
 
 async def _watch_data_tables():

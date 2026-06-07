@@ -2119,8 +2119,18 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             stage = state.get("current", -1)
             record = value_changes.get("record", None)
             candidate_effect_list = effect.get("packCandidates", {}).get("value", None)
+            character = value_changes.get("character", {})
+            hp = _value_change_value(character, "hp", None)
+            max_hp = _value_change_value(character, "maxHp", None)
             GAME_STATE.update_record(record)
-            GAME_STATE.update_other_info(stage=stage, effect_list=effect_list, candidate_effect_list=candidate_effect_list, reason=".lq.Lobby.amuletActivityOperate:53")
+            GAME_STATE.update_other_info(stage=stage, effect_list=effect_list, hp=hp, max_hp=max_hp, candidate_effect_list=candidate_effect_list, reason=".lq.Lobby.amuletActivityOperate:53")
+        # 跳过护身符
+        skip_amulet = next((e for e in events if e.get("type") == 54), None)
+        if skip_amulet:
+            value_changes = skip_amulet.get("valueChanges", {})
+            effect = value_changes.get("effect", {})
+            candidate_effect_list = effect.get("packCandidates", {}).get("value", None)
+            GAME_STATE.update_other_info(candidate_effect_list=candidate_effect_list, reason=".lq.Lobby.amuletActivityOperate:54")
         # 刷新商店
         refresh_shop = next((e for e in events if e.get("type") == 24), None)
         if refresh_shop:
@@ -2287,6 +2297,21 @@ def on_inbound(view: Dict) -> Tuple[str, Any]:
             max_hp = _value_change_value(character, "max_hp", None)
             GAME_STATE.update_other_info(coin=coin, tile_score_map=tile_score_map, fan_value_map=fan_value_map, hp=hp, max_hp=max_hp,
                                          reason=".lq.Lobby.amuletActivityGameOperate:18")
+        # type = 53: 奖励关卡包
+        bonus = next((e for e in events if e.get("type") == 51), None)
+        if bonus:
+            value_changes = bonus.get("valueChanges", {})
+            state = bonus.get("state", {})
+            stage = state.get("current", -1)
+            game = value_changes.get("game", {})
+            coin = game.get("coin", {}).get("value", -1)
+            shop = value_changes.get("shop", {})
+            goods = shop.get("goods", {}).get("value", None)
+            record = value_changes.get("record", None)
+            GAME_STATE.update_record(record)
+            effect = value_changes.get("effect", {})
+            candidate_effect_list = effect.get("packCandidates", {}).get("value", None)
+            GAME_STATE.update_other_info(stage=stage, coin=coin, candidate_effect_list=candidate_effect_list, goods=goods, reason=".lq.Lobby.amuletGameActivityOperate:57")
         # coin_event = next((e for e in events if e.get("type") == 11), None)
         # if coin_event:
         #     value_changes = coin_event.get("valueChanges", {})

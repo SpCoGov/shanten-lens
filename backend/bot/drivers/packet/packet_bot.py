@@ -86,10 +86,12 @@ class PacketBot(GameBot):
             return False
         return stage == st.stage
 
-    def _ensure_stage_with_refresh(self, expected_stage: int, delay_sec: float = 3) -> bool:
+    def _ensure_stage_with_refresh(self, expected_stage: int, expected_stage_list=None, delay_sec: float = 3) -> bool:
+        if expected_stage_list is None:
+            expected_stage_list = []
         st = self._state()
         current_stage = getattr(st, "stage", None) if st else None
-        if current_stage == expected_stage:
+        if current_stage == expected_stage or current_stage in expected_stage_list:
             return True
 
         logger.error(
@@ -148,9 +150,10 @@ class PacketBot(GameBot):
                 return False, "timeout", None
             resp = addon.pop_waiter_sync_resp(msg_id)
             if resp.get('data', {}).get('error', None) is not None:
-                logger.error(f"error occurred: {resp.get('data', {}).get('error')}")
+                error = resp.get('data', {}).get('error') or {}
+                logger.error(f"error occurred: {error}")
                 logger.debug(f"game state while error occurred: {self._state().to_dict()}, method: {method}, data: {data}")
-                return False, f"error code: {resp.get('data', {}).get('error', {}).get('code', 0)}", None
+                return False, f"error code: {error.get('code', 0)}", None
             return True, "ok", resp
         except Exception as e:
             logger.error(f"wait-error")
@@ -294,11 +297,11 @@ class PacketBot(GameBot):
         return False, "unknown id", None
 
     def skip_effect(self, delay_sec: float = 3) -> Tuple[bool, str, Optional[dict]]:
-        if not self._ensure_stage_with_refresh(9, 16, delay_sec=delay_sec):
+        if not self._ensure_stage_with_refresh(9, [16], delay_sec=delay_sec):
             return False, "in the illegal stage", None
-        t = self.op_code.get("select_effect")
+        t = self.op_code.get("quit")
         if t is None:
-            raise NotImplementedError("PacketBot.skip_effect: no op_code 'select_effect'")
+            raise NotImplementedError("PacketBot.skip_effect: no op_code 'quit'")
         ok, reason, resp = self._operate(pkt_type=t, args=[], delay_sec=delay_sec)
         return ok, reason, resp
 
@@ -310,7 +313,7 @@ class PacketBot(GameBot):
             return False, "state-unavailable", None
         good = next((g for g in st.goods if g.get("id") == good_id and g.get("sold") is False), None)
         if good:
-            if good.get("price", 0) <= st.coin:
+            if int(good.get("price", 0)) <= int(st.coin):
                 t = self.op_code.get("buy_pack")
                 if t is None:
                     raise NotImplementedError("PacketBot.buy_pack: no op_code 'buy_pack'")
@@ -325,7 +328,7 @@ class PacketBot(GameBot):
         st = self._state()
         if not st:
             return False, "state-unavailable", None
-        if st.coin >= st.refresh_price:
+        if int(st.coin) >= int(st.refresh_price):
             t = self.op_code.get("refresh_shop")
             if t is None:
                 raise NotImplementedError("PacketBot.refresh_shop: no op_code 'refresh_shop'")

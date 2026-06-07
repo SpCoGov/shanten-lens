@@ -12,6 +12,26 @@ type PacketRecord = {
     method: string;
     from_client: boolean;
     data: any;
+    flow_id?: number | null;
+    flow_peer_key?: string | null;
+    flow_client?: string | null;
+    flow_server?: string | null;
+};
+
+type FlowInfo = {
+    id?: number | null;
+    peer_key?: string | null;
+    client?: string | null;
+    server?: string | null;
+    is_preferred?: boolean;
+    is_last?: boolean;
+};
+
+type FlowEvent = {
+    seq: number;
+    ts: number;
+    event: "start" | "end" | string;
+    flow: FlowInfo;
 };
 
 type PacketGroup = {
@@ -19,6 +39,8 @@ type PacketGroup = {
     method: string;
     msgId: number | null;
     latestTs: number;
+    flowId: number | null;
+    flowPeerKey: string;
     request: PacketRecord | null;
     response: PacketRecord | null;
     items: PacketRecord[];
@@ -65,6 +87,8 @@ function buildGroups(packets: PacketRecord[]) {
             existing.latestTs = Math.max(existing.latestTs, packet.ts);
             if (!existing.method && packet.method) existing.method = packet.method;
             if (existing.msgId == null && packet.msg_id != null) existing.msgId = packet.msg_id;
+            if (existing.flowId == null && packet.flow_id != null) existing.flowId = packet.flow_id;
+            if (!existing.flowPeerKey && packet.flow_peer_key) existing.flowPeerKey = packet.flow_peer_key;
             if (packet.packet_type === "Req") existing.request = packet;
             if (packet.packet_type === "Res") existing.response = packet;
             continue;
@@ -74,6 +98,8 @@ function buildGroups(packets: PacketRecord[]) {
             method: packet.method,
             msgId: packet.msg_id ?? null,
             latestTs: packet.ts,
+            flowId: packet.flow_id ?? null,
+            flowPeerKey: packet.flow_peer_key ?? "",
             request: packet.packet_type === "Req" ? packet : null,
             response: packet.packet_type === "Res" ? packet : null,
             items: [packet],
@@ -85,6 +111,8 @@ function buildGroups(packets: PacketRecord[]) {
 
 export default function PacketTestPage() {
     const [packets, setPackets] = React.useState<PacketRecord[]>([]);
+    const [flowEvents, setFlowEvents] = React.useState<FlowEvent[]>([]);
+    const [selectedFlow, setSelectedFlow] = React.useState("all");
     const [displayCount, setDisplayCount] = React.useState(loadDisplayCount);
     const [enabled, setEnabled] = React.useState(loadEnabled);
     const [blockedMethodsText, setBlockedMethodsText] = React.useState(loadBlockedMethods);
@@ -143,7 +171,9 @@ export default function PacketTestPage() {
             }
             if (pkt.type === "packet_monitor_snapshot") {
                 const next = Array.isArray(pkt.data?.packets) ? pkt.data.packets : [];
+                const nextFlowEvents = Array.isArray(pkt.data?.flowEvents) ? pkt.data.flowEvents : [];
                 setPackets(next);
+                setFlowEvents(nextFlowEvents);
                 return;
             }
             if (pkt.type === "packet_monitor_event" && pkt.data) {
@@ -151,6 +181,9 @@ export default function PacketTestPage() {
                     setSelectedKey(pkt.data.group_key);
                 }
                 setPackets((prev) => [...prev, pkt.data as PacketRecord]);
+            }
+            if (pkt.type === "packet_monitor_flow_event" && pkt.data) {
+                setFlowEvents((prev) => [...prev.slice(-199), pkt.data as FlowEvent]);
             }
         });
 
@@ -162,10 +195,44 @@ export default function PacketTestPage() {
         };
     }, [autoShowNew, blockedMethodsText, enabled]);
 
+    const flowOptions = React.useMemo(() => {
+        const map = new Map<string, FlowInfo>();
+        for (const packet of packets) {
+            if (packet.flow_id == null) continue;
+            const key = String(packet.flow_id);
+            if (!map.has(key)) {
+                map.set(key, {
+                    id: packet.flow_id,
+                    peer_key: packet.flow_peer_key,
+                    client: packet.flow_client,
+                    server: packet.flow_server,
+                });
+            }
+        }
+        for (const event of flowEvents) {
+            const id = event.flow?.id;
+            if (id == null) continue;
+            map.set(String(id), {...(map.get(String(id)) || {}), ...event.flow});
+        }
+        return Array.from(map.values()).sort((a, b) => String(a.peer_key || a.id).localeCompare(String(b.peer_key || b.id)));
+    }, [flowEvents, packets]);
+
+    const filteredPackets = React.useMemo(() => {
+        if (selectedFlow === "all") return packets;
+        return packets.filter((packet) => String(packet.flow_id ?? "") === selectedFlow);
+    }, [packets, selectedFlow]);
+
+    const filteredFlowEvents = React.useMemo(() => {
+        const items = selectedFlow === "all"
+            ? flowEvents
+            : flowEvents.filter((event) => String(event.flow?.id ?? "") === selectedFlow);
+        return items.slice(-20).reverse();
+    }, [flowEvents, selectedFlow]);
+
     const visibleGroups = React.useMemo(() => {
-        return buildGroups(packets)
+        return buildGroups(filteredPackets)
             .slice(0, displayCount);
-    }, [displayCount, packets]);
+    }, [displayCount, filteredPackets]);
 
     React.useEffect(() => {
         if (!visibleGroups.length) {
@@ -258,6 +325,39 @@ export default function PacketTestPage() {
                             />
                             收到新封包时立即切换到最新封包
                         </label>
+                        <div className={styles.field}>
+                            <label>按流筛选</label>
+                            <select
+                                className="form-input"
+                                value={selectedFlow}
+                                onChange={(e) => setSelectedFlow(e.target.value)}
+                            >
+                                <option value="all">全部流</option>
+                                {flowOptions.map((flow) => (
+                                    <option key={String(flow.id)} value={String(flow.id)}>
+                                        {flow.peer_key || `flow-${flow.id}`}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <section className={`card ${styles.panel}`}>
+                    <div className={styles.flowEventHeader}>流事件</div>
+                    <div className={styles.flowEventList}>
+                        {filteredFlowEvents.map((event) => (
+                            <div key={`${event.seq}-${event.event}`} className={styles.flowEventItem}>
+                                <span className={`${styles.flowEventBadge} ${event.event === "end" ? styles.flowEventEnd : ""}`}>
+                                    {event.event === "end" ? "断开" : "建立"}
+                                </span>
+                                <span className={styles.flowEventText}>
+                                    {event.flow?.peer_key || `flow-${event.flow?.id ?? "-"}`}
+                                </span>
+                                <span className={styles.flowEventTime}>{formatTime(event.ts)}</span>
+                            </div>
+                        ))}
+                        {filteredFlowEvents.length === 0 && <div className={styles.hint}>暂无流事件</div>}
                     </div>
                 </section>
 
@@ -272,6 +372,7 @@ export default function PacketTestPage() {
                                 <div className={styles.itemTitle}>{group.method || "(unknown method)"}</div>
                                 <div className={styles.itemMeta}>
                                     <span className={styles.badge}>msg_id: {group.msgId ?? "-"}</span>
+                                    <span className={styles.badge}>flow: {group.flowPeerKey || group.flowId || "-"}</span>
                                     <span className={styles.badge}>
                                         {group.request ? "发" : "-"} / {group.response ? "收" : "-"}
                                     </span>
@@ -296,6 +397,9 @@ export default function PacketTestPage() {
                                 <div><b>{selectedGroup.method || "(unknown method)"}</b></div>
                                 <div className={styles.hint}>
                                     msg_id: {selectedGroup.msgId ?? "-"} | 最近时间: {formatTime(selectedGroup.latestTs)}
+                                </div>
+                                <div className={styles.hint}>
+                                    flow: {selectedGroup.flowPeerKey || selectedGroup.flowId || "-"}
                                 </div>
                             </div>
                             <button className="btn" onClick={replaySelected} disabled={!selectedRequest}>

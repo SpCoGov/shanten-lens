@@ -130,11 +130,22 @@ class WsAddon:
             except Exception as e:
                 logger.error(f"logging full message failed: {e}")
 
+    def websocket_start(self, flow: http.HTTPFlow):
+        try:
+            peer_key = f"{flow.client_conn.address[0]}|{flow.server_conn.address[0]}"
+        except Exception:
+            peer_key = _peer_key_ws(flow)
+        self._flows[peer_key] = flow
+        self.last_flow = flow
+        self._emit_flow_event("start", flow, peer_key)
+
     def websocket_message(self, flow: http.HTTPFlow):
         if not flow.websocket:
             return
 
         peer_key = f"{flow.client_conn.address[0]}|{flow.server_conn.address[0]}"
+        if peer_key not in self._flows:
+            self._emit_flow_event("start", flow, peer_key)
         self._flows[peer_key] = flow
         self.last_flow = flow
 
@@ -150,15 +161,10 @@ class WsAddon:
             return
 
         self._record_flow_packet(flow, view, message.from_client)
-
-        try:
-            if (not message.from_client) and view.get("method") in [".lq.Lobby.loginBeat"]:
-                self.preferred_flow = flow
-                self.preferred_peer_key = f"{flow.client_conn.address[0]}|{flow.server_conn.address[0]}"
-                logger.info(f"[PREFERRED-FLOW] set to game flow f={id(flow)} ({self.preferred_peer_key})")
-
-        except Exception:
-            pass
+        if message.from_client and self._is_business_flow_request(view):
+            self._set_preferred_flow(flow, peer_key, "route request")
+        if (not message.from_client) and view.get("method") == ".lq.Lobby.loginBeat":
+            self._set_preferred_flow(flow, peer_key, "loginBeat")
 
         # 记录客户端最近一次 Req 的 id，供后续注入生成 id 参考
         try:
@@ -176,7 +182,7 @@ class WsAddon:
         try:
             method = str(view.get("method") or "")
             if backend.app.should_emit_packet_monitor(method):
-                packet = PACKET_MONITOR.append(view)
+                packet = PACKET_MONITOR.append(view, self._flow_monitor_payload(flow, peer_key))
                 backend.app.post_broadcast({"type": "packet_monitor_event", "data": packet})
         except Exception as e:
             logger.error(f"packet monitor append failed: {e}")
@@ -245,6 +251,56 @@ class WsAddon:
         if peer_key:
             return self._flows.get(peer_key)
         return self.last_flow
+
+    def _flow_monitor_payload(self, flow: http.HTTPFlow, peer_key: Optional[str] = None) -> dict[str, Any]:
+        try:
+            client = f"{flow.client_conn.address[0]}:{flow.client_conn.address[1]}"
+        except Exception:
+            client = "n/a"
+        try:
+            server = f"{flow.server_conn.address[0]}:{flow.server_conn.address[1]}"
+        except Exception:
+            server = "n/a"
+        return {
+            "id": id(flow),
+            "peer_key": peer_key or _peer_key_ws(flow),
+            "client": client,
+            "server": server,
+            "is_preferred": flow is self.preferred_flow,
+            "is_last": flow is self.last_flow,
+        }
+
+    def _emit_flow_event(self, event: str, flow: http.HTTPFlow, peer_key: Optional[str] = None) -> None:
+        try:
+            if not backend.app.PACKET_MONITOR_ENABLED:
+                return
+            record = PACKET_MONITOR.append_flow_event(event, self._flow_monitor_payload(flow, peer_key))
+            backend.app.post_broadcast({"type": "packet_monitor_flow_event", "data": record})
+        except Exception as e:
+            logger.error(f"packet monitor flow event failed: {e}")
+
+    @staticmethod
+    def _is_business_flow_request(view: dict[str, Any]) -> bool:
+        method = str(view.get("method") or "")
+        if method not in (".lq.Route.requestConnection", ".lq.Route.requestRouteChange"):
+            return False
+        data = view.get("data")
+        if not isinstance(data, dict):
+            return False
+        try:
+            return int(data.get("type")) == 1
+        except Exception:
+            return False
+
+    def _set_preferred_flow(self, flow: http.HTTPFlow, peer_key: Optional[str] = None, reason: str = "set") -> bool:
+        if not flow or not getattr(flow, "websocket", None):
+            return False
+        peer_key = peer_key or _peer_key_ws(flow)
+        if self.preferred_flow is flow and self.preferred_peer_key == peer_key:
+            return True
+        self.preferred_flow = flow
+        self.preferred_peer_key = peer_key
+        return True
 
     def _record_flow_packet(self, flow: http.HTTPFlow, view: dict[str, Any], from_client: bool) -> None:
         flow_id = id(flow)
@@ -412,12 +468,12 @@ class WsAddon:
         if peer_key and peer_key in self._flows:
             self._flows.pop(peer_key, None)
 
+        self._emit_flow_event("end", flow, peer_key)
         self._flow_packet_stats.pop(id(flow), None)
 
         if getattr(self, "preferred_flow", None) is flow:
             self.preferred_flow = None
             self.preferred_peer_key = None
-            logger.info(f"[PREFERRED-FLOW] closed -> set to None (f={id(flow)})")
 
         if getattr(self, "last_flow", None) is flow:
             self.last_flow = None

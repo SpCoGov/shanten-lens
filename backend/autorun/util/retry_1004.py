@@ -8,8 +8,11 @@ import backend.app
 
 def _is_1004(reason: str | None) -> bool:
     r = (reason or "").lower()
-    return "no-preferred-flow" in r or "timeout" in r or "no-preferred-websocket-flow" in r
-    # or "error code: 26104" in r
+    return (
+        "no-preferred-flow" in r
+        or "timeout" in r
+        or "no-preferred-websocket-flow" in r
+    )
 
 
 async def call_with_1004_retry_async(

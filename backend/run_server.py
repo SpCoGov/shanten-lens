@@ -7,8 +7,8 @@ from loguru import logger
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--host", type=str, default="127.0.0.1")
-    p.add_argument("--port", type=int, default=8787)
+    p.add_argument("--host", type=str)
+    p.add_argument("--port", type=int)
     p.add_argument("--data-root", type=str, help="自定义数据根目录")
     return p.parse_args()
 
@@ -36,8 +36,8 @@ async def main():
     )
 
     start_ui_services(
-        host="127.0.0.1",
-        ws_port=int(MANAGER.get("backend.port", 8787)),
+        host=args.host or str(MANAGER.get("backend.host", "127.0.0.1")),
+        ws_port=int(args.port if args.port is not None else MANAGER.get("backend.port", 8787)),
     )
     logger.info("UI services started (ws/http/watchers on UI loop).")
 

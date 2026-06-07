@@ -3837,6 +3837,7 @@ dependencies = [
  "log",
  "reqwest",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-fs",

@@ -5,6 +5,7 @@ import {AutoRunnerConfig, setAutoConfig} from "./autoRunnerStore";
 import {pushToast} from "./toast";
 import {APP_VERSION} from "./version";
 import i18n from "./i18n";
+import {invoke} from "@tauri-apps/api/core";
 
 export type UpdateConfigPacket = { type: "update_config"; data: Record<string, Record<string, any>> };
 export type Packet =
@@ -62,8 +63,9 @@ function translateToastMessage(d: any): string {
 }
 
 class WS {
-    private url: string;
+    private url = "";
     private ws: WebSocket | null = null;
+    private endpointPromise: Promise<void> | null = null;
 
     connected = false;
 
@@ -76,8 +78,20 @@ class WS {
     // 心跳
     private keepTimer: any = null;
 
-    constructor(url: string) {
-        this.url = url.replace(/^http/, "ws");
+    private async ensureEndpoint() {
+        if (this.endpointPromise) return this.endpointPromise;
+        this.endpointPromise = (async () => {
+            try {
+                const endpoint = await invoke<{ ws_url?: string; wsUrl?: string }>("get_backend_endpoint");
+                const nextUrl = String(endpoint?.ws_url || endpoint?.wsUrl || "").trim();
+                if (nextUrl) {
+                    this.url = nextUrl.replace(/^http/, "ws").replace(/\/ws$/, "");
+                }
+            } catch (e) {
+                console.warn("[WS] failed to resolve backend endpoint:", e);
+            }
+        })();
+        return this.endpointPromise;
     }
 
     on(h: PacketHandler): VoidFn {
@@ -107,6 +121,15 @@ class WS {
 
     connect() {
         if (this.ws) return;
+        void this.ensureEndpoint().then(() => this.openSocket());
+    }
+
+    private openSocket() {
+        if (this.ws) return;
+        if (!this.url) {
+            console.warn("[WS] backend endpoint is not available");
+            return;
+        }
 
         const url = this.url.endsWith("/ws") ? this.url : this.url + "/ws";
         const ws = new WebSocket(url);
@@ -210,7 +233,7 @@ class WS {
     }
 }
 
-export const ws = new WS("http://127.0.0.1:8787");
+export const ws = new WS();
 ws.onPacket((pkt) => {
     if (pkt.type === "update_registry") {
         const data = pkt.data as RegistryPayload;
