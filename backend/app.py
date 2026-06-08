@@ -146,6 +146,7 @@ TSUMO_LOOP_TASK: asyncio.Task | None = None
 TSUMO_LOOP_STOP: asyncio.Event | None = None
 TSUMO_LOOP_LAST_REASON = ""
 TSUMO_LOOP_WIN_COUNT = 0
+TSUMO_LOOP_FAILURE_COOLDOWN_SEC = 5.0
 
 
 def tsumo_loop_status_payload() -> Dict[str, Any]:
@@ -176,10 +177,11 @@ async def _tsumo_loop(interval_sec: float) -> None:
             TSUMO_LOOP_LAST_REASON = "" if ok else reason
             if ok:
                 TSUMO_LOOP_WIN_COUNT += 1
-                await broadcast({"type": "tsumo_loop_status", "data": tsumo_loop_status_payload()})
+            await broadcast({"type": "tsumo_loop_status", "data": tsumo_loop_status_payload()})
 
+            next_interval = interval_sec if ok else TSUMO_LOOP_FAILURE_COOLDOWN_SEC
             try:
-                await asyncio.wait_for(TSUMO_LOOP_STOP.wait(), timeout=interval_sec)
+                await asyncio.wait_for(TSUMO_LOOP_STOP.wait(), timeout=next_interval)
             except asyncio.TimeoutError:
                 pass
     except asyncio.CancelledError:
