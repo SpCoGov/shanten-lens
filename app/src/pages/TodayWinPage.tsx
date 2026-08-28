@@ -2,7 +2,6 @@ import React from "react";
 import {useTranslation} from "react-i18next";
 import Tile from "../components/Tile";
 import {
-    YAKU_LABELS,
     buildFeedback,
     generateTodayPuzzle,
     handCalcKey,
@@ -260,7 +259,7 @@ export default function TodayWinPage() {
         setMessageKey(exact ? "today_win.success" : validation.waitMatches ? "" : "today_win.errors.wait_mismatch");
     }, [answerDisplayTiles, concealed, dateKey, gameOver, guesses, hardMode, history, puzzle.analysis, puzzle.answer, puzzle.waits, puzzle.winTile, setError, winTile]);
 
-    const answerYaku = puzzle.analysis.yaku.map((id) => YAKU_LABELS[id]).join(" / ");
+    const answerYaku = puzzle.analysis.yaku.map((id) => t(`today_win.yaku.${id}`)).join(" / ");
     const tilePickerMarks = React.useMemo(() => {
         const marks = new Map<TodayTile, FeedbackColor>();
         const priority: Record<FeedbackColor, number> = {gray: 1, yellow: 2, green: 3};
@@ -322,7 +321,7 @@ export default function TodayWinPage() {
                                     <div className={styles.calendarGrid}>
                                     {Array.from({length: 7}, (_, index) => (
                                         <span key={index} className={styles.calendarWeek}>
-                                            {t(`today_win.weekdays.${index}`, {defaultValue: ["日", "一", "二", "三", "四", "五", "六"][index]})}
+                                            {t(`today_win.weekdays.${index}`)}
                                         </span>
                                     ))}
                                         {monthDays.map((day, index) => {

@@ -21,31 +21,31 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Windows portable
+          - name: Windows MSI
             os: windows-latest
-            artifact_name: shanten-lens-windows-portable
-            artifact_path: Shanten-Lens_*_windows-portable.zip
+            artifact_name: shanten-lens-windows-msi
+            artifact_path: app/src-tauri/target/release/bundle/msi/*.msi
           - name: macOS DMG
             os: macos-14
             artifact_name: shanten-lens-macos-dmg
-            artifact_path: Shanten-Lens_*_macos-*.dmg
+            artifact_path: app/src-tauri/target/release/bundle/dmg/*.dmg
     runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
         with:
-          python-version: "3.11"
+          version: 9.15.9
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: app/package-lock.json
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -55,16 +55,7 @@ jobs:
         shell: bash
         run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
-      - name: Create virtual environment (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: python -m venv .venv
-
-      - name: Create virtual environment (macOS)
-        if: runner.os == 'macOS'
-        run: python3 -m venv .venv
-
-      - name: Build Windows portable
+      - name: Build Windows MSI
         if: runner.os == 'Windows'
         shell: cmd
         run: scripts\build_all.bat

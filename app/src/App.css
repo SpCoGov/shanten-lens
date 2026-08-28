@@ -183,6 +183,50 @@ input, textarea, select, code, pre, .selectable {
     cursor: pointer;
 }
 
+.title-version-mark {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    padding: 3px 7px 2px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--color-ring) 62%, var(--accent-green));
+    border-radius: 6px 10px 6px 10px;
+    color: color-mix(in srgb, var(--color-ring) 72%, var(--text));
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--color-ring) 18%, var(--panel-bg)),
+        color-mix(in srgb, var(--accent-green) 16%, var(--panel-bg)));
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, white 30%, transparent),
+        0 0 12px color-mix(in srgb, var(--color-ring) 22%, transparent);
+    font-size: 10px;
+    font-weight: 900;
+    font-style: italic;
+    line-height: 1;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    user-select: none;
+}
+
+.title-version-mark::after {
+    content: "";
+    position: absolute;
+    inset: -50% auto -50% -65%;
+    width: 42%;
+    background: color-mix(in srgb, white 44%, transparent);
+    transform: skewX(-22deg);
+    animation: titleVersionShine 3.4s ease-in-out infinite;
+}
+
+@keyframes titleVersionShine {
+    0%, 72% { left: -65%; }
+    100% { left: 135%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .title-version-mark::after { animation: none; }
+}
+
 .update-title-badge {
     width: 24px;
     height: 24px;
@@ -643,16 +687,41 @@ input, textarea, select, code, pre, .selectable {
     pointer-events: none;
 }
 
+.hotkey-editor-switch .sidebar-hotkey-track {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    padding: 0;
+    border-color: var(--color-divider);
+    background: color-mix(in srgb, var(--muted) 14%, var(--panel-bg));
+    box-shadow: none;
+}
+
+.hotkey-editor-switch .sidebar-hotkey-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    background: var(--muted);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 25%, transparent);
+}
+
 .hotkey-editor-switch.is-on .sidebar-hotkey-track {
-    background: var(--badge-ok-bg);
-    border-color: var(--badge-ok-border);
-    box-shadow: inset 0 1px 3px color-mix(in srgb, #000 12%, transparent);
+    background: color-mix(in srgb, var(--state-ok) 24%, var(--panel-bg));
+    border-color: var(--state-ok);
+    box-shadow: none;
 }
 
 .hotkey-editor-switch.is-on .sidebar-hotkey-thumb {
-    background: var(--color-ring);
-    box-shadow: 0 1px 3px color-mix(in srgb, #000 24%, transparent);
+    background: var(--state-ok);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 25%, transparent);
     transform: translateX(16px);
+}
+
+.hotkey-editor-switch input:focus-visible + .sidebar-hotkey-track {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
 }
 
 .nav {
@@ -1869,18 +1938,331 @@ input, textarea, select, code, pre, .selectable {
     white-space: nowrap;
 }
 
+.config-page {
+    display: grid;
+    gap: 16px;
+    padding-block: 16px;
+}
+
+.config-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 4px 2px 14px;
+    border-bottom: 1px solid var(--color-divider);
+}
+
+.config-page-header h1,
+.overlay-section-heading h2,
+.overlay-status-copy h2,
+.config-card-heading h2 {
+    margin: 0;
+}
+
+.config-page-header h1 {
+    font-size: 22px;
+    line-height: 1.25;
+}
+
+.config-page-header p,
+.overlay-section-heading p {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.config-primary-button {
+    min-height: 36px;
+    flex: 0 0 auto;
+    padding: 7px 14px;
+    border: 1px solid color-mix(in srgb, var(--color-ring) 68%, var(--color-divider));
+    border-radius: 9px;
+    color: var(--on-strong);
+    background: var(--color-ring);
+    cursor: pointer;
+}
+
+.config-primary-button:hover:not(:disabled) {
+    filter: brightness(1.06);
+}
+
+.config-primary-button:disabled {
+    cursor: not-allowed;
+    opacity: .56;
+}
+
 .fuse-grid {
     display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-items: stretch;
+}
+
+.config-card {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid var(--color-divider);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--panel-bg) 94%, var(--bg));
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--color-ring) 5%, transparent);
+    animation: configCardIn .34s ease-out backwards;
+}
+
+.fuse-grid .config-card:nth-child(2) { animation-delay: 40ms; }
+.fuse-grid .config-card:nth-child(3) { animation-delay: 70ms; }
+.fuse-grid .config-card:nth-child(4) { animation-delay: 100ms; }
+.fuse-grid .config-card:nth-child(5) { animation-delay: 130ms; }
+.fuse-grid .config-card:nth-child(n + 6) { animation-delay: 160ms; }
+
+.config-card-heading {
+    flex: 1 1 auto;
+}
+
+.config-card-heading h2 {
+    font-size: 15px;
+    line-height: 1.35;
+}
+
+.config-card-heading p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.fuse-watch-card {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--color-ring) 7%, var(--panel-bg)), var(--panel-bg) 58%);
+}
+
+.fuse-watch-list {
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid var(--color-divider);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--bg) 42%, transparent);
+}
+
+.fuse-watch-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.fuse-watch-actions button {
+    min-height: 32px;
+    padding: 5px 10px;
+    border: 1px solid var(--color-divider);
+    border-radius: 8px;
+    color: var(--text);
+    background: var(--panel-bg);
+    cursor: pointer;
+}
+
+.fuse-watch-actions button:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--color-ring) 46%, var(--color-divider));
+    background: var(--hover-bg);
+}
+
+.fuse-watch-actions button:disabled {
+    cursor: not-allowed;
+    opacity: .46;
+}
+
+.fuse-watch-pill {
+    animation: configPillIn .22s ease-out backwards;
+}
+
+.config-card-settings {
+    display: grid;
+    gap: 8px;
+}
+
+.config-toggle-row,
+.config-number-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 38px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-divider);
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--panel-bg) 82%, var(--bg));
+    cursor: pointer;
+}
+
+.config-toggle-row > span,
+.config-number-row > span {
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.config-number-row .form-input {
+    width: 76px;
+    min-width: 76px;
+}
+
+.config-field-hint {
+    margin: 0 4px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.config-switch {
+    appearance: none;
+    position: relative;
+    width: 38px;
+    height: 22px;
+    flex: 0 0 38px;
+    margin: 0;
+    border: 1px solid color-mix(in srgb, var(--state-muted) 55%, var(--color-divider));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--state-muted) 18%, var(--panel-bg));
+    cursor: pointer;
+    transition: border-color .16s ease, background .16s ease;
+}
+
+.config-switch::before {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--state-muted);
+    box-shadow: 0 1px 3px color-mix(in srgb, #000 22%, transparent);
+    transition: transform .16s ease, background .16s ease;
+}
+
+.config-switch:checked {
+    border-color: var(--state-ok);
+    background: color-mix(in srgb, var(--state-ok) 24%, var(--panel-bg));
+}
+
+.config-switch:checked::before {
+    background: var(--state-ok);
+    transform: translateX(16px);
+}
+
+.config-switch:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+}
+
+.config-switch:disabled {
+    cursor: not-allowed;
+    opacity: .48;
+}
+
+.config-switch.is-large {
+    width: 46px;
+    height: 26px;
+    flex-basis: 46px;
+}
+
+.config-switch.is-large::before {
+    width: 18px;
+    height: 18px;
+}
+
+.config-switch.is-large:checked::before {
+    transform: translateX(20px);
+}
+
+.overlay-status-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 18px 20px;
+    border: 1px solid var(--color-divider);
+    border-radius: 12px;
+    background: var(--panel-bg);
+    transition: border-color .18s ease, background .18s ease;
+    animation: configCardIn .34s ease-out backwards;
+}
+
+.overlay-status-card.is-enabled {
+    border-color: color-mix(in srgb, var(--state-ok) 42%, var(--color-divider));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--state-ok) 9%, var(--panel-bg)), var(--panel-bg) 62%);
+}
+
+.overlay-status-copy h2 {
+    font-size: 16px;
+}
+
+.overlay-process-status {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 9px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.overlay-section-heading {
+    margin-top: 4px;
+}
+
+.overlay-section-heading h2 {
+    font-size: 16px;
+}
+
+.overlay-option-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
 }
 
-.fuse-grid .panel:first-child {
+.overlay-option-card {
     min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 72px;
+    padding: 15px 16px;
+    border: 1px solid var(--color-divider);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--panel-bg) 94%, var(--bg));
+    cursor: pointer;
+    transition: border-color .16s ease, background .16s ease, transform .16s ease;
+    animation: configCardIn .32s ease-out backwards;
 }
 
-.fuse-grid .panel:first-child .toolbar,
-.fuse-grid .panel:first-child .rows {
-    max-width: min(760px, 100%);
+.overlay-option-card:nth-child(2) { animation-delay: 45ms; }
+.overlay-option-card:nth-child(3) { animation-delay: 90ms; }
+
+.overlay-option-card:hover {
+    border-color: color-mix(in srgb, var(--color-ring) 34%, var(--color-divider));
+    background: var(--panel-bg);
+    transform: translateY(-1px);
+}
+
+.overlay-option-card > span {
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+@keyframes configCardIn {
+    from { opacity: 0; transform: translateY(7px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes configPillIn {
+    from { opacity: 0; transform: scale(.94); }
+    to { opacity: 1; transform: scale(1); }
 }
 
 .title {
@@ -2930,8 +3312,7 @@ input:invalid, textarea:invalid, select:invalid {
 }
 
 .app-main.route-home {
-    height: 100%;
-    overflow: hidden;
+    display: contents;
 }
 
 .home-grid {
@@ -3282,6 +3663,236 @@ input:invalid, textarea:invalid, select:invalid {
     transform: translateX(2px);
 }
 
+.switch-guide-page {
+    display: grid;
+    gap: 16px;
+    padding-block: 16px;
+}
+
+.switch-guide-hero {
+    margin: 0;
+    padding: 0;
+}
+
+.switch-guide-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--color-divider);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--color-ring) 9%, var(--panel-bg)), var(--panel-bg) 58%);
+}
+
+.switch-guide-heading h1 {
+    margin: 0;
+    font-size: 21px;
+    line-height: 1.2;
+}
+
+.switch-guide-heading p {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.switch-guide-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 260px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-divider);
+    border-radius: 999px;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--muted) 8%, var(--panel-bg));
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.switch-guide-status > span {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--state-muted);
+}
+
+.switch-guide-status.is-ready {
+    border-color: color-mix(in srgb, var(--state-ok) 45%, var(--color-divider));
+    color: var(--state-ok);
+    background: color-mix(in srgb, var(--state-ok) 10%, var(--panel-bg));
+}
+
+.switch-guide-status.is-ready > span {
+    background: var(--state-ok);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--state-ok) 14%, transparent);
+}
+
+.switch-guide-command-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 14px 20px;
+}
+
+.switch-guide-actions,
+.switch-guide-options,
+.switch-guide-utility-bar > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.switch-guide-button,
+.switch-guide-utility-bar button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 7px 11px;
+    border: 1px solid var(--color-divider);
+    border-radius: 9px;
+    color: var(--text);
+    background: var(--panel-bg);
+    cursor: pointer;
+    transition: transform .16s ease, border-color .16s ease, background .16s ease, opacity .16s ease;
+}
+
+.switch-guide-button .ms,
+.switch-guide-utility-bar button .ms {
+    font-size: 17px;
+}
+
+.switch-guide-button:hover:not(:disabled),
+.switch-guide-utility-bar button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--color-ring) 42%, var(--color-divider));
+    background: var(--hover-bg);
+}
+
+.switch-guide-button:disabled {
+    opacity: .42;
+    cursor: not-allowed;
+}
+
+.switch-guide-button.is-primary:not(:disabled) {
+    border-color: color-mix(in srgb, var(--color-ring) 58%, var(--color-divider));
+    color: var(--on-strong);
+    background: var(--color-ring);
+}
+
+.switch-guide-button.is-primary:disabled {
+    opacity: .72;
+    color: var(--on-strong);
+    background: color-mix(in srgb, var(--color-ring) 78%, var(--panel-bg));
+}
+
+.switch-guide-button.is-success:not(:disabled) {
+    border-color: color-mix(in srgb, var(--state-ok) 48%, var(--color-divider));
+    color: var(--state-ok);
+    background: color-mix(in srgb, var(--state-ok) 10%, var(--panel-bg));
+}
+
+.switch-guide-button.is-danger:not(:disabled) {
+    border-color: var(--danger-weak-border);
+    color: var(--state-down);
+    background: var(--danger-weak-bg);
+}
+
+.switch-guide-options {
+    flex: 0 0 auto;
+    padding-left: 16px;
+    border-left: 1px solid var(--color-divider);
+}
+
+.switch-guide-toggle,
+.switch-guide-number {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.switch-guide-toggle input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.switch-guide-toggle-track {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    flex: 0 0 auto;
+    border: 1px solid var(--color-divider);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--muted) 14%, var(--panel-bg));
+    transition: background .16s ease, border-color .16s ease;
+}
+
+.switch-guide-toggle-track span {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--muted);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 25%, transparent);
+    transition: transform .16s ease, background .16s ease;
+}
+
+.switch-guide-toggle input:checked + .switch-guide-toggle-track {
+    border-color: var(--state-ok);
+    background: color-mix(in srgb, var(--state-ok) 24%, var(--panel-bg));
+}
+
+.switch-guide-toggle input:checked + .switch-guide-toggle-track span {
+    transform: translateX(16px);
+    background: var(--state-ok);
+}
+
+.switch-guide-toggle input:focus-visible + .switch-guide-toggle-track {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+}
+
+.switch-guide-number input {
+    width: 72px;
+    min-height: 34px;
+    padding-block: 5px;
+}
+
+.switch-guide-utility-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 20px;
+    border-top: 1px solid var(--color-divider);
+    color: var(--muted);
+    background: color-mix(in srgb, var(--bg) 42%, var(--panel-bg));
+    font-size: 12px;
+}
+
+.switch-guide-utility-bar button {
+    min-height: 28px;
+    padding: 4px 8px;
+    color: var(--muted);
+    background: transparent;
+    font-size: 12px;
+}
+
 .blackhole-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -3290,7 +3901,7 @@ input:invalid, textarea:invalid, select:invalid {
 }
 
 .blackhole-layout.with-drawer {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(320px, .55fr);
 }
 
 .blackhole-main {
@@ -3298,11 +3909,13 @@ input:invalid, textarea:invalid, select:invalid {
 }
 
 .blackhole-drawer {
-    position: static;
-    max-height: none;
-    overflow: visible;
+    position: sticky;
+    top: 12px;
+    max-height: calc(100vh - 40px);
+    overflow: auto;
     min-width: 0;
     width: 100%;
+    margin: 0;
 }
 
 .blackhole-drawer-head {
@@ -3326,6 +3939,60 @@ input:invalid, textarea:invalid, select:invalid {
 .blackhole-section:hover {
     transform: translateY(-2px);
     box-shadow: 0 14px 28px color-mix(in srgb, var(--color-ring) 8%, transparent);
+}
+
+@media (max-width: 1080px) {
+    .switch-guide-command-bar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .switch-guide-options {
+        padding: 12px 0 0;
+        border-top: 1px solid var(--color-divider);
+        border-left: 0;
+    }
+
+    .blackhole-layout.with-drawer {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .blackhole-drawer {
+        position: static;
+        max-height: none;
+    }
+}
+
+@media (max-width: 680px) {
+    .switch-guide-heading {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 15px;
+    }
+
+    .switch-guide-status {
+        grid-column: 1 / -1;
+        max-width: none;
+        width: fit-content;
+    }
+
+    .switch-guide-command-bar {
+        padding: 12px 15px;
+    }
+
+    .switch-guide-actions > .switch-guide-button {
+        flex: 1 1 calc(50% - 4px);
+    }
+
+    .switch-guide-options {
+        align-items: stretch;
+        justify-content: space-between;
+    }
+
+    .switch-guide-utility-bar {
+        align-items: flex-start;
+        flex-direction: column;
+        padding-inline: 15px;
+    }
 }
 
 .sidebar .nav-icon:nth-child(1) {
@@ -3360,6 +4027,7 @@ input:invalid, textarea:invalid, select:invalid {
 .route-score > *,
 .route-fuse > *,
 .route-blackhole > *,
+.route-wanxiang > *,
 .route-souzu-debug > *,
 .route-autorun > *,
 .route-settings > *,
@@ -3550,14 +4218,6 @@ input:invalid, textarea:invalid, select:invalid {
         align-items: start;
     }
 
-    .fuse-grid {
-        grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
-        align-items: start;
-    }
-
-    .fuse-grid .panel:first-child {
-        grid-row: span 2;
-    }
 }
 
 @media (min-width: 1680px) {
@@ -3565,12 +4225,18 @@ input:invalid, textarea:invalid, select:invalid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .fuse-grid {
-        grid-template-columns: minmax(0, 1.25fr) minmax(360px, 1fr);
-    }
 }
 
 @media (max-width: 900px) {
+    .fuse-grid,
+    .overlay-option-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .fuse-watch-card {
+        grid-column: auto;
+    }
+
     .target-card-main {
         grid-template-columns: 1fr;
     }
@@ -3581,6 +4247,22 @@ input:invalid, textarea:invalid, select:invalid {
 
     .target-value-box {
         white-space: normal;
+    }
+}
+
+@media (max-width: 600px) {
+    .config-page-header,
+    .overlay-status-card {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .config-primary-button {
+        width: 100%;
+    }
+
+    .overlay-status-card > .config-switch {
+        align-self: flex-end;
     }
 }
 

@@ -1,30 +1,25 @@
 {
   "name": "shanten-lens-ui",
   "private": true,
-  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc -b && vite build",
     "preview": "vite preview",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "backend:dev-win": "cd .. && .venv\\Scripts\\python.exe backend\\run_server.py",
-    "tauri:dev-all": "concurrently -k -n UI,Backend -c \"auto\" \"tauri dev\" \"npm run backend:dev-win\""
+    "tauri:build": "tauri build"
   },
   "dependencies": {
-    "@fontsource/material-symbols-rounded": "^5.2.28",
-    "@tauri-apps/api": "^2.8.0",
-    "@tauri-apps/plugin-fs": "^2.4.2",
-    "@tauri-apps/plugin-log": "^2.2.0",
-    "@tauri-apps/plugin-opener": "^2.5.0",
-    "@tauri-apps/plugin-os": "^2.3.2",
-    "@tauri-apps/plugin-shell": "^2.3.1",
+    "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/plugin-opener": "2.5.0",
+    "@tauri-apps/plugin-os": "2.3.2",
     "i18next": "^25.6.1",
     "i18next-browser-languagedetector": "^8.2.0",
     "react": "^18",
     "react-dom": "^18",
+    "react-grid-layout": "^2.2.4",
     "react-i18next": "^16.2.4",
+    "vanilla-jsoneditor": "^3.13.0",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
@@ -32,7 +27,6 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^4",
-    "concurrently": "^9.2.1",
     "typescript": "^5",
     "vite": "^5"
   }

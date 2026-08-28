@@ -1,4 +1,6 @@
 {
+  "language": {"selector": "选择界面语言", "zh-CN": "简体中文", "ja-JP": "日本語"},
+  "startup": {"loading_language": "正在加载语言与配置", "loading_language_detail": "检测系统语言并初始化界面文案", "rendering": "正在构建主界面", "rendering_detail": "挂载首屏组件并连接事件", "finishing": "正在完成界面初始化", "finishing_detail": "准备显示主窗口"},
   "app": {
     "title": "向听镜",
     "subtitle": "Shanten Lens",
@@ -24,6 +26,7 @@
       "hint": "请确认启动的是同一版本的程序包，或重新解压/更新后再启动。"
     },
     "error_boundary": {
+      "unknown_error": "未知错误", "stack": "调用栈", "component_stack": "组件调用栈", "metadata": "错误元数据",
       "render_title": "界面渲染异常",
       "runtime_title": "运行时异常",
       "promise_title": "异步任务异常",
@@ -165,19 +168,20 @@
     }
   },
   "nav": {
+    "frontendTest": "前端测试",
     "home": "主页",
     "score": "点数",
     "blackhole": "花火指导",
     "wanxiang": "万象换牌",
     "blackholeDebug": "指导测试",
     "fuse": "熔断",
+    "pipeline": "封包流水线",
     "todayWin": "今日和了",
     "overlay": "HUD",
     "autorun": "自动化",
     "refreshGame": "刷新对局",
     "settings": "设置",
     "diagnostics": "日志",
-    "packetTest": "封包测试",
     "about": "关于",
     "gamestate": "GameState"
   },
@@ -225,6 +229,11 @@
     "success": "和了！",
     "current_waits": "当前听牌：{{waits}}",
     "wait_mismatch_badge": "等待不同",
+    "yaku": {
+      "tanyao": "断幺九", "yakuhai": "役牌", "pinfu": "平和", "toitoi": "对对和",
+      "chiitoi": "七对子", "honitsu": "混一色", "chinitsu": "清一色", "kokushi": "国士无双",
+      "iipeikou": "一杯口", "sanshoku": "三色同顺", "ittsuu": "一气通贯", "sanankou": "三暗刻"
+    },
     "errors": {
       "short_hand": "手牌不足 13 张",
       "too_many_hand": "手牌已满",
@@ -263,12 +272,11 @@
     "selectToPreview": "请选择护身符以预览。"
   },
   "about": {
+    "logo_alt": "向听镜标志",
     "show_usage_notice": "查看使用须知",
     "check_update": "检查更新",
     "check_update_loading": "检查中…",
-    "use_system_proxy": "检查更新和打开下载地址时使用系统代理",
     "update_available": "发现 v{{version}}",
-    "update_current": "当前版本：v{{version}}",
     "section_update_title": "更新",
     "section_notice_title": "使用须知",
     "notice_intro": "查看首次启动时展示的风险提示和使用声明。",
@@ -307,6 +315,7 @@
     }
   },
   "autorun": {
+    "target_judge_title": "判定说明：{{name}}",
     "title": "自动化",
     "section_runtime_title": "运行信息",
     "badge_elapsed": "已运行时长：{{time}}",
@@ -467,17 +476,56 @@
     "label_need_pionner_badge_count": "指引印章保留数"
   },
   "diagnostics": {
-    "ws_status_label": "WebSocket",
-    "ws_connected": "已连接",
-    "ws_disconnected": "未连接",
+    "tab_logs": "日志",
+    "tab_packets": "游戏封包",
+    "ipc_status_label": "Tauri IPC",
+    "ipc_connected": "已连接",
+    "ipc_disconnected": "未连接",
     "auto_scroll": "自动滚动",
-    "section_frames_title": "WS 封包（收/发）",
-    "empty_frames": "（暂无封包）",
     "section_logs_title": "后端事件日志",
-    "empty_logs": "（暂无日志）"
+    "section_packets_title": "游戏封包",
+    "empty_logs": "（暂无日志）",
+    "empty_packets": "（暂无封包）",
+    "log_count": "显示 {{shown}} / {{total}} 条",
+    "packet_count": "显示 {{shown}} / {{total}} 条",
+    "level_filter": "日志级别筛选",
+    "module_filter": "日志模块筛选",
+    "all_modules": "全部模块",
+    "search_placeholder": "搜索消息、模块或字段…",
+    "clear_logs": "清空日志",
+    "detail_title": "日志详情",
+    "close_detail": "关闭",
+    "detail_time": "时间",
+    "detail_level": "级别",
+    "detail_module": "模块",
+    "detail_location": "源码位置",
+    "detail_message": "消息",
+    "detail_fields": "结构化字段",
+    "packet_direction": "封包方向",
+    "direction_all": "全部方向",
+    "direction_outbound": "发出",
+    "direction_inbound": "收到",
+    "packet_method_placeholder": "按方法名过滤…",
+    "packet_search_placeholder": "搜索封包字段内容…",
+    "packet_detail_title": "封包详情",
+    "packet_type": "类型",
+    "packet_method": "方法名",
+    "packet_id": "消息 ID",
+    "packet_data": "字段内容",
+    "open_packet_viewer": "在新窗口中查看",
+    "packet_viewer_title": "封包查看器",
+    "packet_editor_label": "封包字段 JSON 编辑器",
+    "packet_editor_hint": "可通过节点菜单添加、删除或切换基本类型与复合类型。",
+    "packet_json_invalid": "字段内容不是有效的 JSON。",
+    "packet_json_object_required": "重放封包的字段根节点必须是对象。",
+    "replay_packet": "重放封包",
+    "replaying": "正在重放…",
+    "replay_success": "封包已重放，消息 ID：{{id}}",
+    "replay_failed": "封包重放失败：{{reason}}"
   },
   "fuse": {
     "title": "熔断",
+    "subtitle": "配置高风险操作的保护规则，并维护购物监控列表。",
     "section_shop_guard_title": "购物守护",
     "section_shop_guard_desc": "维护监控列表后，在购物时应用两条规则：<br/>1）出现监控项时<strong>禁止“跳过”</strong>（启用下方“禁止跳过”）；<br/>2）出现监控项但你<strong>没有选择监控项之一</strong>则阻止（启用下方“强制选择监控项”）。",
     "btn_add_amulet": "添加护身符",
@@ -608,6 +656,8 @@
     "tile_skin_label": "牌面",
     "tile_skin_classic": "雀魂",
     "tile_skin_tempai_svg": "Tempai SVG",
+    "use_system_proxy": "使用系统代理",
+    "use_system_proxy_desc": "检查更新和下载时使用系统代理",
     "btn_manual_sync": "手动同步",
     "btn_open_config_dir": "打开配置目录",
     "notice_server_update_dirty": "服务器有新配置推送，但你有未保存修改。你可以保存或放弃更改再同步。",
@@ -622,6 +672,9 @@
   },
   "overlay": {
     "title": "HUD",
+    "subtitle": "管理游戏内悬浮显示及其展示内容。",
+    "display_title": "显示内容",
+    "display_desc": "选择需要固定显示在游戏画面上的信息。",
     "windows_only": "HUD Overlay currently supports Windows only",
     "enabled": "启用 HUD",
     "process_status": "雀魂进程",
@@ -691,10 +744,13 @@
     "reason_no-reliable-plan-found": "这次只保留经过验证的可靠方案；当前没有找到满足条件的可靠换牌指导。",
     "reason_stage-not-switch": "该指导只在换牌阶段显示。",
     "reason_wanxiang-not-in-hand": "当前手牌中没有万象，无法计算万象换牌方案。",
+    "reason_wanxiang-not-reachable-before-draw": "当前手牌和剩余换牌中没有万象，无法在摸牌前完成万象换牌方案。",
     "reason_cannot-form-four-melds-with-wanxiang": "按剩余换牌顺序无法组成万象加四个面子的方案。",
     "reason_unknown": "暂时没有可用结果。"
   },
   "blackhole": {
+    "source_hand": "手牌", "source_replacement": "换牌堆", "source_wall": "牌山", "source_unknown": "未知来源",
+    "unlimited": "无限制", "tile_count": "{{count}} 张", "final_shape": "最终牌型",
     "title": "花火指导",
     "wanxiang_title": "万象换牌",
     "card_title": "花火指导方案",
@@ -753,7 +809,7 @@
     "execute_reason_step_failed": "第 {{index}} 步换牌失败：{{reason}}。请重进青云之志查看最新状态。",
     "execute_reason_state_stale": "第 {{index}} 步换牌后状态未及时刷新。请重进青云之志查看最新状态。",
     "execute_reason_unknown": "执行换牌时发生未知错误：{{reason}}。请重进青云之志查看最新状态。",
-    "clear_cache": "清空缓存数据",
+    "clear_cache": "清空缓存",
     "auto_stop_first": "找到第一个方案后自动停",
     "verbose_progress": "显示详细调试进度",
     "wall_limit": "牌山读取上限",
@@ -761,11 +817,12 @@
     "search_algorithm": "搜索算法",
     "algorithm_target_enum": "目标牌型枚举搜索",
     "stage_ready": "当前在换牌阶段，可以手动启动搜索。",
+    "status_ready": "可以操作",
+    "status_waiting": "等待换牌阶段",
     "wanxiang_stage_ready": "当前在换牌阶段，可以搜索万象四面子换牌方案。",
-    "stage_not_ready": "当前不在换牌阶段，启动前会先拦下。",
     "need_switch_stage": "当前不在换牌阶段，无法启动花火指导。",
     "wanxiang_need": "当前手牌中没有万象，无法启动万象换牌搜索。",
-    "export_current": "导出当前局面",
+    "export_current": "导出局面",
     "export_empty": "当前没有可导出的局面",
     "export_success": "已导出当前局面",
     "export_success_clipboard": "已导出当前局面，并复制到剪贴板",
@@ -798,6 +855,7 @@
     "debug_import_failed": "导入失败"
   },
   "amulet_card": {
+    "badge_alt_unknown": "印章",
     "title_unknown": "未知护身符 ID={{regId}} (raw={{rawId}})",
     "title_known": "{{name}}{{suffix}}",
     "plus_suffix": "（Plus）",
@@ -842,11 +900,13 @@
     "card_title": "{{name}}（#{{id}}）"
   },
   "goods_bar": {
-    "empty": "暂无商品"
+    "empty": "暂无商品",
+    "aria_list": "商品列表"
   },
   "good_card": {
     "tooltip": "ID={{id}} goodsId={{goodsId}} 价格={{price}}",
     "image_alt": "商品图片（goodsId={{goodsId}}）",
+    "price_aria": "价格 {{price}}",
     "sold": "已售罄"
   },
   "modal": {
@@ -922,6 +982,7 @@
   },
   "amulet": "护身符",
   "score": {
+    "soul": "魂", "dora": "宝牌", "soul_dora": "魂·宝牌", "dora_count": "宝牌×{{count}}", "soul_dora_count": "魂·宝牌×{{count}}",
     "title": "点数",
     "live_point_title": "实时点数计算",
     "current_level": "当前关卡",
@@ -1084,6 +1145,7 @@
   },
   "common": {
     "ok": "确定",
+    "confirm": "确认",
     "continue": "继续",
     "cancel": "取消",
     "save": "保存"
@@ -1168,6 +1230,7 @@
   },
   "candidate_amulet_empty": "暂无候选护身符",
   "gamestate": {
+    "tree_empty": "空",
     "title": "GameState",
     "subtitle_live": "展示前端当前维护的 game_state 快照。",
     "subtitle_empty": "尚未收到后端推送的 game_state。",
@@ -1178,6 +1241,61 @@
     "empty": "暂无 game_state 数据。请先进入对局，或点击刷新对局。",
     "boolean_true": "是",
     "boolean_false": "否"
+  },
+  "packet_pipeline": {
+    "title": "封包流水线",
+    "subtitle": "拖动模块可调整封包传播顺序；模块可以查看、修改、旁路或丢弃封包。",
+    "save": "保存并应用",
+    "reset": "恢复默认配置",
+    "saved": "已应用",
+    "enabled": "启用",
+    "disabled": "停用",
+    "module_toggle": "启用或停用{{module}}模块",
+    "operations": {"inject": "注入", "modify": "修改", "bypass": "旁路", "drop": "丢弃"},
+    "bypass_methods": "旁路方法",
+    "method_count": "{{count}} 个方法",
+    "method_input": "输入完整方法名",
+    "add_method": "添加",
+    "remove_method": "移除方法 {{method}}",
+    "no_method_matches": "Proto 中没有匹配的方法。",
+    "no_methods": "尚未添加方法；未命中的封包会继续向后传播。",
+    "modules": {
+      "replay_injector": {"title": "重放封包", "description": "向流水线重放封包；停用后禁止重放。"},
+      "packet_logger": {"title": "封包日志", "description": "记录封包到日志。"},
+      "method_filter": {"title": "方法过滤器", "description": "按方法名旁路封包。"},
+      "limited_time_activity": {"title": "限时活动", "description": "雀魂限时活动辅助。"},
+      "game_state": {"title": "游戏状态", "description": "维护青云之志游戏状态。"},
+      "unlock_illustrated_book": {"title": "解锁全图鉴", "description": "在图鉴中显示全部护身符、印章和符石。"},
+      "fuse_rules": {"title": "熔断规则", "description": "检查并丢弃命中的高风险操作。"},
+      "autorun": {"title": "自动操作", "description": "生成自动操作封包。"}
+    }
+  },
+  "souzu_debug": {
+    "json_object_required": "导入内容必须是 JSON 对象", "import_invalid": "导入内容无效", "import_first": "请先导入局面",
+    "choose_two_quads": "请先选择两组杠", "quads_must_differ": "两组杠不能相同", "target_seven_tiles": "听牌前目标一共需要 7 张牌", "group_full": "当前分组已满",
+    "source_hand": "手牌", "source_replacement": "换牌堆", "source_replacement_window": "换牌窗口", "source_wall": "牌山",
+    "bucket_meld1": "面子 A", "bucket_meld2": "面子 B", "bucket_pair": "雀头",
+    "stage": "阶段：{{value}}", "changed": "已换：{{value}}", "total_changes": "总换牌次数：{{value}}",
+    "quad_a": "杠 A", "quad_b": "杠 B", "assign_to": "当前点击分配到", "reset_groups": "重置分组", "current_total": "当前总数：{{count}}/7", "allocatable_tiles": "可分配的牌",
+    "pool_diagnostics": "搜索池诊断", "normalized_count": "{{face}} 归一后数量", "raw_count": "原始 {{face}} 数量", "quad_count": "{{face}} 可成杠数",
+    "pool_hand": "手牌入池", "pool_replacement": "换牌窗口入池", "pool_wall": "牌山入池", "pool_total": "总入池数",
+    "used_changes": "已消耗换牌数", "remaining_replacement": "剩余换牌堆总数", "read_window": "实际读取窗口",
+    "focus_details": "{{face}} 明细", "no_focus_tiles": "当前搜索池里没有归一到 {{face}} 的牌。", "available_quads": "当前可成杠",
+    "no_available_quads": "当前搜索池里没有任何可成杠组合。", "normalized_counts": "归一后牌面计数",
+    "select": "请选择", "click_to_add": "点击下方牌加入当前分组", "tile_count": "{{count}} 张", "used_by_quad": "已用于杠", "assigned": "已分配"
+  },
+  "frontend_test": {
+    "default_title": "前端测试", "default_message": "这是一个前端测试用消息框。", "empty": "无",
+    "flow_title": "MITM Flow 测试", "dump_flows": "打印当前所有 Flow", "requesting_flows": "正在请求后端打印 Flow…",
+    "flows_dumped": "已打印 {{count}} 个 Flow 到后端日志", "preferred": "首选", "last": "最近",
+    "frames": "帧：{{count}}", "packets": "封包：{{count}}", "type_counts": "类型统计：{{value}}",
+    "direction_counts": "方向统计：{{value}}", "method_counts": "方法统计：\n{{value}}", "exclusive_packets": "独有封包：\n{{value}}",
+    "toast_title": "Toast 测试", "toast_info": "这是一条信息提示", "toast_success": "操作成功，状态已更新",
+    "toast_error": "操作失败，请检查输入或重试", "trigger_info_toast": "触发 Info Toast", "trigger_success_toast": "触发 Success Toast",
+    "trigger_error_toast": "触发 Error Toast", "trigger_timestamp_toast": "触发带时间戳 Toast", "timestamp_message": "随机提示 @ {{time}}",
+    "msgbox_title": "MsgBox 测试", "field_title": "标题", "field_content": "内容", "acknowledge": "知道了",
+    "open_confirm": "打开确认框（OK/Cancel）", "open_alert": "打开提示框（仅 OK）", "error_boundary_title": "Error Boundary 测试",
+    "throw_render": "手动抛出渲染错误", "throw_async": "手动抛出异步错误", "render_error": "手动前端渲染错误测试", "async_error": "手动前端异步错误测试"
   },
   "game_map": {
     "button": "地图",

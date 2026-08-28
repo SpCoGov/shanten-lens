@@ -108,7 +108,7 @@ const defaultStatus: AutoRunnerStatus = {
     started_at: 0,
     game_ready: false,
     has_live_game: false,
-    game_ready_reason: "未探测，请点击“刷新状态”",
+    game_ready_reason: "",
     game_ready_code: "NOT_PROBED",
     probe_fail_count: 0,
     remake_records: [],

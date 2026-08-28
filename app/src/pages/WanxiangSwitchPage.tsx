@@ -1,7 +1,7 @@
 import React from "react";
 import {useTranslation} from "react-i18next";
 import {pushToast} from "../lib/toast";
-import {ws} from "../lib/ws";
+import * as backendIpc from "../lib/ipc";
 import type {PlanData, TileId} from "../lib/planTypes";
 import type {GameStateData} from "../lib/gamestate";
 import {buildDebugSnapshotFromState} from "./SouzuSwitchDebugPage";
@@ -41,6 +41,7 @@ function isWanxiangPlanData(data: PlanData | null) {
         || data.mode === "wanxiang-four-meld-switch"
         || String(data.plan_signature || "").startsWith("wanxiang|")
         || data.reason === "wanxiang-not-in-hand"
+        || data.reason === "wanxiang-not-reachable-before-draw"
         || data.reason === "cannot-form-four-melds-with-wanxiang";
 }
 
@@ -58,6 +59,7 @@ export default function WanxiangSwitchPage({
                                                data,
                                                resolveFace,
                                                handIds,
+                                               replacementIds,
                                                currentState,
                                                onClear,
                                            }: {
@@ -94,24 +96,20 @@ export default function WanxiangSwitchPage({
     React.useEffect(() => {
         if (stage === 5 || stage === 4) return;
         if (mainData?.status === "searching") {
-            ws.send({type: "souzu_switch_control", data: {action: "stop", notify: false}} as any);
+            void backendIpc.runSwitch({action: "stop", notify: false});
         }
     }, [stage, mainData?.status]);
 
     const planSignature = mainData?.plan_signature || "";
     const canOperate = stage === 5 || stage === 4;
     const hasWanxiang = React.useMemo(
-        () => handIds.some((id) => id === 1000 || resolveFace?.(id) === "bd"),
-        [handIds, resolveFace],
+        () => [...handIds, ...replacementIds]
+            .some((id) => id === 1000 || resolveFace?.(id) === "bd"),
+        [handIds, replacementIds, resolveFace],
     );
     const isSearching = mainData?.status === "searching";
     const canResume = !!planSignature && !isSearching;
-    const hasExecutablePlan = !!(
-        mainData &&
-        mainData.status === "plan" &&
-        Array.isArray(mainData.switch_discards) &&
-        mainData.switch_discards.length > 0
-    );
+    const hasExecutablePlan = mainData?.status === "plan";
 
     const resolveWallLimit = React.useCallback(() => {
         const parsed = parseWallLimitInput(wallLimitInput.trim(), t);
@@ -141,25 +139,22 @@ export default function WanxiangSwitchPage({
         if (!opts?.resume) {
             setSeenSignatures([]);
         }
-        ws.send({
-            type: "souzu_switch_control",
-            data: {
-                action: "start",
-                options: {
-                    skip_signatures: skipSignatures,
-                    wall_limit: nextWallLimit,
-                    search_algorithm: "wanxiang_four_meld_switch",
-                },
+        void backendIpc.runSwitch({
+            action: "start",
+            options: {
+                skip_signatures: skipSignatures,
+                wall_limit: nextWallLimit,
+                search_algorithm: "wanxiang_four_meld_switch",
             },
-        } as any);
+        });
     }, [canOperate, hasWanxiang, planSignature, resolveWallLimit, seenSignatures, t]);
 
     const stopSearch = React.useCallback(() => {
-        ws.send({type: "souzu_switch_control", data: {action: "stop"}} as any);
+        void backendIpc.runSwitch({action: "stop"});
     }, []);
     const executePlan = React.useCallback(() => {
         if (!canOperate || !hasExecutablePlan) return;
-        ws.send({type: "souzu_switch_control", data: {action: "execute_plan"}} as any);
+        void backendIpc.runSwitch({action: "execute_plan"});
     }, [canOperate, hasExecutablePlan]);
     const exportCurrentSnapshot = React.useCallback(async () => {
         if (!currentState) {
@@ -190,47 +185,55 @@ export default function WanxiangSwitchPage({
     }, [mainData, verboseProgress]);
 
     return (
-        <div className="settings-wrap wide-page" style={{paddingBlock: 16}}>
-            <div className="panel">
-                <div className="panel-title">{t("blackhole.wanxiang_title")}</div>
-                <div style={{display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center"}}>
-                    <button className="nav-btn" onClick={() => startSearch()} disabled={isSearching}>
-                        {t("blackhole.start")}
-                    </button>
-                    <button className="nav-btn" onClick={stopSearch} disabled={!isSearching}>
-                        {t("blackhole.stop")}
-                    </button>
-                    <button className="nav-btn" onClick={() => startSearch({resume: true})} disabled={!canResume}>
-                        {t("blackhole.continue")}
-                    </button>
-                    <button className="nav-btn" onClick={executePlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
-                        {t("blackhole.execute_plan")}
-                    </button>
-                    <button className="nav-btn" onClick={exportCurrentSnapshot}>
-                        {t("blackhole.export_current")}
-                    </button>
-                    <button className="nav-btn" onClick={clearCache}>
-                        {t("blackhole.clear_cache")}
-                    </button>
-                    <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
-                        <input type="checkbox" checked={verboseProgress} onChange={(e) => setVerboseProgress(e.target.checked)}/>
-                        <span>{t("blackhole.verbose_progress")}</span>
-                    </label>
-                    <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
-                        <span>{t("blackhole.wall_limit")}</span>
-                        <input
-                            className="form-input"
-                            style={{width: 88}}
-                            type="number"
-                            value={wallLimitInput}
-                            onChange={(e) => setWallLimitInput(e.target.value)}
-                        />
-                    </label>
+        <div className="settings-wrap wide-page switch-guide-page">
+            <section className="panel switch-guide-hero">
+                <div className="switch-guide-heading">
+                    <div>
+                        <h1>{t("blackhole.wanxiang_title")}</h1>
+                        {canOperate ? <p>{t("blackhole.wanxiang_stage_ready")}</p> : null}
+                    </div>
+                    <span className={`switch-guide-status ${canOperate ? "is-ready" : ""}`}>
+                        <span aria-hidden="true"/>{t(canOperate ? "blackhole.status_ready" : "blackhole.status_waiting")}
+                    </span>
                 </div>
-                <div style={{marginTop: 10, color: "var(--muted)", fontSize: 13}}>
-                    {canOperate ? t("blackhole.wanxiang_stage_ready") : t("blackhole.stage_not_ready")} {t("blackhole.wall_limit_hint")}
+
+                <div className="switch-guide-command-bar">
+                    <div className="switch-guide-actions">
+                        <button className="switch-guide-button is-primary" onClick={() => startSearch()} disabled={isSearching}>
+                            <span className="ms" aria-hidden="true">search</span>{t("blackhole.start")}
+                        </button>
+                        <button className="switch-guide-button is-danger" onClick={stopSearch} disabled={!isSearching}>
+                            <span className="ms" aria-hidden="true">stop_circle</span>{t("blackhole.stop")}
+                        </button>
+                        <button className="switch-guide-button" onClick={() => startSearch({resume: true})} disabled={!canResume}>
+                            <span className="ms" aria-hidden="true">resume</span>{t("blackhole.continue")}
+                        </button>
+                        <button className="switch-guide-button is-success" onClick={executePlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
+                            <span className="ms" aria-hidden="true">play_arrow</span>{t("blackhole.execute_plan")}
+                        </button>
+                    </div>
+
+                    <div className="switch-guide-options">
+                        <label className="switch-guide-toggle">
+                            <input type="checkbox" checked={verboseProgress} onChange={(e) => setVerboseProgress(e.target.checked)}/>
+                            <span className="switch-guide-toggle-track" aria-hidden="true"><span/></span>
+                            <span>{t("blackhole.verbose_progress")}</span>
+                        </label>
+                        <label className="switch-guide-number">
+                            <span>{t("blackhole.wall_limit")}</span>
+                            <input className="form-input" type="number" value={wallLimitInput} onChange={(e) => setWallLimitInput(e.target.value)}/>
+                        </label>
+                    </div>
                 </div>
-            </div>
+
+                <div className="switch-guide-utility-bar">
+                    <span>{t("blackhole.wall_limit_hint")}</span>
+                    <div>
+                        <button type="button" onClick={exportCurrentSnapshot}><span className="ms" aria-hidden="true">content_copy</span>{t("blackhole.export_current")}</button>
+                        <button type="button" onClick={clearCache}><span className="ms" aria-hidden="true">delete_sweep</span>{t("blackhole.clear_cache")}</button>
+                    </div>
+                </div>
+            </section>
 
             <div className="blackhole-layout">
                 <div className="blackhole-main">

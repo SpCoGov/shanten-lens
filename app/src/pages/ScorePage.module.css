@@ -1,0 +1,151 @@
+.scorePanel {
+    overflow: hidden;
+    padding: 0;
+}
+
+.panelHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--color-divider);
+}
+
+.stageOverview {
+    display: grid;
+    grid-template-columns: minmax(220px, .8fr) minmax(420px, 1.4fr);
+    align-items: stretch;
+    border-bottom: 1px solid var(--color-divider);
+    background: color-mix(in srgb, var(--color-ring) 4%, var(--panel-bg));
+}
+
+.stageIdentity {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 18px;
+    border-right: 1px solid var(--color-divider);
+}
+
+.stageIcon {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    color: var(--color-ring);
+    font-size: 20px;
+    line-height: 24px;
+}
+
+.stageName,
+.stageMetrics strong,
+.breakdown strong,
+.resultCard strong {
+    display: block;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+}
+
+.stageName { font-size: 19px; }
+.metricLabel { color: var(--muted); font-size: 12px; }
+
+.stageMetrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stageMetrics > div {
+    min-width: 0;
+    padding: 18px;
+}
+
+.stageMetrics > div + div { border-left: 1px solid var(--color-divider); }
+.stageMetrics strong { overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.success { color: var(--state-ok); }
+.danger { color: var(--state-down); }
+.neutral { color: var(--muted); }
+
+.calculationGrid {
+    display: grid;
+    grid-template-columns: minmax(210px, .72fr) minmax(360px, 1.35fr) minmax(260px, .9fr);
+    gap: 14px;
+    padding: 16px;
+}
+
+.inputs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.inputCard {
+    display: grid;
+    align-content: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--color-divider);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--bg) 42%, var(--panel-bg));
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.inputCard input {
+    min-width: 0;
+    max-width: none;
+    font-size: 17px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.breakdown {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
+    min-width: 0;
+    border: 1px solid var(--color-divider);
+    border-radius: 12px;
+}
+
+.breakdown > div { min-width: 0; padding: 14px 16px; }
+.breakdown > div + div { border-left: 1px solid var(--color-divider); }
+.breakdown strong { overflow: hidden; font-size: 18px; text-overflow: ellipsis; }
+
+.results {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.resultCard {
+    display: grid;
+    align-content: center;
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--state-ok) 30%, var(--color-divider));
+    border-radius: 12px;
+    color: var(--state-ok);
+    background: color-mix(in srgb, var(--state-ok) 7%, var(--panel-bg));
+}
+
+.resultCard span { font-size: 12px; font-weight: 600; }
+.resultCard strong { overflow: hidden; font-size: 22px; text-overflow: ellipsis; }
+.totalResult { border-color: color-mix(in srgb, var(--state-ok) 55%, var(--color-divider)); }
+
+@media (max-width: 1100px) {
+    .calculationGrid { grid-template-columns: minmax(200px, .7fr) minmax(360px, 1.3fr); }
+    .results { grid-column: 1 / -1; }
+}
+
+@media (max-width: 760px) {
+    .stageOverview, .calculationGrid { grid-template-columns: 1fr; }
+    .stageIdentity { border-right: 0; border-bottom: 1px solid var(--color-divider); }
+    .results { grid-column: auto; }
+}
+
+@media (max-width: 480px) {
+    .panelHeader { align-items: stretch; flex-direction: column; }
+    .stageMetrics, .inputs, .results { grid-template-columns: 1fr; }
+    .stageMetrics > div + div { border-top: 1px solid var(--color-divider); border-left: 0; }
+}

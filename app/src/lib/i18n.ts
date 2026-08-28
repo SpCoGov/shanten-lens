@@ -2,6 +2,7 @@ import i18n from "i18next";
 import {initReactI18next} from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import { locale } from "@tauri-apps/plugin-os";
+import {setBackendLocale} from "./ipc";
 
 import zhCN from "../locales/zh-CN.json";
 import jaJP from "../locales/ja-JP.json";
@@ -45,12 +46,15 @@ export async function ensureI18nReady() {
             returnNull: false
         });
 
+    await setBackendLocale(i18n.resolvedLanguage || i18n.language);
+
     return i18n;
 }
 
 export function setAppLanguage(lng: string) {
     localStorage.setItem(STORAGE_KEY, lng);
     i18n.changeLanguage(lng);
+    void setBackendLocale(lng);
 }
 
 export default i18n;

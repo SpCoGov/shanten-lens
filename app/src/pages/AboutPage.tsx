@@ -36,16 +36,12 @@ export default function AboutPage({
                                       onCheckUpdate,
                                       updateAvailable,
                                       checkingUpdate,
-                                      useSystemProxy,
-                                      onUseSystemProxyChange,
                                   }: {
     onSecretClick: () => void;
     onShowUsageNotice: () => void;
     onCheckUpdate: () => void;
     updateAvailable: UpdateInfo | null;
     checkingUpdate: boolean;
-    useSystemProxy: boolean;
-    onUseSystemProxyChange: (useSystemProxy: boolean) => void;
 }) {
     const {t} = useTranslation();
     const [openTileGallery, setOpenTileGallery] = React.useState(false);
@@ -55,113 +51,73 @@ export default function AboutPage({
 
     return (
         <div className={styles.wrap}>
-            <div className={styles.hero}>
-                <img className={styles.logo} src="/logo.svg" alt="Shanten Lens logo"/>
-                <h1 className={styles.secretTitle} onClick={onSecretClick}>
-                    {t("app.title")} <span className={styles.sub}>{t("app.subtitle")}</span>
-                </h1>
-            </div>
+            <header className={styles.hero}>
+                <img className={styles.logo} src="/logo.svg" alt={t("about.logo_alt")}/>
+                <div className={styles.identity}>
+                    <h1 className={styles.secretTitle} onClick={onSecretClick}>{t("app.title")}</h1>
+                    <p>{t("app.subtitle")}</p>
+                    <div className={styles.meta}>
+                        <span className={styles.author}>{t("app.author")}</span>
+                        <span className={styles.version}>v{APP_VERSION}</span>
+                        {updateAvailable ? <span className={styles.updateBadge}>{t("about.update_available", {version: updateAvailable.version})}</span> : null}
+                    </div>
+                </div>
+            </header>
 
-            <div className={styles.meta}>
-                <span className={styles.author}>{t("app.author")}</span>
-                <span className={styles.sep} aria-hidden>|</span>
-                <span className={styles.version}>v{APP_VERSION}</span>
-                <span className={styles.build}>(build&nbsp;1)</span>
-                {updateAvailable ? (
-                    <span className={styles.updateBadge}>{t("about.update_available", {version: updateAvailable.version})}</span>
-                ) : null}
-            </div>
-
-            <section>
-                <h2>{t("about.section_license_title")}</h2>
-                <p>
-                    <Trans i18nKey="about.license_copyright_html" values={{year: new Date().getFullYear()}}/>
-                </p>
-                <details>
-                    <summary>{t("about.license_toggle_summary")}</summary>
-                    <pre className={styles.license}>
-{`Licensed under the Apache License, Version 2.0 (the "License").
+            <div className={styles.infoGrid}>
+                <section className={styles.infoCard}>
+                    <h2>{t("about.section_license_title")}</h2>
+                    <p><Trans i18nKey="about.license_copyright_html" values={{year: new Date().getFullYear()}}/></p>
+                    <details className={styles.licenseDetails}>
+                        <summary>{t("about.license_toggle_summary")}</summary>
+                        <pre className={styles.license}>{`Licensed under the Apache License, Version 2.0 (the "License").
 You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
+Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}</pre>
+                    </details>
+                </section>
 
-Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
-          </pre>
-                </details>
-
-                <div className={styles.actionPanelStack}>
-                    <div className={styles.aboutActions}>
-                        <button className="nav-btn" onClick={onCheckUpdate} disabled={checkingUpdate}>
-                            {checkingUpdate ? (
-                                <>
-                                    <span className="ms" aria-hidden="true">sync</span>
-                                    {t("about.check_update_loading")}
-                                </>
-                            ) : t("about.check_update")}
-                        </button>
-                        <label className={styles.switchRow}>
-                            <input
-                                type="checkbox"
-                                checked={useSystemProxy}
-                                onChange={(event) => onUseSystemProxyChange(event.currentTarget.checked)}
-                            />
-                            <span>{t("about.use_system_proxy")}</span>
-                        </label>
-                        <button className="nav-btn" onClick={onShowUsageNotice}>
-                            {t("about.show_usage_notice")}
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <section>
-                <h2>{t("about.section_assets_title")}</h2>
-                <p>{t("about.assets_intro")}</p>
-                <div className={styles.assetList}>
-                    {ASSET_SOURCES.map((item) => (
-                        <div key={item.url} className={styles.assetItem}>
-                            <div className={styles.assetName}>
-                                {t(item.nameKey)}
-                            </div>
-                            <div className={styles.assetNote}>
-                                {t(item.noteKey)}
-                            </div>
-                            <a href={item.url} target="_blank" rel="noreferrer">
-                                {t("about.open_link")}
+                <section className={styles.infoCard}>
+                    <h2>{t("about.section_assets_title")}</h2>
+                    <p>{t("about.assets_intro")}</p>
+                    <div className={styles.assetList}>
+                        {ASSET_SOURCES.map((item) => (
+                            <a key={item.url} className={styles.assetItem} href={item.url} target="_blank" rel="noreferrer">
+                                <span><strong>{t(item.nameKey)}</strong><small>{t(item.noteKey)}</small></span>
+                                <span className="ms" aria-hidden="true">open_in_new</span>
                             </a>
+                        ))}
+                    </div>
+                    <button className={styles.secondaryAction} onClick={() => setOpenTileGallery(true)}>{t("about.view_all_tiles")}</button>
+                </section>
+
+                <section className={`${styles.infoCard} ${styles.usageCard}`}>
+                    <h2>{t("about.section_usage_title")}</h2>
+                    <p><Trans i18nKey="about.section_usage_body_html" values={{year: new Date().getFullYear()}}/></p>
+                </section>
+
+                <section className={`${styles.infoCard} ${styles.issuesCard}`}>
+                    <h2>{t("about.section_known_issues_title")}</h2>
+                    <div className={styles.issueGrid}>
+                        <div className={styles.knownIssueRow}>
+                            <AmuletCard item={amulet225} scale={0.42}/>
+                            <div className={styles.knownIssueText}><Trans i18nKey="about.known_issue_225_html"/></div>
                         </div>
-                    ))}
-                </div>
-                <div className={styles.actionRow}>
-                    <button className="nav-btn" onClick={() => setOpenTileGallery(true)}>
-                        {t("about.view_all_tiles")}
-                    </button>
-                </div>
-            </section>
-
-            <section>
-                <h2>{t("about.section_usage_title")}</h2>
-                <p>
-                    <Trans i18nKey="about.section_usage_body_html" values={{year: new Date().getFullYear()}}/>
-                </p>
-            </section>
-
-            <section>
-                <h2>{t("about.section_known_issues_title")}</h2>
-
-                <div className={styles.knownIssueRow}>
-                    <AmuletCard item={amulet225} scale={0.42}/>
-                    <div className={styles.knownIssueText}>
-                        <Trans i18nKey="about.known_issue_225_html"/>
+                        <div className={styles.knownIssueRow}>
+                            <AmuletCard item={amulet218} scale={0.42}/>
+                            <div className={styles.knownIssueText}><Trans i18nKey="about.known_issue_218_html"/></div>
+                        </div>
                     </div>
-                </div>
+                </section>
+            </div>
 
-                <div className={styles.knownIssueRow}>
-                    <AmuletCard item={amulet218} scale={0.42}/>
-                    <div className={styles.knownIssueText}>
-                        <Trans i18nKey="about.known_issue_218_html"/>
-                    </div>
-                </div>
-            </section>
+            <div className={styles.actions}>
+                <button className={styles.secondaryAction} onClick={onShowUsageNotice}>{t("about.show_usage_notice")}</button>
+                <button className={styles.primaryAction} onClick={onCheckUpdate} disabled={checkingUpdate}>
+                    {checkingUpdate ? <span className={`ms ${styles.spinning}`} aria-hidden="true">sync</span> : null}
+                    {checkingUpdate ? t("about.check_update_loading") : t("about.check_update")}
+                </button>
+            </div>
 
             <Modal
                 open={openTileGallery}

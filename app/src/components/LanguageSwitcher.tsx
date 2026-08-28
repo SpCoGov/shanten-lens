@@ -3,13 +3,10 @@ import {useTranslation} from "react-i18next";
 import {setAppLanguage} from "../lib/i18n";
 import {safeEmit} from "../lib/tauriRuntime";
 
-const LANGS = [
-    {value: "zh-CN", label: "简体中文"},
-    {value: "ja-JP", label: "日本語"}
-];
+const LANGS = ["zh-CN", "ja-JP"] as const;
 
 export default function LanguageSwitcher() {
-    const {i18n} = useTranslation();
+    const {i18n, t} = useTranslation();
 
     const onChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const lng = e.target.value;
@@ -17,9 +14,9 @@ export default function LanguageSwitcher() {
         await safeEmit("i18n:set-language", {lng});
     };
     return (
-        <select value={i18n.resolvedLanguage || i18n.language} onChange={onChange} aria-label="language">
-            {LANGS.map((l) => (
-                <option key={l.value} value={l.value}>{l.label}</option>
+        <select value={i18n.resolvedLanguage || i18n.language} onChange={onChange} aria-label={t("language.selector")}>
+            {LANGS.map((language) => (
+                <option key={language} value={language}>{t(`language.${language}`)}</option>
             ))}
         </select>
     );

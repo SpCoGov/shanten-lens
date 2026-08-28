@@ -1,11 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Shanten Lens",
-  "version": "2.6.1",
   "identifier": "app.shanten.lens",
   "build": {
     "beforeDevCommand": "vite",
-    "beforeBuildCommand": "vite build",
+    "beforeBuildCommand": "pnpm run build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },
@@ -37,36 +36,42 @@
       }
     ],
     "security": {
-      "devCsp": "default-src 'self' http://localhost:* http://127.0.0.1:* tauri: asset: blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.github.com http://ipc.localhost ws://127.0.0.1:* ws://localhost:* tauri: ipc:;",
-      "csp": "default-src 'self' tauri: asset: blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.github.com http://ipc.localhost ws://127.0.0.1:* tauri: ipc:;",
+      "devCsp": "default-src 'self' tauri: asset: blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https://api.github.com http://ipc.localhost tauri: ipc:;",
+      "csp": "default-src 'self' tauri: asset: blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https://api.github.com http://ipc.localhost tauri: ipc:;",
       "capabilities": [
         {
           "identifier": "window-controls",
           "windows": [
             "main",
+            "overlay",
             "settings",
             "splash",
             "msgbox",
-            "msgbox-*"
+            "msgbox-*",
+            "packet-viewer"
           ],
           "permissions": [
-            "core:default",
-            "core:event:default",
-            "core:webview:default",
-            "core:window:default",
+            "core:event:allow-listen",
+            "core:event:allow-unlisten",
+            "core:event:allow-emit",
+            "core:event:allow-emit-to",
+            "core:webview:allow-get-all-webviews",
+            "core:webview:allow-create-webview-window",
+            "core:window:allow-get-all-windows",
             "core:window:allow-start-dragging",
             "core:window:allow-minimize",
             "core:window:allow-toggle-maximize",
-            "core:window:allow-create",
+            "core:window:allow-internal-toggle-maximize",
             "core:window:allow-set-focus",
             "core:window:allow-show",
             "core:window:allow-center",
-            "core:webview:allow-create-webview-window",
             "core:window:allow-close",
-            "core:event:allow-listen",
-            "core:event:allow-emit",
-            "opener:default",
-            "opener:allow-open-url"
+            "core:window:allow-current-monitor",
+            "core:window:allow-inner-size",
+            "core:window:allow-set-size",
+            "opener:allow-open-url",
+            "os:allow-locale",
+            "os:allow-platform"
           ]
         }
       ]
@@ -79,9 +84,6 @@
     ],
     "icon": [
       "icons/icon.ico"
-    ],
-    "resources": [
-      "bin/shanten-backend.exe"
     ],
     "windows": {
       "webviewInstallMode": {

@@ -1,0 +1,113 @@
+.page { width: 100%; padding-bottom: 24px; }
+.header { display: flex; align-items: start; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
+.header h1 { margin: 0 0 6px; font-size: 24px; }
+.header p { margin: 0; color: var(--muted); }
+.actions { display: flex; align-items: center; gap: 10px; }
+.saved { color: var(--state-ok); font-size: 13px; animation: pipelineSavedIn .28s ease-out backwards; }
+.flow { width: 100%; min-width: 0; }
+
+.module {
+    height: 100%; overflow: hidden; border: var(--panel-border); border-radius: var(--panel-radius);
+    background: var(--panel-bg); box-shadow: var(--panel-shadow); cursor: grab;
+    transition: border-color .16s ease, background .16s ease, opacity .16s ease, box-shadow .2s ease, filter .2s ease;
+    animation: pipelineModuleIn .34s ease-out backwards;
+}
+.module:nth-child(2) { animation-delay: 35ms; }
+.module:nth-child(3) { animation-delay: 70ms; }
+.module:nth-child(4) { animation-delay: 105ms; }
+.module:nth-child(n + 5) { animation-delay: 140ms; }
+.module:hover { border-color: color-mix(in srgb, var(--color-ring) 45%, var(--color-divider)); }
+.module.disabled { opacity: .68; background: color-mix(in srgb, var(--panel-bg) 86%, var(--bg)); }
+.module:active { cursor: grabbing; }
+.body { min-width: 0; height: 100%; padding: 14px 16px; box-sizing: border-box; }
+.module[data-module="packet_logger"] .body { padding-block: 12px; }
+.body p { margin: 7px 0 0 32px; color: var(--muted); font-size: 13px; }
+
+.moduleHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.moduleTitle { display: flex; align-items: center; min-width: 0; gap: 8px; }
+.moduleTitle strong { display: block; font-size: 15px; }
+.dragHandle { color: var(--muted); font-size: 20px; }
+
+.toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.toggleTrack {
+    position: relative; width: 36px; height: 20px; flex: 0 0 auto; border: 1px solid var(--color-divider);
+    border-radius: 999px; background: color-mix(in srgb, var(--muted) 14%, var(--panel-bg));
+    transition: background .16s ease, border-color .16s ease;
+}
+.toggleTrack span {
+    position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--muted); box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 25%, transparent);
+    transition: transform .16s ease, background .16s ease;
+}
+.toggle input:checked + .toggleTrack { border-color: var(--state-ok); background: color-mix(in srgb, var(--state-ok) 24%, var(--panel-bg)); }
+.toggle input:checked + .toggleTrack span { transform: translateX(16px); background: var(--state-ok); }
+.toggle input:focus-visible + .toggleTrack { outline: 2px solid var(--color-ring); outline-offset: 2px; }
+.toggleLabel { min-width: 2em; color: var(--muted); font-size: 12px; font-weight: 600; }
+.toggle input:checked ~ .toggleLabel { color: var(--state-ok); }
+
+.operations { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0 32px; }
+.operation { padding: 2px 7px; border: 1px solid; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.operation[data-operation="inject"] { color: var(--state-ok); border-color: color-mix(in srgb, var(--state-ok) 45%, transparent); background: color-mix(in srgb, var(--state-ok) 10%, transparent); }
+.operation[data-operation="modify"] { color: var(--accent-blue); border-color: color-mix(in srgb, var(--accent-blue) 45%, transparent); background: color-mix(in srgb, var(--accent-blue) 10%, transparent); }
+.operation[data-operation="bypass"] { color: var(--state-warn); border-color: color-mix(in srgb, var(--state-warn) 45%, transparent); background: color-mix(in srgb, var(--state-warn) 10%, transparent); }
+.operation[data-operation="drop"] { color: var(--state-down); border-color: color-mix(in srgb, var(--state-down) 45%, transparent); background: color-mix(in srgb, var(--state-down) 10%, transparent); }
+
+.methodEditor {
+    display: grid; gap: 9px; margin: 12px 0 0 32px; padding: 11px;
+    border: 1px solid var(--color-divider); border-radius: 10px;
+    background: color-mix(in srgb, var(--bg) 48%, var(--panel-bg));
+}
+.methodEditorHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--text); font-size: 12px; font-weight: 650; }
+.methodCount { padding: 2px 7px; border-radius: 999px; color: var(--muted); background: color-mix(in srgb, var(--muted) 10%, transparent); font-size: 11px; font-weight: 500; }
+.methodInputRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.methodInputRow input {
+    min-width: 0; padding: 8px 10px; border: 1px solid var(--color-divider); border-radius: 8px;
+    color: var(--text); background: var(--input-bg, var(--bg));
+}
+.methodInputRow input, .methodChip code { font: 13px ui-monospace, SFMono-Regular, Consolas, monospace; }
+.methodInputRow input:focus { border-color: var(--color-ring); outline: 2px solid color-mix(in srgb, var(--color-ring) 18%, transparent); }
+.methodInputRow button {
+    display: inline-flex; align-items: center; gap: 4px; padding: 0 12px; border: 1px solid var(--color-ring);
+    border-radius: 8px; color: var(--button-text, var(--text)); background: color-mix(in srgb, var(--color-ring) 16%, var(--panel-bg)); cursor: pointer;
+}
+.methodInputRow button:disabled { opacity: .45; cursor: default; }
+.methodInputRow button .ms { font-size: 17px; }
+.autocompleteHint { margin-top: -3px; color: var(--muted); font-size: 11px; }
+.methodList { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-height: 29px; max-height: 70px; overflow: auto; }
+.methodChip { display: inline-flex; align-items: center; max-width: 100%; border: 1px solid color-mix(in srgb, var(--state-warn) 35%, var(--color-divider)); border-radius: 7px; background: color-mix(in srgb, var(--state-warn) 8%, var(--panel-bg)); animation: pipelineChipIn .2s ease-out backwards; }
+.methodChip code { min-width: 0; overflow: hidden; padding: 5px 4px 5px 8px; color: var(--text); text-overflow: ellipsis; white-space: nowrap; }
+.methodChip button { display: grid; place-items: center; width: 26px; height: 26px; border: 0; color: var(--muted); background: transparent; cursor: pointer; }
+.methodChip button:hover { color: var(--state-down); }
+.methodChip button .ms { font-size: 15px; }
+.methodEmpty { width: 100%; padding: 5px 2px; color: var(--muted); font-size: 12px; }
+
+.flow :global(.react-grid-item.react-draggable-dragging) { z-index: 20; opacity: .96; filter: brightness(1.03) drop-shadow(0 16px 22px color-mix(in srgb, var(--text) 24%, transparent)); }
+.flow :global(.react-grid-placeholder) { border: 1px dashed color-mix(in srgb, var(--color-ring) 65%, transparent); border-radius: var(--panel-radius); background: color-mix(in srgb, var(--color-ring) 18%, transparent); opacity: 1; }
+
+@keyframes pipelineModuleIn {
+    from { opacity: 0; filter: brightness(1.08); }
+    to { opacity: 1; filter: brightness(1); }
+}
+
+@keyframes pipelineSavedIn {
+    from { opacity: 0; transform: translateY(3px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pipelineChipIn {
+    from { opacity: 0; transform: scale(.94); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .saved,
+    .module,
+    .methodChip { animation: none; }
+}
+
+@media (max-width: 720px) {
+    .header { align-items: stretch; flex-direction: column; }
+    .actions { justify-content: flex-end; }
+    .body p, .operations, .methodEditor { margin-left: 0; }
+}

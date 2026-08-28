@@ -1,0 +1,52 @@
+.home-dashboard {
+    position: relative;
+    min-width: 0;
+    min-height: 100%;
+    overflow: auto;
+}
+
+.home-dashboard-tile {
+    overflow: hidden;
+}
+
+.home-dashboard-tile-content,
+.home-dashboard-tile-content > * {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+}
+
+.home-dashboard-tile-content > .panel,
+.home-dashboard-tile-content > .mj-panel,
+.home-dashboard-tile-content > .right-side-panel {
+    margin: 0;
+    overflow: auto;
+}
+
+.home-dashboard .react-grid-item.react-draggable-dragging,
+.home-dashboard .react-grid-item.resizing {
+    z-index: 20;
+    opacity: 1;
+    filter: drop-shadow(0 12px 18px color-mix(in srgb, var(--text) 20%, transparent));
+}
+
+.home-dashboard .react-grid-placeholder {
+    z-index: 30;
+    border: 1px dashed color-mix(in srgb, var(--color-ring) 65%, transparent);
+    border-radius: var(--panel-radius);
+    background: color-mix(in srgb, var(--color-ring) 18%, transparent);
+    opacity: 1;
+    pointer-events: none;
+}
+
+.home-dashboard .react-resizable-handle-se {
+    position: absolute;
+    z-index: 10;
+    right: 0;
+    bottom: 0;
+    width: 18px;
+    height: 18px;
+    cursor: se-resize;
+}

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8"/>
-    <title>向听镜 正在启动…</title>
+    <title>Shanten Lens</title>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <style>
         :root {
@@ -207,20 +207,20 @@
 <div class="shell no-drag">
     <div class="layout">
         <div class="brand">
-            <img class="brand-mark" src="/logo.svg" alt="Shanten Lens logo"/>
+            <img class="brand-mark" src="/logo.svg" alt=""/>
             <div>
-                <div class="brand-title">向听镜</div>
+                <div class="brand-title" id="brand-title"></div>
                 <div class="brand-subtitle">Shanten Lens</div>
             </div>
         </div>
 
-        <div class="status-label" id="status-label">正在准备启动</div>
-        <div class="status-detail" id="status-detail">初始化窗口与运行环境</div>
+        <div class="status-label" id="status-label"></div>
+        <div class="status-detail" id="status-detail"></div>
 
         <div class="progress-wrap">
             <div class="progress-meta">
-                <span id="phase-text">启动流程</span>
-                <span id="eta-text">预计还需约 8 秒</span>
+                <span id="phase-text"></span>
+                <span id="eta-text"></span>
             </div>
             <div class="progress-track">
                 <div class="progress-fill" id="progress-fill"></div>
@@ -229,13 +229,34 @@
 
         <div class="foot">
             <span class="badge"><span class="dot"></span><span id="percent-text">8%</span></span>
-            <span id="elapsed-text">已等待 0 秒</span>
+            <span id="elapsed-text"></span>
         </div>
     </div>
 </div>
 
 <script>
     const startedAt = Date.now();
+    const locale = (localStorage.getItem("sl-lang") || navigator.language || "zh-CN").toLowerCase().startsWith("ja") ? "ja" : "zh";
+    const messages = {
+        zh: {
+            brand: "向听镜", starting: "正在准备启动", wait: "请稍候", detail: "初始化窗口与运行环境", flow: "启动流程",
+            etaUnknown: "预计仍在处理中", etaNow: "马上完成", etaSeconds: (value) => `预计还需约 ${value} 秒`,
+            etaMinutes: (value) => `预计还需约 ${value} 分钟`, elapsed: (value) => `已等待 ${value} 秒`,
+            phases: {bootstrap: "初始化应用", starting_backend: "启动后台", waiting_backend: "等待后台就绪", backend_ready: "后台已连接", i18n: "加载语言与配置", render: "构建主界面", render_wait_backend: "等待后台连接", ready: "准备完成", fallback: "超时兜底"},
+            details: {bootstrap: "初始化窗口与运行环境", starting_backend: "正在启动内嵌后端", waiting_backend: "正在等待内嵌后端就绪", backend_ready: "内嵌后端已就绪", i18n: "检测系统语言并初始化界面文案", render: "挂载首屏组件并连接事件", render_wait_backend: "正在等待内嵌后端连接", ready: "即将显示主窗口", fallback: "启动时间较长，正在继续处理"}
+        },
+        ja: {
+            brand: "向聴レンズ", starting: "起動準備中", wait: "しばらくお待ちください", detail: "ウィンドウと実行環境を初期化しています", flow: "起動処理",
+            etaUnknown: "処理を続けています", etaNow: "まもなく完了します", etaSeconds: (value) => `残り約 ${value} 秒`,
+            etaMinutes: (value) => `残り約 ${value} 分`, elapsed: (value) => `${value} 秒経過`,
+            phases: {bootstrap: "アプリを初期化", starting_backend: "バックエンドを起動", waiting_backend: "バックエンドを待機", backend_ready: "バックエンド接続済み", i18n: "言語と設定を読み込み", render: "メイン画面を構築", render_wait_backend: "バックエンド接続を待機", ready: "準備完了", fallback: "起動処理を継続中"},
+            details: {bootstrap: "ウィンドウと実行環境を初期化しています", starting_backend: "内蔵バックエンドを起動しています", waiting_backend: "内蔵バックエンドの準備を待っています", backend_ready: "内蔵バックエンドの準備ができました", i18n: "システム言語を検出し、表示文言を初期化しています", render: "初期画面を表示し、イベントに接続しています", render_wait_backend: "内蔵バックエンドへの接続を待っています", ready: "メインウィンドウを表示します", fallback: "起動に時間がかかっています。処理を続けています"}
+        }
+    };
+    const msg = messages[locale];
+    document.documentElement.lang = locale === "ja" ? "ja-JP" : "zh-CN";
+    document.title = `${msg.brand} · ${msg.starting}`;
+    document.getElementById("brand-title").textContent = msg.brand;
     const progressFill = document.getElementById("progress-fill");
     const statusLabel = document.getElementById("status-label");
     const statusDetail = document.getElementById("status-detail");
@@ -244,22 +265,8 @@
     const percentText = document.getElementById("percent-text");
     const elapsedText = document.getElementById("elapsed-text");
 
-    const phaseLabels = {
-        bootstrap: "初始化应用",
-        starting_backend: "启动后台",
-        waiting_backend: "等待后台就绪",
-        backend_ready: "后台已连接",
-        i18n: "加载语言与配置",
-        render: "构建主界面",
-        render_wait_backend: "等待后台连接",
-        ready: "准备完成",
-        fallback: "超时兜底"
-    };
-
     let current = {
         phase: "bootstrap",
-        label: "正在准备启动",
-        detail: "初始化窗口与运行环境",
         progress: 0.08,
         eta_seconds: 8,
         indeterminate: false
@@ -270,22 +277,22 @@
     }
 
     function formatEta(seconds) {
-        if (seconds == null) return "预计仍在处理中";
-        if (seconds <= 0) return "马上完成";
-        if (seconds < 60) return `预计还需约 ${seconds} 秒`;
+        if (seconds == null) return msg.etaUnknown;
+        if (seconds <= 0) return msg.etaNow;
+        if (seconds < 60) return msg.etaSeconds(seconds);
         const minutes = Math.ceil(seconds / 60);
-        return `预计还需约 ${minutes} 分钟`;
+        return msg.etaMinutes(minutes);
     }
 
     function render() {
         const progress = clampProgress(current.progress);
         const percent = Math.round(progress * 100);
-        statusLabel.textContent = current.label || "正在启动";
-        statusDetail.textContent = current.detail || "请稍候";
-        phaseText.textContent = phaseLabels[current.phase] || "启动流程";
+        statusLabel.textContent = msg.phases[current.phase] || msg.starting;
+        statusDetail.textContent = msg.details[current.phase] || msg.wait;
+        phaseText.textContent = msg.phases[current.phase] || msg.flow;
         etaText.textContent = formatEta(current.eta_seconds);
         percentText.textContent = `${percent}%`;
-        elapsedText.textContent = `已等待 ${Math.max(0, Math.round((Date.now() - startedAt) / 1000))} 秒`;
+        elapsedText.textContent = msg.elapsed(Math.max(0, Math.round((Date.now() - startedAt) / 1000)));
         progressFill.style.width = `${percent}%`;
         progressFill.classList.toggle("indeterminate", !!current.indeterminate);
     }

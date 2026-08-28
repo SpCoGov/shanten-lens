@@ -4,6 +4,7 @@ import {invoke} from "@tauri-apps/api/core";
 import App from "./App";
 import { ensureI18nReady } from "./lib/i18n";
 import {AppErrorBoundary} from "./components/AppErrorBoundary";
+import {t} from "i18next";
 
 const appErrorBoundaryRef = React.createRef<AppErrorBoundary>();
 const root = ReactDOM.createRoot(document.getElementById("root")!);
@@ -40,9 +41,9 @@ async function reportStartupProgress(
 }
 
 async function bootstrap() {
-    await reportStartupProgress("i18n", "正在加载语言与配置", 0.82, "检测系统语言并初始化界面文案", 2, false);
     await ensureI18nReady();
-    await reportStartupProgress("render", "正在构建主界面", 0.92, "挂载首屏组件并连接事件", 1, false);
+    await reportStartupProgress("i18n", t("startup.loading_language"), 0.82, t("startup.loading_language_detail"), 2, false);
+    await reportStartupProgress("render", t("startup.rendering"), 0.92, t("startup.rendering_detail"), 1, false);
 
     renderApp(<App />);
 }

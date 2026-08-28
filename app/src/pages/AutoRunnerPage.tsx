@@ -1,6 +1,6 @@
 import React from "react";
 import "../styles/theme.css";
-import {ws} from "../lib/ws";
+import * as backendIpc from "../lib/ipc";
 import {
     addTargetAmulet,
     addTargetBadge,
@@ -198,50 +198,45 @@ export default function AutoRunnerPage() {
         setLevelText(formatLevelNum(config.cutoff_level));
     }, [config.cutoff_level]);
 
-    React.useEffect(() => {
-        const off = ws.onPacket((pkt) => {
-            if (pkt.type !== "autorun_control_result") return;
-            const data = pkt.data ?? {};
-            setStarting(false);
-            if (data.requires_confirmation) {
-                setExistingGameConfirm(true);
-                setControlError("");
-                return;
-            }
-            setExistingGameConfirm(false);
-            setControlError(data.ok ? "" : data.reason_key ? String(t(data.reason_key, data.reason_values ?? {})) : String(data.reason ?? ""));
-        });
-        return off;
+    const acceptControlResult = React.useCallback((data: backendIpc.CommandResult) => {
+        setStarting(false);
+        if (data.requires_confirmation) {
+            setExistingGameConfirm(true);
+            setControlError("");
+            return;
+        }
+        setExistingGameConfirm(false);
+        setControlError(data.ok ? "" : data.reason_key ? String(t(data.reason_key, data.reason_values ?? {})) : String(data.reason ?? ""));
     }, [t]);
 
-    const onSave = React.useCallback(() => {
+    const onSave = React.useCallback(async () => {
         setSaving(true);
         try {
-            ws.send({type: "edit_config", data: {autorun: config}});
+            await backendIpc.updateConfig({autorun: config});
         } finally {
             setSaving(false);
         }
     }, [config]);
 
-    const start = React.useCallback(() => {
+    const start = React.useCallback(async () => {
         setStarting(true);
         setExistingGameConfirm(false);
         setControlError("");
-        ws.send({type: "autorun_control", data: {action: "start"}});
-    }, []);
+        acceptControlResult(await backendIpc.runAutorun("start"));
+    }, [acceptControlResult]);
 
-    const stop = React.useCallback(() => {
+    const stop = React.useCallback(async () => {
         setExistingGameConfirm(false);
         setControlError("");
-        ws.send({type: "autorun_control", data: {action: "stop"}});
-    }, []);
+        acceptControlResult(await backendIpc.runAutorun("stop"));
+    }, [acceptControlResult]);
 
-    const continueExistingGame = React.useCallback(() => {
+    const continueExistingGame = React.useCallback(async () => {
         setStarting(true);
         setExistingGameConfirm(false);
         setControlError("");
-        ws.send({type: "autorun_control", data: {action: "start", force: true}});
-    }, []);
+        acceptControlResult(await backendIpc.runAutorun("start", {force: true}));
+    }, [acceptControlResult]);
 
     const cancelExistingGame = React.useCallback(() => {
         setStarting(false);
@@ -351,7 +346,7 @@ export default function AutoRunnerPage() {
                 <div className="target-card-main">
                     <img src={icon} alt={badgeName} style={{width: 64, height: 64}} draggable={false}/>
                     <div className="target-card-copy">
-                        <div><b>印章</b>{`：${badgeName}`}</div>
+                        <div><b>{t("autorun.target_badge_label")}</b>{`：${badgeName}`}</div>
                     </div>
                 </div>
                 {actionBar}
@@ -364,10 +359,10 @@ export default function AutoRunnerPage() {
         if (!detailTarget) return "";
         if (detailTarget.kind === "amulet") {
             const amuletName = amuletById.get(detailTarget.id)?.name ?? `ID ${detailTarget.id}`;
-            return `判定说明：${amuletName}${detailTarget.plus ? "+" : ""}`;
+            return t("autorun.target_judge_title", {name: `${amuletName}${detailTarget.plus ? "+" : ""}`});
         }
-        return `判定说明：${badgeById.get(detailTarget.id)?.name ?? `ID ${detailTarget.id}`}`;
-    }, [detailTarget, amuletById, badgeById]);
+        return t("autorun.target_judge_title", {name: badgeById.get(detailTarget.id)?.name ?? `ID ${detailTarget.id}`});
+    }, [detailTarget, amuletById, badgeById, t]);
     const detailBody = detailTarget
         ? detailTarget.kind === "amulet"
             ? t("autorun.target_judge_amulet")
@@ -864,7 +859,7 @@ export default function AutoRunnerPage() {
                                 <select
                                     className="form-input"
                                     value={status.mode ?? "continuous"}
-                                    onChange={(e) => ws.send({type: "autorun_control", data: {action: "set_mode", mode: e.target.value}})}
+                                    onChange={(e) => void backendIpc.runAutorun("set_mode", {mode: e.target.value as "continuous" | "step"})}
                                     style={{width: 160}}
                                 >
                                     <option value="continuous">{t("autorun.mode_continuous")}</option>
@@ -874,7 +869,7 @@ export default function AutoRunnerPage() {
 
                             <button
                                 className="nav-btn"
-                                onClick={() => ws.send({type: "autorun_control", data: {action: "step"}})}
+                                onClick={() => void backendIpc.runAutorun("step")}
                                 disabled={status.mode !== "step"}
                                 title={status.mode !== "step" ? t("autorun.tip_step_only") : undefined}
                             >
@@ -965,7 +960,7 @@ export default function AutoRunnerPage() {
                                 <div className="toolbar" style={{gap: 8, marginTop: 6, flexWrap: "wrap" as const}}>
                                     <button
                                         className="nav-btn"
-                                        onClick={() => ws.send({type: "autorun_control", data: {action: "notify_test_email"}})}
+                                        onClick={() => void backendIpc.runAutorun("notify_test_email")}
                                         disabled={!email.enabled || !(email.host && email.port) || !(email.from || "").includes("@") || !(email.to || "").includes("@") || !email.pass}
                                         title={
                                             !email.enabled

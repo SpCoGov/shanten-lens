@@ -1,0 +1,6 @@
+[workspace]
+members = ["backend", "app/src-tauri"]
+resolver = "2"
+
+[workspace.package]
+version = "3.0.0"

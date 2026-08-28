@@ -1,224 +1,317 @@
 .wrap {
+    display: grid;
+    gap: 14px;
+    padding-block: 4px 24px;
     color: var(--text);
 }
 
 .hero {
+    position: relative;
+    min-width: 0;
     display: flex;
     align-items: center;
-    gap: 14px;
-    margin: 0 0 12px;
+    justify-content: flex-start;
+    gap: 18px;
+    min-height: 138px;
+    padding: 24px 30px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--color-ring) 22%, var(--color-divider));
+    border-radius: 14px;
+    background:
+        radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--accent-green) 13%, transparent), transparent 34%),
+        linear-gradient(135deg, color-mix(in srgb, var(--color-ring) 10%, var(--panel-bg)), var(--panel-bg) 58%);
+    box-shadow: 0 12px 30px color-mix(in srgb, var(--color-ring) 7%, transparent);
+}
+
+.hero::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: clamp(32px, 8vw, 120px);
+    width: 150px;
+    height: 150px;
+    background: url("/logo.svg") center / contain no-repeat;
+    opacity: .055;
+    transform: translateY(-50%) rotate(-8deg);
+    pointer-events: none;
 }
 
 .logo {
-    width: 64px;
-    height: 64px;
-    flex: 0 0 auto;
+    width: 76px;
+    height: 76px;
+    flex: 0 0 76px;
     display: block;
+    filter: drop-shadow(0 10px 16px color-mix(in srgb, var(--color-ring) 20%, transparent));
+    z-index: 1;
 }
 
-section {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px 14px;
-    margin-bottom: 12px;
-}
-
-h1 {
-    font-size: 24px;
-    margin: 0;
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
+.identity {
+    min-width: 0;
+    z-index: 1;
 }
 
 .secretTitle {
+    margin: 0;
+    font-size: 25px;
+    line-height: 1.25;
     cursor: pointer;
 }
 
-.sub {
-    font-size: 14px;
+.identity > p {
+    margin: 5px 0 0;
     color: var(--muted);
-    font-weight: 500;
+    font-size: 14px;
 }
 
-h2 {
+.meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 13px;
+}
+
+.author,
+.version,
+.updateBadge {
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border: 1px solid var(--color-divider);
+    border-radius: 999px;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--panel-bg) 82%, transparent);
+    font-size: 11px;
+}
+
+.version {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.updateBadge {
+    border-color: color-mix(in srgb, var(--state-ok) 46%, var(--color-divider));
+    color: var(--state-ok);
+    background: color-mix(in srgb, var(--state-ok) 10%, var(--panel-bg));
+    font-weight: 700;
+}
+
+.infoGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+}
+
+.infoGrid {
+    align-items: start;
+}
+
+.infoCard {
+    min-width: 0;
+    padding: 18px;
+    border: 1px solid var(--color-divider);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--panel-bg) 95%, var(--bg));
+    box-shadow: 0 7px 20px color-mix(in srgb, var(--color-ring) 4%, transparent);
+    animation: aboutCardIn .34s ease-out backwards;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.infoCard:nth-child(2) {
+    animation-delay: 45ms;
+}
+
+.infoCard:nth-child(3) {
+    animation-delay: 90ms;
+}
+
+.infoCard:nth-child(4) {
+    animation-delay: 135ms;
+}
+
+.infoCard h2 {
+    margin: 0;
     font-size: 16px;
-    margin: 16px 0 8px;
+    line-height: 1.35;
 }
 
-section > h2:first-child {
-    margin-top: 0;
+.infoCard > p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
 }
 
-a {
-    color: var(--link);
-    text-decoration: none;
+.primaryAction,
+.secondaryAction {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 11px;
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color .16s ease, background .16s ease, transform .16s ease;
 }
 
-a:hover {
-    text-decoration: underline;
+.primaryAction {
+    border: 1px solid color-mix(in srgb, var(--color-ring) 58%, var(--color-divider));
+    color: color-mix(in srgb, var(--color-ring) 76%, var(--text));
+    background: color-mix(in srgb, var(--color-ring) 10%, var(--panel-bg));
 }
 
-summary {
+.secondaryAction {
+    width: fit-content;
+    border: 1px solid var(--color-divider);
+    background: var(--panel-bg);
+}
+
+.assetList + .secondaryAction {
+    margin-top: 13px;
+}
+
+.primaryAction:hover:not(:disabled),
+.secondaryAction:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.secondaryAction:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--color-ring) 40%, var(--color-divider));
+    background: var(--hover-bg);
+}
+
+.primaryAction:disabled {
+    cursor: not-allowed;
+    opacity: .56;
+}
+
+.spinning {
+    animation: aboutSpin .9s linear infinite;
+}
+
+.licenseDetails {
+    margin-top: 13px;
+}
+
+.licenseDetails summary {
+    width: fit-content;
+    color: var(--color-ring);
+    font-size: 12px;
     cursor: pointer;
     user-select: none;
 }
 
 .license {
+    max-height: 190px;
+    margin: 10px 0 0;
+    padding: 11px;
+    overflow: auto;
+    border: 1px solid var(--color-divider);
+    border-radius: 9px;
+    color: var(--log-fg);
+    background: var(--log-bg);
+    font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     white-space: pre-wrap;
-    background: var(--input-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px;
-    margin-top: 8px;
-    font-size: 12px;
-    line-height: 1.4;
-}
-
-.footer {
-    margin-top: 18px;
-    text-align: right;
-}
-
-.muted {
-    color: var(--muted);
-    font-size: 12px;
-}
-
-.meta {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    margin: 6px 0 18px;
-    color: currentColor;
-    opacity: 0.88;
-    font-size: 0.95rem;
-}
-
-.author {
-    font-weight: 450;
-    letter-spacing: .1px;
-    color: color-mix(in oklab, currentColor 80%, transparent);
-}
-
-.sep {
-    opacity: .6;
-    transform: translateY(-1px);
-}
-
-.version {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-    font-size: 0.92rem;
-    opacity: .9;
-}
-
-.build {
-    font-size: 0.88rem;
-    opacity: .6;
-}
-
-.updateBadge {
-    padding: 2px 8px;
-    border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--accent-green) 48%, var(--border));
-    color: var(--accent-green);
-    background: color-mix(in srgb, var(--accent-green) 10%, transparent);
-    font-size: 12px;
-    font-weight: 700;
-}
-
-@media (prefers-color-scheme: dark) {
-    .meta {
-        opacity: 0.92;
-    }
-
-    .author {
-        color: color-mix(in oklab, white 70%, transparent);
-    }
-}
-
-.knownIssueRow {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    padding: 10px 0;
-}
-
-.knownIssueRow + .knownIssueRow {
-    border-top: 1px solid var(--border);
-}
-
-.knownIssueText {
-    flex: 1 1 auto;
-    min-width: 0;
-    color: var(--text);
-    opacity: 0.92;
-    line-height: 1.5;
-}
-
-.actionRow {
-    margin-top: 12px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.actionPanelStack {
-    margin-top: 12px;
-    display: grid;
-    gap: 8px;
-}
-
-.aboutActions {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px 14px;
-}
-
-.switchRow {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--muted);
-    font-size: 13px;
-}
-
-.switchRow input {
-    accent-color: var(--accent-green);
-}
-
-@media (max-width: 640px) {
-    .aboutActions {
-        align-items: stretch;
-    }
 }
 
 .assetList {
-    margin-top: 10px;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    margin-top: 12px;
 }
 
 .assetItem {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--input-bg);
-    padding: 10px 12px;
-    display: grid;
-    gap: 4px;
-}
-
-.assetName {
-    font-weight: 700;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 10px;
+    border: 1px solid var(--color-divider);
+    border-radius: 9px;
     color: var(--text);
+    background: color-mix(in srgb, var(--bg) 42%, var(--panel-bg));
+    text-decoration: none;
+    transition: border-color .16s ease, background .16s ease;
 }
 
-.assetNote {
-    color: var(--muted);
+.assetItem:hover {
+    border-color: color-mix(in srgb, var(--color-ring) 38%, var(--color-divider));
+    background: var(--hover-bg);
+}
+
+.assetItem > span:first-child {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.assetItem strong {
+    overflow: hidden;
     font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.assetItem small {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.assetItem > :global(.ms) {
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 17px;
+}
+
+.usageCard,
+.issuesCard {
+    grid-column: 1 / -1;
+}
+
+.usageCard {
+    border-color: color-mix(in srgb, var(--state-warn) 34%, var(--color-divider));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--state-warn) 7%, var(--panel-bg)), var(--panel-bg) 65%);
+}
+
+.usageCard > p {
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.65;
+}
+
+.issueGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.knownIssueRow {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px;
+    border: 1px solid var(--color-divider);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--bg) 38%, var(--panel-bg));
+}
+
+.knownIssueText {
+    min-width: 0;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
 }
 
 .tileGallery {
@@ -229,12 +322,15 @@ summary {
 .tileSection {
     margin: 0;
     padding: 12px 14px;
+    border: 1px solid var(--color-divider);
+    border-radius: 11px;
+    background: var(--panel-bg);
 }
 
 .tileSectionTitle {
+    margin-bottom: 10px;
     font-size: 14px;
     font-weight: 700;
-    margin-bottom: 10px;
 }
 
 .tileGrid {
@@ -248,13 +344,63 @@ summary {
     justify-items: center;
     gap: 8px;
     padding: 10px 8px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--color-divider);
     border-radius: 10px;
     background: var(--input-bg);
 }
 
 .tileCode {
-    font-size: 12px;
     color: var(--muted);
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@keyframes aboutCardIn {
+    from { opacity: 0; transform: translateY(7px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes aboutSpin {
+    to { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+    .infoGrid,
+    .issueGrid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .usageCard,
+    .issuesCard {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 640px) {
+    .hero {
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding: 18px;
+    }
+
+    .hero::after {
+        display: none;
+    }
+
+    .logo {
+        width: 64px;
+        height: 64px;
+        flex-basis: 64px;
+    }
+
+    .assetList {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .infoCard,
+    .spinning {
+        animation: none;
+    }
 }

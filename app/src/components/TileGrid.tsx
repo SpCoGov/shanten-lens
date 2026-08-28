@@ -5,7 +5,7 @@ import "./TileGrid.module.css";
 import type {Cell} from "../lib/gamestate";
 import Modal from "./Modal";
 import {t} from "i18next";
-import {ws} from "../lib/ws";
+import * as backendIpc from "../lib/ipc";
 
 const ROWS = 4;
 const COLS = 9;
@@ -79,7 +79,7 @@ export default function TileGrid({
 
     const discardSelectedTile = () => {
         if (typeof selectedTileId !== "number") return;
-        ws.send({type: "discard_tile_by_id", data: {tileId: selectedTileId}});
+        void backendIpc.discardTile(selectedTileId);
         setSelectedCell(null);
     };
 

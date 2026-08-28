@@ -2,8 +2,7 @@ export type TileId = number;
 
 export type QuadCatalogItem = {
     face?: string;
-    label?: string;
-    tile_positions?: Array<{
+    tile_positions: Array<{
         tile_id: TileId;
         source: "hand" | "replacement" | "wall" | string;
         source_index: number;
@@ -50,6 +49,8 @@ export type PlanData = {
     search_algorithm_label?: string;
     target14?: string[];
     target13?: string[];
+    target_physical_ids?: TileId[];
+    target_physical_faces?: string[];
     discards?: TileId[];
     mode?: string;
     reason?: string;

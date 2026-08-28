@@ -56,6 +56,7 @@ function GameStateTreeNode({
     expandedPaths: ReadonlySet<string>;
     onToggle: (path: string) => void;
 }) {
+    const {t} = useTranslation();
     const expandable = Array.isArray(value) || isRecord(value);
     const open = expandedPaths.has(path);
 
@@ -106,7 +107,7 @@ function GameStateTreeNode({
                     )) : (
                         <div className={styles.treeRow} style={{paddingLeft: (depth + 1) * 16}}>
                             <span className={styles.treeSpacer}/>
-                            <span className={styles.treePrimitive}>empty</span>
+                            <span className={styles.treePrimitive}>{t("gamestate.tree_empty")}</span>
                         </div>
                     )}
                 </div>

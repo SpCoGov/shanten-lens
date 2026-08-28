@@ -7,3 +7,7 @@ Shanten-Lens-portable.zip
 __pycache__/
 **/__pycache__/
 *.py[cod]
+.pnpm-store/
+target/
+*.tsbuildinfo
+app/src-tauri/bin/

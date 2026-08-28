@@ -1,240 +1,59 @@
-# Shanten Lens
+# Shanten Lens 3.0
 
-[中国語版 README](./README.md)
+Shanten Lens は『雀魂』の青雲之志モード向けデスクトップ補助ツールです。3.0 は Tauri 2 + React + TypeScript フロントエンドと組み込み Rust バックエンドで動作し、開発・ビルド・実行に Python は不要です。
 
-Shanten Lens は、『雀魂』の青雲之志モード向けに作られたデスクトップ補助ツールです。現在の構成は次のとおりです。
+## アーキテクチャ
 
-- デスクトップフロントエンド：`Tauri + React + TypeScript`
-- バックエンドおよび MITM ブリッジ：`Python`
-- 通信の中継：`mitmproxy` + `Proxifier`
+- フロントエンドとバックエンドは Tauri 2 のプロセス内 commands/events で通信し、UI WebSocket ポートは使用しません。
+- Rust バックエンドは Hudsucker による HTTPS/WebSocket MITM、protobuf デコード、ゲーム状態、パケットパイプライン、自動化を担当します。
+- `backend/` が現在の Rust バックエンドです。
 
-ローカルでゲーム状態を解析し、お守り、候補、牌山、入れ替え、スコア試算、自動化、各種デバッグ機能を提供します。
-
-## 現在の機能
-
-- メイン画面でのリアルタイム表示：
-  - 現在のお守り
-  - ショップ商品 / 候補お守り
-  - 手牌、牌山、入れ替え山
-  - 打牌アドバイスと牌山統計
-  - 現在スコア、目標スコア、ステージ情報
-- スコア計算機：
-  - 現在のお守り順に沿ったリアルタイム得点計算
-  - 個別お守りごとの発動回数、追加発動、成長式の編集
-  - 将来ステージのスコア予測
-  - 「伝導スタンプとして扱う」「以後の成長予測を止める」などの上書き設定
-- ブラックホール / 入れ替え関連ページ：
-  - 入れ替え候補の探索
-  - 候補案、四槓カタログ、検索対象牌の確認
-- 自動化ページ：
-  - 目標お守り / スタンプに到達するまで青雲之志を周回
-  - リメイク記録と目標フィルタ
-- ガード / 確認機能：
-  - 高リスク操作のブロックまたは確認ダイアログ
-
-## 利用前提
-
-現時点では Windows 環境が最も安定しています。通常利用の前に、次のものを用意してください。
-
-- 正常に起動する Shanten Lens デスクトップアプリ
-- `Proxifier`
-- ローカルルート証明書をインストールできる権限
-- Proxifier で中継できる雀魂クライアント、またはブラウザプロセス
-
-初回は一度 Shanten Lens を起動して終了し、初期設定・証明書・データディレクトリを生成しておくことをおすすめします。
-
-## ユーザー向け利用方法
-
-### 1. Proxifier の設定
-
-1. [Proxifier 公式サイト](https://www.proxifier.com/) から Proxifier をダウンロードしてインストールします。
-2. `Profile -> Proxy Servers... -> Add...` を開きます。
-3. ローカルプロキシを追加します。
-
-   - `Address`: `127.0.0.1`
-   - `Port`: `10999`
-   - `Protocol`: `HTTPS`
-
-4. 「デフォルトのプロキシにするか」と聞かれた場合は `No` を選びます。
-5. `Profile -> Proxification Rules... -> Add...` を開き、雀魂のプロセスに対するルールを作成します。
-
-   - クライアント版なら通常は `Jantama_MahjongSoul.exe`
-   - ブラウザ版なら `chrome.exe`、`msedge.exe` など実際に使うブラウザプロセス
-   - `Action` は先ほど作成したローカルプロキシ
-
-### 2. mitmproxy ルート証明書のインストール
-
-ブラウザ版を使う場合や、ログイン時に証明書確認が入る環境では mitmproxy のルート証明書が必要になることがあります。
-
-1. `%USERPROFILE%\.mitmproxy` を開く
-2. `mitmproxy-ca-cert.cer` を探す
-3. 次の場所へインストールする
-   - `ローカル コンピューター`
-   - `信頼されたルート証明機関`
-
-この証明書は、ローカル HTTPS プロキシをこの PC 上で信頼させるためのものです。
-
-### 3. 起動順
-
-推奨手順：
-
-1. Shanten Lens を起動
-2. Proxifier を起動
-3. 雀魂クライアントまたはブラウザを起動
-
-注意点：
-
-- Proxifier だけが起動していて Shanten Lens が起動していない場合、ゲーム通信は存在しないローカルプロキシへ送られるため正常に接続できません。
-- 必要なときだけ使う運用なら、Shanten Lens と Proxifier を必要時のみ起動する形でも構いません。
-
-### 4. Cheat Engine との併用
-
-Shanten Lens は Cheat Engine と併用する運用もおすすめです。よくある用途は次のとおりです。
-
-- 雀魂クライアントのアニメーションを高速化して待ち時間を減らす
-- 自動化実行中に雀魂の速度を `0` に設定する
-- 加速は上げすぎると切断などの問題が出ることがあるため、推奨上限は `5`
-
-自動化中に速度を `0` にすると、AFK 判定タイマーを止めることができます。
-
-## 開発環境
-
-### 技術スタック
-
-- フロントエンド：`React 18`、`TypeScript`、`Vite`
-- デスクトップコンテナ：`Tauri 2`
-- バックエンド：`Python 3.11`
-- 通信：
-  - ローカル UI とバックエンド間は `WebSocket`
-  - ゲーム側は `mitmproxy` 経由でブリッジ
-
-### ディレクトリ構成
+## ディレクトリ
 
 ```text
-.
-├─ app/                 Tauri + React フロントエンド
-├─ backend/             Python バックエンド、MITM、自動化ロジック
-├─ proto/               プロトコルと関連データ
-├─ scripts/             ビルドスクリプト
-├─ dist/                バックエンドのビルド成果物
-└─ README.md
+app/              React フロントエンドと Tauri アプリ
+backend/          組み込み Rust バックエンド
+proto/            ゲームプロトコル定義
+scripts/          Windows/macOS パッケージスクリプト
 ```
 
-### 依存関係のインストール
+## 開発実行
 
-まず Python 仮想環境を作成・有効化したうえで、バックエンド依存関係を入れることをおすすめします。
-
-バックエンド：
-
-```powershell
-python -m venv .venv
-.venv\Scripts\activate
-python -m pip install -r requirements.txt
-```
-
-フロントエンド：
+Rust、Node.js 22、pnpm 9 が必要です。
 
 ```powershell
 cd app
-npm install
+pnpm install
+pnpm run tauri:dev
 ```
 
-## ローカル開発実行
+MITM は既定で `127.0.0.1:10999` を使用します。初回起動時にアプリ設定ディレクトリの `ca/shanten-lens-ca.cer` が生成されます。Proxifier ではゲームプロセスをこの HTTPS プロキシへ転送し、証明書を信頼してください。
 
-### バックエンドのみ起動
+## パッケージ
 
-```powershell
-.venv\Scripts\python.exe backend\run_server.py
-```
-
-デフォルト設定：
-
-- MITM ポート：`10999`
-- UI WebSocket ポート：`8787`
-
-### フロントエンドのみ起動
-
-```powershell
-cd app
-npm run dev
-```
-
-### Tauri フロントエンドと Python バックエンドを同時起動
-
-```powershell
-cd app
-npm run tauri:dev-all
-```
-
-このスクリプトは次を同時に起動します。
-
-- `tauri dev`
-- `backend/run_server.py`
-
-## ビルドとパッケージング
-
-### Windows ワンキー構築
-
-Windows 用には次のビルドスクリプトがあります。
+Windows：
 
 ```powershell
 scripts\build_all.bat
 ```
 
-このスクリプトは順番に次を行います。
+MSI は `app/src-tauri/target/release/bundle/msi/` に出力されます。
 
-1. Python 依存関係の確認 / インストール
-2. PyInstaller によるバックエンドの単体化
-3. Tauri sidecar へのコピー
-4. フロントエンドビルド
-5. `tauri build`
-6. ポータブル版 `Shanten-Lens-portable.zip` の生成
-
-### macOS ビルド
+macOS：
 
 ```bash
 ./scripts/build_macos.sh
 ```
 
-生成物：
+アプリと DMG は `app/src-tauri/target/release/bundle/macos/`、`app/src-tauri/target/release/bundle/dmg/` に出力されます。
 
-- `.app`
-- `.dmg`
+両スクリプトは `pnpm install --frozen-lockfile` の後、Tauri で TypeScript、フロントエンド、Rust バックエンド、インストーラーを構築します。Python、sidecar、旧 IPC 互換層は含みません。
 
-事前に次が必要です。
+## 検証
 
-- Xcode Command Line Tools
-- Rust / cargo
-- Node.js / npm
-- Python 仮想環境と依存関係
-
-## よくある質問
-
-### なぜ急にゲームへ接続できなくなるのですか？
-
-もっとも多い原因は次の組み合わせです。
-
-- Proxifier は有効
-- でも Shanten Lens バックエンドは起動していない
-
-この状態では通信がローカルの `10999` に流れ、実際のプロキシサービスが存在しないため接続できません。
-
-### ブラウザ版では必ず証明書が必要ですか？
-
-必ずではありませんが、必要になるケースが多いです。ブラウザやログイン経路がローカル HTTPS プロキシ証明書を検証するなら、インストールが必要です。
-
-### なぜ Shanten Lens の牌山表示が実際の牌山と一致しないことがあるのですか？
-
-Shanten Lens はすべてのお守りの特殊ケースを個別に処理しているわけではありません。About ページの「既知の問題」セクションで該当項目を確認できるので、そこに書かれているお守りの使用はあまりおすすめしません。
-
-### 自動化を使ったあと雀魂にログインできなくなったのはなぜですか？
-
-自動化ページの操作間隔が短すぎる可能性があります。最小でも `400ms` を推奨します。短すぎる設定では IP が一時的に制限されることがあり、その場合はしばらく待つか、IP を切り替えると再度ログインできることがあります。
-
-### このプロジェクトはサーバーデータを変更しますか？
-
-この README は、現在のコード構成とローカル機能のみを説明するものです。第三者サービス、アカウント制限、プラットフォーム規約に関する保証は行いません。利用リスクは各自で判断してください。
-
-## ライセンス
-
-このリポジトリには [LICENSE](./LICENSE) が含まれています。再配布、改造、独自ビルドの公開を行う場合は、ライセンス本文と依存ライブラリ、ゲーム関連リソースの扱いをあらかじめ確認してください。
+```powershell
+cargo test --manifest-path backend\Cargo.toml
+cd app
+pnpm run build
+cargo check --manifest-path src-tauri\Cargo.toml
+```

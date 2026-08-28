@@ -1,7 +1,7 @@
 import React from "react";
 import {useTranslation} from "react-i18next";
 import {pushToast} from "../lib/toast";
-import {ws} from "../lib/ws";
+import * as backendIpc from "../lib/ipc";
 import Tile from "../components/Tile";
 import styles from "../components/AdvisorPanel.module.css";
 import type {PlanData, TileId} from "../lib/planTypes";
@@ -121,7 +121,7 @@ export default function BlackHolePage({
     React.useEffect(() => {
         if (stage === 5 || stage === 4) return;
         if (mainData?.status === "searching") {
-            ws.send({type: "souzu_switch_control", data: {action: "stop", notify: false}} as any);
+            void backendIpc.runSwitch({action: "stop", notify: false});
         }
     }, [stage, mainData?.status]);
 
@@ -129,12 +129,7 @@ export default function BlackHolePage({
     const canOperate = stage === 5 || stage === 4;
     const isSearching = mainData?.status === "searching";
     const canResume = !!planSignature && !isSearching;
-    const hasExecutablePlan = !!(
-        mainData &&
-        mainData.status === "plan" &&
-        Array.isArray(mainData.switch_discards) &&
-        mainData.switch_discards.length > 0
-    );
+    const hasExecutablePlan = mainData?.status === "plan";
 
     const resolveWallLimit = React.useCallback(() => {
         const parsed = parseWallLimitInput(wallLimitInput.trim(), t);
@@ -160,31 +155,25 @@ export default function BlackHolePage({
         if (!opts?.resume) {
             setSeenSignatures([]);
         }
-        ws.send({
-            type: "souzu_switch_control",
-            data: {
-                action: "start",
-                options: {
-                    skip_signatures: skipSignatures,
-                    wall_limit: nextWallLimit,
-                    search_algorithm: searchAlgorithm,
-                },
+        void backendIpc.runSwitch({
+            action: "start",
+            options: {
+                skip_signatures: skipSignatures,
+                wall_limit: nextWallLimit,
+                search_algorithm: searchAlgorithm,
             },
-        } as any);
+        });
     }, [canOperate, planSignature, resolveWallLimit, searchAlgorithm, seenSignatures, t]);
 
     const stopSearch = React.useCallback(() => {
-        ws.send({type: "souzu_switch_control", data: {action: "stop"}} as any);
+        void backendIpc.runSwitch({action: "stop"});
     }, []);
     const listQuads = React.useCallback(() => {
         const nextWallLimit = resolveWallLimit();
         if (nextWallLimit == null) return;
         setDrawerMode("quad");
         setQuadDrawerOpen(true);
-        ws.send({
-            type: "souzu_switch_control",
-            data: {action: "list_quads", options: {wall_limit: nextWallLimit, search_algorithm: searchAlgorithm}},
-        } as any);
+        void backendIpc.runSwitch({action: "list_quads", options: {wall_limit: nextWallLimit, search_algorithm: searchAlgorithm}});
     }, [resolveWallLimit, searchAlgorithm]);
     const openConsideredTiles = React.useCallback(() => {
         setDrawerMode("considered");
@@ -192,11 +181,11 @@ export default function BlackHolePage({
     }, []);
     const executePlan = React.useCallback(() => {
         if (!canOperate || !hasExecutablePlan) return;
-        ws.send({type: "souzu_switch_control", data: {action: "execute_plan"}} as any);
+        void backendIpc.runSwitch({action: "execute_plan"});
     }, [canOperate, hasExecutablePlan]);
     const executeFullPlan = React.useCallback(() => {
         if (!canOperate || !hasExecutablePlan) return;
-        ws.send({type: "souzu_switch_control", data: {action: "execute_full_plan"}} as any);
+        void backendIpc.runSwitch({action: "execute_full_plan"});
     }, [canOperate, hasExecutablePlan]);
     const exportCurrentSnapshot = React.useCallback(async () => {
         if (!currentState) {
@@ -238,60 +227,67 @@ export default function BlackHolePage({
         [wallIds, wallLimit],
     );
     const consideredSections = React.useMemo(() => ([
-        {key: "hand", title: "手牌", ids: handIds},
-        {key: "replacement", title: "换牌堆", ids: replacementIds},
-        {key: "wall", title: "牌山", ids: consideredWallIds},
-    ]), [consideredWallIds, handIds, replacementIds]);
+        {key: "hand", title: t("blackhole.source_hand"), ids: handIds},
+        {key: "replacement", title: t("blackhole.source_replacement"), ids: replacementIds},
+        {key: "wall", title: t("blackhole.source_wall"), ids: consideredWallIds},
+    ]), [consideredWallIds, handIds, replacementIds, t]);
 
     return (
-        <div className="settings-wrap wide-page" style={{paddingBlock: 16}}>
-            <div className="panel">
-                <div className="panel-title">{t("blackhole.title")}</div>
-                <div style={{display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center"}}>
-                    <button className="nav-btn" data-tutorial="blackhole-start" onClick={() => startSearch()} disabled={isSearching}>
-                        {t("blackhole.start")}
-                    </button>
-                    <button className="nav-btn" onClick={stopSearch} disabled={!isSearching}>
-                        {t("blackhole.stop")}
-                    </button>
-                    <button className="nav-btn" onClick={() => startSearch({resume: true})} disabled={!canResume}>
-                        {t("blackhole.continue")}
-                    </button>
-                    <button className="nav-btn" onClick={listQuads}>
-                        {t("blackhole.list_quads")}
-                    </button>
-                    <button className="nav-btn" data-tutorial="blackhole-execute" onClick={executePlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
-                        {t("blackhole.execute_plan")}
-                    </button>
-                    <button className="nav-btn" data-tutorial="blackhole-execute-full" onClick={executeFullPlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
-                        {t("blackhole.execute_full_plan")}
-                    </button>
-                    <button className="nav-btn" onClick={exportCurrentSnapshot}>
-                        {t("blackhole.export_current")}
-                    </button>
-                    <button className="nav-btn" onClick={clearCache}>
-                        {t("blackhole.clear_cache")}
-                    </button>
+        <div className="settings-wrap wide-page switch-guide-page">
+            <section className="panel switch-guide-hero">
+                <div className="switch-guide-heading">
+                    <div>
+                        <h1>{t("blackhole.title")}</h1>
+                        {canOperate ? <p>{t("blackhole.stage_ready")}</p> : null}
+                    </div>
+                    <span className={`switch-guide-status ${canOperate ? "is-ready" : ""}`}>
+                        <span aria-hidden="true"/>{t(canOperate ? "blackhole.status_ready" : "blackhole.status_waiting")}
+                    </span>
+                </div>
 
-                    <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
-                        <input type="checkbox" checked={verboseProgress} onChange={(e) => setVerboseProgress(e.target.checked)}/>
-                        <span>{t("blackhole.verbose_progress")}</span>
-                    </label>
-                    <label style={{display: "inline-flex", alignItems: "center", gap: 8}}>
-                        <span>{t("blackhole.wall_limit")}</span>
-                        <input
-                            className="form-input"
-                            style={{width: 88}}
-                            type="number"
-                            value={wallLimitInput}
-                            onChange={(e) => setWallLimitInput(e.target.value)}
-                        />
-                    </label>
+                <div className="switch-guide-command-bar">
+                    <div className="switch-guide-actions">
+                        <button className="switch-guide-button is-primary" data-tutorial="blackhole-start" onClick={() => startSearch()} disabled={isSearching}>
+                            <span className="ms" aria-hidden="true">search</span>{t("blackhole.start")}
+                        </button>
+                        <button className="switch-guide-button is-danger" onClick={stopSearch} disabled={!isSearching}>
+                            <span className="ms" aria-hidden="true">stop_circle</span>{t("blackhole.stop")}
+                        </button>
+                        <button className="switch-guide-button" onClick={() => startSearch({resume: true})} disabled={!canResume}>
+                            <span className="ms" aria-hidden="true">resume</span>{t("blackhole.continue")}
+                        </button>
+                        <button className="switch-guide-button" onClick={listQuads}>
+                            <span className="ms" aria-hidden="true">grid_view</span>{t("blackhole.list_quads")}
+                        </button>
+                        <button className="switch-guide-button is-success" data-tutorial="blackhole-execute" onClick={executePlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
+                            <span className="ms" aria-hidden="true">play_arrow</span>{t("blackhole.execute_plan")}
+                        </button>
+                        <button className="switch-guide-button is-success" data-tutorial="blackhole-execute-full" onClick={executeFullPlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
+                            <span className="ms" aria-hidden="true">fast_forward</span>{t("blackhole.execute_full_plan")}
+                        </button>
+                    </div>
+
+                    <div className="switch-guide-options">
+                        <label className="switch-guide-toggle">
+                            <input type="checkbox" checked={verboseProgress} onChange={(e) => setVerboseProgress(e.target.checked)}/>
+                            <span className="switch-guide-toggle-track" aria-hidden="true"><span/></span>
+                            <span>{t("blackhole.verbose_progress")}</span>
+                        </label>
+                        <label className="switch-guide-number">
+                            <span>{t("blackhole.wall_limit")}</span>
+                            <input className="form-input" type="number" value={wallLimitInput} onChange={(e) => setWallLimitInput(e.target.value)}/>
+                        </label>
+                    </div>
                 </div>
-                <div style={{marginTop: 10, color: "var(--muted)", fontSize: 13}}>
-                    {canOperate ? t("blackhole.stage_ready") : t("blackhole.stage_not_ready")} {t("blackhole.wall_limit_hint")}
+
+                <div className="switch-guide-utility-bar">
+                    <span>{t("blackhole.wall_limit_hint")}</span>
+                    <div>
+                        <button type="button" onClick={exportCurrentSnapshot}><span className="ms" aria-hidden="true">content_copy</span>{t("blackhole.export_current")}</button>
+                        <button type="button" onClick={clearCache}><span className="ms" aria-hidden="true">delete_sweep</span>{t("blackhole.clear_cache")}</button>
+                    </div>
                 </div>
-            </div>
+            </section>
 
             <div className={`blackhole-layout ${quadDrawerOpen ? "with-drawer" : ""}`}>
                 <div className="blackhole-main" data-tutorial="blackhole-main">
@@ -304,7 +300,7 @@ export default function BlackHolePage({
                 </div>
 
                 {quadDrawerOpen && (
-                    <aside className="blackhole-drawer panel">
+                    <aside className="blackhole-drawer panel switch-guide-drawer">
                         <div className="blackhole-drawer-head">
                             <div className="panel-title" style={{marginBottom: 0}}>
                                 {drawerMode === "quad" ? t("blackhole.quad_drawer_title") : t("blackhole.considered_tiles_title")}
@@ -484,7 +480,7 @@ function SearchParamsBand({
         return null;
     }
     const perChangeLimit = typeof data.per_change_limit === "number"
-        ? (data.per_change_limit === 13 ? "无限制" : String(data.per_change_limit))
+        ? (data.per_change_limit === 13 ? t("blackhole.unlimited") : String(data.per_change_limit))
         : "-";
     const items = [
         {label: t("blackhole.params_max_change_count"), value: String(data.max_change_count ?? "-"), clickable: false},
@@ -535,6 +531,7 @@ function ConsideredTilesBody({
     sections: Array<{ key: string; title: string; ids: TileId[] }>;
     resolveFace?: (id: number) => string | null;
 }) {
+    const {t} = useTranslation();
     return (
         <div style={{padding: 12, display: "grid", gap: 12}}>
             {sections.map((section) => (
@@ -550,7 +547,7 @@ function ConsideredTilesBody({
                 >
                     <div style={{display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline"}}>
                         <div style={{fontWeight: 600}}>{section.title}</div>
-                        <div className={styles.bandLabel}>{section.ids.length} {"张"}</div>
+                        <div className={styles.bandLabel}>{t("blackhole.tile_count", {count: section.ids.length})}</div>
                     </div>
                     {section.ids.length > 0 ? (
                         <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
@@ -593,40 +590,11 @@ function QuadCatalogBody({data, resolveFace}: { data: PlanData | null; resolveFa
                 <div key={`${item.face || "quad"}-${index}`} style={{display: "grid", gap: 8, border: "1px solid var(--border)", borderRadius: 10, padding: 10}}>
                     <div style={{fontWeight: 600}}>{t("advisor.quad_catalog_item", {index: index + 1, face: item.face || "-"})}</div>
                     {item.score ? <div className={styles.bandLabel}>{item.score}</div> : null}
-                    <QuadTilePositions positions={normalizeQuadPositions(item)} resolveFace={resolveFace}/>
+                    <QuadTilePositions positions={item.tile_positions} resolveFace={resolveFace}/>
                 </div>
             ))}
         </div>
     );
-}
-
-function normalizeQuadPositions(item: {
-    tile_positions?: Array<{ tile_id: TileId; source: string; source_index: number }>;
-    label?: string;
-}) {
-    if (item.tile_positions && item.tile_positions.length > 0) {
-        return item.tile_positions;
-    }
-    if (!item.label) return [];
-
-    const segments = item.label.split("/").map((part) => part.trim()).filter(Boolean);
-    return segments.map((segment) => {
-        const idMatch = segment.match(/id=(\d+)/);
-        const numMatches = Array.from(segment.matchAll(/(\d+)/g)).map((match) => Number(match[1]));
-        const sourceIndex = numMatches.length > 0 ? numMatches[numMatches.length - 1] : NaN;
-        return {
-            tile_id: idMatch ? Number(idMatch[1]) : NaN,
-            source: mapLegacySource(segment),
-            source_index: sourceIndex,
-        };
-    }).filter((entry) => Number.isFinite(entry.tile_id) && Number.isFinite(entry.source_index));
-}
-
-function mapLegacySource(source: string) {
-    if (source.includes("hand") || source.includes("手牌")) return "hand";
-    if (source.includes("replacement") || source.includes("换牌")) return "replacement";
-    if (source.includes("wall") || source.includes("牌山")) return "wall";
-    return "unknown";
 }
 
 function QuadTilePositions({
@@ -636,11 +604,12 @@ function QuadTilePositions({
     positions: Array<{ tile_id: TileId; source: string; source_index: number }>;
     resolveFace?: (id: number) => string | null;
 }) {
+    const {t} = useTranslation();
     const sourceLabel = (source: string) => {
-        if (source === "hand") return "手牌";
-        if (source === "replacement") return "换牌堆";
-        if (source === "wall") return "牌山";
-        return "未知来源";
+        if (source === "hand") return t("blackhole.source_hand");
+        if (source === "replacement") return t("blackhole.source_replacement");
+        if (source === "wall") return t("blackhole.source_wall");
+        return t("blackhole.source_unknown");
     };
 
     if (!positions.length) {
@@ -704,6 +673,7 @@ function TileGroup({
 }
 
 function FinalShapeGroup({quadFaces, tenpaiFaces}: { quadFaces: string[]; tenpaiFaces: string[] }) {
+    const {t} = useTranslation();
     const quadTiles = quadFaces.flatMap((face) => [face, face, face, face]);
     if (!quadTiles.length && !tenpaiFaces.length) {
         return null;
@@ -711,7 +681,7 @@ function FinalShapeGroup({quadFaces, tenpaiFaces}: { quadFaces: string[]; tenpai
 
     return (
         <div style={{display: "grid", gap: 6}}>
-            <div className={styles.label}>{"最终牌型"}</div>
+            <div className={styles.label}>{t("blackhole.final_shape")}</div>
             <div
                 style={{
                     border: "1px solid var(--color-divider)",

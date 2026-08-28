@@ -1,678 +1,584 @@
-use std::{
-  env,
-  io::{BufRead, BufReader},
-  path::{Path, PathBuf},
-  process::{Child, Command, Stdio},
-  time::{Duration, Instant},
-  sync::{Arc, Mutex},
-  thread,
-};
 use std::sync::atomic::{AtomicBool, Ordering};
-
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use serde::Serialize;
 use serde_json::Value;
-use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+use shanten_backend::embedded::BackendRuntime;
+use shanten_backend::ipc::{
+    AmuletActionRequest, AutorunAction, BackendSnapshot, CommandResult, ConfigTables,
+    FlowDumpResult, JsonMap, PacketLogSnapshot, SwitchRequest, TsumoLoopStatus, VersionMismatch,
+};
+use shanten_backend::pipeline::PipelineConfig;
+use tauri::{AppHandle, Emitter, Manager, State};
 
 mod overlay;
 
-const LOG_BATCH_MAX_LINES: usize = 64;
-const LOG_BATCH_MAX_BYTES: usize = 64 * 1024;
-const LOG_CHUNK_MAX_BYTES: usize = 16 * 1024;
 const STARTUP_PROGRESS_EVENT: &str = "startup:progress";
-const DEFAULT_BACKEND_HOST: &str = "127.0.0.1";
-const DEFAULT_BACKEND_PORT: u16 = 8787;
-
-#[derive(Clone, Serialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-enum LogPayload {
-  Lines { lines: Vec<String> },
-  Chunk { id: u64, index: usize, total: usize, text: String },
-}
-
-#[derive(Default)]
-struct BackendProcState {
-  child: Option<Child>,
-}
 
 #[derive(Default)]
 struct GateState {
-  backend_ready: AtomicBool,
-  frontend_ready: AtomicBool,
-  switched: AtomicBool,
+    backend_ready: AtomicBool,
+    frontend_ready: AtomicBool,
+    switched: AtomicBool,
 }
 
 struct SharedGate(pub Arc<GateState>);
 
 #[derive(Clone, Serialize)]
 struct StartupProgressPayload {
-  phase: String,
-  label: String,
-  detail: Option<String>,
-  progress: f64,
-  eta_seconds: Option<u64>,
-  indeterminate: bool,
+    phase: String,
+    label: String,
+    detail: Option<String>,
+    progress: f64,
+    eta_seconds: Option<u64>,
+    indeterminate: bool,
 }
 
 struct StartupProgressState(pub Arc<Mutex<StartupProgressPayload>>);
 
-#[derive(Clone, Serialize)]
-struct BackendEndpoint {
-  host: String,
-  port: u16,
-  ws_url: String,
-}
-
 fn default_startup_progress() -> StartupProgressPayload {
-  StartupProgressPayload {
-    phase: "bootstrap".into(),
-    label: "正在准备启动".into(),
-    detail: Some("初始化窗口与运行环境".into()),
-    progress: 0.08,
-    eta_seconds: Some(8),
-    indeterminate: false,
-  }
+    StartupProgressPayload {
+        phase: "bootstrap".into(),
+        label: "正在准备启动".into(),
+        detail: Some("初始化窗口与运行环境".into()),
+        progress: 0.08,
+        eta_seconds: Some(8),
+        indeterminate: false,
+    }
 }
 
 fn emit_startup_progress(app: &AppHandle, payload: &StartupProgressPayload) {
-  let _ = app.emit(STARTUP_PROGRESS_EVENT, payload.clone());
+    let _ = app.emit(STARTUP_PROGRESS_EVENT, payload.clone());
 }
 
 fn set_startup_progress(
-  app: &AppHandle,
-  state: &StartupProgressState,
-  payload: StartupProgressPayload,
+    app: &AppHandle,
+    state: &StartupProgressState,
+    payload: StartupProgressPayload,
 ) {
-  if let Ok(mut guard) = state.0.lock() {
-    *guard = payload.clone();
-  }
-  emit_startup_progress(app, &payload);
-}
-
-fn split_utf8_chunks(s: &str, max_bytes: usize) -> Vec<String> {
-  if s.len() <= max_bytes {
-    return vec![s.to_string()];
-  }
-
-  let mut chunks = Vec::new();
-  let mut start = 0;
-  while start < s.len() {
-    let mut end = (start + max_bytes).min(s.len());
-    while end > start && !s.is_char_boundary(end) {
-      end -= 1;
+    if let Ok(mut guard) = state.0.lock() {
+        *guard = payload.clone();
     }
-    if end == start {
-      end = s[start..]
-        .char_indices()
-        .nth(1)
-        .map(|(i, _)| start + i)
-        .unwrap_or(s.len());
-    }
-    chunks.push(s[start..end].to_string());
-    start = end;
-  }
-  chunks
+    emit_startup_progress(app, &payload);
 }
 
 fn maybe_switch(app: &AppHandle, gate: &GateState) {
-  if gate.switched.load(Ordering::SeqCst) { return; }
-  if gate.backend_ready.load(Ordering::SeqCst) && gate.frontend_ready.load(Ordering::SeqCst) {
-    if gate.switched.swap(true, Ordering::SeqCst) == false {
-      if let Some(progress_state) = app.try_state::<StartupProgressState>() {
-        set_startup_progress(
-          app,
-          &progress_state,
-          StartupProgressPayload {
-            phase: "ready".into(),
-            label: "启动完成".into(),
-            detail: Some("正在进入主界面".into()),
-            progress: 1.0,
-            eta_seconds: Some(0),
-            indeterminate: false,
-          },
-        );
-      }
-      if let Some(s) = app.get_webview_window("splash") { let _ = s.close(); }
-      if let Some(m) = app.get_webview_window("main") {
-        let _ = m.show();
-        let _ = m.set_focus();
-        let _ = m.set_title("向听镜 - Shanten Lens");
-      }
-    }
-  }
-}
-
-fn spawn_log_pump(
-  app: AppHandle,
-  event_name: &'static str,
-  ready_gate: Option<Arc<GateState>>,
-  reader: impl std::io::Read + Send + 'static,
-) {
-  thread::spawn(move || {
-    let reader = BufReader::new(reader);
-    let mut batch: Vec<String> = Vec::new();
-    let mut batch_bytes = 0usize;
-    let mut last_flush = Instant::now();
-    let mut chunk_id = 0u64;
-
-    let flush = |app: &AppHandle, batch: &mut Vec<String>, batch_bytes: &mut usize, last_flush: &mut Instant| {
-      if batch.is_empty() {
+    if gate.switched.load(Ordering::SeqCst) {
         return;
-      }
-      let payload = LogPayload::Lines {
-        lines: std::mem::take(batch),
-      };
-      let _ = app.emit(event_name, payload);
-      *batch_bytes = 0;
-      *last_flush = Instant::now();
-    };
-
-    for line in reader.lines().flatten() {
-      if line.contains("SL_BACKEND_READY") {
-        if let Some(progress_state) = app.try_state::<StartupProgressState>() {
-          let label = if ready_gate.as_ref().map(|g| g.frontend_ready.load(Ordering::SeqCst)).unwrap_or(false) {
-            "后台服务已就绪"
-          } else {
-            "后台服务已启动"
-          };
-          let detail = if ready_gate.as_ref().map(|g| g.frontend_ready.load(Ordering::SeqCst)).unwrap_or(false) {
-            "正在打开主界面"
-          } else {
-            "正在等待界面完成渲染"
-          };
-          set_startup_progress(
-            &app,
-            &progress_state,
-            StartupProgressPayload {
-              phase: "backend_ready".into(),
-              label: label.into(),
-              detail: Some(detail.into()),
-              progress: if ready_gate.as_ref().map(|g| g.frontend_ready.load(Ordering::SeqCst)).unwrap_or(false) { 0.98 } else { 0.74 },
-              eta_seconds: Some(1),
-              indeterminate: false,
-            },
-          );
-        }
-        if let Some(gate2) = ready_gate.as_ref() {
-          gate2.backend_ready.store(true, Ordering::SeqCst);
-          maybe_switch(&app, gate2);
-        }
-        let _ = app.emit("backend:ready", line.clone());
-      }
-
-      if line.len() > LOG_CHUNK_MAX_BYTES {
-        flush(&app, &mut batch, &mut batch_bytes, &mut last_flush);
-        let parts = split_utf8_chunks(&line, LOG_CHUNK_MAX_BYTES);
-        let total = parts.len();
-        chunk_id = chunk_id.wrapping_add(1);
-        for (index, text) in parts.into_iter().enumerate() {
-          let payload = LogPayload::Chunk { id: chunk_id, index, total, text };
-          let _ = app.emit(event_name, payload);
-        }
-        continue;
-      }
-
-      batch_bytes += line.len();
-      batch.push(line);
-
-      let should_flush =
-        batch.len() >= LOG_BATCH_MAX_LINES ||
-        batch_bytes >= LOG_BATCH_MAX_BYTES ||
-        last_flush.elapsed() >= Duration::from_millis(50);
-      if should_flush {
-        flush(&app, &mut batch, &mut batch_bytes, &mut last_flush);
-      }
     }
-
-    flush(&app, &mut batch, &mut batch_bytes, &mut last_flush);
-  });
+    if gate.backend_ready.load(Ordering::SeqCst) && gate.frontend_ready.load(Ordering::SeqCst) {
+        if gate.switched.swap(true, Ordering::SeqCst) == false {
+            if let Some(progress_state) = app.try_state::<StartupProgressState>() {
+                set_startup_progress(
+                    app,
+                    &progress_state,
+                    StartupProgressPayload {
+                        phase: "ready".into(),
+                        label: "启动完成".into(),
+                        detail: Some("正在进入主界面".into()),
+                        progress: 1.0,
+                        eta_seconds: Some(0),
+                        indeterminate: false,
+                    },
+                );
+            }
+            if let Some(s) = app.get_webview_window("splash") {
+                let _ = s.close();
+            }
+            if let Some(m) = app.get_webview_window("main") {
+                let _ = m.show();
+                let _ = m.set_focus();
+            }
+        }
+    }
 }
 
-struct BackendState(pub Arc<Mutex<BackendProcState>>);
+struct IpcBackendState(pub BackendRuntime);
 
-#[cfg(windows)]
-const BACKEND_BIN_NAME: &str = "shanten-backend.exe";
-#[cfg(not(windows))]
-const BACKEND_BIN_NAME: &str = "shanten-backend";
-
-fn resolve_backend_path(app: &AppHandle) -> Option<PathBuf> {
-  if let Ok(res_dir) = app.path().resource_dir() {
-    let p = res_dir.join("bin").join(BACKEND_BIN_NAME);
-    if p.exists() {
-      return Some(p);
-    }
-  }
-  let dev = Path::new("src-tauri")
-    .join("resources")
-    .join("bin")
-    .join(BACKEND_BIN_NAME);
-  if dev.exists() {
-    return Some(dev);
-  }
-  let dev2 = Path::new("src-tauri").join("bin").join(BACKEND_BIN_NAME);
-  if dev2.exists() {
-    return Some(dev2);
-  }
-  if let Ok(exe) = env::current_exe() {
-    if let Some(dir) = exe.parent() {
-      let p = dir.join("resources").join("bin").join(BACKEND_BIN_NAME);
-      if p.exists() {
-        return Some(p);
-      }
-      let p2 = dir.join("bin").join(BACKEND_BIN_NAME);
-      if p2.exists() {
-        return Some(p2);
-      }
-    }
-  }
-  None
-}
-
-fn backend_config_path() -> Option<PathBuf> {
-  let local_app_data = env::var_os("LOCALAPPDATA")?;
-  Some(
-    PathBuf::from(local_app_data)
-      .join("Shanten Lens")
-      .join("Shanten Lens")
-      .join("configs")
-      .join("backend.json")
-  )
-}
-
-fn read_backend_endpoint() -> BackendEndpoint {
-  let mut host = DEFAULT_BACKEND_HOST.to_string();
-  let mut port = DEFAULT_BACKEND_PORT;
-
-  if let Some(path) = backend_config_path() {
-    if let Ok(text) = std::fs::read_to_string(path) {
-      if let Ok(value) = serde_json::from_str::<Value>(&text) {
-        if let Some(config_host) = value.get("host").and_then(Value::as_str) {
-          let trimmed = config_host.trim();
-          if !trimmed.is_empty() {
-            host = trimmed.to_string();
-          }
-        }
-        if let Some(config_port) = value.get("port").and_then(Value::as_u64) {
-          if (1..=65535).contains(&config_port) {
-            port = config_port as u16;
-          }
-        }
-      }
-    }
-  }
-
-  BackendEndpoint {
-    ws_url: format!("ws://{}:{}", host, port),
-    host,
-    port,
-  }
-}
-
-fn start_backend_with(app: AppHandle, st: Arc<Mutex<BackendProcState>>) -> Result<String, String> {
-  {
-    let mut g = st.lock().map_err(|_| "mutex poisoned".to_string())?;
-    if let Some(ch) = g.child.as_mut() {
-      if ch.try_wait().map_err(|e| e.to_string())?.is_none() {
-        return Ok("already running".into());
-      }
-    }
-  }
-
-  let exe = resolve_backend_path(&app).ok_or_else(|| "backend exe not found".to_string())?;
-  let gate = app.state::<SharedGate>().0.clone();
-  let progress_state = app.state::<StartupProgressState>();
-
-  set_startup_progress(
-    &app,
-    &progress_state,
-    StartupProgressPayload {
-      phase: "starting_backend".into(),
-      label: "正在启动后台服务".into(),
-      detail: Some(format!(
-        "加载 {}",
-        exe.file_name().and_then(|s| s.to_str()).unwrap_or(BACKEND_BIN_NAME)
-      )),
-      progress: 0.22,
-      eta_seconds: Some(6),
-      indeterminate: false,
-    },
-  );
-
-  let endpoint = read_backend_endpoint();
-  let port_arg = endpoint.port.to_string();
-  let mut cmd = Command::new(&exe);
-  cmd.args([
-      "--host", endpoint.host.as_str(),
-      "--port", port_arg.as_str()
-    ])
-    .stdin(Stdio::null())
-    .stdout(Stdio::piped())
-    .stderr(Stdio::piped());
-
-  #[cfg(windows)]
-  {
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    cmd.creation_flags(CREATE_NO_WINDOW);
-  }
-
-  let mut child = cmd.spawn().map_err(|e| format!("spawn failed: {e}"))?;
-
-  set_startup_progress(
-    &app,
-    &progress_state,
-    StartupProgressPayload {
-      phase: "waiting_backend".into(),
-      label: "正在连接后台服务".into(),
-      detail: Some("等待本地分析服务返回就绪信号".into()),
-      progress: 0.46,
-      eta_seconds: Some(4),
-      indeterminate: true,
-    },
-  );
-
-  if let Some(out) = child.stdout.take() {
-    let app2 = app.clone();
-    let gate2 = gate.clone();
-    spawn_log_pump(app2, "backend:stdout", Some(gate2), out);
-  }
-  if let Some(err) = child.stderr.take() {
-    let app2 = app.clone();
-    spawn_log_pump(app2, "backend:stderr", None, err);
-  }
-
-  {
-    let mut g = st.lock().map_err(|_| "mutex poisoned".to_string())?;
-    g.child = Some(child);
-  }
-
-  let _ = app.emit("backend:spawn", format!("spawned: {}", exe.display()));
-  Ok(format!("spawned: {}", exe.display()))
-}
-
-fn stop_backend_with(st: Arc<Mutex<BackendProcState>>) -> Result<String, String> {
-  let mut g = st.lock().map_err(|_| "mutex poisoned".to_string())?;
-  if let Some(mut ch) = g.child.take() {
-    let _ = ch.kill();
-    let _ = ch.wait();
-    Ok("killed".into())
-  } else {
-    Ok("not running".into())
-  }
+#[tauri::command]
+#[specta::specta]
+async fn backend_snapshot(state: State<'_, IpcBackendState>) -> Result<BackendSnapshot, String> {
+    state.0.snapshot().await
 }
 
 #[tauri::command]
-fn start_backend(app: AppHandle, state: State<BackendState>) -> Result<String, String> {
-  let st = state.0.clone();
-  start_backend_with(app, st)
+#[specta::specta]
+fn backend_check_version(
+    version: String,
+    state: State<'_, IpcBackendState>,
+) -> Option<VersionMismatch> {
+    state.0.check_frontend_version(version)
 }
 
 #[tauri::command]
-fn get_backend_endpoint() -> BackendEndpoint {
-  read_backend_endpoint()
+#[specta::specta]
+async fn backend_get_packet_pipeline(
+    state: State<'_, IpcBackendState>,
+) -> Result<PipelineConfig, String> {
+    Ok(state.0.packet_pipeline().await)
 }
 
 #[tauri::command]
-fn stop_backend(state: State<BackendState>) -> Result<String, String> {
-  let st = state.0.clone();
-  stop_backend_with(st)
+#[specta::specta]
+async fn backend_set_packet_pipeline(
+    config: PipelineConfig,
+    state: State<'_, IpcBackendState>,
+) -> Result<CommandResult, String> {
+    Ok(state.0.set_packet_pipeline(config).await)
 }
 
 #[tauri::command]
-fn shutdown_app(app: AppHandle, state: State<BackendState>) -> Result<(), String> {
-  let st = state.0.clone();
-  let _ = stop_backend_with(st);
-  kill_all_backends_silently();
-  app.exit(0);
-  Ok(())
+#[specta::specta]
+fn backend_get_packet_log(state: State<'_, IpcBackendState>) -> PacketLogSnapshot {
+    state.0.packet_log()
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_replay_packet(
+    method: String,
+    payload: JsonMap,
+    state: State<'_, IpcBackendState>,
+) -> Result<CommandResult, String> {
+    Ok(state.0.replay_packet(method, payload).await)
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_update_config(
+    config: ConfigTables,
+    state: State<'_, IpcBackendState>,
+) -> Result<(), String> {
+    state.0.update_config(config)
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_set_locale(app: AppHandle, state: State<'_, IpcBackendState>, locale: String) {
+    if let Some(window) = app.get_webview_window("main") {
+        let title = if locale.to_ascii_lowercase().starts_with("ja") {
+            "向聴レンズ - Shanten Lens"
+        } else {
+            "向听镜 - Shanten Lens"
+        };
+        let _ = window.set_title(title);
+    }
+    state.0.set_locale(locale);
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_dump_flows(state: State<'_, IpcBackendState>) -> FlowDumpResult {
+    state.0.dump_flows()
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_fetch_activity(
+    activity_id: u64,
+    state: State<'_, IpcBackendState>,
+) -> Result<CommandResult, String> {
+    Ok(state.0.fetch_activity(activity_id).await)
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_discard_tile(
+    tile_id: u64,
+    state: State<'_, IpcBackendState>,
+) -> Result<CommandResult, String> {
+    Ok(state.0.discard_tile(tile_id).await)
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_upgrade_shop_buff(
+    activity_id: u64,
+    id: u64,
+    state: State<'_, IpcBackendState>,
+) -> Result<CommandResult, String> {
+    Ok(state.0.upgrade_shop_buff(activity_id, id).await)
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_amulet_action(
+    request: AmuletActionRequest,
+    state: State<'_, IpcBackendState>,
+) -> Result<CommandResult, String> {
+    Ok(state.0.amulet_action(request).await)
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_start_tsumo_loop(
+    interval_ms: u64,
+    reset_count: bool,
+    state: State<'_, IpcBackendState>,
+) -> TsumoLoopStatus {
+    state.0.start_tsumo_loop(interval_ms, reset_count)
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_stop_tsumo_loop(state: State<'_, IpcBackendState>) -> TsumoLoopStatus {
+    state.0.stop_tsumo_loop()
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_autorun(
+    action: AutorunAction,
+    force: bool,
+    mode: Option<String>,
+    state: State<'_, IpcBackendState>,
+) -> Result<CommandResult, String> {
+    Ok(state.0.autorun(action, force, mode).await)
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_resolve_confirmation(id: String, ok: bool, state: State<'_, IpcBackendState>) {
+    state.0.resolve_confirmation(id, ok);
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_switch(
+    request: SwitchRequest,
+    state: State<'_, IpcBackendState>,
+) -> Result<(), String> {
+    state.0.switch(request).await;
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_open_config_dir(state: State<'_, IpcBackendState>) -> Result<(), String> {
+    state.0.open_config_dir()
+}
+
+#[tauri::command]
+fn shutdown_app(app: AppHandle) -> Result<(), String> {
+    app.exit(0);
+    Ok(())
 }
 
 #[tauri::command]
 fn frontend_ready(app: AppHandle, gate: State<SharedGate>) {
-  if let Some(progress_state) = app.try_state::<StartupProgressState>() {
-    let backend_ready = gate.0.backend_ready.load(Ordering::SeqCst);
-    set_startup_progress(
-      &app,
-      &progress_state,
-      StartupProgressPayload {
-        phase: if backend_ready { "ready".into() } else { "render_wait_backend".into() },
-        label: if backend_ready { "启动完成".into() } else { "界面已准备好".into() },
-        detail: if backend_ready {
-          Some("正在进入主界面".into())
-        } else {
-          Some("正在等待后台服务连接".into())
-        },
-        progress: if backend_ready { 1.0 } else { 0.9 },
-        eta_seconds: if backend_ready { Some(0) } else { None },
-        indeterminate: !backend_ready,
-      },
-    );
-  }
-  gate.0.frontend_ready.store(true, Ordering::SeqCst);
-  maybe_switch(&app, &gate.0);
+    if let Some(progress_state) = app.try_state::<StartupProgressState>() {
+        let backend_ready = gate.0.backend_ready.load(Ordering::SeqCst);
+        set_startup_progress(
+            &app,
+            &progress_state,
+            StartupProgressPayload {
+                phase: if backend_ready {
+                    "ready".into()
+                } else {
+                    "render_wait_backend".into()
+                },
+                label: if backend_ready {
+                    "启动完成".into()
+                } else {
+                    "界面已准备好".into()
+                },
+                detail: if backend_ready {
+                    Some("正在进入主界面".into())
+                } else {
+                    Some("正在等待后台服务连接".into())
+                },
+                progress: if backend_ready { 1.0 } else { 0.9 },
+                eta_seconds: if backend_ready { Some(0) } else { None },
+                indeterminate: !backend_ready,
+            },
+        );
+    }
+    gate.0.frontend_ready.store(true, Ordering::SeqCst);
+    maybe_switch(&app, &gate.0);
 }
 
 #[tauri::command]
 fn update_startup_progress(
-  app: AppHandle,
-  state: State<StartupProgressState>,
-  phase: String,
-  label: String,
-  detail: Option<String>,
-  progress: f64,
-  eta_seconds: Option<u64>,
-  indeterminate: Option<bool>,
+    app: AppHandle,
+    state: State<StartupProgressState>,
+    phase: String,
+    label: String,
+    detail: Option<String>,
+    progress: f64,
+    eta_seconds: Option<u64>,
+    indeterminate: Option<bool>,
 ) {
-  set_startup_progress(
-    &app,
-    &state,
-    StartupProgressPayload {
-      phase,
-      label,
-      detail,
-      progress: progress.clamp(0.0, 1.0),
-      eta_seconds,
-      indeterminate: indeterminate.unwrap_or(false),
-    },
-  );
+    set_startup_progress(
+        &app,
+        &state,
+        StartupProgressPayload {
+            phase,
+            label,
+            detail,
+            progress: progress.clamp(0.0, 1.0),
+            eta_seconds,
+            indeterminate: indeterminate.unwrap_or(false),
+        },
+    );
 }
 
 #[tauri::command]
-fn get_startup_progress(state: State<StartupProgressState>) -> Result<StartupProgressPayload, String> {
-  state.0.lock().map(|guard| guard.clone()).map_err(|_| "mutex poisoned".to_string())
+fn get_startup_progress(
+    state: State<StartupProgressState>,
+) -> Result<StartupProgressPayload, String> {
+    state
+        .0
+        .lock()
+        .map(|guard| guard.clone())
+        .map_err(|_| "mutex poisoned".to_string())
 }
 
 #[tauri::command]
 fn is_overlay_supported() -> bool {
-  overlay::is_overlay_supported()
+    overlay::is_overlay_supported()
 }
 
 #[cfg(windows)]
 #[tauri::command]
 fn get_overlay_status(state: State<overlay::OverlayState>) -> overlay::OverlayStatus {
-  overlay::get_status(state)
+    overlay::get_status(state)
 }
 
 #[cfg(not(windows))]
 #[tauri::command]
 fn get_overlay_status() -> overlay::OverlayStatus {
-  overlay::get_status()
+    overlay::get_status()
 }
 
 #[cfg(windows)]
 #[tauri::command]
-fn set_overlay_enabled(state: State<overlay::OverlayState>, enabled: bool) -> overlay::OverlayStatus {
-  overlay::set_enabled(state, enabled)
+fn set_overlay_enabled(
+    state: State<overlay::OverlayState>,
+    enabled: bool,
+) -> overlay::OverlayStatus {
+    overlay::set_enabled(state, enabled)
 }
 
 #[cfg(not(windows))]
 #[tauri::command]
 fn set_overlay_enabled(enabled: bool) -> overlay::OverlayStatus {
-  overlay::set_enabled(enabled)
+    overlay::set_enabled(enabled)
 }
 
 #[cfg(windows)]
 #[tauri::command]
 fn set_overlay_interactive(state: State<overlay::OverlayState>, interactive: bool) {
-  overlay::set_interactive(state, interactive)
+    overlay::set_interactive(state, interactive)
 }
 
 #[cfg(not(windows))]
 #[tauri::command]
 fn set_overlay_interactive(interactive: bool) {
-  overlay::set_interactive(interactive)
+    overlay::set_interactive(interactive)
 }
 
 #[cfg(windows)]
 #[tauri::command]
-fn set_overlay_panel_regions(state: State<overlay::OverlayState>, regions: Vec<overlay::PanelRegion>) {
-  overlay::set_panel_regions(state, regions)
+fn set_overlay_panel_regions(
+    state: State<overlay::OverlayState>,
+    regions: Vec<overlay::PanelRegion>,
+) {
+    overlay::set_panel_regions(state, regions)
 }
 
 #[cfg(not(windows))]
 #[tauri::command]
 fn set_overlay_panel_regions(regions: Vec<overlay::PanelRegion>) {
-  overlay::set_panel_regions(regions)
+    overlay::set_panel_regions(regions)
 }
 
 #[tauri::command]
 fn fetch_latest_release(use_system_proxy: bool) -> Result<String, String> {
-  let mut builder = reqwest::blocking::Client::builder()
-    .user_agent("Shanten-Lens-Updater")
-    .timeout(Duration::from_secs(15));
-  if !use_system_proxy {
-    builder = builder.no_proxy();
-  }
-  let client = builder.build().map_err(|e| e.to_string())?;
-  let response = client
-    .get("https://api.github.com/repos/SpCoGov/shanten-lens/releases/latest")
-    .header("Accept", "application/vnd.github+json")
-    .send()
-    .map_err(|e| e.to_string())?;
-  let status = response.status();
-  let text = response.text().map_err(|e| e.to_string())?;
-  if !status.is_success() {
-    return Err(format!("GitHub Releases API returned {status}: {text}"));
-  }
-  Ok(text)
+    let mut builder = reqwest::blocking::Client::builder()
+        .user_agent("Shanten-Lens-Updater")
+        .timeout(Duration::from_secs(15));
+    if !use_system_proxy {
+        builder = builder.no_proxy();
+    }
+    let client = builder.build().map_err(|e| e.to_string())?;
+    let response = client
+        .get("https://api.github.com/repos/SpCoGov/shanten-lens/releases/latest")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .map_err(|e| e.to_string())?;
+    let status = response.status();
+    let text = response.text().map_err(|e| e.to_string())?;
+    if !status.is_success() {
+        return Err(format!("GitHub Releases API returned {status}: {text}"));
+    }
+    Ok(text)
 }
 
-// Windows 下兜底强杀所有同名后端进程（静默）
-#[cfg(windows)]
-fn kill_all_backends_silently() {
-  use std::os::windows::process::CommandExt;
-  let _ = Command::new("taskkill")
-    .args(["/IM", "shanten-backend.exe", "/F", "/T"])
-    .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
-    .status();
+fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
+    tauri_specta::Builder::new()
+        .error_handling(tauri_specta::ErrorHandlingMode::Throw)
+        .commands(tauri_specta::collect_commands![
+            backend_snapshot,
+            backend_check_version,
+            backend_get_packet_pipeline,
+            backend_set_packet_pipeline,
+            backend_get_packet_log,
+            backend_replay_packet,
+            backend_update_config,
+            backend_set_locale,
+            backend_dump_flows,
+            backend_fetch_activity,
+            backend_discard_tile,
+            backend_upgrade_shop_buff,
+            backend_amulet_action,
+            backend_start_tsumo_loop,
+            backend_stop_tsumo_loop,
+            backend_autorun,
+            backend_resolve_confirmation,
+            backend_switch,
+            backend_open_config_dir,
+        ])
 }
 
-#[cfg(not(windows))]
-fn kill_all_backends_silently() {
+fn export_ipc_bindings(ipc: &tauri_specta::Builder<tauri::Wry>) {
+    ipc.export(
+        specta_typescript::Typescript::default()
+            .bigint(specta_typescript::BigIntExportBehavior::Number),
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/bindings.ts"),
+    )
+    .expect("failed to export Tauri IPC bindings");
 }
 
 pub fn run() {
-  tauri::Builder::default()
-    .plugin(tauri_plugin_fs::init())
-    .plugin(tauri_plugin_opener::init())
-    .plugin(tauri_plugin_os::init())
-    .manage(BackendState(Arc::new(Mutex::new(BackendProcState::default()))))
-    .manage(SharedGate(Arc::new(GateState::default())))
-    .manage(StartupProgressState(Arc::new(Mutex::new(default_startup_progress()))))
-    .invoke_handler(tauri::generate_handler![
-      start_backend,
-      stop_backend,
-      shutdown_app,
-      get_backend_endpoint,
-      frontend_ready,
-      update_startup_progress,
-      get_startup_progress,
-      is_overlay_supported,
-      get_overlay_status,
-      set_overlay_enabled,
-      set_overlay_interactive,
-      set_overlay_panel_regions,
-      fetch_latest_release
-    ])
-    .setup(|app| {
-      let ah = app.handle().clone();
-      let st = app.state::<BackendState>().0.clone();
-      let gate = app.state::<SharedGate>().0.clone();
-      let startup_progress = app.state::<StartupProgressState>();
+    let ipc = ipc_builder();
+    #[cfg(debug_assertions)]
+    export_ipc_bindings(&ipc);
 
-      set_startup_progress(
-        &ah,
-        &startup_progress,
-        StartupProgressPayload {
-          phase: "bootstrap".into(),
-          label: "正在初始化应用".into(),
-          detail: Some("创建窗口并准备启动流程".into()),
-          progress: 0.1,
-          eta_seconds: Some(8),
-          indeterminate: false,
-        },
-      );
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_os::init())
+        .manage(SharedGate(Arc::new(GateState::default())))
+        .manage(StartupProgressState(Arc::new(Mutex::new(
+            default_startup_progress(),
+        ))))
+        .invoke_handler(tauri::generate_handler![
+            shutdown_app,
+            frontend_ready,
+            update_startup_progress,
+            get_startup_progress,
+            is_overlay_supported,
+            get_overlay_status,
+            set_overlay_enabled,
+            set_overlay_interactive,
+            set_overlay_panel_regions,
+            fetch_latest_release,
+            backend_snapshot,
+            backend_check_version,
+            backend_get_packet_pipeline,
+            backend_set_packet_pipeline,
+            backend_get_packet_log,
+            backend_replay_packet,
+            backend_update_config,
+            backend_set_locale,
+            backend_dump_flows,
+            backend_fetch_activity,
+            backend_discard_tile,
+            backend_upgrade_shop_buff,
+            backend_amulet_action,
+            backend_start_tsumo_loop,
+            backend_stop_tsumo_loop,
+            backend_autorun,
+            backend_resolve_confirmation,
+            backend_switch,
+            backend_open_config_dir
+        ])
+        .setup(|app| {
+            let runtime_root = app.path().app_data_dir()?.join("configs");
+            let backend = BackendRuntime::load(runtime_root)?;
+            app.manage(IpcBackendState(backend.clone()));
 
-      let force_autostart = std::env::var("FORCE_AUTOSTART_BACKEND")
-        .map(|v| v == "1")
-        .unwrap_or(false);
+            let ah = app.handle().clone();
+            let gate = app.state::<SharedGate>().0.clone();
+            let startup_progress = app.state::<StartupProgressState>();
 
-      #[cfg(debug_assertions)]
-      {
-        if force_autostart {
-          let _ = start_backend_with(ah.clone(), st.clone());
-        }
-      }
-      #[cfg(not(debug_assertions))]
-      {
-        let _ = start_backend_with(ah.clone(), st.clone());
-      }
+            let mut backend_events = backend.subscribe();
+            let event_app = ah.clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    match backend_events.recv().await {
+                        Ok(payload) => {
+                            if let (Some(kind), Some(data)) = (
+                                payload.get("type").and_then(Value::as_str),
+                                payload.get("data"),
+                            ) {
+                                let _ = event_app.emit(&format!("backend:{kind}"), data.clone());
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+            });
+            tauri::async_runtime::spawn(backend.run_background());
 
-      overlay::start(&ah);
-
-      if let Some(win) = app.get_webview_window("main") {
-        let st2 = st.clone();
-        win.on_window_event(move |e| {
-          if matches!(e, WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed) {
-            let _ = stop_backend_with(st2.clone());
-            kill_all_backends_silently();
-          }
-        });
-      }
-
-      {
-        let ah2 = ah.clone();
-        let gate2 = gate.clone();
-        tauri::async_runtime::spawn(async move {
-          std::thread::sleep(std::time::Duration::from_secs(5));
-          if !gate2.switched.load(Ordering::SeqCst) {
-            if let Some(progress_state) = ah2.try_state::<StartupProgressState>() {
-              set_startup_progress(
-                &ah2,
-                &progress_state,
+            set_startup_progress(
+                &ah,
+                &startup_progress,
                 StartupProgressPayload {
-                  phase: "fallback".into(),
-                  label: "主界面已打开".into(),
-                  detail: Some("启动超时，已直接进入主界面，可稍后继续连接后台".into()),
-                  progress: 0.96,
-                  eta_seconds: Some(0),
-                  indeterminate: false,
+                    phase: "bootstrap".into(),
+                    label: "正在初始化应用".into(),
+                    detail: Some("创建窗口并准备启动流程".into()),
+                    progress: 0.1,
+                    eta_seconds: Some(8),
+                    indeterminate: false,
                 },
-              );
-            }
-            if let Some(s) = ah2.get_webview_window("splash") { let _ = s.close(); }
-            if let Some(m) = ah2.get_webview_window("main") {
-              let _ = m.show();
-              let _ = m.set_focus();
-            }
-            gate2.switched.store(true, Ordering::SeqCst);
-          }
-        });
-      }
+            );
 
-      Ok::<(), Box<dyn std::error::Error>>(())
-    })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+            gate.backend_ready.store(true, Ordering::SeqCst);
+            let _ = ah.emit("backend:ready", "embedded IPC backend ready");
+            maybe_switch(&ah, &gate);
+
+            overlay::start(&ah);
+
+            {
+                let ah2 = ah.clone();
+                let gate2 = gate.clone();
+                tauri::async_runtime::spawn(async move {
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    if !gate2.switched.load(Ordering::SeqCst) {
+                        if let Some(progress_state) = ah2.try_state::<StartupProgressState>() {
+                            set_startup_progress(
+                                &ah2,
+                                &progress_state,
+                                StartupProgressPayload {
+                                    phase: "fallback".into(),
+                                    label: "主界面已打开".into(),
+                                    detail: Some(
+                                        "启动超时，已直接进入主界面，可稍后继续连接后台".into(),
+                                    ),
+                                    progress: 0.96,
+                                    eta_seconds: Some(0),
+                                    indeterminate: false,
+                                },
+                            );
+                        }
+                        if let Some(s) = ah2.get_webview_window("splash") {
+                            let _ = s.close();
+                        }
+                        if let Some(m) = ah2.get_webview_window("main") {
+                            let _ = m.show();
+                            let _ = m.set_focus();
+                        }
+                        gate2.switched.store(true, Ordering::SeqCst);
+                    }
+                });
+            }
+
+            Ok::<(), Box<dyn std::error::Error>>(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }

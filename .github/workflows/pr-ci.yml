@@ -3,7 +3,7 @@ name: PR CI
 on:
   pull_request:
     branches:
-      - "2.0"
+      - "3.0"
   workflow_dispatch:
 
 permissions:
@@ -18,15 +18,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
         with:
-          python-version: "3.11"
+          version: 9.15.9
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -41,29 +43,14 @@ jobs:
             libsoup-3.0-dev \
             libssl-dev
 
-      - name: Create virtual environment
-        run: python -m venv .venv
-
-      - name: Install backend dependencies
-        run: |
-          .venv/bin/python -m pip install --upgrade pip wheel
-          .venv/bin/python -m pip install -r requirements.txt
-
-      - name: Check Python sources
-        run: .venv/bin/python -B -m compileall backend scripts
+      - name: Test Rust backend
+        run: cargo test --manifest-path backend/Cargo.toml
 
       - name: Build frontend
         working-directory: app
         run: |
-          corepack enable
-          corepack prepare pnpm@9.15.9 --activate
-          pnpm install --no-frozen-lockfile
+          pnpm install --frozen-lockfile
           pnpm run build
-
-      - name: Prepare Tauri check resources
-        run: |
-          mkdir -p app/src-tauri/bin
-          touch app/src-tauri/bin/shanten-backend.exe
 
       - name: Check Tauri backend
         working-directory: app/src-tauri

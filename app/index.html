@@ -7,10 +7,10 @@
           content="
         default-src 'self' tauri: asset: blob:;
         img-src 'self' data: blob:;
-        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-        font-src 'self' data: https://fonts.gstatic.com;
+        style-src 'self' 'unsafe-inline';
+        font-src 'self' data:;
         script-src 'self';
-        connect-src 'self' http://ipc.localhost ws://127.0.0.1:* ws://localhost:* tauri: ipc:;
+        connect-src 'self' http://ipc.localhost tauri: ipc:;
         " />
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

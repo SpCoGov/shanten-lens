@@ -30,7 +30,7 @@ function toCapturedError(
     title: string,
     componentStack?: string
 ): CapturedError {
-    const message = stringifyReason(error) || "Unknown error";
+    const message = stringifyReason(error) || t("app.error_boundary.unknown_error");
     const stack = error instanceof Error ? error.stack : undefined;
     return {
         title,
@@ -44,8 +44,8 @@ function toCapturedError(
 
 function AppErrorDialog({error, onReload}: { error: CapturedError; onReload: () => void }) {
     const details = [
-        error.stack ? `Stack:\n${error.stack}` : null,
-        error.componentStack ? `Component stack:\n${error.componentStack}` : null,
+        error.stack ? `${t("app.error_boundary.stack")}:\n${error.stack}` : null,
+        error.componentStack ? `${t("app.error_boundary.component_stack")}:\n${error.componentStack}` : null,
     ].filter(Boolean).join("\n\n");
 
     return (
@@ -65,7 +65,7 @@ function AppErrorDialog({error, onReload}: { error: CapturedError; onReload: () 
                     <p>{t("app.error_boundary.message")}</p>
                 </div>
 
-                <div className="app-error-meta" aria-label="Error metadata">
+                <div className="app-error-meta" aria-label={t("app.error_boundary.metadata")}>
                     <span>{t("app.error_boundary.source")}: {t(`app.error_boundary.sources.${error.source}`, {defaultValue: error.source})}</span>
                     <span>{t("app.error_boundary.time")}: {error.timestamp}</span>
                 </div>

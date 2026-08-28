@@ -5,7 +5,7 @@ import "./overlay.css";
 import "./lib/i18n";
 import {ensureI18nReady} from "./lib/i18n";
 import {t} from "i18next";
-import {ws} from "./lib/ws";
+import * as backendIpc from "./lib/ipc";
 import type {PlanData} from "./lib/planTypes";
 import type {EffectItem, GameStateData} from "./lib/gamestate";
 import {toDeckMap} from "./lib/gamestate";
@@ -57,28 +57,18 @@ type PanelBounds = {
     collapsed: boolean;
 };
 
-function sendSouzuAction(action: string) {
-    ws.send({
-        type: "souzu_switch_control",
-        data: {
-            action,
-            options: action === "start"
-                ? {wall_limit: 36, search_algorithm: DEFAULT_SEARCH_ALGORITHM}
-                : undefined,
-        },
-    } as any);
+function sendSouzuAction(action: backendIpc.SwitchAction) {
+    void backendIpc.runSwitch({
+        action,
+        options: action === "start" ? {wall_limit: 36, search_algorithm: DEFAULT_SEARCH_ALGORITHM} : undefined,
+    });
 }
 
-function sendWanxiangAction(action: string) {
-    ws.send({
-        type: "souzu_switch_control",
-        data: {
-            action,
-            options: action === "start"
-                ? {wall_limit: 36, search_algorithm: WANXIANG_SEARCH_ALGORITHM}
-                : undefined,
-        },
-    } as any);
+function sendWanxiangAction(action: backendIpc.SwitchAction) {
+    void backendIpc.runSwitch({
+        action,
+        options: action === "start" ? {wall_limit: 36, search_algorithm: WANXIANG_SEARCH_ALGORITHM} : undefined,
+    });
 }
 
 function HudOverlay() {
@@ -100,15 +90,19 @@ function HudOverlay() {
     ], [showBlackhole, showScoreProjection, showWanxiang]);
 
     React.useEffect(() => {
-        ws.connect();
         invoke("set_overlay_enabled", {enabled: readHudEnabled()}).catch(() => {
         });
-        const off = ws.onPacket((pkt: any) => {
-            if (pkt.type === "update_gamestate") {
-                setStage(Number(pkt.data?.stage ?? 0));
-                setGameState(pkt.data ?? null);
-            } else if (pkt.type === "discard_recommendation") {
-                const arr = Array.isArray(pkt.data) ? pkt.data : [];
+        void backendIpc.initializeBackend().then((snapshot) => {
+            setStage(Number(snapshot.gameState.stage ?? 0));
+            setGameState(snapshot.gameState);
+        });
+        const unlisteners = [
+            backendIpc.subscribeBackendEvent("update_gamestate", (data) => {
+                setStage(Number(data.stage ?? 0));
+                setGameState(data);
+            }),
+            backendIpc.subscribeBackendEvent("discard_recommendation", (data) => {
+                const arr = Array.isArray(data) ? data : [];
                 for (const item of arr) {
                     if (item?.yaku === "souzu_switch" && item.data?.request_source !== "debug") {
                         if (isWanxiangPlanData(item.data ?? null)) {
@@ -118,8 +112,9 @@ function HudOverlay() {
                         }
                     }
                 }
-            } else if (pkt.type === "souzu_switch_execution" && pkt.data) {
-                const d = pkt.data;
+            }),
+            backendIpc.subscribeBackendEvent("souzu_switch_execution", (data) => {
+                const d = data as Record<string, unknown>;
                 if (d.status === "running" || d.status === "completed" || d.status === "failed") {
                     setExecution({
                         status: d.status,
@@ -129,9 +124,9 @@ function HudOverlay() {
                         phase: String(d.phase || ""),
                     });
                 }
-            }
-        });
-        return off;
+            }),
+        ];
+        return () => unlisteners.forEach((unlisten) => unlisten());
     }, []);
 
     React.useEffect(() => {
@@ -180,9 +175,9 @@ function HudOverlay() {
     }
 
     const isSearching = plan?.status === "searching";
-    const hasPlan = plan?.status === "plan" && Array.isArray(plan.switch_discards) && plan.switch_discards.length > 0;
+    const hasPlan = plan?.status === "plan";
     const wanxiangSearching = wanxiangPlan?.status === "searching";
-    const hasWanxiangPlan = wanxiangPlan?.status === "plan" && Array.isArray(wanxiangPlan.switch_discards) && wanxiangPlan.switch_discards.length > 0;
+    const hasWanxiangPlan = wanxiangPlan?.status === "plan";
     const canOperate = stage === 4 || stage === 5;
     const hasWanxiang = hasWanxiangInState(gameState);
     const scoreProjection = getScoreProjection(gameState);
@@ -524,13 +519,15 @@ function isWanxiangPlanData(data: PlanData | null) {
         || data.mode === "wanxiang-four-meld-switch"
         || String(data.plan_signature || "").startsWith("wanxiang|")
         || data.reason === "wanxiang-not-in-hand"
+        || data.reason === "wanxiang-not-reachable-before-draw"
         || data.reason === "cannot-form-four-melds-with-wanxiang";
 }
 
 function hasWanxiangInState(gameState: GameStateData | null) {
     if (!gameState) return false;
     const deckMap = toDeckMap(gameState.deck_map ?? {});
-    return (gameState.hand_tiles ?? []).some((tileId) => tileId === 1000 || deckMap.get(tileId) === "bd");
+    return [...(gameState.hand_tiles ?? []), ...(gameState.replacement_tiles ?? [])]
+        .some((tileId) => tileId === 1000 || deckMap.get(tileId) === "bd");
 }
 
 function getScoreProjection(gameState: GameStateData | null) {

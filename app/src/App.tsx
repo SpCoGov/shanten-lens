@@ -3,9 +3,7 @@ import {createPortal} from "react-dom";
 import "./styles/theme.css";
 import "./App.css";
 import {invoke} from "@tauri-apps/api/core";
-import SettingsPage from "./pages/SettingsPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
-import PacketTestPage from "./pages/PacketTestPage";
 import FrontendTestPage from "./pages/FrontendTestPage";
 import AutoRunnerPage from "./pages/AutoRunnerPage";
 import FusePage from "./pages/FusePage";
@@ -17,7 +15,7 @@ import ScorePage from "./pages/ScorePage";
 import OverlayPage from "./pages/OverlayPage";
 import TodayWinPage from "./pages/TodayWinPage";
 import GameStatePage from "./pages/GameStatePage";
-import {ws, ensureWsStartedOnce} from "./lib/ws";
+import * as backendIpc from "./lib/ipc";
 import {type LogLevel, useLogStore} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
 import Modal from "./components/Modal";
@@ -37,9 +35,8 @@ import {
     type GameStateData,
     type GoodsItem,
     toDeckMap,
-    type WsEnvelope,
 } from "./lib/gamestate";
-import {installWsToastBridge, pushToast, useGlobalToast} from "./lib/toast";
+import {pushToast, useGlobalToast} from "./lib/toast";
 import {AutoRunnerStatus, setAutoStatus, useAutoRunner} from "./lib/autoRunnerStore";
 import GoodsBar from "./components/GoodsBar";
 import CandidateBar from "./components/CandidateBar";
@@ -59,12 +56,14 @@ import {
     ignoreUpdateVersion,
     readUpdatePrefs,
     setUpdateAutoCheck,
-    setUpdateUseSystemProxy,
     type UpdateInfo,
 } from "./lib/updateCheck";
 import {openUrl} from "@tauri-apps/plugin-opener";
 import {safeListen} from "./lib/tauriRuntime";
 import {formatLevelIdToLabel} from "./lib/levelFormat";
+import {useContainerWidth} from "react-grid-layout";
+import HomeDashboard from "./components/HomeDashboard";
+import PacketPipelinePage from "./pages/PacketPipelinePage";
 
 type BackendLogPayload =
     | string
@@ -285,7 +284,7 @@ async function openSettingsWindow() {
     }
 }
 
-type Route = "home" | "score" | "blackhole" | "wanxiang" | "souzu-debug" | "fuse" | "today-win" | "gamestate" | "autorun" | "settings" | "overlay" | "diagnostics" | "packet-test" | "frontend-test" | "about";
+type Route = "home" | "score" | "blackhole" | "wanxiang" | "souzu-debug" | "fuse" | "pipeline" | "today-win" | "gamestate" | "autorun" | "overlay" | "diagnostics" | "frontend-test" | "about";
 type TutorialId = "home" | "blackhole";
 type TutorialStep = {
     title: string;
@@ -314,13 +313,13 @@ function isWanxiangSwitchPlan(data: PlanData | null | undefined) {
         || data.mode === "wanxiang-four-meld-switch"
         || String(data.plan_signature || "").startsWith("wanxiang|")
         || data.reason === "wanxiang-not-in-hand"
+        || data.reason === "wanxiang-not-reachable-before-draw"
         || data.reason === "cannot-form-four-melds-with-wanxiang";
 }
 
 type UpdateDialogState = {
     update: UpdateInfo;
     autoCheck: boolean;
-    useSystemProxy: boolean;
 };
 
 const BLACKHOLE_TUTORIAL_SEEN_KEY = "sl-tutorial:blackhole:v1";
@@ -345,6 +344,7 @@ function writeTutorialSeen(key: string) {
 
 function isMoreRoute(route: Route) {
     return route === "fuse"
+        || route === "pipeline"
         || route === "wanxiang"
         || route === "today-win"
         || route === "gamestate"
@@ -352,7 +352,6 @@ function isMoreRoute(route: Route) {
         || route === "souzu-debug"
         || route === "diagnostics"
         || route === "frontend-test"
-        || route === "packet-test"
         || route === "about";
 }
 
@@ -617,6 +616,7 @@ function Topbar({
                     </span>
                 ) : null}
                 <span className="title" onClick={onSecretClick}>{t("app.title")}</span>
+                <span className="title-version-mark" aria-hidden="true" data-tauri-drag-region>v3</span>
             </div>
 
             <div className="win" data-tauri-drag-region="false">
@@ -858,7 +858,7 @@ export default function App() {
     const {config: autoConfig, status: autoStatus} = useAutoRunner();
     const [route, setRoute] = React.useState<Route>("home");
     const sidebarRef = React.useRef<HTMLDivElement | null>(null);
-    const appMainRef = React.useRef<HTMLDivElement | null>(null);
+    const {width: homeWidth, containerRef: appMainRef, mounted: homeMounted} = useContainerWidth();
     const navRefs = React.useRef<Partial<Record<Route, HTMLButtonElement | null>>>({});
     const moreButtonRef = React.useRef<HTMLButtonElement | null>(null);
     const moreMenuRef = React.useRef<HTMLDivElement | null>(null);
@@ -873,7 +873,6 @@ export default function App() {
     const [updateDialog, setUpdateDialog] = React.useState<UpdateDialogState | null>(null);
     const [latestUpdate, setLatestUpdate] = React.useState<UpdateInfo | null>(null);
     const [updateChecking, setUpdateChecking] = React.useState(false);
-    const [updatePrefs, setUpdatePrefs] = React.useState(() => readUpdatePrefs());
     const [tsumoLoopStatus, setTsumoLoopStatus] = React.useState<TsumoLoopStatus>({running: false, lastReason: "", winCount: 0});
     const [tsumoLoopIntervalMs, setTsumoLoopIntervalMs] = React.useState(() => readTsumoLoopIntervalMs());
     const [tsumoLoopSettingsOpen, setTsumoLoopSettingsOpen] = React.useState(false);
@@ -1158,12 +1157,10 @@ export default function App() {
             console.info("[update-check]", manual ? "manual" : "auto", result);
             if (result.status === "available") {
                 const prefs = readUpdatePrefs();
-                setUpdatePrefs(prefs);
                 setLatestUpdate(result.update);
                 setUpdateDialog({
                     update: result.update,
                     autoCheck: prefs.autoCheck,
-                    useSystemProxy: prefs.useSystemProxy,
                 });
                 return;
             }
@@ -1179,11 +1176,6 @@ export default function App() {
             if (manual) setUpdateChecking(false);
         }
     }, [t]);
-
-    const handleUpdateProxyChange = React.useCallback((useSystemProxy: boolean) => {
-        setUpdateUseSystemProxy(useSystemProxy);
-        setUpdatePrefs(readUpdatePrefs());
-    }, []);
 
     React.useEffect(() => {
         console.info("[update-check]", "auto", "scheduled");
@@ -1223,7 +1215,7 @@ export default function App() {
         [exchangeShopBuffLevel],
     );
 
-    const handleUpgradeExchangeShopBuff = React.useCallback(() => {
+    const handleUpgradeExchangeShopBuff = React.useCallback(async () => {
         if (stage !== 9) {
             pushToast(t("shop_buff_upgrade.stage_not_allowed"), "info", 1800);
             return;
@@ -1241,17 +1233,25 @@ export default function App() {
             }), "error", 2200);
             return;
         }
-        ws.send({
-            type: "upgrade_shop_buff",
-            data: {activityId: 260511, id: SHOP_BUFF_EXCHANGE_ID},
-        } as any);
+        const result = await backendIpc.upgradeShopBuff(SHOP_BUFF_EXCHANGE_ID);
+        if (result.ok) {
+            pushToast(t("shop_buff_upgrade.success", {name: t("shop_buff_upgrade.exchange_name")}), "success", 1800);
+        } else if (result.reason === "insufficient_coin") {
+            pushToast(t("shop_buff_upgrade.insufficient_coin", {cost: result.cost ?? 0, coin: result.coin ?? 0}), "error", 2200);
+        } else if (result.reason === "maxed") {
+            pushToast(t("shop_buff_upgrade.maxed", {name: t("shop_buff_upgrade.exchange_name")}), "info", 1800);
+        } else if (result.reason === "addon-not-ready") {
+            pushToast(t("shop_buff_upgrade.addon_not_ready"), "error", 2200);
+        } else {
+            pushToast(t("shop_buff_upgrade.failed", {reason: result.reason || "unknown"}), "error", 2600);
+        }
     }, [coin, nextExchangeShopBuffCost, stage, t]);
 
-    const toggleTsumoLoop = React.useCallback(() => {
-        ws.send({
-            type: "tsumo_loop_control",
-            data: {action: tsumoLoopStatus.running ? "stop" : "start", intervalMs: clampTsumoLoopIntervalMs(tsumoLoopIntervalMs)},
-        } as any);
+    const toggleTsumoLoop = React.useCallback(async () => {
+        const status = tsumoLoopStatus.running
+            ? await backendIpc.stopTsumoLoop()
+            : await backendIpc.startTsumoLoop(clampTsumoLoopIntervalMs(tsumoLoopIntervalMs));
+        setTsumoLoopStatus({running: status.running, lastReason: status.lastReason ?? "", winCount: status.winCount ?? 0});
     }, [tsumoLoopIntervalMs, tsumoLoopStatus.running]);
 
     const openTsumoLoopSettings = React.useCallback(() => {
@@ -1415,8 +1415,8 @@ export default function App() {
             try {
                 await invoke("update_startup_progress", {
                     phase: "render",
-                    label: "正在完成界面初始化",
-                    detail: "准备显示主窗口",
+                    label: t("startup.finishing"),
+                    detail: t("startup.finishing_detail"),
                     progress: 0.97,
                     etaSeconds: 1,
                     indeterminate: false,
@@ -1441,13 +1441,9 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
-        ensureWsStartedOnce();
-        setConnected(ws.connected);
-        installWsToastBridge(ws);
-        const offOpen = ws.onOpen(() => setConnected(true));
-        const offClose = ws.onClose(() => setConnected(false));
-
-        const offPkt = ws.onPacket((pkt: WsEnvelope) => {
+        type EventName = "update_config" | "update_gamestate" | "discard_recommendation" | "souzu_switch_execution" | "autorun_status" | "tsumo_loop_status" | "msgbox";
+        type AppBackendEvent = {[K in EventName]: {type: K; data: backendIpc.BackendEventMap[K]}}[EventName];
+        const handleBackendEvent = (pkt: AppBackendEvent) => {
             if (pkt.type === "update_config") {
                 const debug = !!(pkt.data as any)?.general?.debug;
                 setDebugEnabled(debug);
@@ -1555,70 +1551,6 @@ export default function App() {
                     lastReason: String(d.lastReason || ""),
                     winCount: Math.max(0, Number(d.winCount || 0)),
                 });
-            } else if (pkt.type === "upgrade_shop_buff_result") {
-                const d = (pkt.data ?? {}) as {
-                    ok?: boolean;
-                    reason?: string;
-                    cost?: number;
-                    coin?: number;
-                };
-                if (d.ok) {
-                    pushToast(t("shop_buff_upgrade.success", {name: t("shop_buff_upgrade.exchange_name")}), "success", 1800);
-                } else if (d.reason === "insufficient_coin") {
-                    pushToast(t("shop_buff_upgrade.insufficient_coin", {
-                        cost: d.cost ?? 0,
-                        coin: d.coin ?? 0,
-                    }), "error", 2200);
-                } else if (d.reason === "maxed") {
-                    pushToast(t("shop_buff_upgrade.maxed", {name: t("shop_buff_upgrade.exchange_name")}), "info", 1800);
-                } else if (d.reason === "addon-not-ready") {
-                    pushToast(t("shop_buff_upgrade.addon_not_ready"), "error", 2200);
-                } else {
-                    pushToast(t("shop_buff_upgrade.failed", {reason: d.reason || "unknown"}), "error", 2600);
-                }
-            } else if (pkt.type === "amulet_hotkey_action_result") {
-                const d = (pkt.data ?? {}) as {
-                    ok?: boolean;
-                    action?: string;
-                    reason?: string;
-                    stage?: number;
-                };
-                if (d.ok) {
-                    const labelKey = d.action === "buy_pack"
-                        ? "buy_pack"
-                        : d.action === "refresh_shop"
-                            ? "refresh_shop"
-                            : d.action === "sell_recent" || d.action === "sell_effect"
-                                ? "sell_recent"
-                                : d.action === "sort_effect"
-                                    ? "sort_effect"
-                                    : "select_candidate";
-                    pushToast(t("amulet_hotkeys.toast_sent", {action: t(`amulet_hotkeys.action.${labelKey}`)}), "success", 1200);
-                } else {
-                    const reason = d.reason || "unknown";
-                    const msg = reason === "stage-not-allowed"
-                        ? t("amulet_hotkeys.stage_unavailable", {stage: d.stage ?? stage})
-                        : reason === "coin not enough"
-                            ? t("amulet_hotkeys.not_enough_coin_short")
-                            : reason === "no-effects"
-                                ? t("amulet_hotkeys.no_effects")
-                                : reason === "selected-effect-not-found"
-                                    ? t("amulet_hotkeys.selected_effect_missing")
-                                    : reason === "skip-not-allowed"
-                                        ? t("amulet_hotkeys.free_cannot_skip")
-                                        : t("amulet_hotkeys.action_failed", {reason});
-                    pushToast(msg, "error", 1800);
-                }
-            } else if (pkt.type === "version_mismatch" && pkt.data) {
-                const d = pkt.data as Partial<VersionMismatch>;
-                if (!versionMismatchShownRef.current) {
-                    versionMismatchShownRef.current = true;
-                    setVersionMismatch({
-                        frontendVersion: String(d.frontendVersion || APP_VERSION),
-                        backendVersion: String(d.backendVersion || "unknown"),
-                    });
-                }
-                return;
             } else if (pkt.type === "msgbox" && pkt.data) {
                 const d = pkt.data || {};
                 if (!d.id) return;
@@ -1632,7 +1564,27 @@ export default function App() {
                 });
                 return;
             }
-        });
+        };
+
+        const backendUnlisteners = ([
+            "update_config", "update_gamestate", "discard_recommendation", "souzu_switch_execution",
+            "autorun_status", "tsumo_loop_status", "msgbox",
+        ] as EventName[]).map((name) => backendIpc.subscribeBackendEvent(name, (data) => handleBackendEvent({type: name, data} as AppBackendEvent)));
+        void backendIpc.initializeBackend().then((snapshot) => {
+            setConnected(true);
+            handleBackendEvent({type: "update_config", data: snapshot.config});
+            handleBackendEvent({type: "update_gamestate", data: snapshot.gameState});
+            handleBackendEvent({type: "autorun_status", data: snapshot.autorunStatus});
+            handleBackendEvent({type: "tsumo_loop_status", data: snapshot.tsumoLoopStatus});
+            return backendIpc.checkVersion();
+        }).then((mismatch) => {
+            if (!mismatch || versionMismatchShownRef.current) return;
+            versionMismatchShownRef.current = true;
+            setVersionMismatch({
+                frontendVersion: APP_VERSION,
+                backendVersion: String((mismatch as Partial<VersionMismatch>).backendVersion || "unknown"),
+            });
+        }).catch(() => setConnected(false));
 
         const addLog = useLogStore.getState().addLog;
         const addLogs = useLogStore.getState().addLogs;
@@ -1701,23 +1653,19 @@ export default function App() {
             };
             await sub("backend:spawn", "INFO");
             await sub("backend:ready", "INFO");
-            await sub("backend:stdout", "STDOUT");
-            await sub("backend:stderr", "STDERR");
             await sub("backend:exit", "WARN");
             await sub("backend:error", "ERROR");
         })();
 
         return () => {
-            offOpen();
-            offClose();
-            offPkt();
+            backendUnlisteners.forEach((unlisten) => unlisten());
             unsubs.forEach((u) => u());
             unsubs = [];
         };
     }, []);
 
     React.useEffect(() => {
-        if (!debugEnabled && (route === "packet-test" || route === "souzu-debug")) {
+        if (!debugEnabled && route === "souzu-debug") {
             setRoute("diagnostics");
         }
     }, [debugEnabled, route]);
@@ -1818,12 +1766,25 @@ export default function App() {
         updateAmuletHotkey(group, key, index);
     }, [updateAmuletHotkey]);
 
-    const sendAmuletHotkeyAction = React.useCallback((action: string, payload: Record<string, unknown> = {}) => {
-        ws.send({
-            type: "amulet_hotkey_action",
-            data: {activityId: 260511, action, ...payload},
-        } as any);
-    }, []);
+    const sendAmuletHotkeyAction = React.useCallback(async (request: backendIpc.AmuletActionRequest) => {
+        const result = await backendIpc.runAmuletAction(request);
+        if (result.ok) {
+            const labelKey = request.action === "buy_pack" ? "buy_pack"
+                : request.action === "refresh_shop" ? "refresh_shop"
+                    : request.action === "sell_recent" || request.action === "sell_effect" ? "sell_recent"
+                        : request.action === "sort_effect" ? "sort_effect" : "select_candidate";
+            pushToast(t("amulet_hotkeys.toast_sent", {action: t(`amulet_hotkeys.action.${labelKey}`)}), "success", 1200);
+            return;
+        }
+        const reason = result.reason || "unknown";
+        const message = reason === "stage-not-allowed" ? t("amulet_hotkeys.stage_unavailable", {stage: result.stage ?? stage})
+            : reason === "coin not enough" ? t("amulet_hotkeys.not_enough_coin_short")
+                : reason === "no-effects" ? t("amulet_hotkeys.no_effects")
+                    : reason === "selected-effect-not-found" ? t("amulet_hotkeys.selected_effect_missing")
+                        : reason === "skip-not-allowed" ? t("amulet_hotkeys.free_cannot_skip")
+                            : t("amulet_hotkeys.action_failed", {reason});
+        pushToast(message, "error", 1800);
+    }, [stage, t]);
 
     const selectCandidateByIndex = React.useCallback((selectedIndex: number) => {
         if (![2, 9, 16].includes(stage)) {
@@ -1832,7 +1793,7 @@ export default function App() {
         }
         const candidate = (candidates ?? [])[selectedIndex];
         setLastSelectedCandidateId(candidate?.id ?? null);
-        sendAmuletHotkeyAction("select_candidate", {selectedIndex});
+        void sendAmuletHotkeyAction({action: "select_candidate", selectedIndex});
     }, [candidates, sendAmuletHotkeyAction, stage, t]);
 
     const refreshShopManually = React.useCallback(() => {
@@ -1847,7 +1808,7 @@ export default function App() {
             pushToast(t("amulet_hotkeys.not_enough_coin", {cost: refreshPrice, coin: safeCoin}), "error", 1600);
             return;
         }
-        sendAmuletHotkeyAction("refresh_shop");
+        void sendAmuletHotkeyAction({action: "refresh_shop"});
     }, [coin, latestGameState?.refresh_price, sendAmuletHotkeyAction, stage, t]);
 
     const skipCandidateManually = React.useCallback(() => {
@@ -1859,16 +1820,16 @@ export default function App() {
             pushToast(t("amulet_hotkeys.free_cannot_skip"), "info", 1400);
             return;
         }
-        sendAmuletHotkeyAction("skip");
+        void sendAmuletHotkeyAction({action: "skip"});
     }, [sendAmuletHotkeyAction, stage, t]);
 
     const sellOwnedAmulet = React.useCallback((item: EffectItem) => {
         setSellConfirmTarget(null);
-        sendAmuletHotkeyAction("sell_effect", {uid: item.uid});
+        void sendAmuletHotkeyAction({action: "sell_effect", uid: item.uid});
     }, [sendAmuletHotkeyAction]);
 
     const sortOwnedAmulets = React.useCallback((sortedUid: number[]) => {
-        sendAmuletHotkeyAction("sort_effect", {sortedUid});
+        void sendAmuletHotkeyAction({action: "sort_effect", sortedUid});
     }, [sendAmuletHotkeyAction]);
 
     const handleAmuletHotkey = React.useCallback((event: KeyboardEvent) => {
@@ -1895,7 +1856,7 @@ export default function App() {
                     pushToast(t("amulet_hotkeys.not_enough_coin", {cost: price, coin: safeCoin}), "error", 1600);
                     return;
                 }
-                sendAmuletHotkeyAction("buy_pack", {goodId: good.id});
+                void sendAmuletHotkeyAction({action: "buy_pack", goodId: good.id});
                 return;
             }
 
@@ -1933,10 +1894,10 @@ export default function App() {
                     pushToast(t("amulet_hotkeys.no_selected_record"), "info", 1400);
                     return;
                 }
-                sendAmuletHotkeyAction("sell_recent", {mode: "last_selected", rawId: lastSelectedCandidateId});
+                void sendAmuletHotkeyAction({action: "sell_recent", rawId: lastSelectedCandidateId});
                 return;
             }
-            sendAmuletHotkeyAction("sell_recent", {mode: "last_list"});
+            void sendAmuletHotkeyAction({action: "sell_recent"});
         }
     }, [
         amuletHotkeys,
@@ -2098,6 +2059,14 @@ export default function App() {
                                     <span>{t("nav.fuse")}</span>
                                 </button>
                                 <button
+                                    className={`more-menu-item ${route === "pipeline" ? "active" : ""}`}
+                                    role="menuitem"
+                                    onClick={() => navigateFromMore("pipeline")}
+                                >
+                                    <span className="ms">account_tree</span>
+                                    <span>{t("nav.pipeline")}</span>
+                                </button>
+                                <button
                                     className={`more-menu-item ${route === "wanxiang" ? "active" : ""}`}
                                     role="menuitem"
                                     onClick={() => navigateFromMore("wanxiang")}
@@ -2160,7 +2129,7 @@ export default function App() {
                                         onClick={() => navigateFromMore("frontend-test")}
                                     >
                                         <span className="ms">lab_profile</span>
-                                        <span>前端测试</span>
+                                        <span>{t("nav.frontendTest")}</span>
                                     </button>
                                 )}
                                 {debugEnabled && (
@@ -2171,16 +2140,6 @@ export default function App() {
                                     >
                                         <span className="ms">science</span>
                                         <span>{t("nav.blackholeDebug")}</span>
-                                    </button>
-                                )}
-                                {debugEnabled && (
-                                    <button
-                                        className={`more-menu-item ${route === "packet-test" ? "active" : ""}`}
-                                        role="menuitem"
-                                        onClick={() => navigateFromMore("packet-test")}
-                                    >
-                                        <span className="ms">send_and_archive</span>
-                                        <span>{t("nav.packetTest")}</span>
                                     </button>
                                 )}
                             </div>
@@ -2203,7 +2162,7 @@ export default function App() {
                             className="nav-icon"
                             data-tutorial="nav-refresh"
                             title={t("nav.refreshGame")}
-                            onClick={() => ws.send({type: "fetch_amulet_activity_data", data: {activityId: 260511}})}
+                            onClick={() => void backendIpc.fetchActivity()}
                         >
                             <span className="ms">refresh</span>
                         </button>
@@ -2227,9 +2186,8 @@ export default function App() {
                     </div>
                 </aside>
 
-                <main className="main-pane">
+                <main className="main-pane" ref={appMainRef as React.Ref<HTMLElement>}>
                     <div
-                        ref={appMainRef}
                         className={`app-main route-${route}`}
                         style={{
                             padding: `${OUTER_PADDING}px ${OUTER_PADDING}px ${route === "home" ? OUTER_PADDING : 0}px ${OUTER_PADDING}px`,
@@ -2237,11 +2195,10 @@ export default function App() {
                         }}
                     >
                         {route === "home" && (
-                            <div
-                                className="home-grid"
-                                style={{display: "flex", alignItems: "stretch", gap: MAIN_GAP}}
-                            >
-                                {showHomeSidePanel ? (
+                            <HomeDashboard tiles={[
+                                showHomeSidePanel ? {
+                                    id: "side",
+                                    content: (
                                     <div className="panel advisor home-advisor-panel home-side-panel">
                                         {isAdvisorStage ? (
                                             <>
@@ -2272,10 +2229,15 @@ export default function App() {
                                             </>
                                         )}
                                     </div>
-                                ) : null}
+                                    ),
+                                } : null,
 
-                                <div style={{flex: 1, minWidth: 0, minHeight: 0, maxHeight: "100%", position: "relative"}}>
-                                    <div className="panel">
+                                {
+                                    id: "main",
+                                    splitChildren: true,
+                                    content: (
+                                <div style={{width: "100%", height: "100%", minWidth: 0, minHeight: 0, overflow: "auto", position: "relative"}}>
+                                    <div className="panel" key="amulets">
                                         <div className="panel-title panel-title-with-action">
                                             <span>{t("amulet")}</span>
                                             <div className="panel-title-actions">
@@ -2321,7 +2283,7 @@ export default function App() {
                                     </div>
 
                                     {(stage === 9) && (
-                                        <div className="panel">
+                                        <div className="panel" key="goods">
                                             <div className="panel-title panel-title-with-action">
                                                 <span>{t("goods")}</span>
                                                 <button
@@ -2348,7 +2310,7 @@ export default function App() {
                                     )}
 
                                     {stage === 9 && false && (
-                                        <div className="panel">
+                                        <div className="panel" key="shop-buff">
                                             <div className="panel-title">{t("shop_buff_upgrade.panel_title")}</div>
                                             <div style={{display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center"}}>
                                                 <button
@@ -2380,7 +2342,7 @@ export default function App() {
                                     )}
 
                                     {[2, 9, 16].includes(stage) && (
-                                        <div className="panel">
+                                        <div className="panel" key="candidates">
                                             <div className="panel-title panel-title-with-action">
                                                 <span>{t("candidate_amulet")}</span>
                                                 {[9, 16].includes(stage) ? (
@@ -2410,6 +2372,7 @@ export default function App() {
 
                                     {(stage === 4 || stage === 5 || stage === 6 || stage === 7) && (
                                         <TileGrid
+                                            key="tiles"
                                             cells={cells}
                                             tianDoraTiles={tianDoraTiles}
                                             doraCountByTile={doraCountByTile}
@@ -2417,14 +2380,19 @@ export default function App() {
                                     )}
 
                                     {(stage === 5 || stage === 4) && replacementTiles.length > 0 && (
-                                        <ReplacementPanel replacementTiles={replacementTiles} usedCount={switchUsedCount}/>
+                                        <ReplacementPanel key="replacement" replacementTiles={replacementTiles} usedCount={switchUsedCount}/>
                                     )}
 
                                 </div>
+                                    ),
+                                },
 
-                                {(stage === 5 || stage === 4 || stage == 6 || stage === 7) && (
+                                (stage === 5 || stage === 4 || stage == 6 || stage === 7) ? {
+                                    id: "stats",
+                                    splitChildren: true,
+                                    content: (
                                     <div className="right-side-panel">
-                                        <div className="dora-indicator-panel mj-panel">
+                                        <div className="dora-indicator-panel mj-panel" key="dora">
                                             <div className="dora-indicator-title">{t("dora_indicator.title")}</div>
                                             <div className="dora-indicator-list">
                                                 {doraIndicatorTiles.length === 0 ? (
@@ -2445,13 +2413,14 @@ export default function App() {
                                             </div>
                                         </div>
                                         {(stage === 5 || stage === 4) && rightPanelMode === "replacementStats" ? (
-                                            <ReplacementStats replacementTiles={replacementTiles} usedCount={switchUsedCount} headerSlot={statsHeader}/>
+                                            <ReplacementStats key="replacement-stats" replacementTiles={replacementTiles} usedCount={switchUsedCount} headerSlot={statsHeader}/>
                                         ) : (
-                                            <WallStats wallTiles={wallStatsTiles} headerSlot={statsHeader}/>
+                                            <WallStats key="wall-stats" wallTiles={wallStatsTiles} headerSlot={statsHeader}/>
                                         )}
                                     </div>
-                                )}
-                            </div>
+                                    ),
+                                } : null,
+                            ]} width={homeWidth} mounted={homeMounted}/>
                         )}
 
                         {route === "score" && (
@@ -2468,6 +2437,7 @@ export default function App() {
                             />
                         )}
                         {route === "fuse" && <FusePage/>}
+                        {route === "pipeline" && <PacketPipelinePage/>}
                         {route === "today-win" && <TodayWinPage/>}
                         {route === "gamestate" && <GameStatePage currentState={latestGameState}/>}
                         {route === "blackhole" && (
@@ -2502,11 +2472,9 @@ export default function App() {
                             />
                         )}
                         {route === "autorun" && <AutoRunnerPage/>}
-                        {route === "settings" && <SettingsPage/>}
                         {route === "overlay" && <OverlayPage/>}
                         {route === "diagnostics" && <DiagnosticsPage/>}
                         {route === "frontend-test" && <FrontendTestPage/>}
-                        {route === "packet-test" && debugEnabled && <PacketTestPage/>}
                         {route === "about" && (
                             <AboutPage
                                 onSecretClick={onSecretClick}
@@ -2514,8 +2482,6 @@ export default function App() {
                                 onCheckUpdate={() => void runUpdateCheck(true)}
                                 updateAvailable={latestUpdate}
                                 checkingUpdate={updateChecking}
-                                useSystemProxy={updatePrefs.useSystemProxy}
-                                onUseSystemProxyChange={handleUpdateProxyChange}
                             />
                         )}
                     </div>
@@ -2929,20 +2895,6 @@ export default function App() {
                             />
                             <span>{t("update.auto_check_label")}</span>
                         </label>
-                        <label className={`update-dialog-check ${updateDialog.useSystemProxy ? "is-on" : ""}`}>
-                            <input
-                                type="checkbox"
-                                checked={updateDialog.useSystemProxy}
-                                onChange={(event) => {
-                                    const useSystemProxy = event.currentTarget.checked;
-                                    setUpdateUseSystemProxy(useSystemProxy);
-                                    setUpdatePrefs(readUpdatePrefs());
-                                    setUpdateDialog((current) => current ? {...current, useSystemProxy} : current);
-                                }}
-                            />
-                            <span>{t("update.system_proxy_label")}</span>
-                        </label>
-
                         <div className="update-dialog-actions">
                             <button
                                 className="nav-btn"

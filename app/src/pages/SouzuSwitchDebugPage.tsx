@@ -4,7 +4,7 @@ import {useTranslation} from "react-i18next";
 import {pushToast} from "../lib/toast";
 import type {GameStateData} from "../lib/gamestate";
 import type {PlanData} from "../lib/planTypes";
-import {ws} from "../lib/ws";
+import * as backendIpc from "../lib/ipc";
 import {BlackHoleStrategyCard} from "./BlackHolePage";
 
 export type DebugSnapshot = {
@@ -82,10 +82,10 @@ export function buildDebugSnapshotFromState(state: GameStateData): DebugSnapshot
     };
 }
 
-function safeParseSnapshot(text: string): DebugSnapshot {
+function safeParseSnapshot(text: string, t: (key: string) => string): DebugSnapshot {
     const parsed = JSON.parse(text);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new Error("导入内容必须是 JSON 对象");
+        throw new Error(t("souzu_debug.json_object_required"));
     }
     return parsed as DebugSnapshot;
 }
@@ -119,16 +119,12 @@ function sourceShort(source: PoolSource) {
     return "W";
 }
 
-function sourceTitle(source: PoolSource) {
-    if (source === "hand") return "手牌";
-    if (source === "replacement") return "换牌堆";
-    return "牌山";
+function sourceTitle(source: PoolSource, t: (key: string) => string) {
+    return t(`souzu_debug.source_${source}`);
 }
 
-function bucketTitle(key: ManualStructureKey) {
-    if (key === "meld1") return "面子 A";
-    if (key === "meld2") return "面子 B";
-    return "雀头";
+function bucketTitle(key: ManualStructureKey, t: (key: string) => string) {
+    return t(`souzu_debug.bucket_${key}`);
 }
 
 function emptyStructureState(): ManualStructureState {
@@ -252,7 +248,7 @@ export default function SouzuSwitchDebugPage({
 
     const importSnapshot = React.useCallback(() => {
         try {
-            const parsed = safeParseSnapshot(snapshotText);
+            const parsed = safeParseSnapshot(snapshotText, t);
             setActiveSnapshot(parsed);
             resetManualBuilder();
             pushToast(t("blackhole.debug_import_success"), "success", 1400);
@@ -293,62 +289,56 @@ export default function SouzuSwitchDebugPage({
     const runImportedSnapshot = React.useCallback(() => {
         let snapshot: DebugSnapshot;
         try {
-            snapshot = safeParseSnapshot(snapshotText);
+            snapshot = safeParseSnapshot(snapshotText, t);
         } catch (error) {
-            pushToast(error instanceof Error ? error.message : "导入内容无效", "error", 2200);
+            pushToast(error instanceof Error ? error.message : t("souzu_debug.import_invalid"), "error", 2200);
             return;
         }
         const nextWallLimit = resolveWallLimit();
         if (nextWallLimit == null) return;
         setActiveSnapshot(snapshot);
-        ws.send({
-            type: "souzu_switch_control",
-            data: {
-                action: "start_debug",
-                snapshot,
-                options: {
-                    skip_signatures: [],
-                    wall_limit: nextWallLimit,
-                    search_algorithm: searchAlgorithm,
-                },
+        void backendIpc.runSwitch({
+            action: "start_debug",
+            snapshot,
+            options: {
+                skip_signatures: [],
+                wall_limit: nextWallLimit,
+                search_algorithm: searchAlgorithm,
             },
-        } as any);
-    }, [resolveWallLimit, searchAlgorithm, snapshotText]);
+        });
+    }, [resolveWallLimit, searchAlgorithm, snapshotText, t]);
 
     const validateManualPlan = React.useCallback(() => {
         let snapshot: DebugSnapshot;
         try {
-            snapshot = activeSnapshot ?? safeParseSnapshot(snapshotText);
+            snapshot = activeSnapshot ?? safeParseSnapshot(snapshotText, t);
         } catch (error) {
-            pushToast(error instanceof Error ? error.message : "请先导入局面", "error", 2200);
+            pushToast(error instanceof Error ? error.message : t("souzu_debug.import_first"), "error", 2200);
             return;
         }
         if (!selectedQuads[0] || !selectedQuads[1]) {
-            pushToast("请先选择两组杠", "error", 1800);
+            pushToast(t("souzu_debug.choose_two_quads"), "error", 1800);
             return;
         }
         if (selectedQuads[0].key === selectedQuads[1].key) {
-            pushToast("两组杠不能相同", "error", 1800);
+            pushToast(t("souzu_debug.quads_must_differ"), "error", 1800);
             return;
         }
         const totalTiles = manualStructure.meld1.length + manualStructure.meld2.length + manualStructure.pair.length;
         if (totalTiles !== 7) {
-            pushToast("听牌前目标一共需要 7 张牌", "error", 1800);
+            pushToast(t("souzu_debug.target_seven_tiles"), "error", 1800);
             return;
         }
         const nextWallLimit = resolveWallLimit();
         if (nextWallLimit == null) return;
-        ws.send({
-            type: "souzu_switch_control",
-            data: {
-                action: "validate_manual_debug",
-                snapshot,
-                quad_groups: [selectedQuads[0].ids, selectedQuads[1].ids],
-                structure_groups: manualStructure,
-                options: {wall_limit: nextWallLimit},
-            },
-        } as any);
-    }, [activeSnapshot, manualStructure, resolveWallLimit, selectedQuads, snapshotText]);
+        void backendIpc.runSwitch({
+            action: "validate_manual_debug",
+            snapshot,
+            quadGroups: [selectedQuads[0].ids, selectedQuads[1].ids],
+            structureGroups: manualStructure,
+            options: {wall_limit: nextWallLimit},
+        });
+    }, [activeSnapshot, manualStructure, resolveWallLimit, selectedQuads, snapshotText, t]);
 
     const clearDebugState = React.useCallback(() => {
         setSnapshotText("");
@@ -357,7 +347,7 @@ export default function SouzuSwitchDebugPage({
         onClear?.();
     }, [onClear, resetManualBuilder]);
     const stopSearch = React.useCallback(() => {
-        ws.send({type: "souzu_switch_control", data: {action: "stop"}} as any);
+        void backendIpc.runSwitch({action: "stop"});
     }, []);
 
     React.useEffect(() => {
@@ -380,13 +370,13 @@ export default function SouzuSwitchDebugPage({
                 next[key] = next[key].filter((id) => id !== tileId);
             });
             if (next[activeBucket].length >= STRUCTURE_LIMITS[activeBucket]) {
-                pushToast("当前分组已满", "error", 1400);
+                pushToast(t("souzu_debug.group_full"), "error", 1400);
                 return prev;
             }
             next[activeBucket].push(tileId);
             return next;
         });
-    }, [activeBucket, selectedQuadIds]);
+    }, [activeBucket, selectedQuadIds, t]);
 
     const removeTile = React.useCallback((bucket: ManualStructureKey, tileId: number) => {
         setManualStructure((prev) => ({
@@ -440,13 +430,13 @@ export default function SouzuSwitchDebugPage({
                     <div className="panel-title">{t("blackhole.debug_snapshot_preview")}</div>
                     {activeSnapshot ? (
                         <div style={{display: "grid", gap: 12}}>
-                            <SnapshotTileRow title="手牌" ids={activeSnapshot.hand_tiles ?? []} resolveFace={resolveFace}/>
-                            <SnapshotTileRow title="换牌堆" ids={activeSnapshot.replacement_tiles ?? []} resolveFace={resolveFace}/>
-                            <SnapshotTileRow title="牌山" ids={(activeSnapshot.wall_tiles ?? []).slice(0, wallLimit)} resolveFace={resolveFace}/>
+                            <SnapshotTileRow title={t("souzu_debug.source_hand")} ids={activeSnapshot.hand_tiles ?? []} resolveFace={resolveFace}/>
+                            <SnapshotTileRow title={t("souzu_debug.source_replacement")} ids={activeSnapshot.replacement_tiles ?? []} resolveFace={resolveFace}/>
+                            <SnapshotTileRow title={t("souzu_debug.source_wall")} ids={(activeSnapshot.wall_tiles ?? []).slice(0, wallLimit)} resolveFace={resolveFace}/>
                             <div style={{display: "flex", flexWrap: "wrap", gap: 10}}>
-                                <span className="badge">{`阶段: ${String(activeSnapshot.stage ?? "-")}`}</span>
-                                <span className="badge">{`已换: ${String(activeSnapshot.change_tile_count ?? 0)}`}</span>
-                                <span className="badge">{`总换牌次数: ${String(activeSnapshot.total_change_tile_count ?? 0)}`}</span>
+                                <span className="badge">{t("souzu_debug.stage", {value: String(activeSnapshot.stage ?? "-")})}</span>
+                                <span className="badge">{t("souzu_debug.changed", {value: String(activeSnapshot.change_tile_count ?? 0)})}</span>
+                                <span className="badge">{t("souzu_debug.total_changes", {value: String(activeSnapshot.total_change_tile_count ?? 0)})}</span>
                                 <span className="badge">Boss Buff: {(activeSnapshot.boss_buff ?? []).join(", ") || "-"}</span>
                             </div>
                         </div>
@@ -462,13 +452,13 @@ export default function SouzuSwitchDebugPage({
                     <div style={{display: "grid", gap: 16}}>
                         <div style={{display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12}}>
                             <ManualQuadSelect
-                                title="杠 A"
+                                title={t("souzu_debug.quad_a")}
                                 value={selectedQuadKeys[0]}
                                 options={quadOptions}
                                 onChange={(value) => setSelectedQuadKeys(([_, second]) => [value, second])}
                             />
                             <ManualQuadSelect
-                                title="杠 B"
+                                title={t("souzu_debug.quad_b")}
                                 value={selectedQuadKeys[1]}
                                 options={quadOptions}
                                 onChange={(value) => setSelectedQuadKeys(([first]) => [first, value])}
@@ -476,7 +466,7 @@ export default function SouzuSwitchDebugPage({
                         </div>
 
                         <div style={{display: "grid", gap: 10}}>
-                            <div className="hint">当前点击分配到</div>
+                            <div className="hint">{t("souzu_debug.assign_to")}</div>
                             <div style={{display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center"}}>
                                 {(["meld1", "meld2", "pair"] as ManualStructureKey[]).map((key) => (
                                     <button
@@ -484,11 +474,11 @@ export default function SouzuSwitchDebugPage({
                                         className={`nav-btn ${activeBucket === key ? "active" : ""}`}
                                         onClick={() => setActiveBucket(key)}
                                     >
-                                        {bucketTitle(key)} {manualStructure[key].length}/{STRUCTURE_LIMITS[key]}
+                                        {bucketTitle(key, t)} {manualStructure[key].length}/{STRUCTURE_LIMITS[key]}
                                     </button>
                                 ))}
-                                <button className="nav-btn" onClick={resetManualBuilder}>重置分组</button>
-                                <span className="badge">{`当前总数: ${totalTiles}/7`}</span>
+                                <button className="nav-btn" onClick={resetManualBuilder}>{t("souzu_debug.reset_groups")}</button>
+                                <span className="badge">{t("souzu_debug.current_total", {count: totalTiles})}</span>
                             </div>
                         </div>
 
@@ -496,7 +486,7 @@ export default function SouzuSwitchDebugPage({
                             {(["meld1", "meld2", "pair"] as ManualStructureKey[]).map((key) => (
                                 <ManualBucket
                                     key={key}
-                                    title={bucketTitle(key)}
+                                    title={bucketTitle(key, t)}
                                     ids={manualStructure[key]}
                                     resolveFace={resolveFace}
                                     onRemove={(tileId) => removeTile(key, tileId)}
@@ -505,11 +495,11 @@ export default function SouzuSwitchDebugPage({
                         </div>
 
                         <div style={{display: "grid", gap: 12}}>
-                            <div className="hint">可分配的牌</div>
+                            <div className="hint">{t("souzu_debug.allocatable_tiles")}</div>
                             {(["hand", "replacement", "wall"] as PoolSource[]).map((source) => (
                                 <PoolSection
                                     key={source}
-                                    title={sourceTitle(source)}
+                                    title={sourceTitle(source, t)}
                                     entries={groupedPoolEntries[source]}
                                     usedQuadIds={selectedQuadIds}
                                     manualIds={manualIds}
@@ -558,6 +548,7 @@ function DebugPoolCard({
     data: PlanData | null;
     resolveFace: (id: number) => string | null;
 }) {
+    const {t} = useTranslation();
     const debugPool = data?.debug_pool;
     if (!debugPool) return null;
 
@@ -570,39 +561,39 @@ function DebugPoolCard({
 
     return (
         <section className="panel" style={{marginBottom: 12}}>
-            <div className="panel-title">搜索池诊断</div>
+            <div className="panel-title">{t("souzu_debug.pool_diagnostics")}</div>
             <div style={{display: "grid", gap: 14}}>
                 <div style={{display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10}}>
-                    <InfoStat label={`${focusFace} 归一后数量`} value={String(debugPool.focus_count ?? 0)}/>
-                    <InfoStat label="原始 0s 数量" value={String(debugPool.raw_focus_counts?.["0s"] ?? 0)}/>
-                    <InfoStat label="原始 5s 数量" value={String(debugPool.raw_focus_counts?.["5s"] ?? 0)}/>
-                    <InfoStat label={`${focusFace} 可成杠数`} value={String(focusQuads.length)}/>
+                    <InfoStat label={t("souzu_debug.normalized_count", {face: focusFace})} value={String(debugPool.focus_count ?? 0)}/>
+                    <InfoStat label={t("souzu_debug.raw_count", {face: "0s"})} value={String(debugPool.raw_focus_counts?.["0s"] ?? 0)}/>
+                    <InfoStat label={t("souzu_debug.raw_count", {face: "5s"})} value={String(debugPool.raw_focus_counts?.["5s"] ?? 0)}/>
+                    <InfoStat label={t("souzu_debug.quad_count", {face: focusFace})} value={String(focusQuads.length)}/>
                 </div>
 
                 <div style={{display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10}}>
-                    <InfoStat label="手牌入池" value={String(debugPool.pool_counts?.hand ?? 0)}/>
-                    <InfoStat label="换牌窗口入池" value={String(debugPool.pool_counts?.replacement_window ?? 0)}/>
-                    <InfoStat label="牌山入池" value={String(debugPool.pool_counts?.wall ?? 0)}/>
-                    <InfoStat label="总入池数" value={String(debugPool.pool_counts?.total ?? 0)}/>
+                    <InfoStat label={t("souzu_debug.pool_hand")} value={String(debugPool.pool_counts?.hand ?? 0)}/>
+                    <InfoStat label={t("souzu_debug.pool_replacement")} value={String(debugPool.pool_counts?.replacement_window ?? 0)}/>
+                    <InfoStat label={t("souzu_debug.pool_wall")} value={String(debugPool.pool_counts?.wall ?? 0)}/>
+                    <InfoStat label={t("souzu_debug.pool_total")} value={String(debugPool.pool_counts?.total ?? 0)}/>
                 </div>
 
                 <div style={{display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10}}>
-                    <InfoStat label="已消耗换牌数" value={String(debugPool.replacement_window?.used_count ?? 0)}/>
-                    <InfoStat label="剩余换牌堆总数" value={String(debugPool.replacement_window?.total_remaining ?? 0)}/>
-                    <InfoStat label="实际读取窗口" value={String(debugPool.replacement_window?.window_count ?? 0)}/>
+                    <InfoStat label={t("souzu_debug.used_changes")} value={String(debugPool.replacement_window?.used_count ?? 0)}/>
+                    <InfoStat label={t("souzu_debug.remaining_replacement")} value={String(debugPool.replacement_window?.total_remaining ?? 0)}/>
+                    <InfoStat label={t("souzu_debug.read_window")} value={String(debugPool.replacement_window?.window_count ?? 0)}/>
                 </div>
 
                 <div style={{display: "grid", gap: 8}}>
-                    <div style={{fontWeight: 600}}>{`${focusFace} 明细`}</div>
+                    <div style={{fontWeight: 600}}>{t("souzu_debug.focus_details", {face: focusFace})}</div>
                     {focusEntries.length > 0 ? (
                         <DebugTilePositions positions={focusEntries} resolveFace={resolveFace}/>
                     ) : (
-                        <div className="hint">{`当前搜索池里没有归一到 ${focusFace} 的牌。`}</div>
+                        <div className="hint">{t("souzu_debug.no_focus_tiles", {face: focusFace})}</div>
                     )}
                 </div>
 
                 <div style={{display: "grid", gap: 8}}>
-                    <div style={{fontWeight: 600}}>当前可成杠</div>
+                    <div style={{fontWeight: 600}}>{t("souzu_debug.available_quads")}</div>
                     {availableQuads.length > 0 ? (
                         <div style={{display: "grid", gap: 10}}>
                             {availableQuads.map((quad, index) => (
@@ -623,12 +614,12 @@ function DebugPoolCard({
                             ))}
                         </div>
                     ) : (
-                        <div className="hint">当前搜索池里没有任何可成杠组合。</div>
+                        <div className="hint">{t("souzu_debug.no_available_quads")}</div>
                     )}
                 </div>
 
                 <div style={{display: "grid", gap: 8}}>
-                    <div style={{fontWeight: 600}}>归一后牌面计数</div>
+                    <div style={{fontWeight: 600}}>{t("souzu_debug.normalized_counts")}</div>
                     {normCounts.length > 0 ? (
                         <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
                             {normCounts.map(([face, count]) => (
@@ -680,10 +671,11 @@ function DebugTilePositions({
     }>;
     resolveFace: (id: number) => string | null;
 }) {
+    const {t} = useTranslation();
     const sourceLabel = (source: string) => {
-        if (source === "hand") return "手牌";
-        if (source === "replacement") return "换牌窗口";
-        if (source === "wall") return "牌山";
+        if (source === "hand") return t("souzu_debug.source_hand");
+        if (source === "replacement") return t("souzu_debug.source_replacement_window");
+        if (source === "wall") return t("souzu_debug.source_wall");
         return source;
     };
 
@@ -729,11 +721,12 @@ function ManualQuadSelect({
     options: QuadOption[];
     onChange: (value: string) => void;
 }) {
+    const {t} = useTranslation();
     return (
         <label style={{display: "grid", gap: 8}}>
             <span>{title}</span>
             <select value={value} onChange={(e) => onChange(e.target.value)}>
-                <option value="">{"请选择"}</option>
+                <option value="">{t("souzu_debug.select")}</option>
                 {options.map((option) => (
                     <option key={option.key} value={option.key}>{option.label}</option>
                 ))}
@@ -753,6 +746,7 @@ function ManualBucket({
     resolveFace: (id: number) => string | null;
     onRemove: (tileId: number) => void;
 }) {
+    const {t} = useTranslation();
     return (
         <div style={{border: "1px solid var(--border)", borderRadius: 12, padding: 12, display: "grid", gap: 10}}>
             <div style={{fontWeight: 700, fontSize: 18}}>{title}</div>
@@ -778,7 +772,7 @@ function ManualBucket({
                     ))}
                 </div>
             ) : (
-                <div className="hint">{"点击下方牌加入当前分组"}</div>
+                <div className="hint">{t("souzu_debug.click_to_add")}</div>
             )}
         </div>
     );
@@ -797,11 +791,12 @@ function PoolSection({
     manualIds: Set<number>;
     onAssign: (tileId: number) => void;
 }) {
+    const {t} = useTranslation();
     return (
         <div style={{display: "grid", gap: 8}}>
             <div style={{display: "flex", justifyContent: "space-between", alignItems: "baseline"}}>
                 <div style={{fontWeight: 600}}>{title}</div>
-                <div className="hint">{`${entries.length} 张`}</div>
+                <div className="hint">{t("souzu_debug.tile_count", {count: entries.length})}</div>
             </div>
             {entries.length > 0 ? (
                 <div
@@ -815,7 +810,7 @@ function PoolSection({
                         const usedByQuad = usedQuadIds.has(entry.tileId);
                         const usedByManual = manualIds.has(entry.tileId);
                         const used = usedByQuad || usedByManual;
-                        const usedLabel = usedByQuad ? "已用于杠" : usedByManual ? "已分配" : "";
+                        const usedLabel = usedByQuad ? t("souzu_debug.used_by_quad") : usedByManual ? t("souzu_debug.assigned") : "";
                         return (
                             <button
                                 key={`${entry.source}-${entry.tileId}`}
@@ -874,11 +869,12 @@ function SnapshotTileRow({
     ids: number[];
     resolveFace: (id: number) => string | null;
 }) {
+    const {t} = useTranslation();
     return (
         <div style={{display: "grid", gap: 8}}>
             <div style={{display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline"}}>
                 <div style={{fontWeight: 600}}>{title}</div>
-                <div className="hint">{`${ids.length} 张`}</div>
+                <div className="hint">{t("souzu_debug.tile_count", {count: ids.length})}</div>
             </div>
             {ids.length > 0 ? (
                 <div style={{display: "flex", flexWrap: "wrap", gap: 6}}>

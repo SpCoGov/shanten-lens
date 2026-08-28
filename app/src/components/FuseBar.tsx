@@ -114,6 +114,7 @@ function Pill({
 
     return (
         <button
+            className="fuse-watch-pill"
             type="button"
             title={title}
             aria-label={title}

@@ -70,67 +70,58 @@ export default function OverlayPage() {
         writeHudShowWanxiang(enabled);
     };
 
+    const processText = status === null
+        ? t("overlay.status_checking")
+        : status.found
+            ? t("overlay.process_found", {pid: status.pid})
+            : t("overlay.process_not_found");
+
     return (
-        <div className="settings-wrap wide-page">
-            <div className="settings-header">
-                <h2 className="title">{t("overlay.title")}</h2>
-            </div>
+        <div className="settings-wrap wide-page config-page overlay-page">
+            <header className="config-page-header">
+                <div>
+                    <h1>{t("overlay.title")}</h1>
+                    <p>{t("overlay.subtitle")}</p>
+                </div>
+            </header>
 
-            {status?.supported === false ? (
-                <div className="notice">{t("overlay.windows_only")}</div>
-            ) : null}
+            {status?.supported === false ? <div className="notice">{t("overlay.windows_only")}</div> : null}
 
-            <div className="panel">
-                <div className="panel-title">{t("overlay.title")}</div>
-                <div className="rows">
-                    <div className="row">
-                        <label>{t("overlay.enabled")}</label>
-                        <input
-                            type="checkbox"
-                            className="form-checkbox"
-                            checked={Boolean(status?.enabled)}
-                            disabled={saving || status?.supported === false}
-                            onChange={(event) => void toggleEnabled(event.currentTarget.checked)}
-                        />
-                    </div>
-                    <div className="row">
-                        <label>{t("overlay.process_status")}</label>
-                        <span className={`badge ${status?.found ? "ok" : ""}`}>
-                            {status === null
-                                ? t("overlay.status_checking")
-                                : status.found
-                                    ? t("overlay.process_found", {pid: status.pid})
-                            : t("overlay.process_not_found")}
-                        </span>
-                    </div>
-                    <div className="row">
-                        <label>{t("overlay.show_blackhole")}</label>
-                        <input
-                            type="checkbox"
-                            className="form-checkbox"
-                            checked={showBlackhole}
-                            onChange={(event) => toggleShowBlackhole(event.currentTarget.checked)}
-                        />
-                    </div>
-                    <div className="row">
-                        <label>{t("overlay.show_wanxiang")}</label>
-                        <input
-                            type="checkbox"
-                            className="form-checkbox"
-                            checked={showWanxiang}
-                            onChange={(event) => toggleShowWanxiang(event.currentTarget.checked)}
-                        />
-                    </div>
-                    <div className="row">
-                        <label>{t("overlay.show_score_projection")}</label>
-                        <input
-                            type="checkbox"
-                            className="form-checkbox"
-                            checked={showScoreProjection}
-                            onChange={(event) => toggleShowScoreProjection(event.currentTarget.checked)}
-                        />
+            <section className={`overlay-status-card ${status?.enabled ? "is-enabled" : ""}`}>
+                <div className="overlay-status-copy">
+                    <h2>{t("overlay.enabled")}</h2>
+                    <div className="overlay-process-status">
+                        <span>{t("overlay.process_status")}</span>
+                        <span className={`badge ${status?.found ? "ok" : ""}`}>{processText}</span>
                     </div>
                 </div>
+                <input
+                    type="checkbox"
+                    className="config-switch is-large"
+                    aria-label={t("overlay.enabled")}
+                    checked={Boolean(status?.enabled)}
+                    disabled={saving || status?.supported === false}
+                    onChange={(event) => void toggleEnabled(event.currentTarget.checked)}
+                />
+            </section>
+
+            <div className="overlay-section-heading">
+                <h2>{t("overlay.display_title")}</h2>
+                <p>{t("overlay.display_desc")}</p>
+            </div>
+            <div className="overlay-option-grid">
+                <label className="overlay-option-card">
+                    <span>{t("overlay.show_blackhole")}</span>
+                    <input type="checkbox" className="config-switch" checked={showBlackhole} onChange={(event) => toggleShowBlackhole(event.currentTarget.checked)}/>
+                </label>
+                <label className="overlay-option-card">
+                    <span>{t("overlay.show_wanxiang")}</span>
+                    <input type="checkbox" className="config-switch" checked={showWanxiang} onChange={(event) => toggleShowWanxiang(event.currentTarget.checked)}/>
+                </label>
+                <label className="overlay-option-card">
+                    <span>{t("overlay.show_score_projection")}</span>
+                    <input type="checkbox" className="config-switch" checked={showScoreProjection} onChange={(event) => toggleShowScoreProjection(event.currentTarget.checked)}/>
+                </label>
             </div>
         </div>
     );

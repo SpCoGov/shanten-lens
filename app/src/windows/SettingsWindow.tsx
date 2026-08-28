@@ -1,13 +1,15 @@
 import "../styles/theme.css";
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import {getCurrentWindow} from "@tauri-apps/api/window";
-import {ws} from "../lib/ws";
+import * as backendIpc from "../lib/ipc";
 import styles from "./SettingsWindow.module.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import {useTranslation} from "react-i18next";
 import {readTileSkin, setTileSkin, type TileSkin} from "../lib/tileSkin";
+import {readUpdatePrefs, setUpdateUseSystemProxy} from "../lib/updateCheck";
 
 type Tables = Record<string, Record<string, any>>;
+const SETTINGS_TABLES = ["game", "general", "backend"] as const;
 
 function deepEqual(a: any, b: any) {
     try {
@@ -18,13 +20,14 @@ function deepEqual(a: any, b: any) {
 }
 
 export default function SettingsWindow() {
-    const {t} = useTranslation();
+    const {t, i18n} = useTranslation();
     const appWindow = getCurrentWindow();
 
     const [serverTables, setServerTables] = useState<Tables | null>(null);
     const [draft, setDraft] = useState<Tables>({});
     const [active, setActive] = useState<string | null>(null);
     const [tileSkinState, setTileSkinState] = useState<TileSkin>(readTileSkin());
+    const [useSystemProxy, setUseSystemProxy] = useState(() => readUpdatePrefs().useSystemProxy);
 
     const lastInputRef = useRef(0);
     const awaitingSyncRef = useRef(false);
@@ -34,10 +37,7 @@ export default function SettingsWindow() {
     const SAVE_DEBOUNCE = 600;
 
     useEffect(() => {
-        ws.connect();
-        const off = ws.on((pkt: any) => {
-            if (pkt.type !== "update_config") return;
-            const incoming: Tables = pkt.data || {};
+        const accept = (incoming: Tables) => {
             setServerTables(incoming);
 
             const now = Date.now();
@@ -46,25 +46,27 @@ export default function SettingsWindow() {
             if (idle && notWaiting) setDraft(incoming);
             awaitingSyncRef.current = false;
 
-            if (!active) {
-                const first = Object.keys(incoming)[0];
-                if (first) setActive(first);
-            }
-        });
-        const timer = window.setTimeout(() => ws.send({type: "request_update", data: {}} as any), 100);
-        return () => {
-            off();
-            window.clearTimeout(timer);
+            setActive((current) => current && current in incoming
+                ? current
+                : (SETTINGS_TABLES.find((name) => name in incoming) ?? null));
         };
-    }, [active]);
+        void backendIpc.initializeBackend().then((snapshot) => accept(snapshot.config as Tables));
+        return backendIpc.subscribeBackendEvent("update_config", (config) => accept(config as Tables));
+    }, []);
 
     useEffect(() => {
         if (!serverTables) return;
         if (saveTimer.current) window.clearTimeout(saveTimer.current);
         saveTimer.current = window.setTimeout(() => {
             if (deepEqual(draft, serverTables)) return;
+            const savedDraft = draft;
             awaitingSyncRef.current = true;
-            ws.send({type: "edit_config", data: draft} as any);
+            void backendIpc.updateConfig(savedDraft).then(() => {
+                setServerTables(savedDraft);
+                awaitingSyncRef.current = false;
+            }, () => {
+                awaitingSyncRef.current = false;
+            });
         }, SAVE_DEBOUNCE) as unknown as number;
         return () => {
             if (saveTimer.current) window.clearTimeout(saveTimer.current);
@@ -91,7 +93,7 @@ export default function SettingsWindow() {
     }, [draft, serverTables]);
 
     const sidebarItems = useMemo(() => {
-        return Object.keys(tables).map((name) => ({
+        return SETTINGS_TABLES.filter((name) => name in tables).map((name) => ({
             name,
             changed: !!serverTables && !deepEqual(tables[name], (serverTables[name] ?? {})),
         }));
@@ -102,7 +104,10 @@ export default function SettingsWindow() {
         descKey: `settings.config.${table}.${key}_desc`,
     });
 
-    const onSync = () => ws.send({type: "request_update", data: {}} as any);
+    const onSync = () => void backendIpc.getSnapshot().then((snapshot) => {
+        setServerTables(snapshot.config as Tables);
+        setDraft(snapshot.config as Tables);
+    });
 
     const content = (() => {
         if (!active) return <div className={styles.emptyPane}>{t("settings.loading")}</div>;
@@ -111,7 +116,7 @@ export default function SettingsWindow() {
         if (entries.length === 0) return <div className={styles.emptyPane}>{t("settings.loading")}</div>;
 
         return (
-            <div className={styles.sectionBody}>
+            <div className={styles.sectionBody} key={active}>
                 <h3 className={styles.sectionTitle}>
                     {t(`settings.table.${active}`, {defaultValue: active})}
                 </h3>
@@ -120,18 +125,19 @@ export default function SettingsWindow() {
                         const id = `${active}.${key}`;
                         const {nameKey, descKey} = trKey(active, key);
                         const label = t(nameKey);
-                        const title = t(descKey);
+                        const description = i18n.exists(descKey) ? t(descKey) : "";
 
                         const control = typeof val === "boolean"
                             ? (
-                                <input
-                                    id={id}
-                                    type="checkbox"
-                                    className="form-checkbox"
-                                    checked={!!val}
-                                    onChange={(e) => onChange(active, key, e.target.checked)}
-                                    title={title}
-                                />
+                                <label className={styles.toggle} title={description}>
+                                    <input
+                                        id={id}
+                                        type="checkbox"
+                                        checked={!!val}
+                                        onChange={(e) => onChange(active, key, e.target.checked)}
+                                    />
+                                    <span className={styles.toggleTrack} aria-hidden="true"><span/></span>
+                                </label>
                             )
                             : typeof val === "number"
                                 ? (
@@ -141,7 +147,7 @@ export default function SettingsWindow() {
                                         className="form-input"
                                         value={val}
                                         onChange={(e) => onChange(active, key, Number(e.target.value))}
-                                        title={title}
+                                        title={description}
                                     />
                                 )
                                 : (
@@ -150,17 +156,43 @@ export default function SettingsWindow() {
                                         className="form-input"
                                         value={val ?? ""}
                                         onChange={(e) => onChange(active, key, e.target.value)}
-                                        title={title}
+                                        title={description}
                                     />
                                 );
 
                         return (
                             <div className={styles.kvRow} key={key}>
-                                <label htmlFor={id} title={title}>{label}</label>
+                                <label className={styles.settingCopy} htmlFor={id} title={description}>
+                                    <span>{label}</span>
+                                    {description ? <small>{description}</small> : null}
+                                </label>
                                 <div className={styles.ctrl}>{control}</div>
                             </div>
                         );
                     })}
+                    {active === "general" ? (
+                        <div className={styles.kvRow}>
+                            <label className={styles.settingCopy} htmlFor="update.useSystemProxy">
+                                <span>{t("settings.use_system_proxy")}</span>
+                                <small>{t("settings.use_system_proxy_desc")}</small>
+                            </label>
+                            <div className={styles.ctrl}>
+                                <label className={styles.toggle}>
+                                    <input
+                                        id="update.useSystemProxy"
+                                        type="checkbox"
+                                        checked={useSystemProxy}
+                                        onChange={(event) => {
+                                            const checked = event.currentTarget.checked;
+                                            setUpdateUseSystemProxy(checked);
+                                            setUseSystemProxy(checked);
+                                        }}
+                                    />
+                                    <span className={styles.toggleTrack} aria-hidden="true"><span/></span>
+                                </label>
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             </div>
         );
@@ -171,6 +203,8 @@ export default function SettingsWindow() {
             <header className={styles.header} data-tauri-drag-region>
                 <div className={styles.hleft} data-tauri-drag-region>
                     <div className={styles.title}>{t("settings.title")}</div>
+                </div>
+                <div className={styles.hright}>
                     <div className={styles.langWrap}>
                         <LanguageSwitcher />
                     </div>
@@ -188,13 +222,11 @@ export default function SettingsWindow() {
                             <option value="tempai-svg">{t("settings.tile_skin_tempai_svg")}</option>
                         </select>
                     </label>
-                </div>
-                <div className={styles.hright}>
                     <button className={styles.iconBtn} onClick={onSync} title={t("settings.btn_manual_sync") as string}>
-                        <span className="ms">sync</span>
+                        <span className="ms" aria-hidden="true">sync</span>
                     </button>
                     <button className={styles.iconBtn} onClick={() => appWindow.close()} title={t("window.close") as string}>
-                        <span className="ms">close</span>
+                        <span className="ms" aria-hidden="true">close</span>
                     </button>
                 </div>
             </header>

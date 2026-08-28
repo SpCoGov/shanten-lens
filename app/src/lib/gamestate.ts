@@ -73,11 +73,6 @@ export interface CandidateEffectRef {
     badgeId: number;
 }
 
-export interface WsEnvelope<T = any> {
-    type: string;
-    data: T;
-}
-
 /** dict -> Map<number, string>（按 Object.entries 的顺序） */
 export function toDeckMap(dict: Record<string, string>): Map<number, string> {
     const m = new Map<number, string>();

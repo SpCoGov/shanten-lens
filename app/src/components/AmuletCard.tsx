@@ -145,7 +145,7 @@ export default function AmuletCard({
             {plus && (
                 <img
                     src="/assets/amulet/plus.png"
-                    alt="Plus"
+                    alt={t("amulet_card.plus_alt")}
                     style={{
                         position: "absolute",
                         left: Math.round(6 * scale),
@@ -161,7 +161,7 @@ export default function AmuletCard({
             {badgePath && (
                 <img
                     src={badgePath}
-                    alt={bad?.name ?? "Badge"}
+                    alt={bad?.name ?? t("amulet_card.badge_alt_unknown")}
                     style={{
                         position: "absolute",
                         right: Math.round(4 * scale),

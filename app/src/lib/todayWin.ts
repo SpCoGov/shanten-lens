@@ -53,21 +53,6 @@ export const ALL_TILES: TodayTile[] = [
     "1z", "2z", "3z", "4z", "5z", "6z", "7z",
 ];
 
-export const YAKU_LABELS: Record<YakuId, string> = {
-    tanyao: "断幺九",
-    yakuhai: "役牌",
-    pinfu: "平和",
-    toitoi: "对对和",
-    chiitoi: "七对子",
-    honitsu: "混一色",
-    chinitsu: "清一色",
-    kokushi: "国士无双",
-    iipeikou: "一杯口",
-    sanshoku: "三色同顺",
-    ittsuu: "一气通贯",
-    sanankou: "三暗刻",
-};
-
 const CONCRETE_TILES = ALL_TILES;
 const SUITS = ["m", "p", "s"] as const;
 const HONORS: TodayTile[] = ["1z", "2z", "3z", "4z", "5z", "6z", "7z"];

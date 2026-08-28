@@ -2,25 +2,23 @@
 
 ## Project Overview
 
-shanten-lens is a desktop application with a Tauri + React + TypeScript frontend and a Python backend.
+shanten-lens is a desktop application with a Tauri + React + TypeScript frontend and an embedded Rust backend.
 
-The backend uses a MITM approach to obtain information from Qingyunzhizhi. The frontend and backend communicate through WebSocket connections.
+The backend uses a MITM approach to obtain information from Qingyunzhizhi. The frontend and backend communicate through Tauri 2 in-process IPC commands and events.
 
 ## Repository Structure
 
 ### Backend
 
-All backend code is stored in `backend/`.
+The embedded Rust backend is stored in `backend/`.
 
-- `backend/autorun/runner.py` is responsible for automatically rerolling starts.
-- `backend/autorun/util/` stores the tools required for automation, including play and tile-swap guidance.
-- `backend/bot/` defines how game actions are performed by sending packets.
-- `backend/config/` contains the backend configuration system, including the config registry and config manager.
-- `backend/data/` stores the current game's amulet registry, seal registry, and registry loaders.
-- `backend/mitm/` contains the mitmproxy scripts plus packet decoders and parsers.
-- `backend/mitm/hooks.py` handles all packets from the client and server. Fuse logic, fuse handling, and game-state parsing are all implemented in this file.
-- `backend/model/` defines game registry entries and game state models.
-- `backend/run_server.py` is the backend entry point. It starts MITM, defines the packet bot, and starts the backend and frontend WebSocket servers.
+- `backend/src/main.rs` exposes the backend runtime used by Tauri commands.
+- `backend/src/proxy.rs` contains the HTTPS/WebSocket MITM proxy.
+- `backend/src/protocol.rs` contains packet decoding and request/response correlation.
+- `backend/src/runtime.rs` contains the packet-processing and fuse logic.
+- `backend/src/services.rs` contains configuration and game-state services.
+- `backend/src/automation.rs` contains autorun behavior.
+- `backend/assets/` stores the built-in amulet and seal registries.
 
 ### Frontend
 
@@ -44,7 +42,7 @@ All frontend code is stored in `app/`.
 
 2. For component colors, define colors in `app/src/styles/theme.css` unless there is a special reason not to. Colors must support the different themes, including light and dark themes. Components should reference theme colors instead of hard-coding color values.
 
-3. When adding or modifying fuse items, update the logic in `backend/mitm/hooks.py`, inside `def on_outbound(view: Dict) -> Tuple[str, Any]`. If the change includes configuration items, also update `backend/config/registry.py` and `app/src/lib/fuseStore.ts`, then display the corresponding configuration item in `app/src/pages/FusePage.tsx`.
+3. When adding or modifying fuse items, update the logic in `backend/src/runtime.rs`. If the change includes configuration items, also update `backend/src/services.rs` and `app/src/lib/fuseStore.ts`, then display the corresponding configuration item in `app/src/pages/FusePage.tsx`.
 
 4. When changing shared behavior:
    - update backend logic
@@ -56,12 +54,12 @@ All frontend code is stored in `app/`.
 
 IMPORTANT:
 
-- WebSocket payload formats and packet parsing behavior must remain backward compatible unless the change is explicitly intended to break compatibility.
+- Tauri IPC payload formats and packet parsing behavior must remain backward compatible unless the change is explicitly intended to break compatibility.
 
 ## Restrictions
 
 - Do not refactor unrelated files.
-- Do not rename public WebSocket payload fields without updating all consumers.
+- Do not rename public IPC payload fields without updating all consumers.
 - Do not introduce large new dependencies unless necessary.
 - Preserve existing project structure and coding style.
 - Keep diffs minimal and focused.
@@ -69,7 +67,7 @@ IMPORTANT:
 ## Running The Project
 
 - Start the frontend with `pnpm run tauri:dev`.
-- Start the backend with `python backend/run_server.py`.
+- The Rust backend starts inside the Tauri process; it has no separate start command.
 
 Use `pnpm` only. Do not use `npm`.
 

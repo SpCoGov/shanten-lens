@@ -2,7 +2,7 @@ import React from "react";
 import { getCurrentWindow, LogicalSize, currentMonitor } from "@tauri-apps/api/window";
 import { Trans, useTranslation } from "react-i18next";
 
-import { ws } from "../lib/ws";
+import * as backendIpc from "../lib/ipc";
 import { setAppLanguage } from "../lib/i18n";
 import { safeListen } from "../lib/tauriRuntime";
 import "../lib/i18n";
@@ -72,36 +72,6 @@ export default function MsgBoxWindow() {
                 values: {},
             }
         );
-
-        const offOpen = ws.onOpen(() => {
-            if (idRef.current) {
-                ws.send({ type: "msgbox_ready", data: { id: idRef.current } as any });
-            }
-        });
-
-        const offPkt = ws.onPacket((pkt) => {
-            if (pkt.type === "msgbox_init" && pkt.data?.id === idRef.current) {
-                const p = pkt.data as InitPayload;
-                setData({
-                    id: String(p.id),
-                    title: p.title || "msgbox.defaultTitle",
-                    message: p.message || "msgbox.defaultMessage",
-                    okText: p.okText || "common.ok",
-                    cancelText: p.cancelText ?? undefined,
-                    values: p.values || {},
-                });
-            }
-        });
-
-        ws.connect();
-        if (ws.connected && idRef.current) {
-            ws.send({ type: "msgbox_ready", data: { id: idRef.current } as any });
-        }
-
-        return () => {
-            offOpen();
-            offPkt();
-        };
     }, []);
 
     React.useEffect(() => {
@@ -205,7 +175,7 @@ export default function MsgBoxWindow() {
     const reply = async (ok: boolean) => {
         const id = idRef.current;
         if (!id) return close();
-        ws.send({ type: "msgbox_result", data: { id, ok } as any });
+        await backendIpc.resolveConfirmation(id, ok);
         await close();
     };
 

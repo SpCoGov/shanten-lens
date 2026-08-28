@@ -1,5 +1,6 @@
 import React from "react";
 import {useTranslation} from "react-i18next";
+import styles from "./ScorePage.module.css";
 import Modal from "../components/Modal";
 import AmuletCard from "../components/AmuletCard";
 import {getAllRegisteredAmuletRules} from "../lib/amuletRuleRegistry";
@@ -755,80 +756,87 @@ export default function ScorePage({
 
     return (
         <div className="settings-wrap wide-page" style={{paddingBlock: 16}}>
-            <h2 className="title">{t("score.title")}</h2>
-
             <div className="page-stack">
-                <section className="panel">
-                    <div style={{display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 10, flexWrap: "wrap"}}>
+                <section className={`panel ${styles.scorePanel}`}>
+                    <div className={styles.panelHeader}>
                         <div className="panel-title" style={{marginBottom: 0}}>{t("score.live_point_title")}</div>
                         <button className="nav-btn" onClick={() => setShowTileScores(true)}>
                             {t("score.view_tile_scores")}
                         </button>
                     </div>
-                    <div className="responsive-two-col" style={{alignItems: "start"}}>
-                        <div className="rows">
-                            <div className="row">
-                                <label>{t("score.current_level")}</label>
-                                <div className="badge">{currentLevelLabel}</div>
+                    <div className={styles.stageOverview}>
+                        <div className={styles.stageIdentity}>
+                            <span className={`ms ${styles.stageIcon}`} aria-hidden="true">flag</span>
+                            <div>
+                                <span className={styles.metricLabel}>{t("score.current_level")}</span>
+                                <strong className={styles.stageName}>{currentLevelLabel}</strong>
                             </div>
-                            <div className="row">
-                                <label>{t("score.base_fan")}</label>
-                                <div>
-                                    <input
-                                        className="form-input"
-                                        value={fanText}
-                                        onChange={(e) => setFanText(e.target.value)}
-                                        placeholder="1"
-                                    />
-                                </div>
+                        </div>
+                        <div className={styles.stageMetrics}>
+                            <div>
+                                <span className={styles.metricLabel}>{t("score.actual_point")}</span>
+                                <strong>{formatFixed2(actualPoint)}</strong>
                             </div>
-                            <div className="row">
-                                <label>{t("score.win_count")}</label>
-                                <div>
-                                    <input
-                                        className="form-input"
-                                        value={winCountText}
-                                        onChange={(e) => setWinCountText(e.target.value)}
-                                        placeholder="1"
-                                    />
-                                </div>
+                            <div>
+                                <span className={styles.metricLabel}>{t("score.current_target")}</span>
+                                <strong>{formatFixed2(actualTarget)}</strong>
                             </div>
-                            <div className="row">
-                                <label>{t("score.base_score")}</label>
-                                <div className="badge">{formatFixed2(currentResult.baseScore)}</div>
+                            <div>
+                                <span className={styles.metricLabel}>{t("score.current_target_result")}</span>
+                                <strong className={currentReached == null ? styles.neutral : currentReached ? styles.success : styles.danger}>
+                                    {currentReached == null ? t("score.not_set") : currentReached ? t("score.reached") : t("score.not_reached")}
+                                </strong>
                             </div>
-                            <div className="row">
-                                <label>{t("score.final_score")}</label>
-                                <div className="badge">{formatFixed2(currentResult.finalScore)}</div>
+                        </div>
+                    </div>
+
+                    <div className={styles.calculationGrid}>
+                        <div className={styles.inputs}>
+                            <label className={styles.inputCard}>
+                                <span>{t("score.base_fan")}</span>
+                                <input
+                                    className="form-input"
+                                    value={fanText}
+                                    onChange={(e) => setFanText(e.target.value)}
+                                    placeholder="1"
+                                    inputMode="decimal"
+                                />
+                            </label>
+                            <label className={styles.inputCard}>
+                                <span>{t("score.win_count")}</span>
+                                <input
+                                    className="form-input"
+                                    value={winCountText}
+                                    onChange={(e) => setWinCountText(e.target.value)}
+                                    placeholder="1"
+                                    inputMode="numeric"
+                                />
+                            </label>
+                        </div>
+
+                        <div className={styles.breakdown}>
+                            <div>
+                                <span className={styles.metricLabel}>{t("score.base_score")}</span>
+                                <strong>{formatFixed2(currentResult.baseScore)}</strong>
                             </div>
-                            <div className="row">
-                                <label>{t("score.final_fan")}</label>
-                                <div className="badge">{formatFixed2(currentResult.finalFan)}</div>
+                            <div>
+                                <span className={styles.metricLabel}>{t("score.final_score")}</span>
+                                <strong>{formatFixed2(currentResult.finalScore)}</strong>
                             </div>
-                            <div className="row">
-                                <label>{t("score.final_point")}</label>
-                                <div className="badge ok">{formatFixed2(currentResult.finalPoint)}</div>
-                            </div>
-                            <div className="row">
-                                <label>{t("score.total_point")}</label>
-                                <div className="badge ok">{formatFixed2(totalCurrentPoint)}</div>
+                            <div>
+                                <span className={styles.metricLabel}>{t("score.final_fan")}</span>
+                                <strong>{formatFixed2(currentResult.finalFan)}</strong>
                             </div>
                         </div>
 
-                        <div className="rows">
-                            <div className="row">
-                                <label>{t("score.actual_point")}</label>
-                                <div className="badge">{formatFixed2(actualPoint)}</div>
+                        <div className={styles.results}>
+                            <div className={styles.resultCard}>
+                                <span>{t("score.final_point")}</span>
+                                <strong>{formatFixed2(currentResult.finalPoint)}</strong>
                             </div>
-                            <div className="row">
-                                <label>{t("score.current_target")}</label>
-                                <div className="badge">{formatFixed2(actualTarget)}</div>
-                            </div>
-                            <div className="row">
-                                <label>{t("score.current_target_result")}</label>
-                                <div className={`badge ${currentReached ? "ok" : "down"}`}>
-                                    {currentReached == null ? t("score.not_set") : currentReached ? t("score.reached") : t("score.not_reached")}
-                                </div>
+                            <div className={`${styles.resultCard} ${styles.totalResult}`}>
+                                <span>{t("score.total_point")}</span>
+                                <strong>{formatFixed2(totalCurrentPoint)}</strong>
                             </div>
                         </div>
                     </div>
@@ -1117,13 +1125,13 @@ export default function ScorePage({
                                                 const doraCount = doraCountByTile.get(entry.tile) ?? 0;
                                                 const markerLabel =
                                                     isTianDora && doraCount > 0
-                                                        ? (doraCount > 1 ? `魂·ドラ×${doraCount}` : "魂·ドラ")
+                                                        ? (doraCount > 1 ? t("score.soul_dora_count", {count: doraCount}) : t("score.soul_dora"))
                                                         : isTianDora
-                                                            ? "魂"
+                                                            ? t("score.soul")
                                                             : doraCount > 1
-                                                                ? `ドラ×${doraCount}`
+                                                                ? t("score.dora_count", {count: doraCount})
                                                                 : doraCount === 1
-                                                                    ? "ドラ"
+                                                                    ? t("score.dora")
                                                                     : "";
                                                 return (
                                                     <div

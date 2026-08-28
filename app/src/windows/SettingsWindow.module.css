@@ -1,201 +1,438 @@
 .wrap {
     height: 100vh;
     display: grid;
-    grid-template-rows: 56px 1fr;
-    background: var(--panel-bg);
+    grid-template-rows: 64px minmax(0, 1fr);
+    overflow: hidden;
     color: var(--text);
+    background: var(--bg);
     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Arial;
 }
 
 .header {
+    min-width: 0;
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(90px, 1fr) auto;
     align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
-    background: var(--panel-bg);
+    gap: 16px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--color-divider);
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--color-ring) 7%, var(--panel-bg)),
+        var(--panel-bg) 38%,
+        color-mix(in srgb, var(--accent-green) 5%, var(--panel-bg)));
+    animation: settingsHeaderIn .3s ease-out both;
+}
+
+.hleft,
+.hright,
+.langWrap,
+.tileSkinWrap {
+    display: flex;
+    align-items: center;
 }
 
 .hleft {
-    display: flex;
-    align-items: center;
-    gap: 16px;
+    min-width: 0;
 }
 
 .title {
-    font-weight: 700;
-    font-size: 16px;
+    overflow: hidden;
+    font-size: 17px;
+    font-weight: 750;
+    letter-spacing: .01em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     user-select: none;
 }
 
-.langWrap {
-    display: inline-flex;
-    align-items: center;
+.hright {
     gap: 8px;
+}
+
+.langWrap,
+.tileSkinWrap {
+    gap: 7px;
 }
 
 .tileSkinWrap {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
     color: var(--muted);
+    font-size: 12px;
 }
 
 .tileSkinWrap select {
-    width: 150px;
-    max-width: 150px;
-    min-width: 150px;
-}
-
-.hright {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    width: 144px;
+    min-width: 144px;
+    height: 34px;
+    padding: 5px 30px 5px 10px;
+    border: 1px solid var(--color-divider);
+    border-radius: 9px;
+    color: var(--text);
+    background-color: var(--panel-bg);
 }
 
 .iconBtn {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--panel-bg);
+    width: 34px;
+    height: 34px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    flex: 0 0 34px;
+    padding: 0;
+    border: 1px solid var(--color-divider);
+    border-radius: 9px;
+    color: var(--text);
+    background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
     cursor: pointer;
+    transition: border-color .16s ease, background .16s ease, transform .16s ease;
 }
 
 .iconBtn:hover {
+    border-color: color-mix(in srgb, var(--color-ring) 42%, var(--color-divider));
     background: var(--hover-bg);
+    transform: translateY(-1px);
+}
+
+.iconBtn:focus-visible,
+.sideItem:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
 }
 
 .main {
-    display: grid;
-    grid-template-columns: 220px 1fr;
-    height: 100%;
     min-height: 0;
+    display: grid;
+    grid-template-columns: 184px minmax(0, 1fr);
 }
 
 .sidebar {
-    border-right: 1px solid var(--border);
-    background: var(--panel-bg);
-    padding: 8px 6px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 14px 10px;
     overflow: auto;
+    border-right: 1px solid var(--color-divider);
+    background: color-mix(in srgb, var(--panel-bg) 96%, var(--bg));
+    animation: settingsSidebarIn .32s ease-out both;
 }
 
 .sideItem {
+    position: relative;
     width: 100%;
-    text-align: left;
+    min-height: 40px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    padding: 10px 12px;
-    border-radius: 8px;
+    padding: 9px 11px;
     border: 1px solid transparent;
-    background: transparent;
+    border-radius: 9px;
     color: var(--text);
+    background: transparent;
+    text-align: left;
     cursor: pointer;
+    transition: border-color .16s ease, background .16s ease;
 }
 
 .sideItem:hover {
+    border-color: var(--color-divider);
     background: var(--hover-bg);
-    border-color: var(--border);
 }
 
-.active {
-    background: var(--badge-ok-bg);
-    border-color: var(--badge-ok-border);
-    box-shadow: inset 0 0 0 1px var(--badge-ok-border);
+.sideItem.active {
+    border-color: color-mix(in srgb, var(--color-ring) 42%, var(--color-divider));
+    background: color-mix(in srgb, var(--color-ring) 10%, var(--panel-bg));
+    color: color-mix(in srgb, var(--color-ring) 62%, var(--text));
+    font-weight: 650;
+    animation: settingsNavSelect .2s ease-out both;
+}
+
+.sideItem.active::before {
+    content: "";
+    position: absolute;
+    left: -1px;
+    top: 9px;
+    bottom: 9px;
+    width: 3px;
+    border-radius: 999px;
+    background: var(--color-ring);
+    animation: settingsIndicatorIn .24s ease-out both;
 }
 
 .sideText {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.badgeDot {
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
-    background: var(--state-warn);
-}
-
-.content {
-    padding: 16px 18px;
-    overflow-x: auto;
-}
-
-.sectionBody {
-    width: 100%;
-    max-width: none;
-}
-
-.sectionTitle {
-    margin: 8px 0 12px 2px;
-    font-size: 15px;
-    font-weight: 700;
-}
-
-.emptyPane {
-    color: var(--muted);
-    padding: 16px;
-}
-
-
-:root {
-    --ctrl-w: 130px;
-}
-
-.kvRow {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) max-content;
-    align-items: center;
-    column-gap: 12px;
-    padding: 12px;
-    white-space: nowrap;
-}
-
-.kvRow + .kvRow {
-    border-top: 1px solid var(--color-cutline, var(--border));
-}
-
-.kvRow > label {
-    justify-self: start;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.ctrl {
-    justify-self: end;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
+.badgeDot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    border-radius: 50%;
+    background: var(--state-warn);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-warn) 13%, transparent);
+    animation: settingsPendingPulse 1.5s ease-in-out infinite;
 }
 
-.ctrl .form-checkbox {
-    transform: translateY(1px);
+.content {
+    min-width: 0;
+    padding: 22px clamp(18px, 3vw, 34px) 28px;
+    overflow: auto;
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--panel-bg) 54%, var(--bg)),
+        var(--bg) 180px);
 }
 
-@media (max-width: 900px) {
-    .kvRow {
-        grid-template-columns: minmax(0, 1fr) var(--ctrl-w);
-    }
+.sectionBody {
+    width: min(880px, 100%);
+    margin: 0 auto;
+    animation: settingsSectionIn .26s ease-out both;
+}
+
+.sectionTitle {
+    margin: 0 0 16px;
+    font-size: 20px;
+    font-weight: 750;
+    line-height: 1.3;
+}
+
+.emptyPane {
+    padding: 24px;
+    color: var(--muted);
+    text-align: center;
 }
 
 .kvRows {
+    display: grid;
+    gap: 10px;
     width: 100%;
 }
 
+.kvRow {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 18px;
+    min-height: 64px;
+    padding: 13px 15px;
+    border: 1px solid var(--color-divider);
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--panel-bg) 95%, var(--bg));
+    box-shadow: 0 5px 16px color-mix(in srgb, var(--color-ring) 4%, transparent);
+    transition: border-color .16s ease, background .16s ease;
+    animation: settingsRowIn .3s ease-out both;
+}
 
-.ctrl :is(.form-input, select, textarea) {
-    width: var(--ctrl-w);
-    min-width: var(--ctrl-w);
-    max-width: var(--ctrl-w);
-    flex: 0 0 var(--ctrl-w);
+.kvRow:nth-child(2) { animation-delay: 30ms; }
+.kvRow:nth-child(3) { animation-delay: 60ms; }
+.kvRow:nth-child(4) { animation-delay: 90ms; }
+.kvRow:nth-child(5) { animation-delay: 120ms; }
+.kvRow:nth-child(n + 6) { animation-delay: 150ms; }
+
+.kvRow:hover {
+    border-color: color-mix(in srgb, var(--color-ring) 30%, var(--color-divider));
+    background: var(--panel-bg);
+}
+
+.settingCopy {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+    cursor: default;
+}
+
+.settingCopy > span {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.settingCopy > small {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.45;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ctrl {
+    display: inline-flex;
+    align-items: center;
+    justify-self: end;
+}
+
+.ctrl :global(.form-input) {
+    width: 166px;
+    min-width: 166px;
+    max-width: 166px;
+}
+
+.toggle {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.toggle input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.toggleTrack {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    border: 1px solid color-mix(in srgb, var(--state-muted) 55%, var(--color-divider));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--state-muted) 18%, var(--panel-bg));
+    transition: background .16s ease, border-color .16s ease;
+}
+
+.toggleTrack span {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--state-muted);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 24%, transparent);
+    transition: transform .16s ease, background .16s ease;
+}
+
+.toggle input:checked + .toggleTrack {
+    border-color: var(--state-ok);
+    background: color-mix(in srgb, var(--state-ok) 24%, var(--panel-bg));
+}
+
+.toggle input:checked + .toggleTrack span {
+    background: var(--state-ok);
+    transform: translateX(16px);
+}
+
+.toggle input:focus-visible + .toggleTrack {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+}
+
+@keyframes settingsHeaderIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes settingsSidebarIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes settingsSectionIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes settingsRowIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes settingsNavSelect {
+    from { transform: scale(.98); }
+    to { transform: scale(1); }
+}
+
+@keyframes settingsIndicatorIn {
+    from { opacity: 0; transform: scaleY(.35); }
+    to { opacity: 1; transform: scaleY(1); }
+}
+
+@keyframes settingsPendingPulse {
+    0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-warn) 10%, transparent); }
+    50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--state-warn) 20%, transparent); }
+}
+
+@media (max-width: 720px) {
+    .header {
+        gap: 8px;
+        padding-inline: 10px;
+    }
+
+    .hright {
+        gap: 6px;
+    }
+
+    .tileSkinWrap > span {
+        display: none;
+    }
+
+    .tileSkinWrap select {
+        width: 130px;
+        min-width: 130px;
+    }
+
+    .main {
+        grid-template-columns: 150px minmax(0, 1fr);
+    }
+
+    .content {
+        padding-inline: 14px;
+    }
+
+    .ctrl :global(.form-input) {
+        width: 132px;
+        min-width: 132px;
+        max-width: 132px;
+    }
+}
+
+@media (max-width: 560px) {
+    .langWrap,
+    .tileSkinWrap {
+        display: none;
+    }
+
+    .main {
+        grid-template-columns: 124px minmax(0, 1fr);
+    }
+
+    .sidebar {
+        padding-inline: 7px;
+    }
+
+    .sideItem {
+        padding-inline: 9px;
+    }
+
+    .kvRow {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+    }
+
+    .ctrl {
+        justify-self: start;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .header,
+    .sidebar,
+    .sideItem.active,
+    .sideItem.active::before,
+    .badgeDot,
+    .sectionBody,
+    .kvRow {
+        animation: none;
+    }
 }
