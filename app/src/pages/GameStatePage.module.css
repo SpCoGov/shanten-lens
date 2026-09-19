@@ -5,29 +5,40 @@
 }
 
 .header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
+    padding: 2px 2px 4px;
 }
 
 .title {
     margin: 0;
 }
 
-.summaryGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 8px;
+.sectionHeading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
 }
 
-.summaryItem {
+.summaryPrimary {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(110px, 1fr));
+    padding: 12px 0;
+    overflow-x: auto;
+    border-block: 1px solid var(--color-divider);
+}
+
+.summaryMetric {
     min-width: 0;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--text-muted) 7%, transparent);
+    padding: 0 16px;
+}
+
+.summaryMetric:first-child {
+    padding-left: 2px;
+}
+
+.summaryMetric + .summaryMetric {
+    border-left: 1px solid var(--color-divider);
 }
 
 .summaryLabel {
@@ -37,14 +48,43 @@
 }
 
 .summaryValue {
-    margin-top: 4px;
+    margin: 5px 0 0;
     overflow-wrap: anywhere;
+    color: var(--text);
+    font-size: 20px;
     font-weight: 700;
-    line-height: 1.35;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+.summaryDetails {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin: 12px 0 0;
+}
+
+.summaryDetail {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    color: var(--color-muted);
+    font-size: 12px;
+}
+
+.summaryDetail dt,
+.summaryDetail dd {
+    margin: 0;
+}
+
+.summaryDetail dd {
+    color: var(--text);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
 }
 
 .sectionTitle {
-    margin: 0 0 10px;
+    margin: 0;
 }
 
 .rawJson,
@@ -88,6 +128,8 @@
 
 .treeRowButton {
     cursor: pointer;
+    border-radius: 5px;
+    transition: background .16s ease;
 }
 
 .treeRowButton:hover {
@@ -101,6 +143,30 @@
     color: var(--color-muted);
     font-size: 18px;
     line-height: 1;
+}
+
+.treeChevron {
+    transform: rotate(0deg);
+    transition: transform .18s ease, color .18s ease;
+}
+
+.treeChevron[data-open="true"] {
+    transform: rotate(90deg);
+    color: var(--color-ring);
+}
+
+.treeChildren {
+    margin-left: 8px;
+    border-left: 1px solid color-mix(in srgb, var(--color-ring) 20%, var(--border));
+    animation: tree-reveal .18s ease-out;
+    transform-origin: top;
+}
+
+@keyframes tree-reveal {
+    from {
+        opacity: 0;
+        transform: translateY(-3px);
+    }
 }
 
 .treeKey {
@@ -126,4 +192,15 @@
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .treeChevron,
+    .treeRowButton {
+        transition: none;
+    }
+
+    .treeChildren {
+        animation: none;
+    }
 }

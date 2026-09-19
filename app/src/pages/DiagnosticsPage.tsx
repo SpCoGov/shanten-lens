@@ -107,10 +107,13 @@ export default function DiagnosticsPage() {
                     <b>{t("diagnostics.ipc_status_label")}</b>
                     <span>: {conn ? t("diagnostics.ipc_connected") : t("diagnostics.ipc_disconnected")}</span>
                 </div>
-                <label className="tail">
-                    <input type="checkbox" checked={tail} onChange={(event) => setTail(event.target.checked)}/>
-                    {t("diagnostics.auto_scroll")}
-                </label>
+                <div className={styles.topActions}>
+                    <button type="button" className={styles.openFolderButton} aria-label={t("diagnostics.open_log_folder")} title={t("diagnostics.open_log_folder")} onClick={() => void backendIpc.openLogDir()}><span className="ms" aria-hidden="true">folder_open</span></button>
+                    <label className="tail">
+                        <input type="checkbox" checked={tail} onChange={(event) => setTail(event.target.checked)}/>
+                        {t("diagnostics.auto_scroll")}
+                    </label>
+                </div>
             </section>
 
             <section className={`mj-panel card ${styles.viewer}`}>
@@ -190,7 +193,7 @@ export default function DiagnosticsPage() {
                                     <button key={`${packet.ts_ms ?? 0}-${packet.method}-${packet.id ?? "n"}-${index}`} type="button" className={`${styles.packetItem} ${visibleSelectedPacket === packet ? styles.selected : ""} ${packet === packets[packets.length - 1] ? styles.newPacket : ""}`} onClick={() => setSelectedPacket(visibleSelectedPacket === packet ? null : packet)}>
                                         <span className={styles.ts}>{packetTime(packet)}</span>
                                         <span className={`${styles.direction} ${packet.direction === "outbound" ? styles.outbound : styles.inbound}`}>{packet.direction === "outbound" ? "↑" : "↓"}</span>
-                                        <span className={styles.packetType}>{packet.type}</span><span className={styles.message}>{packet.method}</span>
+                                        <span className={styles.packetType}>{packet.type}</span><span className={`${styles.message} selectable`}>{packet.method}</span>
                                     </button>
                                 ))}
                             </div>
@@ -201,7 +204,7 @@ export default function DiagnosticsPage() {
                                         <Detail label={t("diagnostics.detail_time")} value={new Date(visibleSelectedPacket.ts_ms ?? Date.now()).toISOString()}/>
                                         <Detail label={t("diagnostics.packet_direction")} value={t(`diagnostics.direction_${visibleSelectedPacket.direction}`)}/>
                                         <Detail label={t("diagnostics.packet_type")} value={visibleSelectedPacket.type}/>
-                                        <Detail label={t("diagnostics.packet_method")} value={visibleSelectedPacket.method}/>
+                                        <Detail label={t("diagnostics.packet_method")} value={visibleSelectedPacket.method} selectable/>
                                         <Detail label={t("diagnostics.packet_id")} value={visibleSelectedPacket.id == null ? "-" : String(visibleSelectedPacket.id)}/>
                                         <button type="button" className={styles.viewerButton} onClick={() => void openPacketViewerWindow(visibleSelectedPacket)}>
                                             {t("diagnostics.open_packet_viewer")}
@@ -221,6 +224,6 @@ function DetailHeader({title, closeLabel, onClose}: {title: string; closeLabel: 
     return <div className={styles.detailHeader}><h4>{title}</h4><button type="button" aria-label={closeLabel} onClick={onClose}>×</button></div>;
 }
 
-function Detail({label, value, block = false}: {label: string; value: string; block?: boolean}) {
-    return <div className={styles.detailField}><span>{label}</span>{block ? <pre>{value}</pre> : <div>{value}</div>}</div>;
+function Detail({label, value, block = false, selectable = false}: {label: string; value: string; block?: boolean; selectable?: boolean}) {
+    return <div className={styles.detailField}><span>{label}</span>{block ? <pre>{value}</pre> : <div className={selectable ? "selectable" : undefined}>{value}</div>}</div>;
 }

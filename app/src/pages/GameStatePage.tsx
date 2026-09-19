@@ -37,6 +37,10 @@ function primitivePreview(value: unknown) {
     return String(value);
 }
 
+function emptyContainerPreview(value: unknown) {
+    return Array.isArray(value) ? "[]" : "{}";
+}
+
 function childPath(parent: string, childName: string) {
     return `${parent}.${childName.replace(/\\/g, "\\\\").replace(/\./g, "\\.")}`;
 }
@@ -56,8 +60,11 @@ function GameStateTreeNode({
     expandedPaths: ReadonlySet<string>;
     onToggle: (path: string) => void;
 }) {
-    const {t} = useTranslation();
-    const expandable = Array.isArray(value) || isRecord(value);
+    const container = Array.isArray(value) || isRecord(value);
+    const entries = Array.isArray(value)
+        ? value.map((item, index) => [String(index), item] as const)
+        : isRecord(value) ? Object.entries(value) : [];
+    const expandable = entries.length > 0;
     const open = expandedPaths.has(path);
 
     if (!expandable) {
@@ -66,15 +73,11 @@ function GameStateTreeNode({
                 <span className={styles.treeSpacer}/>
                 <span className={styles.treeKey}>{name}</span>
                 <span className={styles.treeColon}>:</span>
-                <span className={styles.treePrimitive}>{primitivePreview(value)}</span>
+                <span className={styles.treePrimitive}>{container ? emptyContainerPreview(value) : primitivePreview(value)}</span>
                 <span className={styles.treeType}>{valueKind(value)}</span>
             </div>
         );
     }
-
-    const entries = Array.isArray(value)
-        ? value.map((item, index) => [String(index), item] as const)
-        : Object.entries(value);
 
     return (
         <div className={styles.treeNode}>
@@ -85,8 +88,8 @@ function GameStateTreeNode({
                 onClick={() => onToggle(path)}
                 aria-expanded={open}
             >
-                <span className={`ms ${styles.treeChevron}`} aria-hidden="true">
-                    {open ? "expand_more" : "chevron_right"}
+                <span className={`ms ${styles.treeChevron}`} data-open={open} aria-hidden="true">
+                    chevron_right
                 </span>
                 <span className={styles.treeKey}>{name}</span>
                 <span className={styles.treeColon}>:</span>
@@ -94,7 +97,7 @@ function GameStateTreeNode({
             </button>
             {open ? (
                 <div className={styles.treeChildren}>
-                    {entries.length > 0 ? entries.map(([childName, childValue]) => (
+                    {entries.map(([childName, childValue]) => (
                         <GameStateTreeNode
                             key={childName}
                             name={childName}
@@ -104,12 +107,7 @@ function GameStateTreeNode({
                             expandedPaths={expandedPaths}
                             onToggle={onToggle}
                         />
-                    )) : (
-                        <div className={styles.treeRow} style={{paddingLeft: (depth + 1) * 16}}>
-                            <span className={styles.treeSpacer}/>
-                            <span className={styles.treePrimitive}>{t("gamestate.tree_empty")}</span>
-                        </div>
-                    )}
+                    ))}
                 </div>
             ) : null}
         </div>
@@ -169,34 +167,46 @@ export default function GameStatePage({currentState}: { currentState: GameStateD
 
     return (
         <div className={styles.wrap}>
-            <section className={`card ${styles.header}`}>
+            <header className={styles.header}>
                 <div>
                     <h2 className={styles.title}>{t("gamestate.title")}</h2>
                     <div className="hint">{t(currentState ? "gamestate.subtitle_live" : "gamestate.subtitle_empty")}</div>
                 </div>
-                <div className={styles.actions}>
-                    <button className="nav-btn" onClick={copyJson} disabled={!currentState}>
-                        {copied ? t("gamestate.copied") : t("gamestate.copy_json")}
-                    </button>
-                </div>
-            </section>
+            </header>
 
             {currentState ? (
                 <section className={`mj-panel card`}>
-                    <h3 className={styles.sectionTitle}>{t("gamestate.summary_title")}</h3>
-                    <div className={styles.summaryGrid}>
-                        {summaryItems.map((item) => (
-                            <div className={styles.summaryItem} key={item.key}>
+                    <div className={styles.sectionHeading}>
+                        <h3 className={styles.sectionTitle}>{t("gamestate.summary_title")}</h3>
+                    </div>
+                    <div className={styles.summaryPrimary}>
+                        {summaryItems.slice(0, 5).map((item) => (
+                            <div className={styles.summaryMetric} key={item.key}>
                                 <div className={styles.summaryLabel}>{item.key}</div>
                                 <div className={styles.summaryValue}>{item.value}</div>
                             </div>
                         ))}
                     </div>
+                    <dl className={styles.summaryDetails}>
+                        {summaryItems.slice(5).map((item) => (
+                            <div className={styles.summaryDetail} key={item.key}>
+                                <dt>{item.key}</dt>
+                                <dd>{item.value}</dd>
+                            </div>
+                        ))}
+                    </dl>
                 </section>
             ) : null}
 
             <section className={`mj-panel card`}>
-                <h3 className={styles.sectionTitle}>{t("gamestate.raw_title")}</h3>
+                <div className={styles.sectionHeading}>
+                    <h3 className={styles.sectionTitle}>{t("gamestate.raw_title")}</h3>
+                    <div className={styles.actions}>
+                        <button className="nav-btn" onClick={copyJson} disabled={!currentState}>
+                            {copied ? t("gamestate.copied") : t("gamestate.copy_json")}
+                        </button>
+                    </div>
+                </div>
                 {currentState ? (
                     <div className={`selectable ${styles.tree}`}>
                         <GameStateTreeNode

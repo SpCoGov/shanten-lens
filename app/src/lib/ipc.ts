@@ -6,9 +6,21 @@ import {
     type CommandResult,
     type FlowDumpResult,
     type JsonValue,
+    type MarketplaceInstallBlock,
+    type MarketplacePluginInfo,
+    type MarketplacePluginStatus,
+    type MarketplaceSnapshot,
+    type MarketplaceSourceInfo,
     type PacketLogItem,
     type PacketLogSnapshot,
+    type PacketModuleInfo,
+    type PacketOperation,
+    type PacketSubscription,
     type PipelineConfig,
+    type PluginInfo,
+    type PluginScanError,
+    type PluginFrontendBundle,
+    type PluginUpdateInfo,
     type SwitchAction,
     type SwitchRequest,
     type TsumoLoopStatus,
@@ -42,9 +54,21 @@ export type {
     CommandResult,
     FlowDumpResult,
     JsonValue,
+    MarketplaceInstallBlock,
+    MarketplacePluginInfo,
+    MarketplacePluginStatus,
+    MarketplaceSnapshot,
+    MarketplaceSourceInfo,
     PacketLogItem,
     PacketLogSnapshot,
+    PacketModuleInfo,
+    PacketOperation,
+    PacketSubscription,
     PipelineConfig,
+    PluginInfo,
+    PluginScanError,
+    PluginFrontendBundle,
+    PluginUpdateInfo,
     SwitchAction,
     SwitchRequest,
     TsumoLoopStatus,
@@ -58,10 +82,15 @@ export type BackendEventMap = {
     update_autorun_config: AutoRunnerConfig;
     update_config: ConfigTables;
     update_gamestate: GameStateData;
+    update_game_record: Record<string, JsonValue>;
+    game_record_override_status: boolean;
     autorun_status: AutoRunnerStatus;
     tsumo_loop_status: TsumoLoopStatus;
     packet_log_event: PacketLogItem;
     packet_pipeline: PipelineConfig;
+    packet_modules: PacketModuleInfo[];
+    plugin_status: PluginInfo[];
+    plugin_update_available: PluginUpdateInfo;
     discard_recommendation: unknown;
     souzu_switch_execution: unknown;
     msgbox: {id: string; title?: string; message: string; okText?: string; cancelText?: string; values?: Record<string, JsonValue>};
@@ -94,9 +123,31 @@ export function subscribeBackendEvent<K extends keyof BackendEventMap>(
 export const getSnapshot = commands.backendSnapshot;
 export const checkVersion = () => commands.backendCheckVersion(APP_VERSION);
 export const getPacketPipeline = commands.backendGetPacketPipeline;
+export const getPacketModules = commands.backendGetPacketModules;
+export const getPluginScanErrors = commands.backendGetPluginScanErrors;
+export const reportPluginFrontendHealth = commands.backendReportPluginFrontendHealth;
+export const installPlugin = commands.backendInstallPlugin;
+export const uninstallPlugin = commands.backendUninstallPlugin;
+export const getPlugins = commands.backendGetPlugins;
+export const getPluginMarketplace = commands.backendGetPluginMarketplace;
+export const addPluginMarketplaceSource = commands.backendAddPluginMarketplaceSource;
+export const removePluginMarketplaceSource = commands.backendRemovePluginMarketplaceSource;
+export const installMarketplacePlugin = commands.backendInstallMarketplacePlugin;
+export const getPluginFrontends = commands.backendGetPluginFrontends;
+export const getPluginConfig = commands.backendGetPluginConfig;
+export const setPluginConfig = commands.backendSetPluginConfig;
+export const invokePlugin = commands.backendInvokePlugin;
+export const rescanPlugins = commands.backendRescanPlugins;
+export const setPluginEnabled = commands.backendSetPluginEnabled;
+export const restartPlugin = commands.backendRestartPlugin;
+export const setPluginAutoUpdate = commands.backendSetPluginAutoUpdate;
+export const checkPluginUpdates = commands.backendCheckPluginUpdates;
+export const updatePlugin = commands.backendUpdatePlugin;
 export const setPacketPipeline = commands.backendSetPacketPipeline;
 export const getPacketLog = commands.backendGetPacketLog;
 export const replayPacket = commands.backendReplayPacket;
+export const fetchGameRecord = commands.backendFetchGameRecord;
+export const overrideGameRecord = commands.backendOverrideGameRecord;
 export const updateConfig = (config: ConfigTables) => commands.backendUpdateConfig(config);
 export const setBackendLocale = commands.backendSetLocale;
 export const dumpFlows = commands.backendDumpFlows;
@@ -111,6 +162,8 @@ export const runAutorun = (action: "start" | "stop" | "step" | "probe" | "notify
 export const resolveConfirmation = commands.backendResolveConfirmation;
 export const runSwitch = commands.backendSwitch;
 export const openConfigDir = commands.backendOpenConfigDir;
+export const openLogDir = commands.backendOpenLogDir;
+export const openPluginDir = commands.backendOpenPluginDir;
 
 function translateToastMessage(data: BackendEventMap["ui_toast"]) {
     const key = String(data.msg_key ?? "");

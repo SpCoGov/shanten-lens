@@ -3,6 +3,9 @@ use serde_json::{json, Value};
 use specta::Type;
 use std::{
     collections::{HashMap, VecDeque},
+    fs::{self, File, OpenOptions},
+    io::{self, Write},
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -29,13 +32,15 @@ pub struct LogEntry {
 pub struct LogBuffer {
     entries: Mutex<VecDeque<LogEntry>>,
     events: broadcast::Sender<Value>,
+    file: JsonLineLog,
 }
 
 impl LogBuffer {
-    fn new(events: broadcast::Sender<Value>) -> Self {
+    fn new(events: broadcast::Sender<Value>, file: JsonLineLog) -> Self {
         Self {
             entries: Mutex::new(VecDeque::with_capacity(LOG_CAPACITY)),
             events,
+            file,
         }
     }
 
@@ -46,6 +51,7 @@ impl LogBuffer {
             }
             entries.push_back(entry.clone());
         }
+        self.file.write(&entry);
         let _ = self
             .events
             .send(json!({"type": "backend_log", "data": entry}));
@@ -57,6 +63,44 @@ impl LogBuffer {
             .map(|entries| entries.iter().cloned().collect())
             .unwrap_or_default()
     }
+}
+
+pub struct JsonLineLog {
+    path: PathBuf,
+    file: Mutex<Option<File>>,
+}
+
+impl JsonLineLog {
+    pub fn create(path: PathBuf) -> io::Result<Self> {
+        Ok(Self {
+            file: Mutex::new(Some(open_log_file(&path)?)),
+            path,
+        })
+    }
+
+    pub fn write<T: Serialize>(&self, value: &T) {
+        let Ok(mut slot) = self.file.lock() else {
+            return;
+        };
+        if !self.path.exists() {
+            *slot = None;
+        }
+        if slot.is_none() {
+            *slot = open_log_file(&self.path).ok();
+        }
+        let Some(file) = slot.as_mut() else {
+            return;
+        };
+        let _ = serde_json::to_writer(&mut *file, value);
+        let _ = writeln!(file);
+    }
+}
+
+fn open_log_file(path: &Path) -> io::Result<File> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    OpenOptions::new().create(true).append(true).open(path)
 }
 
 struct LogLayer {
@@ -145,8 +189,11 @@ impl<S: Subscriber> Layer<S> for LogLayer {
     }
 }
 
-pub fn init(events: broadcast::Sender<Value>) -> anyhow::Result<Arc<LogBuffer>> {
-    let buffer = Arc::new(LogBuffer::new(events));
+pub fn init(events: broadcast::Sender<Value>, log_dir: &Path) -> anyhow::Result<Arc<LogBuffer>> {
+    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    // ponytail: Keep one file per launch; add retention cleanup if disk growth becomes material.
+    let file = JsonLineLog::create(log_dir.join(format!("shanten-lens-{timestamp}.log")))?;
+    let buffer = Arc::new(LogBuffer::new(events, file));
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         EnvFilter::new(
             "info,shanten_backend::hudsucker=debug,tao::platform_impl::platform::event_loop::runner=error",

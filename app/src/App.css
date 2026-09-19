@@ -1220,6 +1220,8 @@ input, textarea, select, code, pre, .selectable {
     left: calc(100% + 10px);
     top: 0;
     min-width: 148px;
+    max-height: calc(100dvh - 260px);
+    overflow-y: auto;
     padding: 6px;
     display: grid;
     gap: 4px;
@@ -1942,6 +1944,11 @@ input, textarea, select, code, pre, .selectable {
     display: grid;
     gap: 16px;
     padding-block: 16px;
+}
+
+.home-amulet-panel {
+    display: flex;
+    flex-direction: column;
 }
 
 .config-page-header {
@@ -3316,8 +3323,6 @@ input:invalid, textarea:invalid, select:invalid {
 }
 
 .home-grid {
-    --home-side-inset: 8px;
-    --home-side-bottom-inset: var(--home-side-inset);
     flex: 1 1 auto;
     height: 100%;
     min-height: 0;
@@ -3330,23 +3335,19 @@ input:invalid, textarea:invalid, select:invalid {
 }
 
 .home-advisor-panel {
-    flex: 0 1 clamp(196px, 19vw, 280px);
-    width: clamp(196px, 19vw, 280px);
-    min-width: min(196px, 32vw);
-    max-width: 280px;
+    min-width: 0;
 }
 
-.home-side-panel {
-    align-self: stretch;
+.home-side-content-panel {
     min-height: 0;
-    max-height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: var(--home-side-inset) var(--home-side-inset) var(--home-side-bottom-inset);
-    box-sizing: border-box;
-    margin-bottom: 0;
-    overflow: hidden;
+    overflow: auto;
+}
+
+.home-side-content-panel > .home-record-panel {
+    min-height: 0;
+    flex: 1 1 auto;
 }
 
 .home-side-tabs {
@@ -3416,11 +3417,14 @@ input:invalid, textarea:invalid, select:invalid {
     display: grid;
     gap: 8px;
     min-height: 0;
+    flex: 1 1 auto;
+    align-content: start;
     overflow: auto;
     padding-right: 2px;
 }
 
 .home-record-row {
+    height: 64px;
     min-width: 0;
     display: flex;
     align-items: center;
@@ -4032,6 +4036,10 @@ input:invalid, textarea:invalid, select:invalid {
 .route-autorun > *,
 .route-settings > *,
 .route-diagnostics > *,
+.route-plugins > *,
+.plugin-section-content,
+.route-plugin > *,
+.route-record > *,
 .route-about > * {
     animation: pageFade .45s ease both;
 }

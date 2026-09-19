@@ -107,6 +107,19 @@
     --sold-scrim: color-mix(in srgb, var(--state-ok) 32%, transparent);
     --sold-pill-bg: color-mix(in srgb, var(--state-ok) 90%, transparent);
     --sold-pill-border: color-mix(in srgb, var(--state-ok) 45%, transparent);
+
+    /* Stable variables exposed to frontend plugins. */
+    --sl-color-bg: var(--color-bg);
+    --sl-color-text: var(--color-text);
+    --sl-color-muted: var(--color-muted);
+    --sl-color-border: var(--color-border);
+    --sl-color-accent: var(--color-ring);
+    --sl-color-success: var(--state-ok);
+    --sl-color-warning: var(--state-warn);
+    --sl-color-danger: var(--state-down);
+    --sl-panel-bg: var(--panel-bg);
+    --sl-input-bg: var(--input-bg);
+    --sl-border-radius: 12px;
 }
 
 :root[data-theme="dark"] {

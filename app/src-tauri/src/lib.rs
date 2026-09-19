@@ -11,7 +11,10 @@ use shanten_backend::ipc::{
     AmuletActionRequest, AutorunAction, BackendSnapshot, CommandResult, ConfigTables,
     FlowDumpResult, JsonMap, PacketLogSnapshot, SwitchRequest, TsumoLoopStatus, VersionMismatch,
 };
-use shanten_backend::pipeline::PipelineConfig;
+use shanten_backend::pipeline::{PacketModuleInfo, PacketOperation, PipelineConfig};
+use shanten_backend::plugins::{
+    MarketplaceSnapshot, PluginFrontendBundle, PluginInfo, PluginScanError, PluginUpdateInfo,
+};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 mod overlay;
@@ -123,6 +126,187 @@ async fn backend_get_packet_pipeline(
 
 #[tauri::command]
 #[specta::specta]
+fn backend_get_packet_modules(state: State<'_, IpcBackendState>) -> Vec<PacketModuleInfo> {
+    state.0.packet_modules()
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_get_plugins(state: State<'_, IpcBackendState>) -> Vec<PluginInfo> {
+    state.0.plugins()
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_get_plugin_marketplace(
+    state: State<'_, IpcBackendState>,
+) -> Result<MarketplaceSnapshot, String> {
+    state.0.plugin_marketplace().await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_add_plugin_marketplace_source(
+    url: String,
+    state: State<'_, IpcBackendState>,
+) -> Result<MarketplaceSnapshot, String> {
+    state.0.add_plugin_marketplace_source(url).await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_remove_plugin_marketplace_source(
+    url: String,
+    state: State<'_, IpcBackendState>,
+) -> Result<MarketplaceSnapshot, String> {
+    state.0.remove_plugin_marketplace_source(url).await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_install_marketplace_plugin(
+    source_url: String,
+    plugin_id: String,
+    state: State<'_, IpcBackendState>,
+) -> Result<Vec<PluginInfo>, String> {
+    state
+        .0
+        .install_marketplace_plugin(source_url, plugin_id)
+        .await
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_get_plugin_scan_errors(state: State<'_, IpcBackendState>) -> Vec<PluginScanError> {
+    state.0.plugin_scan_errors()
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_report_plugin_frontend_health(
+    state: State<'_, IpcBackendState>,
+    id: String,
+    token: String,
+    error: Option<String>,
+) {
+    state.0.report_plugin_frontend_health(id, token, error);
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_install_plugin(
+    state: State<'_, IpcBackendState>,
+    archive: String,
+) -> Result<Vec<PluginInfo>, String> {
+    state.0.install_plugin(archive).await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_uninstall_plugin(
+    state: State<'_, IpcBackendState>,
+    id: String,
+    remove_config: bool,
+) -> Result<Vec<PluginInfo>, String> {
+    state.0.uninstall_plugin(id, remove_config).await
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_get_plugin_frontends(state: State<'_, IpcBackendState>) -> Vec<PluginFrontendBundle> {
+    state.0.plugin_frontends()
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_get_plugin_config(
+    id: String,
+    state: State<'_, IpcBackendState>,
+) -> Result<Value, String> {
+    state.0.plugin_config(id)
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_set_plugin_config(
+    id: String,
+    value: Value,
+    state: State<'_, IpcBackendState>,
+) -> Result<(), String> {
+    state.0.set_plugin_config(id, value)
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_invoke_plugin(
+    id: String,
+    method: String,
+    params: Value,
+    state: State<'_, IpcBackendState>,
+) -> Result<Value, String> {
+    state.0.invoke_plugin(id, method, params).await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_rescan_plugins(
+    state: State<'_, IpcBackendState>,
+) -> Result<Vec<PluginInfo>, String> {
+    state.0.rescan_plugins().await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_set_plugin_enabled(
+    id: String,
+    enabled: bool,
+    approved_permissions: Vec<PacketOperation>,
+    state: State<'_, IpcBackendState>,
+) -> Result<Vec<PluginInfo>, String> {
+    state
+        .0
+        .set_plugin_enabled(id, enabled, approved_permissions)
+        .await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_restart_plugin(
+    id: String,
+    state: State<'_, IpcBackendState>,
+) -> Result<Vec<PluginInfo>, String> {
+    state.0.restart_plugin(id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_set_plugin_auto_update(
+    id: String,
+    enabled: bool,
+    state: State<'_, IpcBackendState>,
+) -> Result<Vec<PluginInfo>, String> {
+    state.0.set_plugin_auto_update(id, enabled).await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_check_plugin_updates(
+    state: State<'_, IpcBackendState>,
+) -> Result<Vec<PluginUpdateInfo>, String> {
+    state.0.check_plugin_updates().await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_update_plugin(
+    id: String,
+    state: State<'_, IpcBackendState>,
+) -> Result<Vec<PluginInfo>, String> {
+    state.0.update_plugin(id).await
+}
+
+#[tauri::command]
+#[specta::specta]
 async fn backend_set_packet_pipeline(
     config: PipelineConfig,
     state: State<'_, IpcBackendState>,
@@ -144,6 +328,24 @@ async fn backend_replay_packet(
     state: State<'_, IpcBackendState>,
 ) -> Result<CommandResult, String> {
     Ok(state.0.replay_packet(method, payload).await)
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_fetch_game_record(
+    game_uuid: String,
+    state: State<'_, IpcBackendState>,
+) -> Result<CommandResult, String> {
+    Ok(state.0.fetch_game_record(game_uuid).await)
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_override_game_record(
+    record: Value,
+    state: State<'_, IpcBackendState>,
+) -> Result<CommandResult, String> {
+    Ok(state.0.override_game_record(record))
 }
 
 #[tauri::command]
@@ -259,6 +461,18 @@ async fn backend_switch(
 #[specta::specta]
 fn backend_open_config_dir(state: State<'_, IpcBackendState>) -> Result<(), String> {
     state.0.open_config_dir()
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_open_log_dir(state: State<'_, IpcBackendState>) -> Result<(), String> {
+    state.0.open_log_dir()
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_open_plugin_dir(state: State<'_, IpcBackendState>) -> Result<(), String> {
+    state.0.open_plugin_dir()
 }
 
 #[tauri::command]
@@ -424,9 +638,31 @@ fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
             backend_snapshot,
             backend_check_version,
             backend_get_packet_pipeline,
+            backend_get_packet_modules,
+            backend_get_plugins,
+            backend_get_plugin_marketplace,
+            backend_add_plugin_marketplace_source,
+            backend_remove_plugin_marketplace_source,
+            backend_install_marketplace_plugin,
+            backend_get_plugin_scan_errors,
+            backend_report_plugin_frontend_health,
+            backend_install_plugin,
+            backend_uninstall_plugin,
+            backend_get_plugin_frontends,
+            backend_get_plugin_config,
+            backend_set_plugin_config,
+            backend_invoke_plugin,
+            backend_rescan_plugins,
+            backend_set_plugin_enabled,
+            backend_restart_plugin,
+            backend_set_plugin_auto_update,
+            backend_check_plugin_updates,
+            backend_update_plugin,
             backend_set_packet_pipeline,
             backend_get_packet_log,
             backend_replay_packet,
+            backend_fetch_game_record,
+            backend_override_game_record,
             backend_update_config,
             backend_set_locale,
             backend_dump_flows,
@@ -440,6 +676,8 @@ fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
             backend_resolve_confirmation,
             backend_switch,
             backend_open_config_dir,
+            backend_open_log_dir,
+            backend_open_plugin_dir,
         ])
 }
 
@@ -478,9 +716,31 @@ pub fn run() {
             backend_snapshot,
             backend_check_version,
             backend_get_packet_pipeline,
+            backend_get_packet_modules,
+            backend_get_plugins,
+            backend_get_plugin_marketplace,
+            backend_add_plugin_marketplace_source,
+            backend_remove_plugin_marketplace_source,
+            backend_install_marketplace_plugin,
+            backend_get_plugin_scan_errors,
+            backend_report_plugin_frontend_health,
+            backend_install_plugin,
+            backend_uninstall_plugin,
+            backend_get_plugin_frontends,
+            backend_get_plugin_config,
+            backend_set_plugin_config,
+            backend_invoke_plugin,
+            backend_rescan_plugins,
+            backend_set_plugin_enabled,
+            backend_restart_plugin,
+            backend_set_plugin_auto_update,
+            backend_check_plugin_updates,
+            backend_update_plugin,
             backend_set_packet_pipeline,
             backend_get_packet_log,
             backend_replay_packet,
+            backend_fetch_game_record,
+            backend_override_game_record,
             backend_update_config,
             backend_set_locale,
             backend_dump_flows,
@@ -493,7 +753,9 @@ pub fn run() {
             backend_autorun,
             backend_resolve_confirmation,
             backend_switch,
-            backend_open_config_dir
+            backend_open_config_dir,
+            backend_open_log_dir,
+            backend_open_plugin_dir
         ])
         .setup(|app| {
             let runtime_root = app.path().app_data_dir()?.join("configs");

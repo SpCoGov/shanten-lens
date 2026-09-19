@@ -7,10 +7,14 @@ use shanten_backend::{
         VersionMismatch,
     },
     logging::{self, LogBuffer},
-    pipeline::{self, PipelineConfig},
+    pipeline::{self, ModuleRegistry, PacketModuleInfo, PipelineConfig, GAME_RECORD},
+    plugins::{
+        MarketplaceSnapshot, PluginFrontendBundle, PluginInfo, PluginManager, PluginScanError,
+        PluginUpdateInfo,
+    },
     proxy::ProxyControl,
     recommendations,
-    runtime::normalize_config,
+    runtime::{normalize_config, register_builtin_modules},
     services::{event, Services},
     VERSION,
 };
@@ -30,6 +34,8 @@ use tracing::error;
 struct State {
     pipeline_path: PathBuf,
     pipeline: Arc<RwLock<PipelineConfig>>,
+    module_registry: Arc<ModuleRegistry>,
+    plugins: Arc<PluginManager>,
     events: broadcast::Sender<Value>,
     logs: Arc<LogBuffer>,
     services: Arc<Services>,
@@ -53,9 +59,23 @@ impl BackendRuntime {
         let pipeline_path = runtime_root.join("pipeline.json");
         let config = normalize_config(pipeline::load(&pipeline_path).unwrap_or_default());
         pipeline::save(&pipeline_path, &config).map_err(anyhow::Error::msg)?;
+        let module_registry = Arc::new(ModuleRegistry::default());
+        register_builtin_modules(&module_registry, &config);
         let (events, _) = broadcast::channel(1_024);
-        let logs = logging::init(events.clone())?;
+        let logs = logging::init(events.clone(), &log_dir(&runtime_root))?;
         let services = Arc::new(Services::load(runtime_root.clone(), events.clone())?);
+        let pipeline = Arc::new(RwLock::new(config));
+        let plugins = PluginManager::load(
+            runtime_root
+                .parent()
+                .unwrap_or(&runtime_root)
+                .join("plugins"),
+            runtime_root.join("plugins.json"),
+            module_registry.clone(),
+            pipeline.clone(),
+            pipeline_path.clone(),
+            events.clone(),
+        )?;
         let backend_config = services.table("backend");
         let mitm_port = backend_config
             .get("mitm_port")
@@ -67,7 +87,9 @@ impl BackendRuntime {
         Ok(Self {
             state: State {
                 pipeline_path,
-                pipeline: Arc::new(RwLock::new(config)),
+                pipeline,
+                module_registry,
+                plugins,
                 events,
                 logs,
                 services,
@@ -111,6 +133,198 @@ impl BackendRuntime {
         self.state.pipeline.read().await.clone()
     }
 
+    pub fn packet_modules(&self) -> Vec<PacketModuleInfo> {
+        self.state.module_registry.snapshot()
+    }
+
+    pub fn plugins(&self) -> Vec<PluginInfo> {
+        self.state.plugins.list()
+    }
+
+    pub async fn plugin_marketplace(&self) -> Result<MarketplaceSnapshot, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || plugins.marketplace())
+            .await
+            .map_err(|error| error.to_string())
+    }
+
+    pub async fn add_plugin_marketplace_source(
+        &self,
+        url: String,
+    ) -> Result<MarketplaceSnapshot, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || {
+            plugins
+                .add_marketplace_source(&url)
+                .map_err(|error| error.to_string())
+        })
+        .await
+        .map_err(|error| error.to_string())?
+    }
+
+    pub async fn remove_plugin_marketplace_source(
+        &self,
+        url: String,
+    ) -> Result<MarketplaceSnapshot, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || {
+            plugins
+                .remove_marketplace_source(&url)
+                .map_err(|error| error.to_string())
+        })
+        .await
+        .map_err(|error| error.to_string())?
+    }
+
+    pub async fn install_marketplace_plugin(
+        &self,
+        source_url: String,
+        plugin_id: String,
+    ) -> Result<Vec<PluginInfo>, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || {
+            plugins
+                .install_marketplace_plugin(&source_url, &plugin_id)
+                .map_err(|error| error.to_string())
+        })
+        .await
+        .map_err(|error| error.to_string())?
+    }
+
+    pub fn plugin_frontends(&self) -> Vec<PluginFrontendBundle> {
+        self.state.plugins.frontend_bundles()
+    }
+
+    pub fn plugin_config(&self, id: String) -> Result<Value, String> {
+        self.state
+            .plugins
+            .get_config(&id)
+            .map_err(|error| error.to_string())
+    }
+
+    pub fn set_plugin_config(&self, id: String, value: Value) -> Result<(), String> {
+        self.state
+            .plugins
+            .set_config(&id, value)
+            .map_err(|error| error.to_string())
+    }
+
+    pub async fn invoke_plugin(
+        &self,
+        id: String,
+        method: String,
+        params: Value,
+    ) -> Result<Value, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || {
+            plugins
+                .invoke(&id, &method, params)
+                .map_err(|error| error.to_string())
+        })
+        .await
+        .map_err(|error| error.to_string())?
+    }
+
+    pub fn plugin_scan_errors(&self) -> Vec<PluginScanError> {
+        self.state.plugins.scan_errors()
+    }
+
+    pub fn report_plugin_frontend_health(&self, id: String, token: String, error: Option<String>) {
+        self.state
+            .plugins
+            .report_frontend_health(&id, &token, error);
+    }
+
+    pub async fn install_plugin(&self, archive: String) -> Result<Vec<PluginInfo>, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || {
+            use base64::Engine;
+            if archive.len() > 180 * 1024 * 1024 {
+                return Err("plugin archive is too large".into());
+            }
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(archive)
+                .map_err(|error| error.to_string())?;
+            plugins.install(&bytes).map_err(|error| error.to_string())
+        })
+        .await
+        .map_err(|error| error.to_string())?
+    }
+
+    pub async fn uninstall_plugin(
+        &self,
+        id: String,
+        remove_config: bool,
+    ) -> Result<Vec<PluginInfo>, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || {
+            plugins
+                .uninstall(&id, remove_config)
+                .map_err(|error| error.to_string())
+        })
+        .await
+        .map_err(|error| error.to_string())?
+    }
+
+    pub async fn rescan_plugins(&self) -> Result<Vec<PluginInfo>, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || plugins.rescan().map_err(|error| error.to_string()))
+            .await
+            .map_err(|error| error.to_string())?
+    }
+
+    pub async fn set_plugin_enabled(
+        &self,
+        id: String,
+        enabled: bool,
+        approved_permissions: Vec<shanten_backend::pipeline::PacketOperation>,
+    ) -> Result<Vec<PluginInfo>, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || {
+            plugins
+                .set_enabled(&id, enabled, approved_permissions)
+                .map_err(|error| error.to_string())
+        })
+        .await
+        .map_err(|error| error.to_string())?
+    }
+
+    pub async fn restart_plugin(&self, id: String) -> Result<Vec<PluginInfo>, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || plugins.restart(&id).map_err(|error| error.to_string()))
+            .await
+            .map_err(|error| error.to_string())?
+    }
+
+    pub async fn set_plugin_auto_update(
+        &self,
+        id: String,
+        enabled: bool,
+    ) -> Result<Vec<PluginInfo>, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || {
+            plugins
+                .set_auto_update(&id, enabled)
+                .map_err(|error| error.to_string())
+        })
+        .await
+        .map_err(|error| error.to_string())?
+    }
+
+    pub async fn check_plugin_updates(&self) -> Result<Vec<PluginUpdateInfo>, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || plugins.check_updates())
+            .await
+            .map_err(|error| error.to_string())
+    }
+
+    pub async fn update_plugin(&self, id: String) -> Result<Vec<PluginInfo>, String> {
+        let plugins = self.state.plugins.clone();
+        tokio::task::spawn_blocking(move || plugins.update(&id).map_err(|error| error.to_string()))
+            .await
+            .map_err(|error| error.to_string())?
+    }
+
     pub async fn set_packet_pipeline(&self, config: PipelineConfig) -> CommandResult {
         let config = normalize_config(config);
         match pipeline::validate(&config)
@@ -118,9 +332,14 @@ impl BackendRuntime {
         {
             Ok(()) => {
                 *self.state.pipeline.write().await = config.clone();
+                register_builtin_modules(&self.state.module_registry, &config);
                 let _ = self.state.events.send(envelope(
                     "packet_pipeline",
-                    serde_json::to_value(config).unwrap_or(Value::Null),
+                    serde_json::to_value(&config).unwrap_or(Value::Null),
+                ));
+                let _ = self.state.events.send(envelope(
+                    "packet_modules",
+                    serde_json::to_value(self.packet_modules()).unwrap_or(Value::Null),
                 ));
                 CommandResult {
                     ok: true,
@@ -167,6 +386,54 @@ impl BackendRuntime {
                 ..Default::default()
             },
             Err(error) => failed(error),
+        }
+    }
+
+    pub async fn fetch_game_record(&self, game_uuid: String) -> CommandResult {
+        let game_uuid = game_uuid.trim();
+        if game_uuid.is_empty() || game_uuid.len() > 200 {
+            return failed("invalid-payload");
+        }
+        match self
+            .state
+            .proxy
+            .inject(
+                ".lq.Lobby.fetchGameRecord",
+                &json!({
+                    "clientVersionString": "StandaloneWindows_2022-0.16.273",
+                    "gameUuid": game_uuid,
+                }),
+                Duration::from_secs(12),
+                self.state.pipeline.read().await.clone(),
+                GAME_RECORD,
+            )
+            .await
+        {
+            Ok((id, response)) => CommandResult {
+                ok: response.get("error").is_none(),
+                reason: response
+                    .get("error")
+                    .is_some()
+                    .then(|| "protocol-error".into()),
+                msg_id: Some(id),
+                response: Some(response),
+                ..Default::default()
+            },
+            Err(error) => failed(error),
+        }
+    }
+
+    pub fn override_game_record(&self, record: Value) -> CommandResult {
+        match self.state.services.arm_game_record_override(&record) {
+            Ok(()) => CommandResult {
+                ok: true,
+                ..Default::default()
+            },
+            Err(error) => {
+                let reason = format!("{error:#}");
+                error!(target: "shanten_backend::game_record", error = %reason, "failed to arm game record override");
+                failed(reason)
+            }
         }
     }
 
@@ -366,6 +633,14 @@ impl BackendRuntime {
         open_directory(self.state.services.config_root())
     }
 
+    pub fn open_log_dir(&self) -> Result<(), String> {
+        open_directory(&log_dir(&self.runtime_root))
+    }
+
+    pub fn open_plugin_dir(&self) -> Result<(), String> {
+        open_directory(self.state.plugins.root())
+    }
+
     pub fn subscribe(&self) -> broadcast::Receiver<Value> {
         self.state.events.subscribe()
     }
@@ -375,6 +650,7 @@ impl BackendRuntime {
             ([127, 0, 0, 1], self.mitm_port).into(),
             &self.runtime_root,
             self.state.pipeline.clone(),
+            self.state.module_registry.clone(),
             self.state.services.clone(),
             self.state.proxy.clone(),
         );
@@ -393,6 +669,10 @@ impl BackendRuntime {
 
 fn envelope(kind: &str, data: Value) -> Value {
     json!({"type": kind, "data": data})
+}
+
+fn log_dir(runtime_root: &std::path::Path) -> PathBuf {
+    runtime_root.parent().unwrap_or(runtime_root).join("logs")
 }
 
 fn open_directory(path: &std::path::Path) -> Result<(), String> {

@@ -11,3 +11,6 @@ __pycache__/
 target/
 *.tsbuildinfo
 app/src-tauri/bin/
+
+# Compiled plugin executables and their runtime dependencies
+/examples/plugins/*/backend/

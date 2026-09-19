@@ -1,7 +1,10 @@
 use crate::{
     ipc::{PacketLogItem, PacketLogSnapshot},
+    logging::JsonLineLog,
     pipeline::Packet,
+    protocol::{decode_game_record_base64, encode_game_record_base64},
 };
+use anyhow::Context;
 use serde_json::{json, Map, Value};
 use std::{
     collections::VecDeque,
@@ -60,9 +63,11 @@ pub struct Services {
     locale: Arc<Mutex<String>>,
     game_state: Arc<Mutex<Value>>,
     packet_log: Arc<Mutex<VecDeque<PacketLogItem>>>,
+    packet_log_file: Arc<JsonLineLog>,
     registry: Arc<Mutex<Value>>,
     waiters: Arc<Mutex<std::collections::HashMap<u32, oneshot::Sender<Value>>>>,
     reserved_response_ids: Arc<Mutex<std::collections::HashSet<u32>>>,
+    game_record_override: Arc<Mutex<Option<Value>>>,
     confirmations: Arc<Mutex<std::collections::HashMap<String, mpsc::Sender<bool>>>>,
     next_confirmation: Arc<AtomicU64>,
     pub events: broadcast::Sender<Value>,
@@ -82,6 +87,10 @@ impl Services {
             }
         }
         let data_dir = root.parent().unwrap_or(&root).join("data");
+        let log_dir = root.parent().unwrap_or(&root).join("logs");
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let packet_log_file =
+            JsonLineLog::create(log_dir.join(format!("shanten-lens-packets-{timestamp}.log")))?;
         let registry = json!({
             "amulets": registry_items(&data_dir.join("amulets.json"), AMULETS, "amulets"),
             "badges": registry_items(&data_dir.join("badges.json"), BADGES, "badges"),
@@ -92,9 +101,11 @@ impl Services {
             locale: Arc::new(Mutex::new("zh-CN".into())),
             game_state: Arc::new(Mutex::new(empty_game_state())),
             packet_log: Arc::new(Mutex::new(VecDeque::new())),
+            packet_log_file: Arc::new(packet_log_file),
             registry: Arc::new(Mutex::new(registry)),
             waiters: Arc::new(Mutex::new(std::collections::HashMap::new())),
             reserved_response_ids: Arc::new(Mutex::new(std::collections::HashSet::new())),
+            game_record_override: Arc::new(Mutex::new(None)),
             confirmations: Arc::new(Mutex::new(std::collections::HashMap::new())),
             next_confirmation: Arc::new(AtomicU64::new(1)),
             events,
@@ -229,6 +240,17 @@ impl Services {
 
     pub fn resolve_response(&self, packet: &Packet) {
         if packet.packet_type == "Res" {
+            if packet.direction == crate::pipeline::Direction::Inbound
+                && packet.method == ".lq.Lobby.fetchGameRecord"
+            {
+                if let Some(encoded) = packet.data.get("data").and_then(Value::as_str) {
+                    if let Ok(record) = decode_game_record_base64(encoded) {
+                        let mut payload = packet.data.clone();
+                        payload["data"] = record;
+                        let _ = self.events.send(event("update_game_record", payload));
+                    }
+                }
+            }
             if let Some(id) = packet.id {
                 self.reserved_response_ids.lock().unwrap().remove(&id);
             }
@@ -237,6 +259,33 @@ impl Services {
                 .and_then(|id| self.waiters.lock().unwrap().remove(&id))
             {
                 let _ = sender.send(packet.data.clone());
+            }
+        }
+    }
+
+    pub fn arm_game_record_override(&self, response: &Value) -> anyhow::Result<()> {
+        let mut encoded = response.clone();
+        let record = response
+            .get("data")
+            .context("fetch response data missing")?;
+        encoded["data"] = Value::String(encode_game_record_base64(record)?);
+        *self.game_record_override.lock().unwrap() = Some(encoded);
+        let _ = self
+            .events
+            .send(event("game_record_override_status", json!(true)));
+        Ok(())
+    }
+
+    pub fn apply_game_record_override(&self, packet: &mut Packet) {
+        if packet.direction == crate::pipeline::Direction::Inbound
+            && packet.packet_type == "Res"
+            && packet.method == ".lq.Lobby.fetchGameRecord"
+        {
+            if let Some(response) = self.game_record_override.lock().unwrap().take() {
+                packet.data = response;
+                let _ = self
+                    .events
+                    .send(event("game_record_override_status", json!(false)));
             }
         }
     }
@@ -250,6 +299,7 @@ impl Services {
             data: packet.data.clone(),
             ts_ms: now_ms(),
         };
+        self.packet_log_file.write(&value);
         let mut packets = self.packet_log.lock().unwrap();
         if packets.len() == 1_000 {
             packets.pop_front();

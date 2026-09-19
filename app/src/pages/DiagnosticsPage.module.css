@@ -1,15 +1,23 @@
 .page {
+    box-sizing: border-box;
     grid-template-rows: auto minmax(0, 1fr);
     flex: 1 1 auto;
     width: 100%;
     height: 100%;
     min-height: 0;
+    padding-bottom: 16px;
 }
 
 .viewer {
     display: flex;
     flex-direction: column;
     min-height: 0;
+}
+
+.topActions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 .tabs {
@@ -126,6 +134,29 @@
 
 .filters .logSearch {
     min-width: 220px;
+}
+
+.openFolderButton {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.openFolderButton span {
+    font-size: 18px;
+}
+
+.openFolderButton:hover {
+    background: var(--list-item-hover);
 }
 
 .clearButton {

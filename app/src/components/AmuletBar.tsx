@@ -2,9 +2,15 @@ import React from "react";
 import {createPortal} from "react-dom";
 import "../styles/theme.css";
 import {type EffectItem} from "../lib/gamestate";
-import AmuletCard from "./AmuletCard";
+import AmuletCard, {AMULET_CARD_BASE_HEIGHT, amuletCardBaseWidth} from "./AmuletCard";
 import "../lib/i18n";
 import {useTranslation} from "react-i18next";
+
+// 与下方容器样式以及 App.css 中的横向滚动条高度保持一致。
+const BAR_GAP = 8;
+const BAR_PADDING_X = 8;
+const BAR_PADDING_Y = 12;
+const HORIZONTAL_SCROLLBAR_HEIGHT = 10;
 
 type DragState = {
     uid: number;
@@ -24,6 +30,7 @@ type DragState = {
 export default function AmuletBar({
                                       items,
                                       scale = 0.55,
+                                      fillHeight = false,
                                       max = 8,
                                       onItemClick,
                                       showPrice,
@@ -31,6 +38,7 @@ export default function AmuletBar({
                                   }: {
     items: EffectItem[];
     scale?: number;
+    fillHeight?: boolean;
     max?: number;
     onItemClick?: (item: EffectItem) => void;
     showPrice?: boolean;
@@ -45,8 +53,36 @@ export default function AmuletBar({
     const capturedElementRef = React.useRef<HTMLDivElement | null>(null);
     const suppressClickRef = React.useRef(false);
     const latestDisplayListRef = React.useRef<EffectItem[]>(list);
+    const barRef = React.useRef<HTMLDivElement | null>(null);
+    const [cardScale, setCardScale] = React.useState(scale);
 
     const canDrag = Boolean(onReorder) && list.length > 1;
+
+    React.useLayoutEffect(() => {
+        if (!fillHeight) {
+            setCardScale(scale);
+            return;
+        }
+        const element = barRef.current;
+        if (!element) return;
+        const updateScale = () => {
+            // 先按完整高度预测横向溢出，首次绘制就直接使用最终缩放值，避免滚动条闪现一次。
+            const fullScale = Math.max(0.1, (element.offsetHeight - BAR_PADDING_Y) / AMULET_CARD_BASE_HEIGHT);
+            const contentWidth = list.reduce(
+                (width, item) => width + Math.round(amuletCardBaseWidth(item.volume) * fullScale),
+                BAR_PADDING_X + Math.max(0, list.length - 1) * BAR_GAP,
+            );
+            const scrollbarHeight = contentWidth > element.clientWidth ? HORIZONTAL_SCROLLBAR_HEIGHT : 0;
+            setCardScale(Math.max(
+                0.1,
+                (element.offsetHeight - BAR_PADDING_Y - scrollbarHeight) / AMULET_CARD_BASE_HEIGHT,
+            ));
+        };
+        updateScale();
+        const observer = new ResizeObserver(updateScale);
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [fillHeight, list, scale]);
 
     React.useEffect(() => {
         latestDisplayListRef.current = displayList;
@@ -219,10 +255,13 @@ export default function AmuletBar({
 
     return (
         <div
+            ref={barRef}
             style={{
                 display: "flex",
                 flexWrap: "nowrap",
-                gap: 8,
+                flex: fillHeight ? "1 1 0" : undefined,
+                minHeight: fillHeight ? 0 : undefined,
+                gap: BAR_GAP,
                 overflowX: "auto",
                 overflowY: "hidden",
                 padding: "6px 4px",
@@ -239,7 +278,7 @@ export default function AmuletBar({
                     data-draggable={canDrag ? "true" : "false"}
                     onPointerDown={(event) => startPointerDrag(event, it)}
                 >
-                    <AmuletCard item={it} scale={scale} showPrice={showPrice}/>
+                    <AmuletCard item={it} scale={cardScale} showPrice={showPrice}/>
                 </div>
             ))}
             {drag?.active ? createPortal(
@@ -252,7 +291,7 @@ export default function AmuletBar({
                         height: drag.height,
                     }}
                 >
-                    <AmuletCard item={drag.item} scale={scale} showPrice={showPrice}/>
+                    <AmuletCard item={drag.item} scale={cardScale} showPrice={showPrice}/>
                 </div>,
                 document.body,
             ) : null}

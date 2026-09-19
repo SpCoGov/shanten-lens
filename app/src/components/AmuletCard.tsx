@@ -13,6 +13,9 @@ const RAR_BG_INDEX: Record<string, number> = {
     GRAY: 5,
 };
 
+export const AMULET_CARD_BASE_HEIGHT = 213;
+export const amuletCardBaseWidth = (volume: number) => volume === 2 ? 316 : 152;
+
 function pad4(n: number) {
     return n.toString().padStart(4, "0");
 }
@@ -56,8 +59,8 @@ export default function AmuletCard({
     const badgePath = item.badge ? `/assets/badge/badge_${item.badge.id}.png` : null;
 
     // 原始尺寸
-    const W0 = isWide ? 316 : 152;
-    const H0 = 213;
+    const W0 = amuletCardBaseWidth(item.volume);
+    const H0 = AMULET_CARD_BASE_HEIGHT;
     const PLUS0 = 50;
     const BADGE0 = 76;
 

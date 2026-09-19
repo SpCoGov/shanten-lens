@@ -14,21 +14,91 @@ export type HomeTile = {
     splitChildren?: boolean;
 };
 
-type Breakpoint = "lg" | "md" | "sm" | "xs";
-type StoredLayout = {schema: 2; layouts: ResponsiveLayouts};
+type Breakpoint = "lg";
+type StoredLayout = {schema: 4; layouts: ResponsiveLayouts};
 
 const STORAGE_KEY = "shanten-lens.home-layout";
-const BREAKPOINTS = {lg: 1200, md: 850, sm: 560, xs: 0};
-const COLS = {lg: 12, md: 10, sm: 6, xs: 2};
+// 主界面只使用一套网格布局，调整窗口大小时不再切换并改写另一套组件尺寸。
+const BREAKPOINTS = {lg: 0};
+const COLS = {lg: 12};
+const DEFAULT_WIDTH = 4;
+// react-grid-layout 的 3 个纵向小行约等于界面中 1 个正方形单位。
+const ROWS_PER_UNIT = 3;
+
+type TileSize = {
+    default: {w: number; h: number};
+    min: {w: number; h: number};
+    max: {w: number | null; h: number | null};
+};
+
+// 所有组件的尺寸只在这里定义：default=默认，min=最小，max=最大；max 中的 null 表示不限制。
+// w 使用网格列数，h 使用纵向小行数。需要按视觉方格设置高度时，用 ROWS_PER_UNIT 换算。
+const TILE_SIZES: Record<string, TileSize> = {
+    // 左侧信息
+    "side-content":            {default: {w: DEFAULT_WIDTH, h: 6}, min: {w: 2, h: 3}, max: {w: DEFAULT_WIDTH, h: null}}, // 关卡建议/历史分数
+    "side-health":             {default: {w: DEFAULT_WIDTH, h: 2}, min: {w: 2, h: 2}, max: {w: DEFAULT_WIDTH, h: 2}}, // 角色血量
+
+    // 主区域：护身符、商店、手牌和替换序列
+    "main:amulets":            {default: {w: DEFAULT_WIDTH, h: 9}, min: {w: 4, h: 5}, max: {w: null, h: null}}, // 护身符
+    "main:goods":              {default: {w: DEFAULT_WIDTH, h: 9}, min: {w: 1, h: ROWS_PER_UNIT}, max: {w: null, h: null}}, // 商品
+    "main:shop-buff":          {default: {w: DEFAULT_WIDTH, h: 9}, min: {w: 1, h: ROWS_PER_UNIT}, max: {w: null, h: null}}, // 商店增益
+    "main:candidates":         {default: {w: DEFAULT_WIDTH, h: 9}, min: {w: 1, h: ROWS_PER_UNIT}, max: {w: null, h: null}}, // 推荐候选
+    "main:tiles":              {default: {w: DEFAULT_WIDTH, h: 9}, min: {w: 3, h: 2 * ROWS_PER_UNIT}, max: {w: null, h: null}}, // 手牌
+    "main:replacement":        {default: {w: DEFAULT_WIDTH, h: 9}, min: {w: 1, h: ROWS_PER_UNIT}, max: {w: null, h: null}}, // 替换序列
+
+    // 统计区域：宝牌、替换统计和牌山统计
+    "stats:dora":              {default: {w: DEFAULT_WIDTH, h: 9}, min: {w: 2, h: ROWS_PER_UNIT}, max: {w: null, h: null}}, // 宝牌指示牌
+    "stats:replacement-stats": {default: {w: DEFAULT_WIDTH, h: 9}, min: {w: 1, h: ROWS_PER_UNIT}, max: {w: null, h: null}}, // 替换统计
+    "stats:wall-stats":        {default: {w: DEFAULT_WIDTH, h: 9}, min: {w: 3, h: 2 * ROWS_PER_UNIT}, max: {w: null, h: null}}, // 牌山统计
+};
+
+function tileSize(id: string, cols: number) {
+    const size = TILE_SIZES[id] ?? {
+        default: {w: DEFAULT_WIDTH, h: 9},
+        min: {w: 1, h: ROWS_PER_UNIT},
+        max: {w: null, h: null},
+    };
+    return {
+        w: Math.min(size.default.w, cols),
+        h: size.default.h,
+        minW: Math.min(size.min.w, cols),
+        minH: size.min.h,
+        ...(size.max.w == null ? {} : {maxW: Math.min(size.max.w, cols)}),
+        ...(size.max.h == null ? {} : {maxH: size.max.h}),
+    };
+}
+
+function normalizeTileId(id: string) {
+    const separator = id.indexOf(":");
+    const reactKeyMarker = id.lastIndexOf("$");
+    if (separator >= 0 && reactKeyMarker > separator) {
+        return `${id.slice(0, separator + 1)}${id.slice(reactKeyMarker + 1)}`;
+    }
+    return id;
+}
 
 function defaults(ids: string[]): ResponsiveLayouts {
     return Object.fromEntries((Object.keys(COLS) as Breakpoint[]).map((bp) => {
         const cols = COLS[bp];
-        const width = bp === "xs" ? cols : bp === "sm" ? 3 : bp === "md" ? 5 : 4;
-        return [bp, ids.map((id, index) => ({
-            i: id, x: (index * width) % cols, y: Math.floor(index * width / cols) * 9,
-            w: Math.min(width, cols), h: id === "side" ? 14 : 9, minW: 1, minH: 3,
-        }))];
+        const hasSideContent = ids.includes("side-content");
+        const hasSideHealth = ids.includes("side-health");
+        const hasSide = hasSideContent || hasSideHealth;
+        const regularIds = ids.filter((id) => id !== "side-content" && id !== "side-health");
+        return [bp, ids.map((id) => {
+            const size = tileSize(id, cols);
+            if (id === "side-content") {
+                return {i: id, x: 0, y: 0, ...size};
+            }
+            if (id === "side-health") {
+                return {i: id, x: 0, y: hasSideContent ? TILE_SIZES["side-content"].default.h : 0, ...size};
+            }
+            const regularIndex = regularIds.indexOf(id);
+            const index = regularIndex + (hasSide ? 1 : 0);
+            const y = Math.floor(index * size.w / cols) * size.h;
+            return {
+                i: id, x: (index * size.w) % cols, y, ...size,
+            };
+        })];
     }));
 }
 
@@ -40,7 +110,21 @@ function reconcileLayouts(layouts: ResponsiveLayouts, ids: string[]): Responsive
         const currentIds = new Set(current.map((item) => item.i));
         const reconciled = current.map((item) => {
             const initial = baseById.get(item.i);
-            return initial ? {...initial, ...item, minW: initial.minW, minH: initial.minH} : item;
+            if (!initial) return item;
+            const minW = initial.minW ?? 1;
+            const maxW = initial.maxW ?? Infinity;
+            const minH = initial.minH ?? 1;
+            const maxH = initial.maxH ?? Infinity;
+            return {
+                ...initial,
+                ...item,
+                w: Math.max(minW, Math.min(item.w, maxW)),
+                h: Math.max(minH, Math.min(item.h, maxH)),
+                minW: initial.minW,
+                maxW: initial.maxW,
+                minH: initial.minH,
+                maxH: initial.maxH,
+            };
         });
         return [bp, [...reconciled, ...(base[bp] ?? []).filter((item) => !currentIds.has(item.i))]];
     }));
@@ -48,21 +132,25 @@ function reconcileLayouts(layouts: ResponsiveLayouts, ids: string[]): Responsive
 
 function loadState(ids: string[]): StoredLayout {
     try {
-        const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") as Partial<StoredLayout> | null;
-        if (parsed?.schema === 2 && parsed.layouts) {
-            return {schema: 2, layouts: reconcileLayouts(parsed.layouts, ids)};
+        const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") as {schema?: number; layouts?: ResponsiveLayouts} | null;
+        if ((parsed?.schema === 2 || parsed?.schema === 3 || parsed?.schema === 4) && parsed.layouts) {
+            const layouts = Object.fromEntries(Object.entries(parsed.layouts).map(([bp, layout]) => [
+                bp,
+                layout?.map((item) => ({...item, i: normalizeTileId(item.i)})),
+            ])) as ResponsiveLayouts;
+            return {schema: 4, layouts: reconcileLayouts(layouts, ids)};
         }
     } catch {
         // Invalid or unavailable local storage falls back to the shipped layout.
     }
-    return {schema: 2, layouts: defaults(ids)};
+    return {schema: 4, layouts: defaults(ids)};
 }
 
 function expandTiles(tiles: Array<HomeTile | null>): HomeTile[] {
     return tiles.filter((tile): tile is HomeTile => tile !== null).flatMap((tile) => {
         if (!tile.splitChildren || !React.isValidElement<{children?: React.ReactNode}>(tile.content)) return [tile];
         return React.Children.toArray(tile.content.props.children).map((content, index) => ({
-            id: `${tile.id}:${React.isValidElement(content) && content.key != null ? content.key : index}`,
+            id: normalizeTileId(`${tile.id}:${React.isValidElement(content) && content.key != null ? content.key : index}`),
             content,
         }));
     });
@@ -90,7 +178,7 @@ export default function HomeDashboard({tiles, width, mounted}: {
 
     const persist = React.useCallback((nextLayouts: ResponsiveLayouts) => {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({schema: 2, layouts: nextLayouts}));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({schema: 4, layouts: nextLayouts}));
         } catch {
             // The dashboard remains usable when persistence is unavailable.
         }

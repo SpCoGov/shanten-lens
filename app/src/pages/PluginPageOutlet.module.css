@@ -1,0 +1,18 @@
+.page,
+.container {
+    width: 100%;
+    min-height: 100%;
+}
+
+.error {
+    padding: 16px;
+    border: 1px solid var(--danger-weak-border);
+    border-radius: 12px;
+    background: var(--danger-weak-bg);
+    color: var(--state-down);
+}
+
+.error pre {
+    margin: 8px 0 0;
+    white-space: pre-wrap;
+}

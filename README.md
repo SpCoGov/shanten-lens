@@ -1,17 +1,50 @@
-# Shanten Lens 3.0
+<div align="center">
+  <img src="./app/public/logo.svg" width="128" height="128" alt="Shanten Lens Logo" />
+  <h1>Shanten Lens</h1>
+</div>
 
-[日本語版README](./README_JA.md)
+Shanten Lens 是一款面向《雀魂》青云之志模式的桌面辅助工具。应用会在本地解析游戏状态，提供护身符与商店信息、手牌与牌山分析、换牌指导、分数推演、自动化、熔断保护、插件扩展和调试功能。
 
-Shanten Lens是一款面向《雀魂》青云之志模式的桌面辅助工具。3.0版本采用：
+<div align="center">
+  <a href="https://github.com/SpCoGov/shanten-lens/stargazers"><img src="https://img.shields.io/github/stars/SpCoGov/shanten-lens?logo=github" alt="GitHub stars" /></a>
+  <a href="https://github.com/SpCoGov/shanten-lens/releases"><img src="https://img.shields.io/github/v/release/SpCoGov/shanten-lens?label=release&logo=github&include_prereleases" alt="Latest release" /></a>
+  <a href="https://github.com/SpCoGov/shanten-lens/issues"><img src="https://img.shields.io/github/issues/SpCoGov/shanten-lens?logo=github" alt="Open issues" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue?logo=apache" alt="License: Apache-2.0" /></a>
+  <a href="https://github.com/SpCoGov/shanten-lens/actions/workflows/release-build.yml"><img src="https://img.shields.io/github/actions/workflow/status/SpCoGov/shanten-lens/release-build.yml?branch=v3&logo=githubactions&label=build" alt="Build status" /></a>
+  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2" /></a>
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-2021-000000?logo=rust&logoColor=white" alt="Rust 2021" /></a>
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React 18" /></a>
+</div>
 
-- `Tauri 2+React 18+TypeScript`作为桌面前端
-- 内嵌`Rust`后端负责游戏状态、自动化和业务逻辑
-- `Hudsucker+Proxifier`负责HTTPS/WebSocket流量代理
-- 前后端通过Tauri进程内commands和events通信
+[日本語版 README](./README_JA.md)
 
-程序会在本地解析游戏状态，并提供护身符、商店候选、手牌与牌山、换牌指导、分数推演、自动化、熔断保护和调试功能。3.0不再需要Python后端、sidecar或UI WebSocket服务。
+## 目录
 
-## 当前功能
+- [使用须知](#使用须知)
+- [功能](#功能)
+- [使用说明](#使用说明)
+- [技术栈](#技术栈)
+- [目录结构](#目录结构)
+- [构建与打包流程](#构建与打包流程)
+- [项目校验](#项目校验)
+- [插件](#插件)
+- [常见问题](#常见问题)
+- [许可](#许可)
+
+## 使用须知
+
+本项目仅用于教育和研究。第三方辅助、自动化和修改通信可能违反游戏服务条款，并可能导致账号限制。使用者应自行了解并承担相关风险。
+
+目前最稳定的使用环境仍然是 Windows。日常使用前需要准备：
+
+- 可正常运行的 Shanten Lens 桌面程序
+- `Proxifier` 或具备进程级代理转发能力的同类工具
+- 安装本地根证书的权限
+- 能被代理工具接管的雀魂客户端或浏览器进程
+
+首次使用时，建议先启动一次 Shanten Lens 再关闭，让程序生成配置、证书和数据目录。
+
+## 功能
 
 - 主界面实时显示：
   - 当前护身符与印章
@@ -39,22 +72,13 @@ Shanten Lens是一款面向《雀魂》青云之志模式的桌面辅助工具�
 - 调试与辅助：
   - 配置封包流水线和模块顺序
   - 查看运行日志、游戏状态和封包详情
-  - 使用独立HUD窗口显示关键信息
+  - 使用独立 HUD 窗口显示关键信息
+- 插件：
+  - 从插件市场或本地 ZIP 安装插件
+  - 管理插件状态、封包权限和自动更新
+  - 通过插件扩展后端处理模块和前端页面
 
-## 使用须知
-
-本项目仅用于教育和研究。第三方辅助、自动化和修改通信可能违反游戏服务条款，并可能导致账号限制。使用者应自行了解并承担相关风险。
-
-目前最稳定的使用环境仍然是Windows。日常使用前需要准备：
-
-- 可正常运行的Shanten Lens桌面程序
-- `Proxifier`或具备进程级代理转发能力的同类工具
-- 安装本地根证书的权限
-- 能被代理工具接管的雀魂客户端或浏览器进程
-
-首次使用时，建议先启动一次Shanten Lens再关闭，让程序生成配置、证书和数据目录。
-
-## 用户使用说明
+## 使用说明
 
 以下步骤以Windows和Proxifier为例。
 
@@ -113,41 +137,42 @@ Shanten Lens是一款面向《雀魂》青云之志模式的桌面辅助工具�
 
 使用任何第三方工具前，请自行确认风险和适用规则。
 
-## 开发环境
+## 技术栈
 
-### 技术栈
-
-- 前端：`React 18`、`TypeScript`、`Vite`
+- 前端：`React 18`、`TypeScript`、`Vite 5`
 - 桌面容器：`Tauri 2`
 - 后端：`Rust 2021`
-- MITM代理：`Hudsucker`
-- 协议：`protobuf`、HTTPS和WebSocket
-- 前后端通信：Tauri进程内IPC
+- MITM 代理：`Hudsucker`
+- 协议：`protobuf`、HTTPS 和 WebSocket
+- 前后端通信：Tauri 进程内 IPC commands 和 events
 - 包管理器：`pnpm 9`
 
-### 目录结构
+Shanten Lens 3.0 将 Rust 后端直接嵌入 Tauri 进程，不需要 Python 后端、sidecar 或独立的 UI WebSocket 服务。
+
+## 目录结构
 
 ```text
 .
-├─ app/                 React前端与Tauri桌面应用
-│  ├─ src/              前端页面、组件和业务逻辑
-│  ├─ public/           护身符、印章和牌面资源
-│  └─ src-tauri/        Tauri Rust入口与IPC命令
-├─ backend/             内嵌Rust后端、MITM和自动化逻辑
+├─ app/                 React 前端与 Tauri 桌面应用
+│  ├─ src/              页面、组件和前端业务逻辑
+│  ├─ public/           护身符、印章、牌面与 Logo 资源
+│  └─ src-tauri/        Tauri Rust 入口与 IPC 命令
+├─ backend/             内嵌 Rust 后端、MITM、插件和自动化逻辑
 ├─ proto/               游戏协议定义
-├─ scripts/             协议工具与Windows/macOS打包脚本
+├─ scripts/             Windows 与 macOS 打包脚本
+├─ .github/workflows/   持续集成与发布流程
 ├─ Cargo.toml           Rust workspace
 └─ README.md
 ```
 
-### 安装依赖
+## 构建与打包流程
 
-需要安装：
+### 环境要求
 
-- Rust stable与Cargo
+- Rust stable 与 Cargo
 - Node.js 22
 - pnpm 9
-- Tauri 2所需的系统依赖
+- Tauri 2 对应平台的系统依赖
 
 安装前端依赖：
 
@@ -156,84 +181,87 @@ cd app
 pnpm install
 ```
 
-Rust依赖会由Cargo在构建时自动下载。正常开发、构建和运行不需要Python；只有重新生成协议文件时才会使用`scripts/desc_to_proto.py`。
+Rust 依赖会由 Cargo 在构建时自动下载。
 
-## 本地开发运行
+### 本地开发
 
-Rust后端内嵌在Tauri进程中，没有单独的启动命令。
+Rust 后端内嵌在 Tauri 进程中，没有单独的启动命令。
 
 ```powershell
 cd app
 pnpm run tauri:dev
 ```
 
-默认情况下，MITM代理监听`127.0.0.1:10999`。前端与后端通过Tauri IPC直接通信，不监听旧版UI WebSocket端口。
+默认情况下，MITM 代理监听 `127.0.0.1:10999`。前端与后端通过 Tauri IPC 直接通信。
 
-如果只需要调试浏览器中的前端界面，可以运行：
+只调试浏览器中的前端界面时，可以运行：
 
 ```powershell
 cd app
 pnpm run dev
 ```
 
-纯浏览器模式无法使用依赖Tauri IPC的完整后端功能。
+纯浏览器模式无法使用依赖 Tauri IPC 的完整后端功能。
 
-## 构建与打包
-
-### Windows一键构建
+### Windows 打包
 
 ```powershell
 scripts\build_all.bat
 ```
 
-脚本会依次执行：
-
-1. 使用`pnpm install --frozen-lockfile`安装前端依赖
-2. 编译TypeScript和前端资源
-3. 编译Tauri与内嵌Rust后端
-4. 生成Windows MSI安装包
-
-输出目录：
+脚本会安装锁定版本的前端依赖，并构建包含内嵌 Rust 后端的 MSI 安装包。输出目录：
 
 ```text
 app/src-tauri/target/release/bundle/msi/
 ```
 
-### macOS构建
+### macOS 打包
 
 ```bash
 ./scripts/build_macos.sh
 ```
 
-脚本会生成`.app`和`.dmg`：
+脚本会生成 `.app` 和 `.dmg`。macOS 构建还需要 Xcode Command Line Tools 和 Tauri 对应的系统依赖。输出目录：
 
 ```text
 app/src-tauri/target/release/bundle/macos/
 app/src-tauri/target/release/bundle/dmg/
 ```
 
-macOS构建还需要Xcode Command Line Tools和Tauri对应的系统依赖。
-
 ## 项目校验
 
-Rust后端测试：
+Rust 后端测试：
 
 ```powershell
 cargo test --manifest-path backend\Cargo.toml
 ```
 
-TypeScript与前端生产构建：
+TypeScript 与前端生产构建：
 
 ```powershell
 cd app
 pnpm run build
 ```
 
-Tauri后端检查：
+Tauri 后端检查：
 
 ```powershell
 cargo check --manifest-path app\src-tauri\Cargo.toml
 ```
+
+## 插件
+
+相关项目：[插件市场](https://github.com/SpCoGov/shanten-lens-marketplace) · [插件 SDK](https://github.com/SpCoGov/shanten-lens-sdk)
+
+应用内的“插件”页面提供插件市场、已安装插件和插件源管理。
+
+- 可以从插件市场安装插件，也可以导入根目录含 `plugin.json` 的 ZIP 包。
+- 插件默认需要经过启用和封包权限确认；只授予你理解且确实需要的权限。
+- 支持检查更新、自动更新、禁用、重新扫描和卸载插件。
+- 插件可以提供独立后端进程、前端页面、本地化资源和封包处理模块。
+- 第三方插件不属于 Shanten Lens 核心代码。安装前应核对来源、权限和发布者，并自行承担运行第三方代码的风险。
+
+手动开发或调试插件时，可以在插件页面打开插件目录，放入包含 `plugin.json` 的插件目录后执行“重新扫描”。当前插件 API 版本为 `1`。
 
 ## 常见问题
 
@@ -263,4 +291,4 @@ cargo check --manifest-path app\src-tauri\Cargo.toml
 
 ## 许可
 
-项目源代码采用[Apache License 2.0](./LICENSE)发布。部分牌面及游戏相关素材来源于《雀魂》，仅用于非商业用途与学习研究；相关素材不因项目代码许可证而改变其原有权利归属。
+项目源代码采用 [Apache License 2.0](./LICENSE) 发布。部分牌面及游戏相关素材来源于《雀魂》，仅用于非商业用途与学习研究；相关素材不因项目代码许可证而改变其原有权利归属。

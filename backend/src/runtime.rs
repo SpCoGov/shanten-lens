@@ -1,7 +1,8 @@
 use crate::services::Services;
 use crate::{
     pipeline::{
-        Direction, ModuleAction, Outcome, Packet, PacketModule, Pipeline, PipelineConfig,
+        Direction, ModuleAction, ModuleRegistry, Outcome, Packet, PacketModule, PacketModuleInfo,
+        PacketOperation, PacketSubscription, Pipeline, PipelineConfig, GAME_RECORD,
         REPLAY_INJECTOR,
     },
     protocol::{LiqiCodec, MessageType},
@@ -14,9 +15,15 @@ pub enum FrameOutcome {
     Forward(Vec<u8>),
     Drop,
     Inject {
-        frame: Vec<u8>,
-        injected: Vec<Vec<u8>>,
+        frame: Option<Vec<u8>>,
+        injected: Vec<InjectedFrame>,
     },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct InjectedFrame {
+    pub direction: Direction,
+    pub frame: Vec<u8>,
 }
 
 pub struct FlowProcessor {
@@ -30,33 +37,103 @@ pub struct FlowProcessor {
 
 impl FlowProcessor {
     pub fn new(config: PipelineConfig) -> Self {
-        Self::build(config, None)
+        let registry = Arc::new(ModuleRegistry::default());
+        register_builtin_modules(&registry, &config);
+        Self::build(config, None, registry)
     }
 
     pub fn with_services(config: PipelineConfig, services: Arc<Services>) -> Self {
-        Self::build(config, Some(services))
+        let registry = Arc::new(ModuleRegistry::default());
+        register_builtin_modules(&registry, &config);
+        Self::build(config, Some(services), registry)
     }
 
-    fn build(config: PipelineConfig, services: Option<Arc<Services>>) -> Self {
-        let modules: Vec<Box<dyn PacketModule>> = vec![
-            Box::new(MethodFilter),
-            Box::new(LimitedTimeActivity),
-            Box::new(PacketLogger(services.clone())),
-            Box::new(GameState(services.clone())),
-            Box::new(UnlockIllustratedBook(services.clone())),
-            Box::new(FuseRules(services.clone())),
-            Box::new(AutorunEvents(services.clone())),
-        ];
+    pub fn with_registry(
+        config: PipelineConfig,
+        services: Arc<Services>,
+        registry: Arc<ModuleRegistry>,
+    ) -> Self {
+        Self::build(config, Some(services), registry)
+    }
+
+    fn build(
+        config: PipelineConfig,
+        services: Option<Arc<Services>>,
+        registry: Arc<ModuleRegistry>,
+    ) -> Self {
+        let modules = builtin_modules(services.clone());
         Self {
             codec: LiqiCodec::new(),
-            pipeline: Pipeline::new(config, modules),
+            pipeline: Pipeline::with_registry(config, modules, registry),
             last_business_signal: false,
             latest_inbound_id: None,
             suppressed_response_ids: HashSet::new(),
             services,
         }
     }
+}
 
+fn builtin_modules(services: Option<Arc<Services>>) -> Vec<Box<dyn PacketModule>> {
+    vec![
+        Box::new(MethodFilter),
+        Box::new(GameRecord(services.clone())),
+        Box::new(LimitedTimeActivity),
+        Box::new(PacketLogger(services.clone())),
+        Box::new(GameState(services.clone())),
+        Box::new(UnlockIllustratedBook(services.clone())),
+        Box::new(FuseRules(services.clone())),
+        Box::new(AutorunEvents(services)),
+    ]
+}
+
+pub fn register_builtin_modules(registry: &ModuleRegistry, config: &PipelineConfig) {
+    let _ = registry.register(PacketModuleInfo::builtin(
+        REPLAY_INJECTOR,
+        vec![subscription(
+            Some(Direction::Outbound),
+            Some("Req"),
+            None,
+            &[PacketOperation::Inject],
+        )],
+    ));
+    for module in builtin_modules(None) {
+        let options = config
+            .modules
+            .iter()
+            .find(|entry| entry.id == module.id())
+            .map(|entry| &entry.options)
+            .unwrap_or(&Value::Null);
+        let _ = registry.register(module.registration(options));
+    }
+}
+
+fn subscription(
+    direction: Option<Direction>,
+    packet_type: Option<&str>,
+    method: Option<&str>,
+    operations: &[PacketOperation],
+) -> PacketSubscription {
+    PacketSubscription {
+        direction,
+        packet_type: packet_type.map(str::to_owned),
+        method: method.map(str::to_owned),
+        operations: operations.to_vec(),
+    }
+}
+
+fn method_subscriptions(
+    direction: Direction,
+    packet_type: &str,
+    methods: &[&str],
+    operations: &[PacketOperation],
+) -> Vec<PacketSubscription> {
+    methods
+        .iter()
+        .map(|method| subscription(Some(direction), Some(packet_type), Some(method), operations))
+        .collect()
+}
+
+impl FlowProcessor {
     pub fn set_config(&mut self, config: PipelineConfig) -> Result<(), String> {
         self.pipeline.set_config(config)
     }
@@ -131,6 +208,10 @@ impl FlowProcessor {
         self.process_from(bytes, Direction::Outbound, Some(REPLAY_INJECTOR))
     }
 
+    pub fn process_injected(&mut self, bytes: &[u8], source: &str) -> anyhow::Result<FrameOutcome> {
+        self.process_from(bytes, Direction::Outbound, Some(source))
+    }
+
     fn process_from(
         &mut self,
         bytes: &[u8],
@@ -166,8 +247,13 @@ impl FlowProcessor {
             id: parsed.id.map(u32::from),
             data: parsed.data.clone(),
         };
+        let delayed_response = direction == Direction::Inbound
+            && parsed.message_type == MessageType::Response
+            && packet.method == ".lq.Lobby.fetchGameRecord";
         if let Some(services) = &self.services {
-            services.resolve_response(&packet);
+            if !delayed_response {
+                services.resolve_response(&packet);
+            }
         }
         self.last_business_signal = is_business_packet(&packet);
         let pipeline_outcome = match source {
@@ -178,14 +264,57 @@ impl FlowProcessor {
             None => self.pipeline.process(packet),
         };
         let outcome = match pipeline_outcome {
-            Outcome::Drop => FrameOutcome::Drop,
-            Outcome::Forward(packet) => {
-                parsed.data = packet.data;
-                FrameOutcome::Forward(self.codec.rebuild(&parsed)?)
+            Outcome::Drop => {
+                if delayed_response {
+                    if let (Some(services), Some(id)) = (&self.services, parsed.id) {
+                        services.cancel_waiter(id.into());
+                    }
+                }
+                FrameOutcome::Drop
             }
-            Outcome::Inject { packet, injected } => {
+            Outcome::Forward(packet) => {
+                if delayed_response {
+                    if let Some(services) = &self.services {
+                        services.resolve_response(&packet);
+                    }
+                }
                 parsed.data = packet.data;
-                let frame = self.codec.rebuild(&parsed)?;
+                FrameOutcome::Forward(if packet.method != parsed.method.as_ref() {
+                    self.codec.build(
+                        parsed.message_type,
+                        parsed.id,
+                        &packet.method,
+                        &parsed.data,
+                    )?
+                } else {
+                    self.codec.rebuild(&parsed)?
+                })
+            }
+            Outcome::Inject {
+                packet,
+                injected,
+                forward,
+            } => {
+                if delayed_response && forward {
+                    if let Some(services) = &self.services {
+                        services.resolve_response(&packet);
+                    }
+                }
+                parsed.data = packet.data;
+                let frame = if forward {
+                    Some(if packet.method != parsed.method.as_ref() {
+                        self.codec.build(
+                            parsed.message_type,
+                            parsed.id,
+                            &packet.method,
+                            &parsed.data,
+                        )?
+                    } else {
+                        self.codec.rebuild(&parsed)?
+                    })
+                } else {
+                    None
+                };
                 let mut frames = Vec::with_capacity(injected.len());
                 for packet in injected {
                     let message_type = message_type(&packet.packet_type)?;
@@ -212,14 +341,20 @@ impl FlowProcessor {
                             }
                         };
                         self.suppressed_response_ids.insert(id);
-                        frames.push(frame);
+                        frames.push(InjectedFrame {
+                            direction: packet.direction,
+                            frame,
+                        });
                     } else {
-                        frames.push(self.codec.build(
-                            message_type,
-                            packet.id.and_then(|id| u16::try_from(id).ok()),
-                            &packet.method,
-                            &packet.data,
-                        )?);
+                        frames.push(InjectedFrame {
+                            direction: packet.direction,
+                            frame: self.codec.build(
+                                message_type,
+                                packet.id.and_then(|id| u16::try_from(id).ok()),
+                                &packet.method,
+                                &packet.data,
+                            )?,
+                        });
                     }
                 }
                 FrameOutcome::Inject {
@@ -228,18 +363,27 @@ impl FlowProcessor {
                 }
             }
         };
-        if matches!(&outcome, FrameOutcome::Drop)
-            && direction == Direction::Outbound
+        if matches!(
+            &outcome,
+            FrameOutcome::Drop | FrameOutcome::Inject { frame: None, .. }
+        ) && direction == Direction::Outbound
             && parsed.message_type == MessageType::Request
         {
             if let Some(id) = parsed.id {
                 self.codec.cancel_pending(id);
             }
         }
-        if suppress_response {
-            Ok(FrameOutcome::Drop)
-        } else {
-            Ok(outcome)
+        if !suppress_response {
+            return Ok(outcome);
+        }
+        match outcome {
+            FrameOutcome::Inject { injected, .. } if !injected.is_empty() => {
+                Ok(FrameOutcome::Inject {
+                    frame: None,
+                    injected,
+                })
+            }
+            _ => Ok(FrameOutcome::Drop),
         }
     }
 }
@@ -273,9 +417,43 @@ impl PacketModule for PacketLogger {
     fn id(&self) -> &'static str {
         "packet_logger"
     }
+    fn subscriptions(&self, _options: &Value) -> Vec<PacketSubscription> {
+        vec![subscription(None, None, None, &[PacketOperation::Read])]
+    }
     fn process(&mut self, packet: &mut Packet, _options: &Value) -> ModuleAction {
         if let Some(services) = &self.0 {
             services.record_packet(packet);
+        }
+        ModuleAction::Forward
+    }
+}
+
+struct GameRecord(Option<Arc<Services>>);
+impl PacketModule for GameRecord {
+    fn id(&self) -> &'static str {
+        GAME_RECORD
+    }
+
+    fn subscriptions(&self, _options: &Value) -> Vec<PacketSubscription> {
+        vec![
+            subscription(
+                Some(Direction::Inbound),
+                Some("Res"),
+                Some(".lq.Lobby.fetchGameRecord"),
+                &[PacketOperation::Read, PacketOperation::Edit],
+            ),
+            subscription(
+                Some(Direction::Outbound),
+                Some("Req"),
+                Some(".lq.Lobby.fetchGameRecord"),
+                &[PacketOperation::Inject],
+            ),
+        ]
+    }
+
+    fn process(&mut self, packet: &mut Packet, _options: &Value) -> ModuleAction {
+        if let Some(services) = &self.0 {
+            services.apply_game_record_override(packet);
         }
         ModuleAction::Forward
     }
@@ -285,6 +463,15 @@ struct LimitedTimeActivity;
 impl PacketModule for LimitedTimeActivity {
     fn id(&self) -> &'static str {
         "limited_time_activity"
+    }
+
+    fn subscriptions(&self, _options: &Value) -> Vec<PacketSubscription> {
+        method_subscriptions(
+            Direction::Outbound,
+            "Req",
+            &[".lq.Lobby.majClubActivityFinishDay"],
+            &[PacketOperation::Read, PacketOperation::Edit],
+        )
     }
 
     fn process(&mut self, packet: &mut Packet, _options: &Value) -> ModuleAction {
@@ -317,6 +504,22 @@ struct GameState(Option<Arc<Services>>);
 impl PacketModule for GameState {
     fn id(&self) -> &'static str {
         "game_state"
+    }
+    fn subscriptions(&self, _options: &Value) -> Vec<PacketSubscription> {
+        vec![
+            subscription(
+                Some(Direction::Inbound),
+                None,
+                None,
+                &[PacketOperation::Read],
+            ),
+            subscription(
+                Some(Direction::Inbound),
+                Some("Res"),
+                None,
+                &[PacketOperation::Edit],
+            ),
+        ]
     }
     fn process(&mut self, packet: &mut Packet, _options: &Value) -> ModuleAction {
         if let Some(services) = &self.0 {
@@ -373,6 +576,14 @@ impl PacketModule for UnlockIllustratedBook {
     fn id(&self) -> &'static str {
         "unlock_illustrated_book"
     }
+    fn subscriptions(&self, _options: &Value) -> Vec<PacketSubscription> {
+        method_subscriptions(
+            Direction::Inbound,
+            "Res",
+            &[".lq.Lobby.amuletActivityFetchBrief"],
+            &[PacketOperation::Read, PacketOperation::Edit],
+        )
+    }
     fn process(&mut self, packet: &mut Packet, _options: &Value) -> ModuleAction {
         let Some(services) = &self.0 else {
             return ModuleAction::Forward;
@@ -422,6 +633,19 @@ struct FuseRules(Option<Arc<Services>>);
 impl PacketModule for FuseRules {
     fn id(&self) -> &'static str {
         "fuse_rules"
+    }
+    fn subscriptions(&self, _options: &Value) -> Vec<PacketSubscription> {
+        method_subscriptions(
+            Direction::Outbound,
+            "Req",
+            &[
+                ".lq.Lobby.amuletActivityGameOperate",
+                ".lq.Lobby.amuletActivityOperate",
+                ".lq.Lobby.amuletActivityUpgrade",
+                ".lq.Lobby.amuletActivityEndShopping",
+            ],
+            &[PacketOperation::Read, PacketOperation::Drop],
+        )
     }
     fn process(&mut self, packet: &mut Packet, _options: &Value) -> ModuleAction {
         let Some(services) = &self.0 else {
@@ -701,6 +925,20 @@ impl PacketModule for AutorunEvents {
     fn id(&self) -> &'static str {
         "autorun"
     }
+    fn subscriptions(&self, _options: &Value) -> Vec<PacketSubscription> {
+        method_subscriptions(
+            Direction::Inbound,
+            "Res",
+            &[
+                ".lq.Lobby.amuletActivityStartGame",
+                ".lq.Lobby.amuletActivityGiveup",
+                ".lq.Lobby.amuletActivityOperate",
+                ".lq.Lobby.amuletActivityGameOperate",
+                ".lq.Lobby.amuletActivityEndShopping",
+            ],
+            &[PacketOperation::Read],
+        )
+    }
     fn process(&mut self, packet: &mut Packet, _options: &Value) -> ModuleAction {
         if let Some(services) = &self.0 {
             if packet.direction == Direction::Inbound
@@ -729,6 +967,16 @@ impl PacketModule for MethodFilter {
     fn id(&self) -> &'static str {
         "method_filter"
     }
+    fn subscriptions(&self, options: &Value) -> Vec<PacketSubscription> {
+        options
+            .get("bypass_methods")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(|method| subscription(None, None, Some(method), &[PacketOperation::Bypass]))
+            .collect()
+    }
     fn process(&mut self, packet: &mut Packet, options: &Value) -> ModuleAction {
         let bypass = options
             .get("bypass_methods")
@@ -755,9 +1003,6 @@ pub fn default_module_options(id: &str) -> Value {
 
 pub fn normalize_config(mut config: PipelineConfig) -> PipelineConfig {
     let defaults = PipelineConfig::default();
-    config
-        .modules
-        .retain(|module| defaults.modules.iter().any(|known| known.id == module.id));
     for module in &mut config.modules {
         if module.options.is_null() {
             module.options = default_module_options(&module.id);
@@ -809,6 +1054,77 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ))
+    }
+
+    #[test]
+    fn external_request_replacement_preserves_id_and_receives_server_response() {
+        struct Replace;
+        impl crate::pipeline::ExternalPacketModule for Replace {
+            fn notify(&self, _: &Packet, _: u64) -> Result<(), String> {
+                Ok(())
+            }
+            fn decide(
+                &self,
+                _: &Packet,
+                revision: u64,
+                _: std::time::Duration,
+            ) -> Result<crate::pipeline::ExternalDecision, String> {
+                Ok(crate::pipeline::ExternalDecision::Edit {
+                    method: Some(".lq.Lobby.loginBeat".into()),
+                    data: json!({"contract":"test"}),
+                    expected_revision: revision,
+                })
+            }
+        }
+        let registry = Arc::new(ModuleRegistry::default());
+        let mut info = PacketModuleInfo::builtin(
+            "soulmax",
+            vec![subscription(
+                Some(Direction::Outbound),
+                Some("Req"),
+                Some(".lq.Lobby.fetchConnectionInfo"),
+                &[PacketOperation::Edit],
+            )],
+        );
+        info.builtin = false;
+        info.provider_id = "test".into();
+        registry.register_external(info, Arc::new(Replace)).unwrap();
+        let mut processor = FlowProcessor::build(
+            PipelineConfig {
+                schema: 1,
+                modules: vec![crate::pipeline::ModuleConfig {
+                    id: "soulmax".into(),
+                    enabled: true,
+                    options: Value::Null,
+                }],
+            },
+            None,
+            registry,
+        );
+        let FrameOutcome::Forward(frame) = processor
+            .process(&request_frame(), Direction::Outbound)
+            .unwrap()
+        else {
+            panic!("request not forwarded")
+        };
+        let mut server = LiqiCodec::new();
+        let request = server.parse(&frame).unwrap();
+        assert_eq!(request.id, Some(7));
+        assert_eq!(request.method.as_ref(), ".lq.Lobby.loginBeat");
+        assert_eq!(request.data["contract"], "test");
+        let response = server
+            .build(
+                MessageType::Response,
+                Some(7),
+                ".lq.Lobby.loginBeat",
+                &json!({}),
+            )
+            .unwrap();
+        assert_eq!(
+            processor.process(&response, Direction::Inbound).unwrap(),
+            FrameOutcome::Forward(response)
+        );
+        assert!(!processor.codec.has_pending(7));
     }
 
     #[test]

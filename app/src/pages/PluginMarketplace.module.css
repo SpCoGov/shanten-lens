@@ -1,0 +1,308 @@
+.filters,
+.sourceForm > div,
+.cardHeader,
+.cardActions,
+.meta,
+.categories,
+.links,
+.sourceCard > div {
+    display: flex;
+    align-items: center;
+}
+
+.filters {
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.filters select,
+.filters button,
+.sourceForm button {
+    height: 38px;
+}
+
+.filters button,
+.sourceForm button,
+.cardActions > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    line-height: 1;
+}
+
+.filters button :global(.ms),
+.sourceForm button :global(.ms) {
+    flex: 0 0 auto;
+    font-size: 18px;
+}
+
+.filters select,
+.search,
+.sourceForm input {
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--input-bg);
+    color: var(--text);
+}
+
+.search {
+    display: flex;
+    align-items: center;
+    flex: 1 1 280px;
+    min-width: 0;
+    padding-inline: 11px;
+}
+
+.search input {
+    flex: 1;
+    min-width: 0;
+    height: 36px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: inherit;
+}
+
+.filters select {
+    min-width: 150px;
+    padding: 0 10px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+    gap: 12px;
+}
+
+.pluginCard,
+.sourceCard,
+.sourceForm,
+.empty,
+.sourceErrors {
+    border: var(--panel-border);
+    border-radius: 14px;
+    background: var(--panel);
+    box-shadow: var(--panel-shadow);
+}
+
+.pluginCard {
+    display: flex;
+    min-width: 0;
+    padding: 14px;
+    flex-direction: column;
+}
+
+.cardHeader {
+    gap: 10px;
+}
+
+.cardHeader > div {
+    flex: 1;
+    min-width: 0;
+}
+
+.cardHeader h2 {
+    margin: 0;
+    font-size: 15px;
+    overflow-wrap: anywhere;
+}
+
+.cardHeader code,
+.sourceCard code {
+    color: var(--muted);
+    font-size: 11px;
+    overflow-wrap: anywhere;
+}
+
+.icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--list-item-bg);
+    color: var(--accent-blue);
+}
+
+.badge,
+.categories span,
+.meta span {
+    padding: 3px 7px;
+    border-radius: 6px;
+    background: var(--list-item-bg);
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.badge[data-status="active"] {
+    color: var(--state-ok);
+}
+
+.badge[data-status="blocked"] {
+    color: var(--state-down);
+}
+
+.description {
+    display: -webkit-box;
+    margin: 10px 0 8px;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.meta,
+.categories {
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.categories {
+    margin-top: 8px;
+}
+
+.warning,
+.error {
+    color: var(--state-down);
+}
+
+.warning,
+.success,
+.error,
+.notes {
+    margin: 12px 0 0;
+    font-size: 12px;
+}
+
+.success {
+    color: var(--state-ok);
+}
+
+.notes summary {
+    color: var(--accent-blue);
+    cursor: pointer;
+}
+
+.notes p {
+    margin: 8px 0 0;
+    color: var(--muted);
+    white-space: pre-wrap;
+}
+
+.cardActions {
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: auto;
+    padding-top: 10px;
+}
+
+.links {
+    gap: 7px;
+}
+
+.links button {
+    display: grid;
+    place-items: center;
+    width: 31px;
+    height: 31px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--list-item-bg);
+    color: var(--accent-blue);
+    cursor: pointer;
+}
+
+.sourceForm {
+    padding: 18px;
+    margin-bottom: 14px;
+}
+
+.sourceForm label {
+    display: block;
+    margin-bottom: 9px;
+    font-weight: 600;
+}
+
+.sourceForm > div {
+    gap: 8px;
+}
+
+.sourceForm input {
+    flex: 1;
+    min-width: 0;
+    height: 36px;
+    padding: 0 11px;
+}
+
+.sources {
+    display: grid;
+    gap: 10px;
+}
+
+.sourceCard {
+    position: relative;
+    padding: 17px;
+}
+
+.sourceCard > div {
+    gap: 8px;
+    margin-bottom: 7px;
+}
+
+.removeButton {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    border: 0;
+    background: transparent;
+    color: var(--state-down);
+    cursor: pointer;
+}
+
+.sourceErrors {
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    border-color: var(--danger-weak-border);
+    background: var(--danger-weak-bg);
+}
+
+.sourceErrors p {
+    margin: 4px 0;
+    color: var(--state-down);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.empty {
+    display: grid;
+    place-items: center;
+    gap: 8px;
+    min-height: 180px;
+    padding: 30px;
+    color: var(--muted);
+    text-align: center;
+}
+
+.empty > :global(.ms) {
+    font-size: 36px;
+}
+
+@media (max-width: 700px) {
+    .filters,
+    .sourceForm > div {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .filters select,
+    .search {
+        width: 100%;
+    }
+}

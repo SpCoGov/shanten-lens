@@ -1,0 +1,27 @@
+.sidebar {overflow-y:auto;overflow-x:hidden;min-height:0;scrollbar-width:none;}
+.sidebar > button {flex-shrink:0;}
+.spacer {flex:1;min-height:12px;}
+.divider {width:100%;border-top:1px solid var(--border);margin:5px 0;flex-shrink:0;}
+.menu {position:fixed;z-index:1000;max-height:calc(100dvh - 16px);}
+.editor {position:fixed;z-index:1001;width:min(310px,calc(100vw - 90px));max-height:min(560px,calc(100dvh - 16px));overflow:hidden;display:flex;flex-direction:column;padding:6px;border:1px solid var(--border);border-radius:13px;box-shadow:var(--panel-shadow);background:var(--panel-bg);color:var(--text);font-size:13px;box-sizing:border-box;}
+.editor header,.editor footer {flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:4px 6px;color:var(--muted);gap:8px;}
+.editor button {border:0;background:transparent;color:var(--accent-blue);font:inherit;cursor:pointer;padding:4px;}
+.editorList {overflow-y:auto;min-height:0;flex:1 1 auto;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) transparent;}
+.editorList::-webkit-scrollbar {width:6px;}
+.editorList::-webkit-scrollbar-thumb {background:var(--scrollbar-thumb);border-radius:6px;}
+.row {display:flex;align-items:center;gap:8px;padding:3px 5px;min-height:32px;border-radius:8px;}
+.row:hover,.row:focus-within {background:var(--list-item-hover);}
+.row input {width:13px;height:13px;margin:0 2px;accent-color:var(--accent-blue);cursor:pointer;flex-shrink:0;}
+.row input:disabled {opacity:.4;cursor:default;}
+.row > :global(.ms) {font-size:17px;}
+.label {flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.row .handle {color:var(--muted);cursor:grab;touch-action:none;display:flex;padding:2px;}
+.handle:active {cursor:grabbing;}
+.handle :global(.ms) {font-size:17px;}
+.row .remove {color:var(--muted);}
+.editor footer {border-top:1px solid var(--border);margin-top:4px;font-size:12px;}
+.editor :focus-visible {outline:2px solid var(--color-ring);outline-offset:1px;}
+.editor p {color:var(--state-down);padding:0 8px;}
+.row input {appearance:none;border:1px solid var(--muted);border-radius:50%;display:grid;place-content:center;}
+.row input:checked {background:var(--accent-blue);border-color:var(--accent-blue);}
+.row input:checked::after {content:"";width:5px;height:3px;border-left:1.5px solid var(--panel-bg);border-bottom:1.5px solid var(--panel-bg);transform:rotate(-45deg);margin-top:-1px;}

@@ -19,7 +19,7 @@ type InitPayload = {
 
 export default function MsgBoxWindow() {
     const { t } = useTranslation();
-    const appWindow = getCurrentWindow();
+    const appWindow = React.useMemo(() => getCurrentWindow(), []);
 
     const [data, setData] = React.useState<InitPayload | null>(null);
     const idRef = React.useRef<string>("");
@@ -79,83 +79,64 @@ export default function MsgBoxWindow() {
 
         const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
+        let cancelled = false;
+        let running = false;
+        let pending = false;
+        let raf: number | null = null;
+
+        const schedule = () => {
+            if (cancelled) return;
+            if (running) { pending = true; return; }
+            if (raf !== null) cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(() => { raf = null; void measureAndResize(); });
+        };
+
         const measureAndResize = async () => {
-            if (!rootRef.current) return;
-
-            const header = rootRef.current.querySelector(`.${styles.header}`) as HTMLElement | null;
-            const main = rootRef.current.querySelector(`.${styles.main}`) as HTMLElement | null;
-            const footer = rootRef.current.querySelector(`.${styles.btns}`) as HTMLElement | null;
-            const mainStyle = main ? getComputedStyle(main) : null;
-            const mainPaddingY =
-                (Number.parseFloat(mainStyle?.paddingTop || "0") || 0) +
-                (Number.parseFloat(mainStyle?.paddingBottom || "0") || 0);
-
-            const contentW = Math.max(rootRef.current.scrollWidth, rootRef.current.offsetWidth);
-            const naturalContentH =
-                (header?.offsetHeight || 0) +
-                mainPaddingY +
-                Math.max(messageRef.current?.scrollHeight || 0, messageRef.current?.offsetHeight || 0) +
-                (footer?.offsetHeight || 0);
-            const contentH = Math.max(rootRef.current.scrollHeight, rootRef.current.offsetHeight, naturalContentH);
-            const w = Math.ceil(contentW + 12);
-
-            let chromeInsetH = 0;
+            if (cancelled || !rootRef.current) return;
+            running = true;
             try {
-                const cur = await appWindow.innerSize();
-                const viewportH = document.documentElement.clientHeight || window.innerHeight || 0;
-                chromeInsetH = Math.max(0, cur.height - viewportH);
-            } catch {
-                // ignore
-            }
-
-            const h = Math.ceil(contentH + chromeInsetH + 12);
-
-            const mon = await currentMonitor();
-            const availW = mon?.size?.width ?? 1920;
-            const availH = mon?.size?.height ?? 1080;
-
-            const MAX_W = Math.min(520, Math.floor(availW * 0.5));
-            const MAX_H = Math.min(560, Math.floor(availH * 0.68));
-            const MIN_W = 320;
-            const MIN_H = 170;
-
-            const targetW = clamp(w, MIN_W, MAX_W);
-            const targetH = clamp(h, MIN_H, MAX_H);
-
-            try {
-                const cur = await appWindow.innerSize();
-                const dx = Math.abs(cur.width - targetW);
-                const dy = Math.abs(cur.height - targetH);
-                if (dx < 2 && dy < 2) return;
-            } catch {
-                // ignore
-            }
-
-            try {
-                await appWindow.setSize(new LogicalSize(targetW, targetH));
-                if (!centeredOnceRef.current) {
+                const scale = await appWindow.scaleFactor();
+                const cur = (await appWindow.innerSize()).toLogical(scale);
+                const mon = await currentMonitor();
+                if (cancelled || !rootRef.current) return;
+                const monitorSize = mon?.size.toLogical(mon.scaleFactor);
+                const maxW = Math.max(320, Math.min(520, Math.floor((monitorSize?.width ?? 1920) * 0.5)));
+                const maxH = Math.max(170, Math.min(560, Math.floor((monitorSize?.height ?? 1080) * 0.68)));
+                // The root fills the viewport: its dimensions cannot measure natural content.
+                // Keep the initial content-based width and let the body wrap within it.
+                const targetW = clamp(Math.round(cur.width), 320, maxW);
+                const header = rootRef.current.querySelector<HTMLElement>(`.${styles.header}`);
+                const main = rootRef.current.querySelector<HTMLElement>(`.${styles.main}`);
+                const footer = rootRef.current.querySelector<HTMLElement>(`.${styles.btns}`);
+                const mainStyle = main ? getComputedStyle(main) : null;
+                const padding = (parseFloat(mainStyle?.paddingTop || "0") || 0)
+                    + (parseFloat(mainStyle?.paddingBottom || "0") || 0);
+                const naturalHeight = (header?.offsetHeight ?? 0) + padding
+                    + (messageRef.current?.scrollHeight ?? 0) + (footer?.offsetHeight ?? 0);
+                const targetH = clamp(Math.ceil(naturalHeight), 170, maxH);
+                if (Math.abs(cur.width - targetW) >= 2 || Math.abs(cur.height - targetH) >= 2) {
+                    await appWindow.setSize(new LogicalSize(targetW, targetH));
+                }
+                if (!cancelled && !centeredOnceRef.current) {
                     centeredOnceRef.current = true;
                     await appWindow.center();
                 }
             } catch {
-                // ignore resize failure on some platforms/states
+                // The window may have closed while the native calls were pending.
+            } finally {
+                running = false;
+                if (pending) { pending = false; schedule(); }
             }
         };
 
-        let raf: number | null = null;
-        let timer: number | null = null;
-        const ro = new ResizeObserver(() => {
-            if (raf) cancelAnimationFrame(raf);
-            raf = requestAnimationFrame(measureAndResize);
-        });
-
+        const ro = new ResizeObserver(schedule);
         ro.observe(rootRef.current);
-        void measureAndResize();
-        timer = window.setTimeout(() => {
-            void measureAndResize();
-        }, 80);
+        if (messageRef.current) ro.observe(messageRef.current);
+        schedule();
+        const timer = window.setTimeout(schedule, 80);
 
         return () => {
+            cancelled = true;
             ro.disconnect();
             if (raf) cancelAnimationFrame(raf);
             if (timer) window.clearTimeout(timer);

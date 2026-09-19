@@ -1,6 +1,6 @@
 use crate::{
     ipc::FlowDumpItem,
-    pipeline::{Direction, PipelineConfig},
+    pipeline::{Direction, ModuleRegistry, PipelineConfig, REPLAY_INJECTOR},
     runtime::{FlowProcessor, FrameOutcome},
     services::Services,
 };
@@ -91,7 +91,19 @@ impl ProxyControl {
         timeout: Duration,
         config: PipelineConfig,
     ) -> Result<(u16, Value), String> {
-        self.request_inner(method, data, timeout, true, Some(config))
+        self.request_inner(method, data, timeout, true, Some((config, REPLAY_INJECTOR)))
+            .await
+    }
+
+    pub async fn inject(
+        &self,
+        method: &str,
+        data: &Value,
+        timeout: Duration,
+        config: PipelineConfig,
+        source: &'static str,
+    ) -> Result<(u16, Value), String> {
+        self.request_inner(method, data, timeout, false, Some((config, source)))
             .await
     }
 
@@ -101,24 +113,25 @@ impl ProxyControl {
         data: &Value,
         timeout: Duration,
         replay_id: bool,
-        pipeline_config: Option<PipelineConfig>,
+        pipeline_config: Option<(PipelineConfig, &'static str)>,
     ) -> Result<(u16, Value), String> {
-        let (processor, sender) = {
+        let (processor, outbound, inbound) = {
             let flows = self.flows.lock().map_err(|_| "flow map poisoned")?;
             flows
                 .values()
                 .filter_map(|flow| {
-                    flow.outbound.as_ref().map(|sender| {
+                    flow.outbound.as_ref().map(|outbound| {
                         (
                             flow.business_activity,
                             flow.activity,
                             flow.processor.clone(),
-                            sender.clone(),
+                            outbound.clone(),
+                            flow.inbound.clone(),
                         )
                     })
                 })
-                .max_by_key(|(business, activity, _, _)| (*business > 0, *business, *activity))
-                .map(|(_, _, processor, sender)| (processor, sender))
+                .max_by_key(|(business, activity, _, _, _)| (*business > 0, *business, *activity))
+                .map(|(_, _, processor, outbound, inbound)| (processor, outbound, inbound))
                 .ok_or("no-preferred-websocket-flow")?
         };
         let mut candidate = if replay_id {
@@ -154,15 +167,20 @@ impl ProxyControl {
             let previous = built.0.wrapping_sub(1);
             candidate = if previous == 0 { u16::MAX } else { previous };
         };
-        let frames = if let Some(config) = pipeline_config {
-            let outcome: Result<FrameOutcome, String> = (|| {
-                let mut processor = processor.lock().map_err(|_| "flow processor poisoned")?;
+        let frames = if let Some((config, source)) = pipeline_config {
+            let pipeline_processor = processor.clone();
+            let pipeline_frame = frame.clone();
+            let outcome = tokio::task::spawn_blocking(move || {
+                let mut processor = pipeline_processor
+                    .lock()
+                    .map_err(|_| "flow processor poisoned")?;
                 processor.set_config(config)?;
-                let outcome = processor
-                    .process_replay(&frame)
-                    .map_err(|error| error.to_string())?;
-                Ok(outcome)
-            })();
+                processor
+                    .process_injected(&pipeline_frame, source)
+                    .map_err(|error| error.to_string())
+            })
+            .await
+            .unwrap_or_else(|error| Err(error.to_string()));
             let outcome = match outcome {
                 Ok(outcome) => outcome,
                 Err(error) => {
@@ -174,13 +192,17 @@ impl ProxyControl {
                 }
             };
             match outcome {
-                FrameOutcome::Forward(frame) => vec![frame],
-                FrameOutcome::Inject {
-                    frame,
-                    mut injected,
-                } => {
-                    let mut frames = vec![frame];
-                    frames.append(&mut injected);
+                FrameOutcome::Forward(frame) => vec![(Direction::Outbound, frame)],
+                FrameOutcome::Inject { frame, injected } => {
+                    let mut frames = frame
+                        .into_iter()
+                        .map(|frame| (Direction::Outbound, frame))
+                        .collect::<Vec<_>>();
+                    frames.extend(
+                        injected
+                            .into_iter()
+                            .map(|injected| (injected.direction, injected.frame)),
+                    );
                     frames
                 }
                 FrameOutcome::Drop => {
@@ -189,9 +211,15 @@ impl ProxyControl {
                 }
             }
         } else {
-            vec![frame]
+            vec![(Direction::Outbound, frame)]
         };
-        for frame in frames {
+        for (direction, frame) in frames {
+            let sender = match direction {
+                Direction::Outbound => &outbound,
+                Direction::Inbound => inbound
+                    .as_ref()
+                    .ok_or("preferred-websocket-flow-has-no-inbound-side")?,
+            };
             if sender.send(Message::Binary(frame.into())).is_err() {
                 self.services.cancel_waiter(id.into());
                 if let Ok(mut processor) = processor.lock() {
@@ -271,6 +299,7 @@ impl ProxyControl {
 #[derive(Clone)]
 struct Handler {
     config: Arc<RwLock<PipelineConfig>>,
+    module_registry: Arc<ModuleRegistry>,
     services: Arc<Services>,
     control: ProxyControl,
 }
@@ -292,7 +321,11 @@ impl Handler {
                 client: client.to_string(),
                 server: server.to_owned(),
             };
-            let processor = FlowProcessor::with_services(config, self.services.clone());
+            let processor = FlowProcessor::with_registry(
+                config,
+                self.services.clone(),
+                self.module_registry.clone(),
+            );
             FlowEntry {
                 processor: Arc::new(Mutex::new(processor)),
                 info,
@@ -413,16 +446,21 @@ impl WebSocketHandler for Handler {
                 continue;
             };
             let config = self.config.read().await.clone();
-            let outcome = {
-                let mut processor = flow.lock().expect("flow processor poisoned");
+            let process_flow = flow.clone();
+            let original = bytes.to_vec();
+            let fallback = original.clone();
+            let outcome = tokio::task::spawn_blocking(move || {
+                let mut processor = process_flow.lock().expect("flow processor poisoned");
                 if processor.set_config(config).is_err() {
-                    FrameOutcome::Forward(bytes.to_vec())
+                    FrameOutcome::Forward(original)
                 } else {
                     processor
-                        .process(&bytes, direction)
-                        .unwrap_or_else(|_| FrameOutcome::Forward(bytes.to_vec()))
+                        .process(&original, direction)
+                        .unwrap_or_else(|_| FrameOutcome::Forward(original))
                 }
-            };
+            })
+            .await
+            .unwrap_or(FrameOutcome::Forward(fallback));
             if let Ok(mut flows) = self.control.flows.lock() {
                 if let Some(entry) = flows.get_mut(&client) {
                     let sequence = self.control.activity.fetch_add(1, Ordering::Relaxed);
@@ -439,14 +477,32 @@ impl WebSocketHandler for Handler {
                 FrameOutcome::Forward(frame) => sink.send(Message::Binary(frame.into())).await,
                 FrameOutcome::Drop => continue,
                 FrameOutcome::Inject { frame, injected } => {
-                    if sink.send(Message::Binary(frame.into())).await.is_err() {
-                        break;
+                    if let Some(frame) = frame {
+                        if sink.send(Message::Binary(frame.into())).await.is_err() {
+                            break;
+                        }
                     }
                     let mut result = Ok(());
-                    for frame in injected {
-                        result = sink.send(Message::Binary(frame.into())).await;
-                        if result.is_err() {
-                            break;
+                    for injected in injected {
+                        if injected.direction == direction {
+                            result = sink.send(Message::Binary(injected.frame.into())).await;
+                            if result.is_err() {
+                                break;
+                            }
+                            continue;
+                        }
+                        let target = self.control.flows.lock().ok().and_then(|flows| {
+                            flows
+                                .get(&client)
+                                .and_then(|flow| match injected.direction {
+                                    Direction::Outbound => flow.outbound.clone(),
+                                    Direction::Inbound => flow.inbound.clone(),
+                                })
+                        });
+                        if target.is_none_or(|sender| {
+                            sender.send(Message::Binary(injected.frame.into())).is_err()
+                        }) {
+                            warn!(target: "shanten_backend::hudsucker", %client, direction = ?injected.direction, "injected WebSocket target unavailable");
                         }
                     }
                     result
@@ -632,6 +688,7 @@ pub async fn run(
     address: SocketAddr,
     data_root: &Path,
     config: Arc<RwLock<PipelineConfig>>,
+    module_registry: Arc<ModuleRegistry>,
     services: Arc<Services>,
     control: ProxyControl,
 ) -> Result<()> {
@@ -656,6 +713,7 @@ pub async fn run(
     let websocket_connector = crate::upstream::websocket_connector()?;
     let handler = Handler {
         config,
+        module_registry,
         services,
         control,
     };

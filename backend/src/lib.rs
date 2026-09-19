@@ -5,6 +5,7 @@ extern crate self as shanten_backend;
 pub mod ipc;
 pub mod logging;
 pub mod pipeline;
+pub mod plugins;
 pub mod protocol;
 pub mod proxy;
 pub mod runtime;

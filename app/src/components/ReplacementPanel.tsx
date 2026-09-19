@@ -82,7 +82,7 @@ export default function ReplacementPanel({
     const lastIdx = Math.max(-1, usedCount - 1);
 
     return (
-        <section className="mj-panel" style={{marginTop: 12, overflowY: "hidden"}}>
+        <section className="mj-panel" style={{overflowY: "hidden"}}>
             <div style={{marginBottom: 8, display: "flex", alignItems: "baseline", gap: 8}}>
                 <div style={{fontWeight: 600}}>{t("replacement_panel.title")}</div>
                 <div style={{fontSize: 12, color: "var(--muted)"}}>

@@ -14,6 +14,66 @@ async backendCheckVersion(version: string) : Promise<VersionMismatch | null> {
 async backendGetPacketPipeline() : Promise<PipelineConfig> {
     return await TAURI_INVOKE("backend_get_packet_pipeline");
 },
+async backendGetPacketModules() : Promise<PacketModuleInfo[]> {
+    return await TAURI_INVOKE("backend_get_packet_modules");
+},
+async backendGetPlugins() : Promise<PluginInfo[]> {
+    return await TAURI_INVOKE("backend_get_plugins");
+},
+async backendGetPluginMarketplace() : Promise<MarketplaceSnapshot> {
+    return await TAURI_INVOKE("backend_get_plugin_marketplace");
+},
+async backendAddPluginMarketplaceSource(url: string) : Promise<MarketplaceSnapshot> {
+    return await TAURI_INVOKE("backend_add_plugin_marketplace_source", { url });
+},
+async backendRemovePluginMarketplaceSource(url: string) : Promise<MarketplaceSnapshot> {
+    return await TAURI_INVOKE("backend_remove_plugin_marketplace_source", { url });
+},
+async backendInstallMarketplacePlugin(sourceUrl: string, pluginId: string) : Promise<PluginInfo[]> {
+    return await TAURI_INVOKE("backend_install_marketplace_plugin", { sourceUrl, pluginId });
+},
+async backendGetPluginScanErrors() : Promise<PluginScanError[]> {
+    return await TAURI_INVOKE("backend_get_plugin_scan_errors");
+},
+async backendReportPluginFrontendHealth(id: string, token: string, error: string | null) : Promise<void> {
+    await TAURI_INVOKE("backend_report_plugin_frontend_health", { id, token, error });
+},
+async backendInstallPlugin(archive: string) : Promise<PluginInfo[]> {
+    return await TAURI_INVOKE("backend_install_plugin", { archive });
+},
+async backendUninstallPlugin(id: string, removeConfig: boolean) : Promise<PluginInfo[]> {
+    return await TAURI_INVOKE("backend_uninstall_plugin", { id, removeConfig });
+},
+async backendGetPluginFrontends() : Promise<PluginFrontendBundle[]> {
+    return await TAURI_INVOKE("backend_get_plugin_frontends");
+},
+async backendGetPluginConfig(id: string) : Promise<JsonValue> {
+    return await TAURI_INVOKE("backend_get_plugin_config", { id });
+},
+async backendSetPluginConfig(id: string, value: JsonValue) : Promise<null> {
+    return await TAURI_INVOKE("backend_set_plugin_config", { id, value });
+},
+async backendInvokePlugin(id: string, method: string, params: JsonValue) : Promise<JsonValue> {
+    return await TAURI_INVOKE("backend_invoke_plugin", { id, method, params });
+},
+async backendRescanPlugins() : Promise<PluginInfo[]> {
+    return await TAURI_INVOKE("backend_rescan_plugins");
+},
+async backendSetPluginEnabled(id: string, enabled: boolean, approvedPermissions: PacketOperation[]) : Promise<PluginInfo[]> {
+    return await TAURI_INVOKE("backend_set_plugin_enabled", { id, enabled, approvedPermissions });
+},
+async backendRestartPlugin(id: string) : Promise<PluginInfo[]> {
+    return await TAURI_INVOKE("backend_restart_plugin", { id });
+},
+async backendSetPluginAutoUpdate(id: string, enabled: boolean) : Promise<PluginInfo[]> {
+    return await TAURI_INVOKE("backend_set_plugin_auto_update", { id, enabled });
+},
+async backendCheckPluginUpdates() : Promise<PluginUpdateInfo[]> {
+    return await TAURI_INVOKE("backend_check_plugin_updates");
+},
+async backendUpdatePlugin(id: string) : Promise<PluginInfo[]> {
+    return await TAURI_INVOKE("backend_update_plugin", { id });
+},
 async backendSetPacketPipeline(config: PipelineConfig) : Promise<CommandResult> {
     return await TAURI_INVOKE("backend_set_packet_pipeline", { config });
 },
@@ -22,6 +82,12 @@ async backendGetPacketLog() : Promise<PacketLogSnapshot> {
 },
 async backendReplayPacket(method: string, payload: Partial<{ [key in string]: JsonValue }>) : Promise<CommandResult> {
     return await TAURI_INVOKE("backend_replay_packet", { method, payload });
+},
+async backendFetchGameRecord(gameUuid: string) : Promise<CommandResult> {
+    return await TAURI_INVOKE("backend_fetch_game_record", { gameUuid });
+},
+async backendOverrideGameRecord(record: JsonValue) : Promise<CommandResult> {
+    return await TAURI_INVOKE("backend_override_game_record", { record });
 },
 async backendUpdateConfig(config: Partial<{ [key in string]: Partial<{ [key in string]: JsonValue }> }>) : Promise<null> {
     return await TAURI_INVOKE("backend_update_config", { config });
@@ -61,6 +127,12 @@ async backendSwitch(request: SwitchRequest) : Promise<null> {
 },
 async backendOpenConfigDir() : Promise<null> {
     return await TAURI_INVOKE("backend_open_config_dir");
+},
+async backendOpenLogDir() : Promise<null> {
+    return await TAURI_INVOKE("backend_open_log_dir");
+},
+async backendOpenPluginDir() : Promise<null> {
+    return await TAURI_INVOKE("backend_open_plugin_dir");
 }
 }
 
@@ -90,10 +162,23 @@ export type FuseGuardItems = { amulets: number[]; badges: number[] }
 export type GameStateData = { stage: number; coin: string; point: string | null; target_point: string | null; level: number | null; node: number | null; map_nodes: JsonValue[] | null; deck_map: Partial<{ [key in string]: string }>; hand_tiles: number[]; dora_tiles: number[]; tian_dora_tiles: JsonValue[] | null; ming: JsonValue[] | null; replacement_tiles: number[]; wall_tiles: number[]; ended: boolean | null; desktop_remain: number; locked_tiles: number[]; switch_used_tiles: number[]; effect_list: JsonValue[] | null; goods: JsonValue[] | null; refresh_price: number | null; candidate_effect_list: JsonValue[] | null; boss_buff: number[] | null; shop_buff_list: Partial<{ [key in string]: number }> | null; change_tile_count: number | null; total_change_tile_count: number | null; max_effect_volume: number | null; tile_score_map: Partial<{ [key in string]: string }> | null; fan_value_map: Partial<{ [key in string]: string }> | null; character_id: JsonValue | null; hp: JsonValue | null; max_hp: JsonValue | null; update_reason: string[] | null }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LogEntry = { ts_ms: number; level: string; target: string; file: string | null; line: number | null; message: string; fields: Partial<{ [key in string]: JsonValue }> }
+export type MarketplaceInstallBlock = "blocked" | "unsupported_api" | "app_too_old"
+export type MarketplacePackageInfo = { downloadUrl: string; sha256: string; size: number }
+export type MarketplacePluginInfo = { sourceUrl: string; marketplaceId: string; marketplaceName: string; id: string; name: string; description: string | null; version: string; apiVersion: number; minimumAppVersion: string | null; author: string | null; homepage: string | null; source: string | null; repository: string; issues: string | null; license: string | null; categories: string[]; package: MarketplacePackageInfo; releaseNotes: string | null; releaseNotesUrl: string | null; publishedAt: string; status: MarketplacePluginStatus; installBlock: MarketplaceInstallBlock | null }
+export type MarketplacePluginStatus = "active" | "deprecated" | "blocked"
+export type MarketplaceSnapshot = { sources: MarketplaceSourceInfo[]; plugins: MarketplacePluginInfo[] }
+export type MarketplaceSourceInfo = { url: string; marketplaceId: string | null; name: string | null; default: boolean; error: string | null }
 export type ModuleConfig = { id: string; enabled: boolean; options?: Partial<{ [key in string]: JsonValue }> }
 export type PacketLogItem = { direction: Direction; type: string; method: string; id: number | null; data: JsonValue; ts_ms: number }
 export type PacketLogSnapshot = { packets: PacketLogItem[] }
+export type PacketModuleInfo = { id: string; providerId: string; name: string; description: string | null; builtin: boolean; online: boolean; subscriptionsRevision: number; subscriptions: PacketSubscription[]; invocationCount: number; totalDurationUs: number; timeoutCount: number; droppedReadCount: number }
+export type PacketOperation = "read" | "edit" | "drop" | "bypass" | "inject"
+export type PacketSubscription = { direction?: Direction | null; type?: string | null; method?: string | null; operations: PacketOperation[] }
 export type PipelineConfig = { schema: number; modules: ModuleConfig[] }
+export type PluginFrontendBundle = { pluginId: string; source: string | null; entryPath: string | null; defaultLocale: string; locales: Partial<{ [key in string]: JsonValue }>; error: string | null; healthToken: string | null; generation: number }
+export type PluginInfo = { id: string; name: string; version: string; description: string | null; author: string | null; homepage: string | null; source: string | null; issues: string | null; hasUpdateSource: boolean; autoUpdate: boolean; apiVersion: number; enabled: boolean; running: boolean; hasFrontend: boolean; requestedPacketPermissions: PacketOperation[]; approvedPacketPermissions: PacketOperation[]; lastError: string | null; modules: PacketModuleInfo[] }
+export type PluginScanError = { path: string; error: string }
+export type PluginUpdateInfo = { pluginId: string; currentVersion: string; latestVersion: string | null; available: boolean; releaseNotes: string | null; error: string | null }
 export type RegistryAmulet = { id: number; icon_id: number; name: string; rarity: string }
 export type RegistryBadge = { id: number; icon_id: number; name: string; rarity: string }
 export type RegistryPayload = { amulets: RegistryAmulet[]; badges: RegistryBadge[] }

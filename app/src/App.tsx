@@ -1,3 +1,4 @@
+import NavigationSidebar, {type SidebarItem} from "./components/NavigationSidebar";
 import React from "react";
 import {createPortal} from "react-dom";
 import "./styles/theme.css";
@@ -15,6 +16,7 @@ import ScorePage from "./pages/ScorePage";
 import OverlayPage from "./pages/OverlayPage";
 import TodayWinPage from "./pages/TodayWinPage";
 import GameStatePage from "./pages/GameStatePage";
+import GameRecordPage from "./pages/GameRecordPage";
 import * as backendIpc from "./lib/ipc";
 import {type LogLevel, useLogStore} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
@@ -64,6 +66,10 @@ import {formatLevelIdToLabel} from "./lib/levelFormat";
 import {useContainerWidth} from "react-grid-layout";
 import HomeDashboard from "./components/HomeDashboard";
 import PacketPipelinePage from "./pages/PacketPipelinePage";
+import PluginsPage from "./pages/PluginsPage";
+import PluginPageOutlet from "./pages/PluginPageOutlet";
+import {startPluginRuntime} from "./lib/pluginRuntime";
+import {usePluginStore, type PluginPage} from "./lib/pluginStore";
 
 type BackendLogPayload =
     | string
@@ -284,7 +290,7 @@ async function openSettingsWindow() {
     }
 }
 
-type Route = "home" | "score" | "blackhole" | "wanxiang" | "souzu-debug" | "fuse" | "pipeline" | "today-win" | "gamestate" | "autorun" | "overlay" | "diagnostics" | "frontend-test" | "about";
+type Route = "home" | "score" | "blackhole" | "wanxiang" | "souzu-debug" | "fuse" | "pipeline" | "plugins" | "plugin" | "today-win" | "gamestate" | "record" | "autorun" | "overlay" | "diagnostics" | "frontend-test" | "about";
 type TutorialId = "home" | "blackhole";
 type TutorialStep = {
     title: string;
@@ -342,17 +348,12 @@ function writeTutorialSeen(key: string) {
     }
 }
 
-function isMoreRoute(route: Route) {
-    return route === "fuse"
-        || route === "pipeline"
-        || route === "wanxiang"
-        || route === "today-win"
-        || route === "gamestate"
-        || route === "overlay"
-        || route === "souzu-debug"
-        || route === "diagnostics"
-        || route === "frontend-test"
-        || route === "about";
+function pluginPageTitle(page: PluginPage) {
+    try {
+        return typeof page.title === "function" ? page.title() : page.title;
+    } catch {
+        return page.id;
+    }
 }
 
 const OUTER_PADDING = 16;
@@ -732,7 +733,7 @@ function CharacterHealthPanel({info}: {info: CharacterHealthInfo}) {
     const {t} = useTranslation();
     const hpText = `${Math.trunc(info.hp)} / ${Math.trunc(info.maxHp)}`;
     return (
-        <div className="character-health-panel" title={t("character_health.title")}>
+        <div className="panel character-health-panel" title={t("character_health.title")}>
             <img
                 className="character-health-portrait"
                 src={`/assets/character/character_${info.characterId}.png`}
@@ -857,13 +858,11 @@ export default function App() {
     const {toast, visible: toastVisible} = useGlobalToast();
     const {config: autoConfig, status: autoStatus} = useAutoRunner();
     const [route, setRoute] = React.useState<Route>("home");
-    const sidebarRef = React.useRef<HTMLDivElement | null>(null);
+    const [activePluginPageId, setActivePluginPageId] = React.useState<string>();
+    const pluginPages = usePluginStore((state) => state.pages);
+    const activePluginPage = pluginPages.find((page) => page.id === activePluginPageId);
     const {width: homeWidth, containerRef: appMainRef, mounted: homeMounted} = useContainerWidth();
-    const navRefs = React.useRef<Partial<Record<Route, HTMLButtonElement | null>>>({});
-    const moreButtonRef = React.useRef<HTMLButtonElement | null>(null);
-    const moreMenuRef = React.useRef<HTMLDivElement | null>(null);
     const themeButtonRef = React.useRef<HTMLButtonElement | null>(null);
-    const [moreMenuOpen, setMoreMenuOpen] = React.useState(false);
     const [connected, setConnected] = React.useState(false);
     const [debugEnabled, setDebugEnabled] = React.useState(false);
     const [versionMismatch, setVersionMismatch] = React.useState<VersionMismatch | null>(null);
@@ -901,6 +900,11 @@ export default function App() {
     const [switchUsedCount, setSwitchUsedCount] = React.useState<number>(0);
     const [rightPanelMode, setRightPanelMode] = React.useState<"replacementStats" | "wall">("replacementStats");
     const [wallTileIds, setWallTileIds] = React.useState<number[]>([]);
+
+    React.useEffect(() => startPluginRuntime(), []);
+    React.useEffect(() => {
+        if (route === "plugin" && !activePluginPage) setRoute("plugins");
+    }, [activePluginPage, route]);
 
     const homeTutorialSteps = React.useMemo<TutorialStep[]>(() => [
         {
@@ -1015,6 +1019,7 @@ export default function App() {
     const [planWanxiangSwitch, setPlanWanxiangSwitch] = React.useState<PlanData | null>(null);
     const [debugSouzuSwitch, setDebugSouzuSwitch] = React.useState<PlanData | null>(null);
     const [latestGameState, setLatestGameState] = React.useState<GameStateData | null>(null);
+    const [latestGameRecord, setLatestGameRecord] = React.useState<Record<string, backendIpc.JsonValue> | null>(null);
     const [amuletHotkeys, setAmuletHotkeys] = React.useState<AmuletHotkeySettings>(() => readAmuletHotkeySettings());
     const [gameMapOpen, setGameMapOpen] = React.useState(false);
     const [hotkeyEditorOpen, setHotkeyEditorOpen] = React.useState(false);
@@ -1034,7 +1039,6 @@ export default function App() {
         [latestGameState],
     );
     const isAdvisorStage = stage === 2 || stage === 3;
-    const showHomeSidePanel = isAdvisorStage || hasLevelRecords || characterHealthInfo != null;
     const effectiveHomeSideMode: HomeSideMode = isAdvisorStage && !hasLevelRecords ? "advisor" : homeSideMode;
 
     const THEME_ORDER: ThemeMode[] = ["auto", "dark", "dark-green"];
@@ -1441,7 +1445,7 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
-        type EventName = "update_config" | "update_gamestate" | "discard_recommendation" | "souzu_switch_execution" | "autorun_status" | "tsumo_loop_status" | "msgbox";
+        type EventName = "update_config" | "update_gamestate" | "update_game_record" | "discard_recommendation" | "souzu_switch_execution" | "autorun_status" | "tsumo_loop_status" | "msgbox";
         type AppBackendEvent = {[K in EventName]: {type: K; data: backendIpc.BackendEventMap[K]}}[EventName];
         const handleBackendEvent = (pkt: AppBackendEvent) => {
             if (pkt.type === "update_config") {
@@ -1489,6 +1493,9 @@ export default function App() {
                 setCandidates(d.candidate_effect_list ?? []);
                 setTileScoreMap(d.tile_score_map ?? {});
                 setFanValueMap(d.fan_value_map ?? {});
+            } else if (pkt.type === "update_game_record") {
+                setLatestGameRecord(pkt.data);
+                setRoute("record");
             } else if (pkt.type === "discard_recommendation" && pkt.data) {
                 const arr = (Array.isArray(pkt.data) ? pkt.data : []) as Array<{ yaku: string; data: PlanData }>;
                 for (const item of arr) {
@@ -1567,7 +1574,7 @@ export default function App() {
         };
 
         const backendUnlisteners = ([
-            "update_config", "update_gamestate", "discard_recommendation", "souzu_switch_execution",
+            "update_config", "update_gamestate", "update_game_record", "discard_recommendation", "souzu_switch_execution",
             "autorun_status", "tsumo_loop_status", "msgbox",
         ] as EventName[]).map((name) => backendIpc.subscribeBackendEvent(name, (data) => handleBackendEvent({type: name, data} as AppBackendEvent)));
         void backendIpc.initializeBackend().then((snapshot) => {
@@ -1932,68 +1939,34 @@ export default function App() {
         main.scrollLeft = 0;
     }, [route]);
 
-    const navigateFromMore = React.useCallback((nextRoute: Route) => {
-        setRoute(nextRoute);
-        setMoreMenuOpen(false);
-    }, []);
-
-    React.useLayoutEffect(() => {
-        const updateSidebarIndicator = () => {
-            const sidebar = sidebarRef.current;
-            const activeBtn = navRefs.current[route] ?? (isMoreRoute(route) ? moreButtonRef.current : null);
-            if (!sidebar || !activeBtn) return;
-
-            let top = activeBtn.offsetTop;
-            let offsetParent = activeBtn.offsetParent;
-            while (offsetParent instanceof HTMLElement && offsetParent !== sidebar) {
-                top += offsetParent.offsetTop;
-                offsetParent = offsetParent.offsetParent;
-            }
-            const height = activeBtn.offsetHeight;
-
-            sidebar.style.setProperty("--nav-indicator-top", `${top}px`);
-            sidebar.style.setProperty("--nav-indicator-height", `${height}px`);
-        };
-
-        updateSidebarIndicator();
-
-        const ro = new ResizeObserver(() => updateSidebarIndicator());
-        if (sidebarRef.current) ro.observe(sidebarRef.current);
-        Object.values(navRefs.current).forEach((el) => {
-            if (el) ro.observe(el);
-        });
-        if (moreButtonRef.current) ro.observe(moreButtonRef.current);
-
-        window.addEventListener("resize", updateSidebarIndicator);
-        return () => {
-            ro.disconnect();
-            window.removeEventListener("resize", updateSidebarIndicator);
-        };
-    }, [route]);
-
-    React.useEffect(() => {
-        if (!moreMenuOpen) return;
-
-        const closeOnOutsidePointer = (event: PointerEvent) => {
-            const target = event.target as Node | null;
-            if (!target) return;
-            if (moreButtonRef.current?.contains(target) || moreMenuRef.current?.contains(target)) return;
-            setMoreMenuOpen(false);
-        };
-        const closeOnEscape = (event: KeyboardEvent) => {
-            if (event.key === "Escape") {
-                setMoreMenuOpen(false);
-                moreButtonRef.current?.focus();
-            }
-        };
-
-        document.addEventListener("pointerdown", closeOnOutsidePointer);
-        document.addEventListener("keydown", closeOnEscape);
-        return () => {
-            document.removeEventListener("pointerdown", closeOnOutsidePointer);
-            document.removeEventListener("keydown", closeOnEscape);
-        };
-    }, [moreMenuOpen]);
+    const navigationItems: SidebarItem[] = [
+        {id:"home", icon:"home", title:t("nav.home"), active:route === "home", tutorial:"nav-home", onClick:() => setRoute("home")},
+        {id:"score", icon:"calculate", title:t("nav.score"), active:route === "score", tutorial:"nav-score", onClick:() => setRoute("score")},
+        {id:"blackhole", icon:"deblur", title:t("nav.blackhole"), active:route === "blackhole", tutorial:"nav-blackhole", onClick:() => setRoute("blackhole")},
+        {id:"fuse", icon:"gpp_maybe", title:t("nav.fuse"), active:route === "fuse", tutorial:"nav-fuse", onClick:() => setRoute("fuse")},
+        {id:"pipeline", icon:"account_tree", title:t("nav.pipeline"), active:route === "pipeline", tutorial:"nav-pipeline", onClick:() => setRoute("pipeline")},
+        {id:"plugins", icon:"extension", title:t("nav.plugins"), active:route === "plugins", tutorial:"nav-plugins", onClick:() => setRoute("plugins")},
+        {id:"wanxiang", icon:"all_inclusive", title:t("nav.wanxiang"), active:route === "wanxiang", tutorial:"nav-wanxiang", onClick:() => setRoute("wanxiang")},
+        {id:"overlay", icon:"picture_in_picture", title:t("nav.overlay"), active:route === "overlay", tutorial:"nav-overlay", onClick:() => setRoute("overlay")},
+        {id:"diagnostics", icon:"article", title:t("nav.diagnostics"), active:route === "diagnostics", tutorial:"nav-diagnostics", onClick:() => setRoute("diagnostics")},
+        {id:"about", icon:"help", title:t("nav.about"), active:route === "about", tutorial:"nav-about", onClick:() => setRoute("about")},
+        {id:"today-win", icon:"extension", title:t("nav.todayWin"), active:route === "today-win", tutorial:"nav-today-win", onClick:() => setRoute("today-win")},
+        {id:"record", icon:"receipt_long", title:t("nav.record"), active:route === "record", tutorial:"nav-record", onClick:() => setRoute("record")},
+        {id:"gamestate", icon:"data_object", title:t("nav.gamestate"), active:route === "gamestate", tutorial:"nav-gamestate", onClick:() => setRoute("gamestate")},
+        ...pluginPages.map(page => ({id: "plugin:" + page.id, icon:page.icon, title:pluginPageTitle(page), active:route === "plugin" && activePluginPageId === page.id, onClick:() => {setActivePluginPageId(page.id);setRoute("plugin");}})),
+        ...(debugEnabled ? [
+            {id:"frontend-test", icon:"lab_profile", title:t("nav.frontendTest"), active:route === "frontend-test", onClick:() => setRoute("frontend-test")},
+            {id:"souzu-debug", icon:"science", title:t("nav.blackholeDebug"), active:route === "souzu-debug", onClick:() => setRoute("souzu-debug")},
+        ] : []),
+        {id:"hotkeys", icon:"keyboard", title:t("amulet_hotkeys.customize"), tutorial:"nav-hotkeys", onClick:() => setHotkeyEditorOpen(true)},
+        {id:"refresh", icon:"refresh", title:t("nav.refreshGame"), tutorial:"nav-refresh", onClick:() => void backendIpc.fetchActivity()},
+        {id:"settings", icon:"settings", title:t("nav.settings"), onClick:openSettingsWindow},
+        {id:"theme", icon:themeIcon, title:t("app.theme.toggle", {name:themeLabel}), buttonRef:themeButtonRef, onClick:() => toggleTheme()},
+    ];
+    const navigationDefaults = {
+        outside:["home", "score", "blackhole", "more", "spacer", "hotkeys", "refresh", "settings", "theme"],
+        more:["fuse", "pipeline", "plugins", ...pluginPages.map(page => "plugin:" + page.id), "wanxiang", "overlay", "diagnostics", "about", "separator:tools", "today-win", "record", "gamestate", ...(debugEnabled ? ["separator:debug", "frontend-test", "souzu-debug"] : [])],
+    };
 
     return (
         <div className="app">
@@ -2014,177 +1987,8 @@ export default function App() {
             />
 
             <div className="shell">
-                <aside className="sidebar" ref={sidebarRef}>
-                    <div className="sidebar-active-indicator" aria-hidden="true"/>
-                    <button ref={(el) => {
-                        navRefs.current.home = el;
-                    }} className={`nav-icon ${route === "home" ? "active" : ""}`} data-tutorial="nav-home" title={t("nav.home")} onClick={() => setRoute("home")}>
-                        <span className="ms">home</span>
-                    </button>
-                    <button ref={(el) => {
-                        navRefs.current.score = el;
-                    }} className={`nav-icon ${route === "score" ? "active" : ""}`} data-tutorial="nav-score" title={t("nav.score")} onClick={() => setRoute("score")}>
-                        <span className="ms">calculate</span>
-                    </button>
-                    <button ref={(el) => {
-                        navRefs.current.blackhole = el;
-                    }} className={`nav-icon ${route === "blackhole" ? "active" : ""}`} data-tutorial="nav-blackhole" title={t("nav.blackhole")} onClick={() => setRoute("blackhole")}>
-                        <span className="ms">deblur</span>
-                    </button>
-                    {false && (<button ref={(el) => {
-                        navRefs.current.autorun = el;
-                    }} className={`nav-icon ${route === "autorun" ? "active" : ""}`} data-tutorial="nav-autorun" title={t("nav.autorun")} onClick={() => setRoute("autorun")}>
-                        <span className="ms">autoplay</span>
-                    </button>)}
-                    <div className="more-nav">
-                        <button
-                            ref={moreButtonRef}
-                            className={`nav-icon ${isMoreRoute(route) ? "active" : ""}`}
-                            data-tutorial="nav-more"
-                            title={t("nav.more", {defaultValue: t("tutorial.home.step_more.title")})}
-                            aria-haspopup="menu"
-                            aria-expanded={moreMenuOpen}
-                            onClick={() => setMoreMenuOpen((open) => !open)}
-                        >
-                            <span className="ms">more_horiz</span>
-                        </button>
-                        {moreMenuOpen && (
-                            <div className="more-menu" ref={moreMenuRef} role="menu">
-                                <button
-                                    className={`more-menu-item ${route === "fuse" ? "active" : ""}`}
-                                    role="menuitem"
-                                    onClick={() => navigateFromMore("fuse")}
-                                >
-                                    <span className="ms">gpp_maybe</span>
-                                    <span>{t("nav.fuse")}</span>
-                                </button>
-                                <button
-                                    className={`more-menu-item ${route === "pipeline" ? "active" : ""}`}
-                                    role="menuitem"
-                                    onClick={() => navigateFromMore("pipeline")}
-                                >
-                                    <span className="ms">account_tree</span>
-                                    <span>{t("nav.pipeline")}</span>
-                                </button>
-                                <button
-                                    className={`more-menu-item ${route === "wanxiang" ? "active" : ""}`}
-                                    role="menuitem"
-                                    onClick={() => navigateFromMore("wanxiang")}
-                                >
-                                    <span className="ms">all_inclusive</span>
-                                    <span>{t("nav.wanxiang")}</span>
-                                </button>
-                                <button
-                                    className={`more-menu-item ${route === "overlay" ? "active" : ""}`}
-                                    role="menuitem"
-                                    onClick={() => navigateFromMore("overlay")}
-                                >
-                                    <span className="ms">picture_in_picture</span>
-                                    <span>{t("nav.overlay")}</span>
-                                </button>
-                                <button
-                                    className={`more-menu-item ${route === "diagnostics" ? "active" : ""}`}
-                                    role="menuitem"
-                                    onClick={() => navigateFromMore("diagnostics")}
-                                >
-                                    <span className="ms">article</span>
-                                    <span>{t("nav.diagnostics")}</span>
-                                </button>
-                                <button
-                                    className={`more-menu-item ${route === "about" ? "active" : ""}`}
-                                    role="menuitem"
-                                    onClick={() => navigateFromMore("about")}
-                                >
-                                    <span className="ms">help</span>
-                                    <span>{t("nav.about")}</span>
-                                </button>
+                <NavigationSidebar items={navigationItems} defaults={navigationDefaults}/>
 
-                                <div className="more-menu-divider" role="separator" aria-hidden="true"/>
-
-                                <button
-                                    className={`more-menu-item ${route === "today-win" ? "active" : ""}`}
-                                    role="menuitem"
-                                    onClick={() => navigateFromMore("today-win")}
-                                >
-                                    <span className="ms">extension</span>
-                                    <span>{t("nav.todayWin")}</span>
-                                </button>
-                                <button
-                                    className={`more-menu-item ${route === "gamestate" ? "active" : ""}`}
-                                    role="menuitem"
-                                    onClick={() => navigateFromMore("gamestate")}
-                                >
-                                    <span className="ms">data_object</span>
-                                    <span>{t("nav.gamestate")}</span>
-                                </button>
-
-                                {debugEnabled && (
-                                    <div className="more-menu-divider" role="separator" aria-hidden="true"/>
-                                )}
-
-                                {debugEnabled && (
-                                    <button
-                                        className={`more-menu-item ${route === "frontend-test" ? "active" : ""}`}
-                                        role="menuitem"
-                                        onClick={() => navigateFromMore("frontend-test")}
-                                    >
-                                        <span className="ms">lab_profile</span>
-                                        <span>{t("nav.frontendTest")}</span>
-                                    </button>
-                                )}
-                                {debugEnabled && (
-                                    <button
-                                        className={`more-menu-item ${route === "souzu-debug" ? "active" : ""}`}
-                                        role="menuitem"
-                                        onClick={() => navigateFromMore("souzu-debug")}
-                                    >
-                                        <span className="ms">science</span>
-                                        <span>{t("nav.blackholeDebug")}</span>
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="sidebar-spacer"/>
-
-                    <div className="sidebar-bottom">
-                        <button
-                            className="nav-icon"
-                            data-tutorial="nav-hotkeys"
-                            title={t("amulet_hotkeys.customize")}
-                            onClick={() => setHotkeyEditorOpen(true)}
-                        >
-                            <span className="ms">keyboard</span>
-                        </button>
-
-                        <button
-                            className="nav-icon"
-                            data-tutorial="nav-refresh"
-                            title={t("nav.refreshGame")}
-                            onClick={() => void backendIpc.fetchActivity()}
-                        >
-                            <span className="ms">refresh</span>
-                        </button>
-
-                        <button
-                            className="nav-icon"
-                            title={t("nav.settings")}
-                            onClick={openSettingsWindow}
-                        >
-                            <span className="ms">settings</span>
-                        </button>
-
-                        <button
-                            ref={themeButtonRef}
-                            className="nav-icon"
-                            title={t("app.theme.toggle", {name: themeLabel})}
-                            onClick={toggleTheme}
-                        >
-                            <span className="ms">{themeIcon}</span>
-                        </button>
-                    </div>
-                </aside>
 
                 <main className="main-pane" ref={appMainRef as React.Ref<HTMLElement>}>
                     <div
@@ -2196,40 +2000,37 @@ export default function App() {
                     >
                         {route === "home" && (
                             <HomeDashboard tiles={[
-                                showHomeSidePanel ? {
-                                    id: "side",
+                                (isAdvisorStage || hasLevelRecords) ? {
+                                    id: "side-content",
                                     content: (
-                                    <div className="panel advisor home-advisor-panel home-side-panel">
-                                        {isAdvisorStage ? (
-                                            <>
-                                                <HomeSideTabs
-                                                    mode={effectiveHomeSideMode}
-                                                    onModeChange={setHomeSideMode}
-                                                    recordsAvailable={hasLevelRecords}
-                                                />
-                                                {effectiveHomeSideMode === "advisor" ? (
-                                                    <AdvisorPanel
-                                                        suuAnkou={planSuuAnkou}
-                                                        chiitoi={planChiitoi}
-                                                        resolveFace={(id) => deckMap.get(id) ?? null}
+                                        <div className="panel home-advisor-panel home-side-content-panel">
+                                            {isAdvisorStage ? (
+                                                <>
+                                                    <HomeSideTabs
+                                                        mode={effectiveHomeSideMode}
+                                                        onModeChange={setHomeSideMode}
+                                                        recordsAvailable={hasLevelRecords}
                                                     />
-                                                ) : (
-                                                    <LevelRecordPanel level={level} items={levelRecordItems}/>
-                                                )}
-                                                {characterHealthInfo ? (
-                                                    <CharacterHealthPanel info={characterHealthInfo}/>
-                                                ) : null}
-                                            </>
-                                        ) : (
-                                            <>
+                                                    {effectiveHomeSideMode === "advisor" ? (
+                                                        <AdvisorPanel
+                                                            suuAnkou={planSuuAnkou}
+                                                            chiitoi={planChiitoi}
+                                                            resolveFace={(id) => deckMap.get(id) ?? null}
+                                                        />
+                                                    ) : (
+                                                        <LevelRecordPanel level={level} items={levelRecordItems}/>
+                                                    )}
+                                                </>
+                                            ) : (
                                                 <LevelRecordPanel level={level} items={levelRecordItems}/>
-                                                {characterHealthInfo ? (
-                                                    <CharacterHealthPanel info={characterHealthInfo}/>
-                                                ) : null}
-                                            </>
-                                        )}
-                                    </div>
+                                            )}
+                                        </div>
                                     ),
+                                } : null,
+
+                                characterHealthInfo ? {
+                                    id: "side-health",
+                                    content: <CharacterHealthPanel info={characterHealthInfo}/>,
                                 } : null,
 
                                 {
@@ -2237,7 +2038,7 @@ export default function App() {
                                     splitChildren: true,
                                     content: (
                                 <div style={{width: "100%", height: "100%", minWidth: 0, minHeight: 0, overflow: "auto", position: "relative"}}>
-                                    <div className="panel" key="amulets">
+                                    <div className="panel home-amulet-panel" key="amulets">
                                         <div className="panel-title panel-title-with-action">
                                             <span>{t("amulet")}</span>
                                             <div className="panel-title-actions">
@@ -2277,6 +2078,7 @@ export default function App() {
                                         <AmuletBar
                                             items={amulets}
                                             scale={0.55}
+                                            fillHeight
                                             onItemClick={(item) => setSellConfirmTarget(item)}
                                             onReorder={sortOwnedAmulets}
                                         />
@@ -2438,8 +2240,11 @@ export default function App() {
                         )}
                         {route === "fuse" && <FusePage/>}
                         {route === "pipeline" && <PacketPipelinePage/>}
+                        {route === "plugins" && <PluginsPage/>}
+                        {route === "plugin" && <PluginPageOutlet page={activePluginPage}/>}
                         {route === "today-win" && <TodayWinPage/>}
                         {route === "gamestate" && <GameStatePage currentState={latestGameState}/>}
+                        {route === "record" && <GameRecordPage record={latestGameRecord} onChange={setLatestGameRecord}/>}
                         {route === "blackhole" && (
                             <BlackHolePage
                                 stage={stage}

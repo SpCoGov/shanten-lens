@@ -5,11 +5,11 @@
 
     <meta http-equiv="Content-Security-Policy"
           content="
-        default-src 'self' tauri: asset: blob:;
+        default-src 'self' tauri: asset: http://asset.localhost;
         img-src 'self' data: blob:;
         style-src 'self' 'unsafe-inline';
         font-src 'self' data:;
-        script-src 'self';
+        script-src 'self' asset: http://asset.localhost;
         connect-src 'self' http://ipc.localhost tauri: ipc:;
         " />
 

@@ -1,0 +1,1347 @@
+.wrap {
+    box-sizing: border-box;
+    display: grid;
+    gap: 14px;
+    min-width: 0;
+    padding-bottom: 16px;
+}
+
+.title {
+    margin: 0;
+}
+
+.pageHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 38px;
+}
+
+.titleBlock,
+.sectionTitle {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.titleIcon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--color-ring) 14%, var(--panel-bg));
+    color: var(--color-ring);
+}
+
+.titleIcon > .ms {
+    width: 22px;
+    height: 22px;
+    display: block;
+    font-size: 22px;
+    line-height: 22px;
+    text-align: center;
+}
+
+.actionBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+}
+
+.toolbar,
+.onlineImport {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.toolbar {
+    flex-wrap: wrap;
+}
+
+.toolbar button,
+.onlineImport button,
+.editorHeading button,
+.timelineTools button,
+.actionTools button {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel-bg);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.toolbar button .ms,
+.onlineImport button .ms,
+.editorHeading button .ms,
+.timelineTools button .ms,
+.actionTools button .ms {
+    font-size: 17px;
+}
+
+.toolbar button:hover:not(:disabled),
+.onlineImport button:hover:not(:disabled) {
+    border-color: var(--color-ring);
+    background: color-mix(in srgb, var(--color-ring) 7%, var(--panel-bg));
+}
+
+.toolbar button:disabled,
+.onlineImport button:disabled {
+    opacity: .5;
+    cursor: default;
+}
+
+.toolbar button.overrideActive {
+    border-color: var(--color-ring);
+    background: color-mix(in srgb, var(--color-ring) 20%, var(--panel-bg));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-ring) 45%, transparent);
+}
+
+.toolbarDivider {
+    align-self: stretch;
+    width: 1px;
+    background: var(--border);
+}
+
+.onlineImport {
+    min-width: min(430px, 42vw);
+    padding-left: 10px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--panel-bg);
+}
+
+.inputIcon {
+    flex: 0 0 auto;
+    color: var(--color-muted);
+    font-size: 18px;
+}
+
+.onlineImport input {
+    width: 100%;
+    min-width: 80px;
+    min-height: 34px;
+    padding: 5px 2px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+}
+
+.onlineImportButton {
+    width: 36px;
+    flex: 0 0 36px;
+    padding: 0 !important;
+    border: 0 !important;
+    white-space: nowrap;
+}
+
+.fileInput {
+    display: none;
+}
+
+.emptyState {
+    min-height: min(520px, calc(100vh - 220px));
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 12px;
+    color: var(--color-muted);
+}
+
+.emptyLayout {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.emptyLayout .emptyState {
+    min-height: 0;
+}
+
+.emptyState .ms {
+    color: color-mix(in srgb, var(--color-ring) 55%, var(--color-muted));
+    font-size: 52px;
+}
+
+.summary {
+    display: grid;
+    grid-template-columns: minmax(260px, 1.8fr) minmax(420px, 2fr);
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px;
+}
+
+.summaryIdentity {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 12px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--color-ring) 8%, var(--panel-bg));
+}
+
+.summaryIdentity > .ms {
+    color: var(--color-ring);
+    font-size: 25px;
+}
+
+.summaryIdentity > div,
+.summaryStats div {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.summaryStats {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(68px, 1fr));
+    align-items: center;
+}
+
+.summaryStats div {
+    padding: 4px 12px;
+    border-left: 1px solid var(--border);
+}
+
+.summary span {
+    color: var(--color-muted);
+    font-size: 12px;
+}
+
+.summary strong {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.accountSection {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+}
+
+.recordEditor {
+    display: grid;
+    gap: 10px;
+}
+
+.editorHeading,
+.timelineTools,
+.actionTools,
+.editorButtons {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.editorHeading {
+    justify-content: space-between;
+}
+
+.editorHeading h3 {
+    margin: 0;
+    font-size: 15px;
+}
+
+.sectionTitle > .ms {
+    color: var(--color-ring);
+    font-size: 20px;
+}
+
+.editorHeading button,
+.timelineTools button,
+.actionTools button,
+.editorButtons button,
+.changeSkinButton {
+    padding: 5px 9px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.editorHeading button:hover,
+.timelineTools button:hover,
+.actionTools button:hover,
+.editorButtons button:hover,
+.changeSkinButton:hover {
+    border-color: var(--color-ring);
+}
+
+.jsonEditor {
+    display: grid;
+    gap: 8px;
+}
+
+.specialEditor {
+    display: grid;
+    gap: 14px;
+}
+
+.formGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.formField {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.formField > span,
+.advancedEditor summary {
+    color: var(--color-muted);
+    font-size: 11px;
+}
+
+.formField input,
+.formField select {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 36px;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+}
+
+.booleanField {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    color: var(--text);
+    font-size: 12px;
+}
+
+.editorGroup {
+    min-width: 0;
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+}
+
+.editorGroup legend {
+    padding: 0 5px;
+    color: var(--color-muted);
+    font-size: 12px;
+}
+
+.playerEditor {
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+}
+
+.playerEditor > legend {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.playerAccountGrid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.characterEditor {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--color-ring) 3%, var(--panel));
+}
+
+.characterEditor > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.characterEditor > header strong {
+    font-size: 12px;
+}
+
+.playerCharacterGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.advancedEditor summary {
+    padding: 5px 0;
+    cursor: pointer;
+}
+
+.jsonEditor textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 260px;
+    resize: vertical;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--log-bg);
+    color: var(--log-fg);
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.editorButtons {
+    justify-content: flex-end;
+}
+
+.changeSkinButton {
+    width: fit-content;
+}
+
+.skinPicker {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 12px;
+}
+
+.skinDialogBody {
+    box-sizing: border-box;
+    height: min(600px, calc(100vh - 90px));
+    min-height: 0;
+    display: grid;
+    overflow: hidden;
+}
+
+.skinPickerColumns {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.skinPickerColumns > section {
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 6px;
+    overflow: hidden;
+}
+
+.skinPickerColumns h4 {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 12px;
+}
+
+.skinPickerList {
+    min-height: 0;
+    display: grid;
+    align-content: start;
+    gap: 4px;
+    overflow-y: scroll;
+    scrollbar-color: var(--color-muted) var(--panel);
+    scrollbar-width: thin;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+}
+
+.skinPickerList button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 9px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.skinPickerList button:hover,
+.skinPickerList button.pickerSelected {
+    border-color: var(--color-ring);
+    background: color-mix(in srgb, var(--color-ring) 10%, var(--panel));
+}
+
+.skinPickerList small {
+    flex: 0 0 auto;
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.skinPickerList::-webkit-scrollbar {
+    width: 10px;
+}
+
+.skinPickerList::-webkit-scrollbar-track {
+    background: var(--panel);
+}
+
+.skinPickerList::-webkit-scrollbar-thumb {
+    border: 2px solid var(--panel);
+    border-radius: 10px;
+    background: var(--color-muted);
+}
+
+.skinPickerFooter {
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.namedIdField {
+    min-width: 0;
+    position: relative;
+}
+
+.namedIdField > span {
+    position: absolute;
+    top: 0;
+    right: 0;
+    max-width: 58%;
+    overflow: hidden;
+    color: var(--color-muted);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.editorBackdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: var(--overlay-scrim);
+}
+
+.editorDialog {
+    box-sizing: border-box;
+    width: min(1000px, 100%);
+    max-height: calc(100vh - 32px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel);
+    color: var(--text);
+    box-shadow: var(--elev-shadow);
+}
+
+.editorDialog > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.editorDialog > header h3 {
+    margin: 0;
+}
+
+.editorDialog > header button,
+.tileGroups button,
+.fanEditor button,
+.winnerEditor > button {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.editorDialog > header button {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+}
+
+.editorDialogBody {
+    overflow: auto;
+    padding: 14px 16px 16px;
+}
+
+.tileField {
+    grid-column: 1 / -1;
+}
+
+.tilePicker,
+.tileGroupEditor {
+    display: grid;
+    gap: 8px;
+}
+
+.tilePicker {
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--panel-bg) 72%, var(--bg));
+}
+
+.collectionHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--color-muted);
+    font-size: 11px;
+}
+
+.collectionHeader strong {
+    color: var(--text);
+    font-size: 12px;
+}
+
+.tilePicker > .collectionHeader {
+    padding: 8px 10px;
+}
+
+.selectedTiles {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    align-content: center;
+    flex-wrap: wrap;
+    gap: 7px;
+    min-height: 70px;
+    padding: 10px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+}
+
+.selectedTiles > button {
+    display: grid;
+    place-items: center;
+    line-height: 0;
+}
+
+.selectedTiles > button,
+.tilePalette button {
+    position: relative;
+    padding: 2px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.selectedTiles > button:hover,
+.tilePalette button:hover {
+    background: color-mix(in srgb, var(--color-ring) 12%, transparent);
+}
+
+.selectedTiles > button > span {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 16px;
+    height: 16px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--danger-weak-bg);
+    color: var(--text);
+    font-size: 12px;
+}
+
+.selectedTiles small,
+.tileGroupEditor > span {
+    color: var(--color-muted);
+    font-size: 11px;
+}
+
+.selectedTiles small {
+    width: 100%;
+    text-align: center;
+}
+
+.tilePalette {
+    border-top: 1px solid var(--border);
+}
+
+.tilePalette summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 10px;
+    color: var(--text);
+    font-size: 12px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.tilePalette summary::-webkit-details-marker {
+    display: none;
+}
+
+.tilePaletteBody {
+    display: grid;
+    gap: 9px;
+    padding: 10px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+}
+
+.tilePaletteGroup {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+}
+
+.tilePaletteGroup > span {
+    color: var(--color-muted);
+    font-size: 11px;
+}
+
+.tilePaletteGroup > div {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.numberArray {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    background: color-mix(in srgb, var(--panel-bg) 72%, var(--bg));
+}
+
+.numberArrayItems {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.numberArrayItem {
+    display: grid;
+    grid-template-columns: auto 82px 28px;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 4px 4px 7px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--panel);
+}
+
+.numberArrayItem > span {
+    color: var(--color-muted);
+    font-size: 10px;
+}
+
+.numberArrayItem input {
+    box-sizing: border-box;
+    width: 82px;
+    min-height: 30px;
+    padding: 4px 6px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+}
+
+.numberArrayItem button,
+.addArrayItem {
+    min-height: 28px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.numberArrayItem button {
+    display: grid;
+    place-items: center;
+    padding: 0;
+}
+
+.addArrayItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+}
+
+.tileGroups {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 9px;
+}
+
+.tileGroups > button,
+.tileGroupEditor > button,
+.fanEditor > button,
+.fanRow > button,
+.winnerEditor > button,
+.addWinnerButton {
+    width: fit-content;
+    padding: 5px 9px;
+}
+
+.winnerEditor {
+    display: grid;
+    gap: 10px;
+}
+
+.addWinnerButton {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.fanEditor {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 8px;
+}
+
+.fanRow {
+    display: grid;
+    grid-template-columns: minmax(220px, 2fr) minmax(80px, .7fr) auto;
+    align-items: end;
+    gap: 8px;
+}
+
+.fanRow > button {
+    min-height: 32px;
+}
+
+button.iconEditorButton {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+}
+
+button.borderlessDeleteButton {
+    border-color: transparent;
+    background: transparent;
+}
+
+.accountSection h3 {
+    margin: 0;
+    font-size: 15px;
+}
+
+.accounts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 8px;
+}
+
+.accountCard {
+    display: grid;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--panel-bg) 88%, var(--bg));
+}
+
+.accountCard header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.accountCard header strong {
+    min-width: 0;
+    overflow: hidden;
+    flex: 1 1 auto;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.seatBadge {
+    width: 25px;
+    height: 25px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--color-ring) 13%, var(--panel-bg));
+    color: var(--color-ring) !important;
+    font-size: 12px !important;
+    font-weight: 700;
+}
+
+.accountCard header span,
+.accountCard dt {
+    color: var(--color-muted);
+    font-size: 12px;
+}
+
+.accountCard dl {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 14px;
+    margin: 0;
+}
+
+.accountCard dl div {
+    display: grid;
+    gap: 2px;
+}
+
+.accountCard dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.roundTabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 0 0 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.roundTabs button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.roundTabs button:hover,
+.roundTabs button.active {
+    border-color: var(--color-ring);
+    background: color-mix(in srgb, var(--color-ring) 10%, var(--panel));
+}
+
+.roundTabs small {
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.timeline {
+    display: grid;
+    gap: 6px;
+}
+
+.timelinePanel {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    min-height: 220px;
+    padding: 14px;
+}
+
+.timelineHeading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.timelineHeading label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-muted);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.timelineTools {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.actionCard {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--panel);
+}
+
+.actionHeader {
+    display: flex;
+    align-items: center;
+}
+
+.actionMain {
+    width: auto;
+    min-width: 0;
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    flex: 1 1 auto;
+}
+
+.actionMain:hover {
+    background: color-mix(in srgb, var(--color-ring) 7%, transparent);
+}
+
+.actionIndex {
+    width: 48px;
+    flex: 0 0 48px;
+    color: var(--color-muted);
+    font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    text-align: right;
+}
+
+.actionIcon {
+    width: 28px;
+    flex: 0 0 28px;
+    color: var(--color-ring);
+    font-size: 22px;
+    text-align: center;
+}
+
+.actionText {
+    min-width: 170px;
+    display: grid;
+    gap: 3px;
+    flex: 1 1 260px;
+}
+
+.actionText strong {
+    font-size: 14px;
+}
+
+.actionText span {
+    overflow: hidden;
+    color: var(--color-muted);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tiles {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 2px;
+    flex: 0 1 auto;
+}
+
+.tileSlot {
+    display: block;
+    flex: 0 0 auto;
+}
+
+.tileGroupStart {
+    margin-left: 8px;
+}
+
+.changeTiles {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex: 0 1 auto;
+}
+
+.changePlayer {
+    display: grid;
+    gap: 3px;
+    padding-left: 8px;
+    border-left: 1px solid var(--border);
+}
+
+.changePlayerTitle,
+.changeTileLabel {
+    color: var(--color-muted);
+    font-size: 11px;
+}
+
+.changePlayerTitle {
+    white-space: nowrap;
+}
+
+.changeTileRow {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.changeTileLabel {
+    width: 28px;
+    align-self: center;
+}
+
+.wall {
+    padding: 0 12px 12px;
+}
+
+.openingHands {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 14px;
+    padding: 0 12px 12px;
+}
+
+.openingHand {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.openingHand > span {
+    overflow: hidden;
+    color: var(--color-muted);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.openingHand > div {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 2px;
+}
+
+.wallTiles {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 2px;
+}
+
+
+.chevron {
+    color: var(--color-muted);
+    transition: transform .16s ease;
+}
+
+.chevron[data-open="true"] {
+    transform: rotate(90deg);
+}
+
+.actionJson {
+    max-height: 420px;
+    overflow: auto;
+    margin: 0;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--log-bg);
+    color: var(--log-fg);
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    scrollbar-color: var(--color-muted) var(--log-bg);
+    scrollbar-width: thin;
+}
+
+.actionJson::-webkit-scrollbar,
+.jsonEditor textarea::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.actionJson::-webkit-scrollbar-track,
+.jsonEditor textarea::-webkit-scrollbar-track {
+    background: var(--log-bg);
+}
+
+.actionJson::-webkit-scrollbar-thumb,
+.jsonEditor textarea::-webkit-scrollbar-thumb {
+    border: 2px solid var(--log-bg);
+    border-radius: 10px;
+    background: var(--color-muted);
+}
+
+.actionTools {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    gap: 3px;
+    margin: 0;
+    padding-right: 9px;
+}
+
+.actionTools button {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+}
+
+.actionTools button:hover {
+    background: color-mix(in srgb, var(--color-ring) 8%, transparent);
+}
+
+.actionTools button:last-child:hover {
+    border-color: var(--state-down);
+    background: color-mix(in srgb, var(--state-down) 8%, transparent);
+    color: var(--state-down);
+}
+
+.jsonRow {
+    min-height: 24px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 1px 4px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+button.jsonRow {
+    width: 100%;
+    cursor: pointer;
+}
+
+button.jsonRow:hover {
+    background: color-mix(in srgb, var(--color-ring) 10%, transparent);
+}
+
+.jsonChevron,
+.jsonSpacer {
+    width: 16px;
+    flex: 0 0 16px;
+}
+
+.jsonChevron {
+    font-size: 16px;
+    transition: transform .16s ease;
+}
+
+.jsonChevron[data-open="true"] {
+    transform: rotate(90deg);
+}
+
+.jsonKey {
+    color: var(--log-fg);
+}
+
+.jsonType {
+    color: var(--color-muted);
+}
+
+.jsonPrimitive[data-type="string"] {
+    color: var(--color-ring);
+}
+
+.jsonPrimitive[data-type="number"],
+.jsonPrimitive[data-type="boolean"] {
+    color: color-mix(in srgb, var(--accent-green) 28%, var(--log-fg));
+}
+
+.jsonPrimitive[data-type="null"] {
+    color: var(--color-muted);
+}
+
+.jsonChildren {
+    margin-left: 12px;
+    padding-left: 8px;
+    border-left: 1px solid var(--border);
+}
+
+@media (max-width: 1100px) {
+    .actionBar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .toolbarDivider {
+        display: none;
+    }
+
+    .onlineImport {
+        min-width: 0;
+    }
+
+    .summary {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 760px) {
+    .toolbar,
+    .onlineImport {
+        flex-wrap: wrap;
+    }
+
+    .onlineImport input {
+        min-width: 180px;
+        flex: 1 1 180px;
+    }
+
+    .summaryStats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .summaryStats div {
+        border-left: 0;
+        border-top: 1px solid var(--border);
+    }
+
+    .tiles,
+    .changeTiles {
+        display: none;
+    }
+
+    .actionIndex {
+        width: 38px;
+        flex-basis: 38px;
+    }
+
+    .fanRow {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .playerCharacterGrid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .skinPickerColumns {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 7px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chevron,
+    .jsonChevron {
+        transition: none;
+    }
+}

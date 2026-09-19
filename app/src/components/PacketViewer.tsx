@@ -107,7 +107,7 @@ export default function PacketViewer({packet, onClose, standalone = false}: {pac
                     <div>
                         <h3>{t("diagnostics.packet_viewer_title")}</h3>
                         <div className={styles.meta}>
-                            <span><b>{t("diagnostics.packet_method")}</b>{packet.method}</span>
+                            <span className="selectable"><b>{t("diagnostics.packet_method")}</b>{packet.method}</span>
                             <span><b>{t("diagnostics.packet_id")}</b>{packet.id == null ? "-" : packet.id}</span>
                             <span><b>{t("diagnostics.packet_direction")}</b>{t(`diagnostics.direction_${packet.direction}`)}</span>
                         </div>
