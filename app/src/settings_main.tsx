@@ -3,7 +3,6 @@ import "./App.css";
 import "./fonts/material-symbols.css";
 import {applyTheme, readTheme} from "./lib/theme";
 import SettingsWindow from "./windows/SettingsWindow";
-import React from "react";
 import ReactDOM from "react-dom/client";
 import "./lib/i18n";
 import {ensureI18nReady} from "./lib/i18n";

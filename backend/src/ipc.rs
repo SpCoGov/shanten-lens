@@ -83,6 +83,9 @@ pub struct RegistryPayload {
 #[allow(dead_code)]
 #[derive(Deserialize, Serialize, Type)]
 pub struct GameStateData {
+    session_id: Option<u64>,
+    revision: Option<u64>,
+    flow_id: Option<u64>,
     stage: i64,
     coin: String,
     point: Option<String>,
@@ -148,6 +151,7 @@ pub struct AutoRunnerStatus {
 #[serde(rename_all = "camelCase")]
 pub struct BackendSnapshot {
     pub version: String,
+    pub proxy_status: ProxyStatus,
     pub backend_logs: Vec<LogEntry>,
     pub packet_pipeline: PipelineConfig,
     pub fuse_config: FuseConfig,
@@ -158,6 +162,12 @@ pub struct BackendSnapshot {
     pub autorun_status: AutoRunnerStatus,
     pub tsumo_loop_status: TsumoLoopStatus,
     pub packet_log: PacketLogSnapshot,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Type)]
+pub struct ProxyStatus {
+    pub running: bool,
+    pub error: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Type)]

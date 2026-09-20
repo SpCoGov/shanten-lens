@@ -1,4 +1,3 @@
-import React from "react";
 import "../styles/theme.css";
 import {type GoodsItem} from "../lib/gamestate";
 import {t} from "i18next";

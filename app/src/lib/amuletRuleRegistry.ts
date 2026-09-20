@@ -17,9 +17,7 @@ export function getRegisteredAmuletRule(regId: number) {
     return amuletRuleRegistry[regId];
 }
 
-export function getRegisteredAmuletRuleExact(regId: number) {
-    return amuletRuleRegistry[regId];
-}
+export const getRegisteredAmuletRuleExact = getRegisteredAmuletRule;
 
 export function getAllRegisteredAmuletRules() {
     return amuletRuleRegistry;

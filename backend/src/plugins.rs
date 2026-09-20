@@ -433,8 +433,8 @@ impl PluginManager {
         result
     }
 
-    pub fn marketplace(&self) -> MarketplaceSnapshot {
-        let sources = self.marketplace_sources();
+    pub fn marketplace(&self) -> anyhow::Result<MarketplaceSnapshot> {
+        let sources = self.marketplace_sources()?;
         let client = update_client();
         let mut source_info = Vec::with_capacity(sources.len());
         let mut plugins = Vec::new();
@@ -474,10 +474,10 @@ impl PluginManager {
                 .then_with(|| left.id.cmp(&right.id))
                 .then_with(|| left.source_url.cmp(&right.source_url))
         });
-        MarketplaceSnapshot {
+        Ok(MarketplaceSnapshot {
             sources: source_info,
             plugins,
-        }
+        })
     }
 
     pub fn add_marketplace_source(&self, url: &str) -> anyhow::Result<MarketplaceSnapshot> {
@@ -488,7 +488,7 @@ impl PluginManager {
         );
         fetch_marketplace_registry(&update_client()?, &url)?;
         let guard = self.update_lock.lock().unwrap();
-        let mut config = self.load_marketplace_config();
+        let mut config = self.load_marketplace_config()?;
         anyhow::ensure!(
             !config.sources.iter().any(|source| source == &url),
             "marketplace source already exists"
@@ -496,7 +496,7 @@ impl PluginManager {
         config.sources.push(url);
         self.save_marketplace_config(&config)?;
         drop(guard);
-        Ok(self.marketplace())
+        self.marketplace()
     }
 
     pub fn remove_marketplace_source(&self, url: &str) -> anyhow::Result<MarketplaceSnapshot> {
@@ -506,7 +506,7 @@ impl PluginManager {
             url != update_url(DEFAULT_MARKETPLACE_URL)?.to_string(),
             "default marketplace source cannot be removed"
         );
-        let mut config = self.load_marketplace_config();
+        let mut config = self.load_marketplace_config()?;
         let previous = config.sources.len();
         config.sources.retain(|source| source != &url);
         anyhow::ensure!(
@@ -515,7 +515,7 @@ impl PluginManager {
         );
         self.save_marketplace_config(&config)?;
         drop(_guard);
-        Ok(self.marketplace())
+        self.marketplace()
     }
 
     pub fn install_marketplace_plugin(
@@ -525,7 +525,7 @@ impl PluginManager {
     ) -> anyhow::Result<Vec<PluginInfo>> {
         let source_url = update_url(source_url)?.to_string();
         anyhow::ensure!(
-            self.marketplace_sources()
+            self.marketplace_sources()?
                 .iter()
                 .any(|(source, _)| source == &source_url),
             "unknown marketplace source"
@@ -568,7 +568,7 @@ impl PluginManager {
     }
 
     fn rescan_locked(&self) -> anyhow::Result<Vec<PluginInfo>> {
-        let config = self.load_config();
+        let config = self.load_config()?;
         let frontend_generation = self.frontend_generation.fetch_add(1, Ordering::Relaxed) + 1;
         let mut directories: Vec<_> = fs::read_dir(&self.root)?
             .filter_map(Result::ok)
@@ -908,10 +908,15 @@ impl PluginManager {
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_nanos();
+        let enabled = self
+            .load_config()?
+            .plugins
+            .get(id)
+            .is_some_and(|choice| choice.enabled);
         let staging = parent.join(format!(".plugin-update-{id}-{nonce}"));
         let backup = parent.join(format!(".plugin-backup-{id}-{nonce}"));
         fs::create_dir(&staging)?;
-        if let Err(error) = extract_update(&archive, &staging) {
+        if let Err(error) = extract_update(archive, &staging) {
             let _ = fs::remove_dir_all(&staging);
             return Err(error);
         }
@@ -943,23 +948,18 @@ impl PluginManager {
                 return Err(error.into());
             }
         };
-        if let Err(error) = fs::rename(&directory, &backup) {
+        if let Err(error) = fs::rename(directory, &backup) {
             let _ = fs::remove_dir_all(&staging);
             let _ = self.rescan_locked();
             return Err(error.into());
         }
-        if let Err(error) = fs::rename(&staging, &directory) {
-            fs::rename(&backup, &directory)?;
+        if let Err(error) = fs::rename(&staging, directory) {
+            fs::rename(&backup, directory)?;
             let _ = fs::remove_dir_all(&staging);
             let _ = self.rescan_locked();
             return Err(error.into());
         }
-        let needs_frontend = self
-            .load_config()
-            .plugins
-            .get(id)
-            .is_some_and(|choice| choice.enabled)
-            && installed_manifest.frontend.is_some();
+        let needs_frontend = enabled && installed_manifest.frontend.is_some();
         if needs_frontend {
             *self.frontend_health.lock().unwrap() = Some(FrontendHealth {
                 id: id.to_owned(),
@@ -980,10 +980,10 @@ impl PluginManager {
                 self.plugins.lock().unwrap().remove(id);
                 self.emit_status();
                 // Keep the failed version aside until the old directory has been restored.
-                fs::rename(&directory, &staging)?;
-                fs::rename(&backup, &directory)?;
+                fs::rename(directory, &staging)?;
+                fs::rename(&backup, directory)?;
                 if let Some(bytes) = old_config {
-                    fs::write(&config_path, bytes)?;
+                    crate::storage::write_bytes(&config_path, &bytes)?;
                 } else if config_path.exists() {
                     fs::remove_file(&config_path)?;
                 }
@@ -1098,11 +1098,11 @@ impl PluginManager {
             let destination = self.root.join(&manifest.id);
             anyhow::ensure!(!destination.exists(), "plugin directory already exists");
             // Reinstalling a previously removed plugin must never reuse an enabled choice.
-            let mut config = self.load_config();
+            let mut config = self.load_config()?;
             config
                 .plugins
                 .insert(manifest.id.clone(), PluginChoice::default());
-            fs::write(&self.config_path, serde_json::to_vec_pretty(&config)?)?;
+            crate::storage::write_json(&self.config_path, &config)?;
             fs::rename(&staging, destination)?;
             Ok(())
         })();
@@ -1128,7 +1128,7 @@ impl PluginManager {
             directory != root && directory.starts_with(&root),
             "plugin directory escapes plugin root"
         );
-        let mut config = self.load_config();
+        let mut config = self.load_config()?;
         config.plugins.remove(id);
         self.plugins.lock().unwrap().remove(id);
         self.emit_status();
@@ -1137,7 +1137,7 @@ impl PluginManager {
             return Err(error.into());
         }
         self.remove_plugin_modules(id)?;
-        fs::write(&self.config_path, serde_json::to_vec_pretty(&config)?)?;
+        crate::storage::write_json(&self.config_path, &config)?;
         if remove_config {
             let path = self.plugin_config_path(id);
             if path.exists() {
@@ -1215,7 +1215,7 @@ impl PluginManager {
             path.parent()
                 .ok_or_else(|| anyhow::anyhow!("invalid config path"))?,
         )?;
-        fs::write(path, serde_json::to_vec_pretty(&value)?)?;
+        crate::storage::write_json(&path, &value)?;
         Ok(())
     }
 
@@ -1226,12 +1226,19 @@ impl PluginManager {
             .get(id)
             .ok_or_else(|| anyhow::anyhow!("unknown plugin: {id}"))?;
         anyhow::ensure!(plugin.choice.enabled, "plugin is disabled");
-        plugin
+        let core = plugin
             .provider
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("plugin has no running backend provider"))?
-            .invoke(method, params)
-            .map_err(anyhow::Error::msg)
+            .core
+            .clone();
+        drop(plugins);
+        core.call(
+            "frontend.invoke",
+            json!({"method":method,"params":params}),
+            HANDSHAKE_TIMEOUT,
+        )
+        .map_err(anyhow::Error::msg)
     }
 
     fn plugin_config_path(&self, id: &str) -> PathBuf {
@@ -1242,56 +1249,55 @@ impl PluginManager {
             .join(format!("{id}.json"))
     }
 
-    fn load_config(&self) -> PluginConfig {
-        fs::read(&self.config_path)
-            .ok()
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-            .unwrap_or_else(|| PluginConfig {
+    fn load_config(&self) -> anyhow::Result<PluginConfig> {
+        match fs::read(&self.config_path) {
+            Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(PluginConfig {
                 schema: 1,
                 plugins: HashMap::new(),
-            })
+            }),
+            Err(error) => Err(error.into()),
+        }
     }
 
-    fn marketplace_sources(&self) -> Vec<(String, bool)> {
+    fn marketplace_sources(&self) -> anyhow::Result<Vec<(String, bool)>> {
         let default = update_url(DEFAULT_MARKETPLACE_URL)
             .expect("default marketplace URL is valid")
             .to_string();
         let mut sources = vec![(default.clone(), true)];
-        for source in self.load_marketplace_config().sources {
+        for source in self.load_marketplace_config()?.sources {
             if source != default && !sources.iter().any(|(url, _)| url == &source) {
                 sources.push((source, false));
             }
         }
-        sources
+        Ok(sources)
     }
 
-    fn load_marketplace_config(&self) -> MarketplaceConfig {
-        fs::read(&self.marketplace_config_path)
-            .ok()
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-            .unwrap_or_else(|| MarketplaceConfig {
+    fn load_marketplace_config(&self) -> anyhow::Result<MarketplaceConfig> {
+        match fs::read(&self.marketplace_config_path) {
+            Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(MarketplaceConfig {
                 schema: 1,
                 sources: Vec::new(),
-            })
+            }),
+            Err(error) => Err(error.into()),
+        }
     }
 
     fn save_marketplace_config(&self, config: &MarketplaceConfig) -> anyhow::Result<()> {
-        fs::write(
-            &self.marketplace_config_path,
-            serde_json::to_vec_pretty(config)?,
-        )?;
+        crate::storage::write_json(&self.marketplace_config_path, config)?;
         Ok(())
     }
 
     fn save_config(&self, plugins: &HashMap<String, ManagedPlugin>) -> anyhow::Result<()> {
-        let mut config = self.load_config();
+        let mut config = self.load_config()?;
         config.schema = 1;
         config.plugins.extend(
             plugins
                 .iter()
                 .map(|(id, plugin)| (id.clone(), plugin.choice.clone())),
         );
-        fs::write(&self.config_path, serde_json::to_vec_pretty(&config)?)?;
+        crate::storage::write_json(&self.config_path, &config)?;
         Ok(())
     }
 
@@ -1650,10 +1656,10 @@ fn webview_path(path: &Path) -> String {
         if let Some(path) = value.strip_prefix(r"\\?\UNC\") {
             return format!(r"//{path}").replace('\\', "/");
         }
-        return value
+        value
             .strip_prefix(r"\\?\")
             .unwrap_or(&value)
-            .replace('\\', "/");
+            .replace('\\', "/")
     }
     #[cfg(not(windows))]
     value.into_owned()
@@ -1873,14 +1879,6 @@ impl ProcessProvider {
         self.core.last_error.lock().unwrap().clone()
     }
 
-    fn invoke(&self, method: &str, params: Value) -> RpcResult {
-        self.core.call(
-            "frontend.invoke",
-            json!({"method":method,"params":params}),
-            HANDSHAKE_TIMEOUT,
-        )
-    }
-
     fn check_update(&self) {
         let _ = self.core.notify("host.checkUpdate", json!({}));
     }
@@ -2076,11 +2074,7 @@ impl ProviderCore {
             .parent()
             .ok_or("invalid plugin config path")?;
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-        fs::write(
-            &self.config_path,
-            serde_json::to_vec_pretty(&value).map_err(|error| error.to_string())?,
-        )
-        .map_err(|error| error.to_string())?;
+        crate::storage::write_json(&self.config_path, &value).map_err(|error| error.to_string())?;
         Ok(json!({"ok":true}))
     }
 

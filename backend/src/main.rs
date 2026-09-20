@@ -42,7 +42,9 @@ struct State {
     proxy: ProxyControl,
     automation: Arc<Automation>,
     switch_plan: Arc<RwLock<Option<Value>>>,
-    switch_generation: Arc<AtomicU64>,
+    switch_generation: tokio::sync::watch::Sender<u64>,
+    debug_generation: Arc<AtomicU64>,
+    switch_execution: Arc<tokio::sync::Mutex<()>>,
 }
 
 /// Backend runtime embedded by the Tauri application and exposed through
@@ -57,7 +59,7 @@ pub struct BackendRuntime {
 impl BackendRuntime {
     pub fn load(runtime_root: PathBuf) -> anyhow::Result<Self> {
         let pipeline_path = runtime_root.join("pipeline.json");
-        let config = normalize_config(pipeline::load(&pipeline_path).unwrap_or_default());
+        let config = normalize_config(pipeline::load(&pipeline_path).map_err(anyhow::Error::msg)?);
         pipeline::save(&pipeline_path, &config).map_err(anyhow::Error::msg)?;
         let module_registry = Arc::new(ModuleRegistry::default());
         register_builtin_modules(&module_registry, &config);
@@ -82,7 +84,7 @@ impl BackendRuntime {
             .and_then(Value::as_u64)
             .and_then(|value| u16::try_from(value).ok())
             .unwrap_or(10999);
-        let proxy = ProxyControl::new(services.clone());
+        let proxy = ProxyControl::new(services.clone(), pipeline.clone());
         let automation = Arc::new(Automation::new(services.clone(), proxy.clone()));
         Ok(Self {
             state: State {
@@ -96,7 +98,9 @@ impl BackendRuntime {
                 proxy,
                 automation,
                 switch_plan: Arc::new(RwLock::new(None)),
-                switch_generation: Arc::new(AtomicU64::new(0)),
+                switch_generation: tokio::sync::watch::channel(0).0,
+                debug_generation: Arc::new(AtomicU64::new(0)),
+                switch_execution: Arc::new(tokio::sync::Mutex::new(())),
             },
             runtime_root,
             mitm_port,
@@ -106,6 +110,7 @@ impl BackendRuntime {
     pub async fn snapshot(&self) -> Result<BackendSnapshot, String> {
         Ok(BackendSnapshot {
             version: VERSION.into(),
+            proxy_status: self.state.services.proxy_status(),
             backend_logs: self.state.logs.snapshot(),
             packet_pipeline: self.state.pipeline.read().await.clone(),
             fuse_config: snapshot_part(self.state.services.table("fuse"), "fuse config")?,
@@ -143,9 +148,11 @@ impl BackendRuntime {
 
     pub async fn plugin_marketplace(&self) -> Result<MarketplaceSnapshot, String> {
         let plugins = self.state.plugins.clone();
-        tokio::task::spawn_blocking(move || plugins.marketplace())
-            .await
-            .map_err(|error| error.to_string())
+        tokio::task::spawn_blocking(move || {
+            plugins.marketplace().map_err(|error| error.to_string())
+        })
+        .await
+        .map_err(|error| error.to_string())?
     }
 
     pub async fn add_plugin_marketplace_source(
@@ -327,11 +334,13 @@ impl BackendRuntime {
 
     pub async fn set_packet_pipeline(&self, config: PipelineConfig) -> CommandResult {
         let config = normalize_config(config);
+        let mut current = self.state.pipeline.write().await;
         match pipeline::validate(&config)
             .and_then(|_| pipeline::save(&self.state.pipeline_path, &config))
         {
             Ok(()) => {
-                *self.state.pipeline.write().await = config.clone();
+                *current = config.clone();
+                drop(current);
                 register_builtin_modules(&self.state.module_registry, &config);
                 let _ = self.state.events.send(envelope(
                     "packet_pipeline",
@@ -364,6 +373,7 @@ impl BackendRuntime {
         if !self.state.services.can_replay(&method) {
             return failed("packet-not-observed");
         }
+        let config = self.state.pipeline.read().await.clone();
         match self
             .state
             .proxy
@@ -371,7 +381,7 @@ impl BackendRuntime {
                 &method,
                 &Value::Object(payload.into_iter().collect()),
                 Duration::from_secs(12),
-                self.state.pipeline.read().await.clone(),
+                config,
             )
             .await
         {
@@ -394,6 +404,7 @@ impl BackendRuntime {
         if game_uuid.is_empty() || game_uuid.len() > 200 {
             return failed("invalid-payload");
         }
+        let config = self.state.pipeline.read().await.clone();
         match self
             .state
             .proxy
@@ -404,7 +415,7 @@ impl BackendRuntime {
                     "gameUuid": game_uuid,
                 }),
                 Duration::from_secs(12),
-                self.state.pipeline.read().await.clone(),
+                config,
                 GAME_RECORD,
             )
             .await
@@ -439,7 +450,7 @@ impl BackendRuntime {
 
     pub fn update_config(&self, config: ConfigTables) -> Result<(), String> {
         let config = serde_json::to_value(config).map_err(|error| error.to_string())?;
-        self.state.services.patch_config(&config)?;
+        let result = self.state.services.patch_config(&config);
         for update in [
             event("update_fuse_config", self.state.services.table("fuse")),
             event(
@@ -450,7 +461,7 @@ impl BackendRuntime {
         ] {
             let _ = self.state.events.send(update);
         }
-        Ok(())
+        result
     }
 
     pub fn set_locale(&self, locale: String) {
@@ -660,9 +671,13 @@ impl BackendRuntime {
                 self.state.services.reload_files();
             }
         };
-        let (proxy_result, _) = tokio::join!(proxy, reload);
-        if let Err(error) = proxy_result {
-            error!(target: "shanten_backend::proxy", error = %format!("{error:#}"), "MITM proxy stopped");
+        tokio::select! {
+            proxy_result = proxy => {
+                let reason = proxy_result.err().map(|error| format!("{error:#}")).unwrap_or_else(|| "MITM proxy stopped".into());
+                error!(target: "shanten_backend::proxy", error = %reason, "MITM proxy stopped");
+                self.state.services.set_proxy_status(false, Some(reason));
+            }
+            _ = reload => {}
         }
     }
 }
@@ -709,7 +724,17 @@ async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
         .unwrap_or(36) as usize;
     match action {
         "start" | "start_debug" => {
-            let generation = state.switch_generation.fetch_add(1, Ordering::SeqCst) + 1;
+            let debug = action == "start_debug";
+            let generation = if debug {
+                state.debug_generation.fetch_add(1, Ordering::SeqCst) + 1
+            } else {
+                let mut current = state.switch_plan.write().await;
+                state
+                    .switch_generation
+                    .send_modify(|generation| *generation += 1);
+                *current = None;
+                *state.switch_generation.borrow()
+            };
             let snapshot = if action == "start_debug" {
                 data.get("snapshot")
                     .cloned()
@@ -729,18 +754,28 @@ async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
+            let session = snapshot.get("session_id").cloned().unwrap_or(Value::Null);
+            let revision = snapshot.get("revision").cloned().unwrap_or(Value::Null);
+            let algorithm = data
+                .get("options")
+                .and_then(|v| v.get("search_algorithm"))
+                .and_then(Value::as_str)
+                .map(str::to_owned);
             let mut plan = tokio::task::spawn_blocking(move || {
-                recommendations::switch_plan(&snapshot, wall_limit, &skip_signatures)
+                recommendations::switch_plan(&snapshot, wall_limit, &skip_signatures, algorithm.as_deref())
             })
             .await
             .unwrap_or_else(|error| {
                 json!({"status":"impossible","reason":format!("search-task-failed: {error}")})
             });
-            if state.switch_generation.load(Ordering::SeqCst) != generation {
-                return vec![event(
-                    "discard_recommendation",
-                    json!([{"yaku":"souzu_switch","data":{"status":"impossible","reason":"stopped-by-user"}}]),
-                )];
+            let mut current = state.switch_plan.write().await;
+            let current_generation = if debug {
+                state.debug_generation.load(Ordering::SeqCst)
+            } else {
+                *state.switch_generation.borrow()
+            };
+            if current_generation != generation {
+                return vec![];
             }
             if let Some(object) = plan.as_object_mut() {
                 object.insert(
@@ -755,7 +790,16 @@ async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
                     ),
                 );
             }
-            *state.switch_plan.write().await = Some(plan.clone());
+            plan["plan_id"] = json!(format!(
+                "{}-{generation}",
+                if debug { "debug" } else { "live" }
+            ));
+            plan["generation"] = json!(generation);
+            plan["session_id"] = session;
+            plan["state_revision"] = revision;
+            if !debug {
+                *current = Some(plan.clone());
+            }
             vec![event(
                 "discard_recommendation",
                 json!([{"yaku":"souzu_switch","data":plan}]),
@@ -769,7 +813,7 @@ async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
             )]
         }
         "validate_manual_debug" => {
-            state.switch_generation.fetch_add(1, Ordering::SeqCst);
+            state.debug_generation.fetch_add(1, Ordering::SeqCst);
             let snapshot = data
                 .get("snapshot")
                 .cloned()
@@ -783,13 +827,21 @@ async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
             if let Some(object) = plan.as_object_mut() {
                 object.insert("request_source".into(), Value::String("debug".into()));
             }
-            *state.switch_plan.write().await = Some(plan.clone());
             vec![event(
                 "discard_recommendation",
                 json!([{"yaku":"souzu_switch","data":plan}]),
             )]
         }
         "execute_plan" | "execute_full_plan" => {
+            let reject = |reason: &str| {
+                vec![event(
+                    "souzu_switch_control_result",
+                    json!({"action":action,"ok":false,"reason":reason}),
+                )]
+            };
+            let Ok(_execution) = state.switch_execution.try_lock() else {
+                return reject("execution-already-running");
+            };
             let plan = state.switch_plan.read().await.clone();
             let Some(plan) = plan else {
                 return vec![event(
@@ -797,10 +849,31 @@ async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
                     json!({"action":action,"ok":false,"reason":"no-plan"}),
                 )];
             };
-            let result = if action == "execute_full_plan" {
-                execute_full_switch_plan(state, &plan).await
-            } else {
-                execute_switch_batches(state, &plan, false).await
+            let mut cancellation = state.switch_generation.subscribe();
+            let requested_id = data
+                .get("options")
+                .and_then(|v| v.get("plan_id"))
+                .and_then(Value::as_str);
+            let game = state.services.game_state();
+            if requested_id.is_none()
+                || requested_id != plan.get("plan_id").and_then(Value::as_str)
+                || plan.get("request_source").and_then(Value::as_str) != Some("live")
+                || plan.get("state_revision") != game.get("revision")
+                || !plan_is_current(state, &plan).await
+            {
+                return reject("stale-plan");
+            }
+            let execute = async {
+                if action == "execute_full_plan" {
+                    execute_full_switch_plan(state, &plan).await
+                } else {
+                    execute_switch_batches(state, &plan, false).await
+                }
+            };
+            let result = tokio::select! {
+                biased;
+                _ = cancellation.changed() => Err("stopped-by-user".into()),
+                result = execute => result,
             };
             let (ok, reason) = match result {
                 Ok(()) => (true, String::new()),
@@ -816,7 +889,10 @@ async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
             )]
         }
         "stop" => {
-            state.switch_generation.fetch_add(1, Ordering::SeqCst);
+            state
+                .switch_generation
+                .send_modify(|generation| *generation += 1);
+            state.debug_generation.fetch_add(1, Ordering::SeqCst);
             *state.switch_plan.write().await = None;
             vec![event(
                 "discard_recommendation",
@@ -852,27 +928,31 @@ fn deck_face(game: &Value, id: u64) -> Option<&str> {
 }
 
 async fn plan_is_current(state: &State, plan: &Value) -> bool {
-    let signature = plan.get("plan_signature").and_then(Value::as_str);
-    state
-        .switch_plan
-        .read()
-        .await
-        .as_ref()
-        .is_some_and(|current| {
-            signature.is_none()
-                || current.get("plan_signature").and_then(Value::as_str) == signature
-        })
+    let id = plan.get("plan_id").and_then(Value::as_str);
+    id.is_some()
+        && plan.get("generation").and_then(Value::as_u64) == Some(*state.switch_generation.borrow())
+        && plan.get("session_id") == state.services.game_state().get("session_id")
+        && state
+            .switch_plan
+            .read()
+            .await
+            .as_ref()
+            .is_some_and(|current| current.get("plan_id").and_then(Value::as_str) == id)
 }
 
 async fn wait_for_game_change(
-    services: &Services,
+    state: &State,
+    plan: &Value,
     old_hand: &[u64],
     old_change_count: u64,
     timeout: Duration,
 ) -> Result<(), String> {
     let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
-        let game = services.game_state();
+        if !plan_is_current(state, plan).await {
+            return Err("stopped-by-user".into());
+        }
+        let game = state.services.game_state();
         let hand = value_ids(game.get("hand_tiles"));
         let change_count = game
             .get("change_tile_count")
@@ -948,11 +1028,12 @@ async fn execute_switch_batches(
             .unwrap_or(0);
         let _ = state.services.events.send(event(
             "souzu_switch_execution",
-            json!({"status":"running","phase":"switch","batch_index":index,"batch_total":batches.len()}),
+            json!({"status":"running","phase":"switch","batch_index":index+1,"batch_total":batches.len(),"batch_count":batches.len()}),
         ));
         send_game_operation(state, 101, &keep).await?;
         wait_for_game_change(
-            &state.services,
+            state,
+            plan,
             &hand,
             old_change_count,
             Duration::from_secs(12),
@@ -1087,13 +1168,8 @@ async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), Str
                     .get("change_tile_count")
                     .and_then(Value::as_u64)
                     .unwrap_or(0);
-                wait_for_game_change(
-                    &state.services,
-                    &hand,
-                    change_count,
-                    Duration::from_secs(12),
-                )
-                .await?;
+                wait_for_game_change(state, plan, &hand, change_count, Duration::from_secs(12))
+                    .await?;
                 pending_quads.remove(quad_index);
                 continue;
             }
@@ -1119,13 +1195,7 @@ async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), Str
                 .get("change_tile_count")
                 .and_then(Value::as_u64)
                 .unwrap_or(0);
-            wait_for_game_change(
-                &state.services,
-                &hand,
-                change_count,
-                Duration::from_secs(12),
-            )
-            .await?;
+            wait_for_game_change(state, plan, &hand, change_count, Duration::from_secs(12)).await?;
             if pending_quads.is_empty() {
                 post_kan_discards += 1;
             }
@@ -1217,4 +1287,90 @@ fn failed(reason: impl Into<String>) -> CommandResult {
 
 fn snapshot_part<T: serde::de::DeserializeOwned>(value: Value, name: &str) -> Result<T, String> {
     serde_json::from_value(value).map_err(|error| format!("invalid {name}: {error}"))
+}
+
+#[cfg(test)]
+mod audit_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn debug_cannot_replace_live_plan_and_execution_checks_identity_and_session() {
+        const CHILD_ROOT: &str = "SHANTEN_SWITCH_TEST_ROOT";
+        let root = match std::env::var_os(CHILD_ROOT) {
+            Some(root) => PathBuf::from(root),
+            None => {
+                let root = std::env::temp_dir().join(format!(
+                    "shanten-switch-{}-{}",
+                    std::process::id(),
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_nanos()
+                ));
+                // Runtime logging is process-global; finish that process before removing its files.
+                let output = std::process::Command::new(std::env::current_exe().unwrap())
+                    .args([
+                        "--exact",
+                        "embedded::audit_tests::debug_cannot_replace_live_plan_and_execution_checks_identity_and_session",
+                        "--nocapture",
+                    ])
+                    .env(CHILD_ROOT, &root)
+                    .output()
+                    .unwrap();
+                assert!(output.status.success(), "{output:?}");
+                std::fs::remove_dir_all(root).unwrap();
+                return;
+            }
+        };
+        let runtime_root = root.join("runtime");
+        let runtime = tokio::task::spawn_blocking(move || BackendRuntime::load(runtime_root))
+            .await
+            .unwrap()
+            .unwrap();
+        let state = &runtime.state;
+        switch_command(state, &json!({"action":"start"})).await;
+        let live = state.switch_plan.read().await.clone().unwrap();
+        switch_command(state, &json!({"action":"start_debug","snapshot":{}})).await;
+        switch_command(
+            state,
+            &json!({"action":"validate_manual_debug","snapshot":{}}),
+        )
+        .await;
+        assert_eq!(state.switch_plan.read().await.as_ref(), Some(&live));
+        assert!(plan_is_current(state, &live).await);
+        let result = switch_command(
+            state,
+            &json!({"action":"execute_plan","options":{"plan_id":"debug-1"}}),
+        )
+        .await;
+        assert_eq!(result[0]["data"]["reason"], "stale-plan");
+        let lock = state.switch_execution.lock().await;
+        let result = switch_command(
+            state,
+            &json!({"action":"execute_plan","options":{"plan_id":live["plan_id"]}}),
+        )
+        .await;
+        assert_eq!(result[0]["data"]["reason"], "execution-already-running");
+        drop(lock);
+        state.services.update_game_state(&pipeline::Packet {
+            direction: pipeline::Direction::Inbound,
+            packet_type: "Res".into(),
+            method: ".lq.Lobby.fetchAmuletActivityData".into(),
+            id: Some(1),
+            data: json!({"game":{"state":{"current":5}}}),
+        });
+        assert!(!plan_is_current(state, &live).await);
+        let result = switch_command(
+            state,
+            &json!({"action":"execute_plan","options":{"plan_id":live["plan_id"]}}),
+        )
+        .await;
+        assert_eq!(result[0]["data"]["reason"], "stale-plan");
+        let mut cancel = state.switch_generation.subscribe();
+        switch_command(state, &json!({"action":"stop"})).await;
+        assert!(cancel.has_changed().unwrap());
+        cancel.changed().await.unwrap();
+        assert!(state.switch_plan.read().await.is_none());
+        drop(runtime);
+    }
 }

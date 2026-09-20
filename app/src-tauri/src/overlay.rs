@@ -162,13 +162,11 @@ mod imp {
             configure_overlay_hwnd(hud_hwnd);
 
             let mut current_game: Option<WindowCandidate> = None;
-            let mut last_area: Option<ClientArea> = None;
 
             while !stop.load(Ordering::SeqCst) {
                 if !enabled.load(Ordering::SeqCst) {
                     hide(hud_hwnd);
                     current_game = None;
-                    last_area = None;
                     update_status(&status, false, None);
                     thread::sleep(BACKGROUND_IDLE_INTERVAL);
                     continue;
@@ -179,7 +177,6 @@ mod imp {
                     .unwrap_or(true)
                 {
                     current_game = find_game_window();
-                    last_area = None;
                 }
 
                 let Some(game) = current_game else {
@@ -215,38 +212,21 @@ mod imp {
                         apply_window_region(hud_hwnd, visible_region);
 
                         let z_after = z_order_insert_after(game.hwnd, hud_hwnd);
-                        let should_move = last_area != Some(area);
-                        if should_move {
-                            unsafe {
-                                let _ = SetWindowPos(
-                                    hud_hwnd,
-                                    Some(z_after),
-                                    area.x,
-                                    area.y,
-                                    area.width,
-                                    area.height,
-                                    SWP_NOACTIVATE | SWP_SHOWWINDOW,
-                                );
-                            }
-                        } else {
-                            unsafe {
-                                let _ = SetWindowPos(
-                                    hud_hwnd,
-                                    Some(z_after),
-                                    area.x,
-                                    area.y,
-                                    area.width,
-                                    area.height,
-                                    SWP_NOACTIVATE | SWP_SHOWWINDOW,
-                                );
-                            }
+                        unsafe {
+                            let _ = SetWindowPos(
+                                hud_hwnd,
+                                Some(z_after),
+                                area.x,
+                                area.y,
+                                area.width,
+                                area.height,
+                                SWP_NOACTIVATE | SWP_SHOWWINDOW,
+                            );
                         }
-                        last_area = Some(area);
                     }
                     None => {
                         hide(hud_hwnd);
                         current_game = None;
-                        last_area = None;
                         update_status(&status, true, None);
                     }
                 }
@@ -437,10 +417,7 @@ mod imp {
             return None;
         }
 
-        let mut cover = match unsafe { GetWindow(game_hwnd, GW_HWNDPREV) } {
-            Ok(hwnd) => Some(hwnd),
-            Err(_) => None,
-        };
+        let mut cover = unsafe { GetWindow(game_hwnd, GW_HWNDPREV) }.ok();
 
         while let Some(hwnd) = cover {
             if hwnd == hud_hwnd {
@@ -491,16 +468,11 @@ mod imp {
         }
 
         let fallback = PanelRegion {
-            x: ((area.width
-                - (area.width - HUD_PANEL_MARGIN_X * 2)
-                    .min(HUD_PANEL_MAX_WIDTH)
-                    .max(1))
+            x: ((area.width - (area.width - HUD_PANEL_MARGIN_X * 2).clamp(1, HUD_PANEL_MAX_WIDTH))
                 / 2)
             .max(0),
             y: (area.height - HUD_PANEL_BOTTOM - HUD_PANEL_HEIGHT).max(0),
-            width: (area.width - HUD_PANEL_MARGIN_X * 2)
-                .min(HUD_PANEL_MAX_WIDTH)
-                .max(1),
+            width: (area.width - HUD_PANEL_MARGIN_X * 2).clamp(1, HUD_PANEL_MAX_WIDTH),
             height: HUD_PANEL_HEIGHT,
         };
 

@@ -51,13 +51,15 @@ export default function MsgBoxWindow() {
     }
 
     React.useEffect(() => {
+        let active = true;
         let un = () => {};
         (async () => {
             un = await safeListen<{ lng: string }>("i18n:set-language", (e) => {
                 setAppLanguage(e.payload.lng);
             });
+            if (!active) un();
         })();
-        return () => un();
+        return () => { active = false; un(); };
     }, []);
 
     React.useEffect(() => {

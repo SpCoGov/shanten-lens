@@ -1,7 +1,9 @@
 use anyhow::{bail, ensure, Context, Result};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use prost::Message;
-use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, SerializeOptions};
+use prost_reflect::{
+    DescriptorPool, DynamicMessage, MessageDescriptor, SerializeOptions, Value as ProtoValue,
+};
 use serde_json::Value;
 use std::{
     collections::HashMap,
@@ -26,6 +28,8 @@ pub struct ParsedMessage {
     pub method: Arc<str>,
     pub data: Value,
     descriptor: MessageDescriptor,
+    original: Option<DynamicMessage>,
+    original_frame: Option<Vec<u8>>,
 }
 
 #[derive(Clone, PartialEq, Message)]
@@ -145,18 +149,30 @@ impl LiqiCodec {
 
     pub fn parse(&mut self, bytes: &[u8]) -> Result<ParsedMessage> {
         ensure!(!bytes.is_empty(), "empty frame");
-        match bytes[0] {
+        let mut message = match bytes[0] {
             1 => self.parse_notify(bytes),
             2 => self.parse_request(bytes),
             3 => self.parse_response(bytes),
             value => bail!("invalid message type {value}"),
-        }
+        }?;
+        message.original_frame = Some(bytes.to_vec());
+        Ok(message)
     }
 
     pub fn rebuild(&self, parsed: &ParsedMessage) -> Result<Vec<u8>> {
+        if let (Some(original), Some(frame)) = (&parsed.original, &parsed.original_frame) {
+            let mut original_data = dynamic_to_json(original)?;
+            maybe_decode_action(&mut original_data)?;
+            if parsed.data == original_data {
+                return Ok(frame.clone());
+            }
+        }
         let mut data = parsed.data.clone();
         maybe_encode_action(&mut data)?;
-        let dynamic = dynamic_from_json(parsed.descriptor.clone(), &data)?;
+        let mut dynamic = dynamic_from_json(parsed.descriptor.clone(), &data)?;
+        if let Some(original) = &parsed.original {
+            preserve_unknown_fields(original, &mut dynamic)?;
+        }
         let wrapper = Wrapper {
             name: if parsed.message_type == MessageType::Response {
                 String::new()
@@ -174,7 +190,16 @@ impl LiqiCodec {
         if let Some(id) = parsed.id {
             output.extend_from_slice(&id.to_le_bytes());
         }
-        wrapper.encode(&mut output)?;
+        if let Some(frame) = &parsed.original_frame {
+            let prefix = if parsed.id.is_some() { 3 } else { 1 };
+            let mut envelope =
+                DynamicMessage::decode(message_descriptor("lq.Wrapper")?, &frame[prefix..])?;
+            envelope.set_field_by_name("name", ProtoValue::String(wrapper.name));
+            envelope.set_field_by_name("data", ProtoValue::Bytes(wrapper.data.into()));
+            envelope.encode(&mut output)?;
+        } else {
+            wrapper.encode(&mut output)?;
+        }
         Ok(output)
     }
 
@@ -193,16 +218,19 @@ impl LiqiCodec {
             }
             MessageType::Response => (method_descriptors(method)?.1, None),
         };
-        if let (MessageType::Request, Some(id), Some(response)) = (message_type, id, response) {
-            self.pending.insert(id, (Arc::from(method), response));
-        }
-        self.rebuild(&ParsedMessage {
+        let frame = self.rebuild(&ParsedMessage {
             message_type,
             id,
             method: Arc::from(method),
             data: data.clone(),
             descriptor,
-        })
+            original: None,
+            original_frame: None,
+        })?;
+        if let (MessageType::Request, Some(id), Some(response)) = (message_type, id, response) {
+            self.pending.insert(id, (Arc::from(method), response));
+        }
+        Ok(frame)
     }
 
     pub fn has_pending(&self, id: u16) -> bool {
@@ -231,14 +259,15 @@ impl LiqiCodec {
         let wrapper = Wrapper::decode(&bytes[3..])?;
         let (request, response) = method_descriptors(&wrapper.name)?;
         let method: Arc<str> = Arc::from(wrapper.name.as_str());
-        self.pending.insert(id, (method, response));
-        parsed(
+        let parsed = parsed(
             MessageType::Request,
             Some(id),
             wrapper.name,
             wrapper.data,
             request,
-        )
+        )?;
+        self.pending.insert(id, (method, response));
+        Ok(parsed)
     }
 
     fn parse_response(&mut self, bytes: &[u8]) -> Result<ParsedMessage> {
@@ -247,15 +276,18 @@ impl LiqiCodec {
         let wrapper = Wrapper::decode(&bytes[3..])?;
         let (method, descriptor) = self
             .pending
-            .remove(&id)
+            .get(&id)
+            .cloned()
             .with_context(|| format!("response {id} has no request"))?;
-        parsed(
+        let parsed = parsed(
             MessageType::Response,
             Some(id),
             method.to_string(),
             wrapper.data,
             descriptor,
-        )
+        )?;
+        self.pending.remove(&id);
+        Ok(parsed)
     }
 }
 
@@ -266,10 +298,8 @@ fn parsed(
     bytes: Vec<u8>,
     descriptor: MessageDescriptor,
 ) -> Result<ParsedMessage> {
-    let mut data = dynamic_to_json(&DynamicMessage::decode(
-        descriptor.clone(),
-        bytes.as_slice(),
-    )?)?;
+    let original = DynamicMessage::decode(descriptor.clone(), bytes.as_slice())?;
+    let mut data = dynamic_to_json(&original)?;
     maybe_decode_action(&mut data)?;
     Ok(ParsedMessage {
         message_type: kind,
@@ -277,7 +307,42 @@ fn parsed(
         method: Arc::from(method),
         data,
         descriptor,
+        original: Some(original),
+        original_frame: None,
     })
+}
+
+fn preserve_unknown_fields(original: &DynamicMessage, edited: &mut DynamicMessage) -> Result<()> {
+    fn preserve_value(original: &ProtoValue, edited: &mut ProtoValue) -> Result<()> {
+        match (original, edited) {
+            (ProtoValue::Message(old), ProtoValue::Message(new)) => {
+                preserve_unknown_fields(old, new)?
+            }
+            (ProtoValue::List(old), ProtoValue::List(new)) => {
+                for (old, new) in old.iter().zip(new) {
+                    preserve_value(old, new)?;
+                }
+            }
+            (ProtoValue::Map(old), ProtoValue::Map(new)) => {
+                for (key, new) in new {
+                    if let Some(old) = old.get(key) {
+                        preserve_value(old, new)?;
+                    }
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+    for (field, value) in edited.fields_mut() {
+        preserve_value(original.get_field(&field).as_ref(), value)?;
+    }
+    let mut unknown = Vec::new();
+    for field in original.unknown_fields() {
+        field.encode(&mut unknown);
+    }
+    edited.merge(unknown.as_slice())?;
+    Ok(())
 }
 
 fn message_descriptor(name: &str) -> Result<MessageDescriptor> {
@@ -363,6 +428,62 @@ fn xor_action(bytes: &mut [u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unknown_fields_survive_passthrough_and_known_field_edits() {
+        let method = ".lq.Lobby.loginBeat";
+        let mut codec = LiqiCodec::new();
+        let frame = codec
+            .build(
+                MessageType::Request,
+                Some(42),
+                method,
+                &serde_json::json!({"contract":"old"}),
+            )
+            .unwrap();
+        let mut wrapper = Wrapper::decode(&frame[3..]).unwrap();
+        let unknown = [0xa0, 0x06, 0x7b]; // field 100, varint 123
+        wrapper.data.extend(unknown);
+        let mut frame = vec![2, 42, 0];
+        wrapper.encode(&mut frame).unwrap();
+        frame.extend(unknown); // unknown envelope field too
+        let mut parsed = codec.parse(&frame).unwrap();
+        assert_eq!(codec.rebuild(&parsed).unwrap(), frame);
+        parsed.data["contract"] = serde_json::json!("new");
+        let edited = codec.rebuild(&parsed).unwrap();
+        let envelope =
+            DynamicMessage::decode(message_descriptor("lq.Wrapper").unwrap(), &edited[3..])
+                .unwrap();
+        assert_eq!(envelope.unknown_fields().count(), 1);
+        let decoded = Wrapper::decode(&edited[3..]).unwrap();
+        assert!(decoded.data.ends_with(&unknown));
+        assert_eq!(codec.parse(&edited).unwrap().data["contract"], "new");
+    }
+
+    #[test]
+    fn invalid_payload_does_not_reserve_id_and_invalid_response_keeps_correlation() {
+        let mut codec = LiqiCodec::new();
+        let method = ".lq.Lobby.loginBeat";
+        assert!(codec
+            .build(
+                MessageType::Request,
+                Some(42),
+                method,
+                &serde_json::json!({"contract":{}})
+            )
+            .is_err());
+        assert!(!codec.has_pending(42));
+        codec
+            .build(
+                MessageType::Request,
+                Some(42),
+                method,
+                &serde_json::json!({}),
+            )
+            .unwrap();
+        assert!(codec.parse(&[3, 42, 0, 18, 1, 255]).is_err());
+        assert!(codec.has_pending(42));
+    }
 
     #[test]
     fn request_roundtrip_and_response_correlation() {

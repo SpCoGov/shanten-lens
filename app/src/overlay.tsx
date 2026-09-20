@@ -11,6 +11,7 @@ import type {EffectItem, GameStateData} from "./lib/gamestate";
 import {toDeckMap} from "./lib/gamestate";
 import {
     calculateCurrentPoint,
+    cloneResolvedRules,
     computeBaseScore,
     formatFixed2,
     parseFixed2,
@@ -18,9 +19,9 @@ import {
     projectFuturePoints,
     resolveAmuletRule,
     type AmuletRuleConfig,
-    type ResolvedAmuletRule,
 } from "./lib/scoreEngine";
-import {formatLevelIdToLabel, LEVEL_TARGETS_BY_ID, ORDERED_LEVEL_TARGETS} from "./pages/ScorePage";
+import {formatLevelIdToLabel} from "./lib/levelFormat";
+import {LEVEL_TARGETS_BY_ID, ORDERED_LEVEL_TARGETS} from "./lib/levelTargets";
 import {
     readHudEnabled,
     readHudShowBlackhole,
@@ -57,17 +58,17 @@ type PanelBounds = {
     collapsed: boolean;
 };
 
-function sendSouzuAction(action: backendIpc.SwitchAction) {
+function sendSouzuAction(action: backendIpc.SwitchAction, planId?: string) {
     void backendIpc.runSwitch({
         action,
-        options: action === "start" ? {wall_limit: 36, search_algorithm: DEFAULT_SEARCH_ALGORITHM} : undefined,
+        options: action === "start" ? {wall_limit: 36, search_algorithm: DEFAULT_SEARCH_ALGORITHM} : {plan_id: planId ?? ""},
     });
 }
 
-function sendWanxiangAction(action: backendIpc.SwitchAction) {
+function sendWanxiangAction(action: backendIpc.SwitchAction, planId?: string) {
     void backendIpc.runSwitch({
         action,
-        options: action === "start" ? {wall_limit: 36, search_algorithm: WANXIANG_SEARCH_ALGORITHM} : undefined,
+        options: action === "start" ? {wall_limit: 36, search_algorithm: WANXIANG_SEARCH_ALGORITHM} : {plan_id: planId ?? ""},
     });
 }
 
@@ -92,7 +93,9 @@ function HudOverlay() {
     React.useEffect(() => {
         invoke("set_overlay_enabled", {enabled: readHudEnabled()}).catch(() => {
         });
+        let active = true;
         void backendIpc.initializeBackend().then((snapshot) => {
+            if (!active) return;
             setStage(Number(snapshot.gameState.stage ?? 0));
             setGameState(snapshot.gameState);
         });
@@ -126,7 +129,7 @@ function HudOverlay() {
                 }
             }),
         ];
-        return () => unlisteners.forEach((unlisten) => unlisten());
+        return () => { active = false; unlisteners.forEach((unlisten) => unlisten()); };
     }, []);
 
     React.useEffect(() => {
@@ -199,10 +202,10 @@ function HudOverlay() {
                         <button onClick={() => sendSouzuAction("start")} disabled={!canOperate || isSearching}>
                             {t("blackhole.start")}
                         </button>
-                        <button onClick={() => sendSouzuAction("execute_plan")} disabled={!canOperate || !hasPlan || isSearching}>
+                        <button onClick={() => sendSouzuAction("execute_plan", plan?.plan_id)} disabled={!canOperate || !hasPlan || isSearching}>
                             {t("blackhole.execute_plan")}
                         </button>
-                        <button onClick={() => sendSouzuAction("execute_full_plan")} disabled={!canOperate || !hasPlan || isSearching}>
+                        <button onClick={() => sendSouzuAction("execute_full_plan", plan?.plan_id)} disabled={!canOperate || !hasPlan || isSearching}>
                             {t("blackhole.execute_full_plan")}
                         </button>
                     </div>
@@ -235,7 +238,7 @@ function HudOverlay() {
                         <button onClick={() => sendWanxiangAction("start")} disabled={!canOperate || !hasWanxiang || wanxiangSearching}>
                             {t("blackhole.start")}
                         </button>
-                        <button onClick={() => sendWanxiangAction("execute_plan")} disabled={!canOperate || !hasWanxiangPlan || wanxiangSearching}>
+                        <button onClick={() => sendWanxiangAction("execute_plan", wanxiangPlan?.plan_id)} disabled={!canOperate || !hasWanxiangPlan || wanxiangSearching}>
                             {t("blackhole.execute_plan")}
                         </button>
                     </div>
@@ -585,12 +588,6 @@ function getScorePageFutureProjections(gameState: GameStateData, level: number) 
     );
 }
 
-function cloneResolvedRules(rules: ResolvedAmuletRule[]): ResolvedAmuletRule[] {
-    return rules.map((rule) => ({
-        ...rule,
-        dataRawList: [...rule.dataRawList],
-    }));
-}
 
 function getRuleKey(item: EffectItem) {
     return `${item.uid}:${item.id}`;

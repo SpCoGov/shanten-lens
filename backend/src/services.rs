@@ -1,3 +1,4 @@
+use crate::storage::write_json;
 use crate::{
     ipc::{PacketLogItem, PacketLogSnapshot},
     logging::JsonLineLog,
@@ -16,7 +17,7 @@ use std::{
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tokio::sync::{broadcast, oneshot};
+use tokio::sync::broadcast;
 
 const AMULETS: &str = include_str!("../assets/amulets.json");
 const BADGES: &str = include_str!("../assets/badges.json");
@@ -44,7 +45,7 @@ fn defaults() -> Value {
 
 fn empty_game_state() -> Value {
     json!({
-        "stage": -1, "deck_map": {}, "hand_tiles": [], "dora_tiles": [], "tian_dora_tiles": [],
+        "stage": -1, "session_id": 0, "revision": 0, "flow_id": 0, "deck_map": {}, "hand_tiles": [], "dora_tiles": [], "tian_dora_tiles": [],
         "ming": [], "replacement_tiles": [], "wall_tiles": [], "switch_used_tiles": [], "ended": false,
         "opening_hand_tiles": [], "used_desktop_tiles": [],
         "desktop_remain": 0, "locked_tiles": [], "coin": "0", "point": "0", "target_point": "0",
@@ -65,12 +66,11 @@ pub struct Services {
     packet_log: Arc<Mutex<VecDeque<PacketLogItem>>>,
     packet_log_file: Arc<JsonLineLog>,
     registry: Arc<Mutex<Value>>,
-    waiters: Arc<Mutex<std::collections::HashMap<u32, oneshot::Sender<Value>>>>,
-    reserved_response_ids: Arc<Mutex<std::collections::HashSet<u32>>>,
     game_record_override: Arc<Mutex<Option<Value>>>,
     confirmations: Arc<Mutex<std::collections::HashMap<String, mpsc::Sender<bool>>>>,
     next_confirmation: Arc<AtomicU64>,
     pub events: broadcast::Sender<Value>,
+    proxy_status: Arc<Mutex<crate::ipc::ProxyStatus>>,
 }
 
 impl Services {
@@ -80,7 +80,8 @@ impl Services {
         for name in ["game", "general", "backend", "fuse", "autorun"] {
             let path = root.join(format!("{name}.json"));
             let registered = config[name].clone();
-            let (loaded, need_write) = load_config_table(&path, &registered, &registered);
+            let (loaded, need_write) = load_config_table(&path, &registered, &registered)?;
+            validate_config(name, &loaded).map_err(anyhow::Error::msg)?;
             config[name] = loaded;
             if need_write {
                 write_json(&path, &config[name])?;
@@ -103,12 +104,11 @@ impl Services {
             packet_log: Arc::new(Mutex::new(VecDeque::new())),
             packet_log_file: Arc::new(packet_log_file),
             registry: Arc::new(Mutex::new(registry)),
-            waiters: Arc::new(Mutex::new(std::collections::HashMap::new())),
-            reserved_response_ids: Arc::new(Mutex::new(std::collections::HashSet::new())),
             game_record_override: Arc::new(Mutex::new(None)),
             confirmations: Arc::new(Mutex::new(std::collections::HashMap::new())),
             next_confirmation: Arc::new(AtomicU64::new(1)),
             events,
+            proxy_status: Arc::new(Mutex::new(crate::ipc::ProxyStatus::default())),
         })
     }
 
@@ -158,16 +158,33 @@ impl Services {
         self.game_state.lock().unwrap().clone()
     }
 
+    pub fn proxy_status(&self) -> crate::ipc::ProxyStatus {
+        self.proxy_status.lock().unwrap().clone()
+    }
+
+    pub fn set_proxy_status(&self, running: bool, error: Option<String>) {
+        let status = crate::ipc::ProxyStatus { running, error };
+        *self.proxy_status.lock().unwrap() = status.clone();
+        let _ = self
+            .events
+            .send(event("proxy_status", serde_json::to_value(status).unwrap()));
+    }
+
     pub fn patch_config(&self, patch: &Value) -> Result<(), String> {
         let Some(tables) = patch.as_object() else {
             return Err("config patch must be an object".into());
         };
         let mut config = self.config.lock().unwrap();
+        let defaults = defaults();
+        let mut candidate = config.clone();
         for (name, partial) in tables {
+            if defaults.get(name).is_none() {
+                return Err(format!("unknown config table: {name}"));
+            }
             let Some(values) = partial.as_object() else {
                 return Err(format!("config table {name} must be an object"));
             };
-            let table = config
+            let table = candidate
                 .as_object_mut()
                 .unwrap()
                 .entry(name)
@@ -176,11 +193,14 @@ impl Services {
                 return Err(format!("config table {name} is invalid"));
             };
             table.extend(values.clone());
-            write_json(
-                &self.root.join(format!("{name}.json")),
-                &Value::Object(table.clone()),
-            )
-            .map_err(|e| e.to_string())?;
+            validate_config(name, &candidate[name])?;
+        }
+        let mut applied = Vec::new();
+        for name in tables.keys() {
+            write_json(&self.root.join(format!("{name}.json")), &candidate[name])
+                .map_err(|e| format!("failed to save {name}: {e}; saved tables: {applied:?}"))?;
+            config[name] = candidate[name].clone();
+            applied.push(name);
         }
         Ok(())
     }
@@ -196,7 +216,24 @@ impl Services {
                 let path = self.root.join(format!("{name}.json"));
                 let current = config[name].clone();
                 let (loaded, need_write) =
-                    load_config_table(&path, &default_config[name], &current);
+                    match load_config_table(&path, &default_config[name], &current).and_then(
+                        |loaded| {
+                            validate_config(name, &loaded.0).map_err(anyhow::Error::msg)?;
+                            Ok(loaded)
+                        },
+                    ) {
+                        Ok(loaded) => loaded,
+                        Err(error) => {
+                            tracing::warn!(%name, %error, "keeping last valid config");
+                            continue;
+                        }
+                    };
+                if need_write {
+                    if let Err(error) = write_json(&path, &loaded) {
+                        tracing::warn!(%name, %error, "config backfill failed");
+                        continue;
+                    }
+                }
                 if current != loaded || need_write {
                     config[name] = loaded;
                     match name {
@@ -204,9 +241,6 @@ impl Services {
                         "autorun" => changed_autorun = true,
                         _ => changed_normal = true,
                     }
-                }
-                if need_write {
-                    let _ = write_json(&path, &config[name]);
                 }
             }
         }
@@ -238,27 +272,17 @@ impl Services {
         }
     }
 
-    pub fn resolve_response(&self, packet: &Packet) {
-        if packet.packet_type == "Res" {
-            if packet.direction == crate::pipeline::Direction::Inbound
-                && packet.method == ".lq.Lobby.fetchGameRecord"
-            {
-                if let Some(encoded) = packet.data.get("data").and_then(Value::as_str) {
-                    if let Ok(record) = decode_game_record_base64(encoded) {
-                        let mut payload = packet.data.clone();
-                        payload["data"] = record;
-                        let _ = self.events.send(event("update_game_record", payload));
-                    }
+    pub fn publish_game_record(&self, packet: &Packet) {
+        if packet.packet_type == "Res"
+            && packet.direction == crate::pipeline::Direction::Inbound
+            && packet.method == ".lq.Lobby.fetchGameRecord"
+        {
+            if let Some(encoded) = packet.data.get("data").and_then(Value::as_str) {
+                if let Ok(record) = decode_game_record_base64(encoded) {
+                    let mut payload = packet.data.clone();
+                    payload["data"] = record;
+                    let _ = self.events.send(event("update_game_record", payload));
                 }
-            }
-            if let Some(id) = packet.id {
-                self.reserved_response_ids.lock().unwrap().remove(&id);
-            }
-            if let Some(sender) = packet
-                .id
-                .and_then(|id| self.waiters.lock().unwrap().remove(&id))
-            {
-                let _ = sender.send(packet.data.clone());
             }
         }
     }
@@ -326,25 +350,6 @@ impl Services {
         })
     }
 
-    pub fn try_response_waiter(&self, id: u32) -> Option<oneshot::Receiver<Value>> {
-        let mut reserved = self.reserved_response_ids.lock().unwrap();
-        if !reserved.insert(id) {
-            return None;
-        }
-        let (sender, receiver) = oneshot::channel();
-        self.waiters.lock().unwrap().insert(id, sender);
-        Some(receiver)
-    }
-
-    pub fn reserve_response_id(&self, id: u32) -> bool {
-        self.reserved_response_ids.lock().unwrap().insert(id)
-    }
-
-    pub fn cancel_waiter(&self, id: u32) {
-        self.waiters.lock().unwrap().remove(&id);
-        self.reserved_response_ids.lock().unwrap().remove(&id);
-    }
-
     pub fn confirm(&self, title: &str, message: &str, values: Value) -> bool {
         let id = format!(
             "rust-{:016x}",
@@ -374,15 +379,67 @@ impl Services {
     }
 
     pub fn update_game_state(&self, packet: &Packet) {
-        if packet.direction != crate::pipeline::Direction::Inbound {
+        self.update_game_state_from_flow(packet, 0);
+    }
+
+    pub fn active_flow_id(&self) -> u64 {
+        self.game_state.lock().unwrap()["flow_id"]
+            .as_u64()
+            .unwrap_or(0)
+    }
+
+    pub fn disconnect_game_flow(&self, flow_id: u64) {
+        let mut state = self.game_state.lock().unwrap();
+        if state["flow_id"].as_u64() != Some(flow_id) {
             return;
         }
+        state["session_id"] = json!(state["session_id"].as_u64().unwrap_or(0) + 1);
+        state["revision"] = json!(state["revision"].as_u64().unwrap_or(0) + 1);
+        let payload = state.clone();
+        drop(state);
+        let _ = self.events.send(event("update_gamestate", payload));
+    }
+
+    pub fn update_game_state_from_flow(&self, packet: &Packet, flow_id: u64) {
+        if packet.direction != crate::pipeline::Direction::Inbound
+            || packet.data.get("error").is_some()
+        {
+            return;
+        }
+        let fetch = packet.method == ".lq.Lobby.fetchAmuletActivityData";
+        let giveup = packet.method == ".lq.Lobby.amuletActivityGiveup";
+        let events = packet.data.get("events").and_then(Value::as_array);
+        if !fetch && !giveup && events.is_none_or(Vec::is_empty) {
+            return;
+        }
+        let new_game = events.is_some_and(|events| {
+            events
+                .iter()
+                .any(|event| event.pointer("/result/newGameResult").is_some())
+        });
         let mut state = self.game_state.lock().unwrap();
         let Some(target) = state.as_object_mut() else {
             return;
         };
-        if packet.method == ".lq.Lobby.amuletActivityGiveup" {
+        let old_flow = target.get("flow_id").and_then(Value::as_u64).unwrap_or(0);
+        if old_flow != 0 && old_flow != flow_id && !fetch && !new_game {
+            return;
+        }
+        let previous = target.clone();
+        let revision = target.get("revision").and_then(Value::as_u64).unwrap_or(0);
+        let session = target
+            .get("session_id")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        target.insert("flow_id".into(), json!(flow_id));
+        if fetch || new_game || giveup || old_flow != flow_id {
+            target.insert("session_id".into(), json!(session + 1));
+        }
+        if giveup {
             *target = empty_game_state().as_object().unwrap().clone();
+            target.insert("session_id".into(), json!(session + 1));
+            target.insert("revision".into(), json!(revision + 1));
+            target.insert("flow_id".into(), json!(flow_id));
             target.insert("ended".into(), Value::Bool(true));
             target.insert("update_reason".into(), json!([packet.method]));
             let payload = Value::Object(target.clone());
@@ -390,7 +447,7 @@ impl Services {
             let _ = self.events.send(event("update_gamestate", payload));
             return;
         }
-        if packet.method == ".lq.Lobby.fetchAmuletActivityData" {
+        if fetch {
             apply_fetch_state(target, &packet.data);
         }
         if let Some(events) = packet.data.get("events").and_then(Value::as_array) {
@@ -398,6 +455,10 @@ impl Services {
                 apply_event_state(target, item);
             }
         }
+        if *target == previous {
+            return;
+        }
+        target.insert("revision".into(), json!(revision + 1));
         target.insert("update_reason".into(), json!([packet.method]));
         let payload = Value::Object(target.clone());
         drop(state);
@@ -512,17 +573,28 @@ fn write_registry(path: &Path, value: &Value) -> anyhow::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(path, serde_json::to_vec_pretty(value)?)?;
-    Ok(())
+    write_json(path, value)
 }
 
-fn load_config_table(path: &Path, defaults: &Value, registered: &Value) -> (Value, bool) {
-    let disk = fs::read(path)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
-        .and_then(|value| value.as_object().cloned());
+fn load_config_table(
+    path: &Path,
+    defaults: &Value,
+    registered: &Value,
+) -> anyhow::Result<(Value, bool)> {
+    let disk =
+        match fs::read(path) {
+            Ok(bytes) => {
+                let value: Value = serde_json::from_slice(&bytes)
+                    .with_context(|| format!("invalid config file: {}", path.display()))?;
+                Some(value.as_object().cloned().ok_or_else(|| {
+                    anyhow::anyhow!("config must be an object: {}", path.display())
+                })?)
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error.into()),
+        };
     let Some(items) = registered.as_object() else {
-        return (json!({}), true);
+        anyhow::bail!("config schema must be an object");
     };
     let need_write = disk.as_ref().is_none_or(|values| {
         values.len() != items.len() || items.keys().any(|key| !values.contains_key(key))
@@ -538,14 +610,52 @@ fn load_config_table(path: &Path, defaults: &Value, registered: &Value) -> (Valu
                 .unwrap_or_else(|| current.clone()),
         );
     }
-    (Value::Object(loaded), need_write)
+    Ok((Value::Object(loaded), need_write))
 }
 
-fn write_json(path: &Path, value: &Value) -> anyhow::Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
+fn validate_config(name: &str, value: &Value) -> Result<(), String> {
+    fn validate(schema: &Value, value: &Value, path: &str) -> Result<(), String> {
+        let valid = match (schema, value) {
+            (Value::Object(schema), Value::Object(values)) => {
+                for (key, value) in values {
+                    let expected = schema
+                        .get(key)
+                        .ok_or_else(|| format!("unknown config field: {path}.{key}"))?;
+                    validate(expected, value, &format!("{path}.{key}"))?;
+                }
+                schema.keys().all(|key| values.contains_key(key))
+            }
+            (Value::Bool(_), Value::Bool(_))
+            | (Value::String(_), Value::String(_))
+            | (Value::Array(_), Value::Array(_)) => true,
+            (Value::Number(_), Value::Number(number)) => number.as_u64().is_some(),
+            _ => false,
+        };
+        if valid {
+            Ok(())
+        } else {
+            Err(format!("invalid config value: {path}"))
+        }
     }
-    fs::write(path, serde_json::to_vec_pretty(value)?)?;
+    validate(&defaults()[name], value, name)?;
+    match name {
+        "fuse" => {
+            serde_json::from_value::<crate::ipc::FuseConfig>(value.clone())
+                .map_err(|error| error.to_string())?;
+        }
+        "autorun" => {
+            serde_json::from_value::<crate::ipc::AutoRunnerConfig>(value.clone())
+                .map_err(|error| error.to_string())?;
+        }
+        "backend"
+            if !value["mitm_port"]
+                .as_u64()
+                .is_some_and(|port| (1..=65535).contains(&port)) =>
+        {
+            return Err("invalid mitm_port".into())
+        }
+        _ => {}
+    }
     Ok(())
 }
 
@@ -582,92 +692,6 @@ fn apply_fetch_state(target: &mut Map<String, Value>, response: &Value) {
         ("totalChangeTileCount", "total_change_tile_count"),
     ] {
         set_known(target, round, source, dest);
-    }
-    if let Some(pool) = round.get("pool").and_then(Value::as_array) {
-        let deck = pool
-            .iter()
-            .filter_map(|tile| Some((tile.get("id")?.to_string(), tile.get("tile")?.clone())))
-            .collect::<Map<_, _>>();
-        target.insert("deck_map".into(), Value::Object(deck));
-        let hands = round
-            .get("hands")
-            .and_then(Value::as_array)
-            .map(Vec::as_slice)
-            .unwrap_or(&[]);
-        let ids = pool
-            .iter()
-            .filter_map(|tile| tile.get("id").and_then(Value::as_u64))
-            .collect::<Vec<_>>();
-        let hand_ids = hands
-            .iter()
-            .filter_map(Value::as_u64)
-            .collect::<std::collections::HashSet<_>>();
-        let dora_hint = round
-            .get("dora")
-            .and_then(Value::as_array)
-            .and_then(|items| items.first())
-            .and_then(Value::as_u64);
-        let mut opening = if let Some(first_dora) = dora_hint {
-            ids.iter()
-                .position(|id| *id == first_dora)
-                .map(|index| ids[..index].to_vec())
-                .unwrap_or_else(|| hand_ids.iter().copied().collect())
-        } else {
-            hand_ids.iter().copied().collect()
-        };
-        if let Some(last) = pool.last() {
-            if last.get("tile").and_then(Value::as_str) == Some("bd") {
-                if let Some(id) = last.get("id").and_then(Value::as_u64) {
-                    if hand_ids.contains(&id) && !opening.contains(&id) {
-                        opening.push(id)
-                    }
-                }
-            }
-        }
-        let opening = opening
-            .into_iter()
-            .collect::<std::collections::HashSet<_>>();
-        let remaining = ids
-            .into_iter()
-            .filter(|id| !opening.contains(id))
-            .collect::<Vec<_>>();
-        target.insert(
-            "dora_tiles".into(),
-            json!(remaining.iter().take(10).collect::<Vec<_>>()),
-        );
-        let locked = round
-            .get("lockedTile")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_u64)
-            .collect::<std::collections::HashSet<_>>();
-        let used = round
-            .get("usedDesktop")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_u64)
-            .collect::<std::collections::HashSet<_>>();
-        let mut wall = remaining
-            .iter()
-            .skip(10)
-            .take(36)
-            .copied()
-            .filter(|id| !locked.contains(id) && !used.contains(id))
-            .collect::<Vec<_>>();
-        let remain = round
-            .get("desktopRemain")
-            .and_then(Value::as_u64)
-            .unwrap_or(wall.len() as u64) as usize;
-        if wall.len() > remain {
-            wall = wall.split_off(wall.len() - remain)
-        }
-        target.insert("wall_tiles".into(), json!(wall));
-        target.insert(
-            "replacement_tiles".into(),
-            json!(remaining.iter().skip(46).collect::<Vec<_>>()),
-        );
     }
     let effect = game.get("effect").unwrap_or(&Value::Null);
     for (source, dest) in [
@@ -1189,6 +1213,70 @@ mod tests {
     }
 
     #[test]
+    fn failed_giveup_preserves_state_and_other_flows_cannot_apply_deltas() {
+        let root = temp_root("failed-giveup");
+        let (events, _) = broadcast::channel(16);
+        let services = Services::load(root.join("configs"), events).unwrap();
+        let mut packet = Packet {
+            direction: crate::pipeline::Direction::Inbound,
+            packet_type: "Res".into(),
+            method: ".lq.Lobby.fetchAmuletActivityData".into(),
+            id: Some(1),
+            data: json!({"game":{"state":{"current":5}}}),
+        };
+        services.update_game_state_from_flow(&packet, 10);
+        let previous = services.game_state();
+        packet.method = ".lq.Lobby.amuletActivityGiveup".into();
+        packet.data = json!({"error":{"code":1}});
+        services.update_game_state_from_flow(&packet, 10);
+        assert_eq!(services.game_state(), previous);
+        packet.method = ".lq.Lobby.amuletActivityOperate".into();
+        packet.data = json!({"events":[{"state":{"current":3}}]});
+        services.update_game_state_from_flow(&packet, 20);
+        assert_eq!(services.game_state(), previous);
+        services.disconnect_game_flow(10);
+        assert_ne!(services.game_state()["session_id"], previous["session_id"]);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn fetch_and_delta_use_the_same_pool_partition() {
+        for boss in [false, true] {
+            let pool = (1..=80)
+                .map(|id| json!({"id":id,"tile":if id==80 {"bd"} else {"1m"}}))
+                .collect::<Vec<_>>();
+            let round = json!({"pool":pool,"hands":[1,2,3,4,5,6,7,8,9,10,11,12,80],"dora":[13],"lockedTile":[25],"usedDesktop":[26],"desktopRemain":16});
+            let mut fetched = empty_game_state().as_object().unwrap().clone();
+            apply_fetch_state(
+                &mut fetched,
+                &json!({"game":{"round":round,"map":{"node":1,"mapNodes":[{"args":if boss {vec![926]} else {vec![]}}]}}}),
+            );
+            assert_eq!(fetched["dora_tiles"], json!((13..23).collect::<Vec<_>>()));
+            assert_eq!(fetched["wall_tiles"].as_array().unwrap().len(), 16);
+            assert!(!fetched["replacement_tiles"]
+                .as_array()
+                .unwrap()
+                .contains(&json!(80)));
+            assert_eq!(fetched["replacement_tiles"][0], if boss { 41 } else { 59 });
+            let mut delta = fetched.clone();
+            rebuild_pool_sections(
+                &mut delta,
+                &json!({"pool":{"dirty":true,"value":pool},"dora":{"dirty":true,"value":[13]}}),
+                false,
+            );
+            for field in [
+                "deck_map",
+                "opening_hand_tiles",
+                "dora_tiles",
+                "wall_tiles",
+                "replacement_tiles",
+            ] {
+                assert_eq!(fetched[field], delta[field], "{field}");
+            }
+        }
+    }
+
+    #[test]
     fn config_backfills_missing_fields_and_can_overwrite_existing_files() {
         let base = temp_root("config");
         let config_root = base.join("configs");
@@ -1225,8 +1313,24 @@ mod tests {
             .unwrap();
         assert_eq!(services.table("game")["public_all"], false);
         fs::write(config_root.join("game.json"), "[]").unwrap();
+        let previous = services.table("game");
         services.reload_files();
-        assert_eq!(services.table("game"), defaults()["game"]);
+        assert_eq!(services.table("game"), previous);
+        assert_eq!(
+            fs::read_to_string(config_root.join("game.json")).unwrap(),
+            "[]"
+        );
+        assert!(services
+            .patch_config(&json!({"../outside": {"value": true}}))
+            .is_err());
+        assert!(!base.join("outside.json").exists());
+        assert!(services
+            .patch_config(&json!({"game": {"public_all": "wrong type"}}))
+            .is_err());
+        assert!(services
+            .patch_config(&json!({"backend": {"mitm_port": 65536}}))
+            .is_err());
+        assert_eq!(services.table("game"), previous);
 
         fs::remove_dir_all(base).unwrap();
     }

@@ -151,14 +151,6 @@ function isSimple(tile: TodayTile) {
     return tileSuit(tile) !== "z" && tileNumber(tile) >= 2 && tileNumber(tile) <= 8;
 }
 
-function isSequence(tiles: TodayTile[]) {
-    if (tiles.length !== 3) return false;
-    const sorted = sortTiles(tiles);
-    const suit = tileSuit(sorted[0]);
-    if (suit === "z" || sorted.some((tile) => tileSuit(tile) !== suit || tileNumber(tile) === 0)) return false;
-    return tileNumber(sorted[1]) === tileNumber(sorted[0]) + 1 && tileNumber(sorted[2]) === tileNumber(sorted[1]) + 1;
-}
-
 function sequence(start: number, suit: "m" | "p" | "s"): TodayTile[] {
     return [`${start}${suit}`, `${start + 1}${suit}`, `${start + 2}${suit}`] as TodayTile[];
 }

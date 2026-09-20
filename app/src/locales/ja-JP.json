@@ -162,6 +162,7 @@
       }
     },
     "blackhole": {
+    "control_failed": "操作を実行できませんでした：{{reason}}",
       "step_welcome": {
         "title": "花火ガイドへようこそ",
         "body": "花火ガイドは現在の交換局面から実行可能な交換ルートを探索し、ブラックホールと花火を使う際に、より手軽に最適な方針を立てられるよう支援します。"
@@ -500,6 +501,7 @@
     "label_need_pionner_badge_count": "先導の印保持数"
   },
   "diagnostics": {
+    "proxy_start_failed": "プロキシが動作していません：{{reason}}",
     "tab_logs": "ログ",
     "tab_packets": "ゲームパケット",
     "ipc_status_label": "Tauri IPC",
@@ -640,6 +642,7 @@
     }
   },
   "settings": {
+    "save_failed": "設定の保存に失敗しました：{{reason}}",
     "table": {
       "game": "ゲーム",
       "general": "一般",

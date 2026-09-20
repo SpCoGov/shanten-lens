@@ -43,6 +43,7 @@ export type DebugPoolData = {
 };
 
 export type PlanData = {
+    plan_id?: string;
     status?: "win_now" | "plan" | "impossible" | "searching" | "catalog";
     draws_needed?: number | null;
     search_algorithm?: string;

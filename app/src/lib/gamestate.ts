@@ -1,4 +1,7 @@
 export interface GameStateData {
+    session_id?: number;
+    revision?: number;
+    flow_id?: number;
     stage: number;
     coin: string;
     point?: string;

@@ -1,6 +1,5 @@
 import {
     BASE_UNIT_EXPONENTS,
-    formatLargeNumber,
     formatLargeScaledNumber,
     getLargeNumberHumanUnits,
     normalizeNumericString,
@@ -55,6 +54,10 @@ export type ResolvedAmuletRule = AmuletRuleConfig & {
     hasTransmissionSeal: boolean;
     hasAngelSeal: boolean;
 };
+
+export function cloneResolvedRules(rules: ResolvedAmuletRule[]): ResolvedAmuletRule[] {
+    return rules.map((rule) => ({...rule, dataRawList: [...rule.dataRawList]}));
+}
 
 export type CurrentPointResult = {
     baseScore: bigint;
@@ -323,21 +326,25 @@ export function parseTargetPointValue(value: string | number | bigint): bigint |
 
     const sci = text.match(/^([+-]?\d+(?:\.\d+)?)[eE]([+-]?\d+)$/);
     if (sci) {
-        const scaled = parseFixed2(sci[1]);
         const exponent = Number.parseInt(sci[2], 10);
-        if (!Number.isFinite(exponent)) return null;
-        if (exponent >= 0) return scaled * (10n ** BigInt(exponent));
-        const divisor = 10n ** BigInt(-exponent);
-        return scaled / divisor;
+        return scaleDecimal(sci[1], exponent);
     }
 
     const unitMatch = text.match(/^([+-]?\d+(?:\.\d+)?)(.+)$/);
     if (!unitMatch) return null;
-    const numeric = parseFixed2(unitMatch[1]);
     const unit = unitMatch[2].trim();
     const exponent = getUnitExponents().get(unit);
     if (exponent == null) return null;
-    return numeric * (10n ** BigInt(exponent));
+    return scaleDecimal(unitMatch[1], exponent);
+}
+
+function scaleDecimal(text: string, exponent: number): bigint | null {
+    // ponytail: 10,000 digits covers game values; reject unbounded user exponents.
+    if (!Number.isSafeInteger(exponent) || Math.abs(exponent) > 10_000) return null;
+    const [whole, fraction = ""] = text.split(".");
+    const digits = BigInt(whole + fraction);
+    const shift = exponent + SCALE_DECIMALS - fraction.length;
+    return shift >= 0 ? digits * 10n ** BigInt(shift) : digits / 10n ** BigInt(-shift);
 }
 
 export function fixed2ToString(value: bigint, trimTrailingZeros = true): string {
@@ -1066,14 +1073,17 @@ function simulateLevelWins(
     const normalizedWinCount = Math.max(1, Math.trunc(winCount));
     let firstResult: CurrentPointResult | null = null;
     let lastResult: CurrentPointResult | null = null;
+    let totalPoint = 0n;
     for (let winIndex = 0; winIndex < normalizedWinCount; winIndex += 1) {
         const result = calculateCurrentPoint(baseScore, baseFan, level, rules, runtime, {freezeFutureGrowth: true});
         if (firstResult == null) firstResult = result;
         lastResult = result;
+        totalPoint += result.finalPoint;
     }
     return {
         firstResult: firstResult!,
         lastResult: lastResult!,
+        totalPoint,
     };
 }
 
@@ -1156,7 +1166,7 @@ export function projectFuturePoints(
         const projectedSingleWinResult = simulated.firstResult;
         result = simulated.lastResult;
         const target = parseTargetPointValue(future.target ?? "") ?? null;
-        const totalPoint = projectedSingleWinResult.finalPoint * BigInt(Math.max(1, winCount));
+        const totalPoint = simulated.totalPoint;
         out.push({
             level,
             point: projectedSingleWinResult.finalPoint,

@@ -40,6 +40,27 @@ use tracing::{debug, info, warn};
 
 type SharedFlow = Arc<Mutex<FlowProcessor>>;
 
+struct PendingRequest {
+    processor: SharedFlow,
+    id: u16,
+}
+
+impl Drop for PendingRequest {
+    fn drop(&mut self) {
+        if let Ok(mut processor) = self.processor.try_lock() {
+            processor.cancel_waiting_request(self.id);
+        } else {
+            let processor = self.processor.clone();
+            let id = self.id;
+            tokio::task::spawn_blocking(move || {
+                if let Ok(mut processor) = processor.lock() {
+                    processor.cancel_waiting_request(id);
+                }
+            });
+        }
+    }
+}
+
 struct FlowEntry {
     processor: SharedFlow,
     info: FlowInfo,
@@ -62,15 +83,17 @@ pub struct ProxyControl {
     flows: Arc<Mutex<HashMap<SocketAddr, FlowEntry>>>,
     next_id: Arc<AtomicU16>,
     activity: Arc<std::sync::atomic::AtomicU64>,
+    config: Arc<RwLock<PipelineConfig>>,
     services: Arc<Services>,
 }
 
 impl ProxyControl {
-    pub fn new(services: Arc<Services>) -> Self {
+    pub fn new(services: Arc<Services>, config: Arc<RwLock<PipelineConfig>>) -> Self {
         Self {
             flows: Arc::new(Mutex::new(HashMap::new())),
             next_id: Arc::new(AtomicU16::new(u16::MAX)),
             activity: Arc::new(std::sync::atomic::AtomicU64::new(1)),
+            config,
             services,
         }
     }
@@ -81,7 +104,9 @@ impl ProxyControl {
         data: &Value,
         timeout: Duration,
     ) -> Result<(u16, Value), String> {
-        self.request_inner(method, data, timeout, false, None).await
+        let config = self.config.read().await.clone();
+        self.request_inner(method, data, timeout, false, config, None)
+            .await
     }
 
     pub async fn replay(
@@ -91,7 +116,7 @@ impl ProxyControl {
         timeout: Duration,
         config: PipelineConfig,
     ) -> Result<(u16, Value), String> {
-        self.request_inner(method, data, timeout, true, Some((config, REPLAY_INJECTOR)))
+        self.request_inner(method, data, timeout, true, config, Some(REPLAY_INJECTOR))
             .await
     }
 
@@ -103,7 +128,7 @@ impl ProxyControl {
         config: PipelineConfig,
         source: &'static str,
     ) -> Result<(u16, Value), String> {
-        self.request_inner(method, data, timeout, false, Some((config, source)))
+        self.request_inner(method, data, timeout, false, config, Some(source))
             .await
     }
 
@@ -113,28 +138,22 @@ impl ProxyControl {
         data: &Value,
         timeout: Duration,
         replay_id: bool,
-        pipeline_config: Option<(PipelineConfig, &'static str)>,
+        config: PipelineConfig,
+        source: Option<&'static str>,
     ) -> Result<(u16, Value), String> {
         let (processor, outbound, inbound) = {
             let flows = self.flows.lock().map_err(|_| "flow map poisoned")?;
-            flows
-                .values()
-                .filter_map(|flow| {
-                    flow.outbound.as_ref().map(|outbound| {
-                        (
-                            flow.business_activity,
-                            flow.activity,
-                            flow.processor.clone(),
-                            outbound.clone(),
-                            flow.inbound.clone(),
-                        )
-                    })
+            self.preferred_flow(&flows)
+                .map(|(_, flow)| {
+                    (
+                        flow.processor.clone(),
+                        flow.outbound.as_ref().unwrap().clone(),
+                        flow.inbound.clone(),
+                    )
                 })
-                .max_by_key(|(business, activity, _, _, _)| (*business > 0, *business, *activity))
-                .map(|(_, _, processor, outbound, inbound)| (processor, outbound, inbound))
                 .ok_or("no-preferred-websocket-flow")?
         };
-        let mut candidate = if replay_id {
+        let candidate = if replay_id {
             0
         } else {
             let start = self.next_id.fetch_sub(1, Ordering::Relaxed);
@@ -144,53 +163,37 @@ impl ProxyControl {
                 start
             }
         };
-        let (id, frame, receiver) = loop {
-            let built = {
-                let mut processor = processor.lock().map_err(|_| "flow processor poisoned")?;
-                if replay_id {
-                    processor.build_replay_request(method, data)
-                } else {
-                    processor.build_request_auto(candidate, method, data)
-                }
-                .map_err(|e| e.to_string())?
-            };
-            if let Some(receiver) = self.services.try_response_waiter(built.0.into()) {
-                break (built.0, built.1, receiver);
+        let (id, frame, receiver) = {
+            let mut processor = processor.lock().map_err(|_| "flow processor poisoned")?;
+            let (id, frame) = if replay_id {
+                processor.build_replay_request(method, data)
+            } else {
+                processor.build_request_auto(candidate, method, data)
             }
-            processor
-                .lock()
-                .map_err(|_| "flow processor poisoned")?
-                .cancel_request(built.0);
-            if replay_id {
-                return Err("replay-message-id-in-use".into());
-            }
-            let previous = built.0.wrapping_sub(1);
-            candidate = if previous == 0 { u16::MAX } else { previous };
+            .map_err(|e| e.to_string())?;
+            (id, frame, processor.response_waiter(id))
         };
-        let frames = if let Some((config, source)) = pipeline_config {
+        let _pending = PendingRequest {
+            processor: processor.clone(),
+            id,
+        };
+        let frames = {
             let pipeline_processor = processor.clone();
-            let pipeline_frame = frame.clone();
+            let pipeline_frame = frame;
             let outcome = tokio::task::spawn_blocking(move || {
                 let mut processor = pipeline_processor
                     .lock()
                     .map_err(|_| "flow processor poisoned")?;
                 processor.set_config(config)?;
-                processor
-                    .process_injected(&pipeline_frame, source)
-                    .map_err(|error| error.to_string())
+                match source {
+                    Some(source) => processor.process_injected(&pipeline_frame, source),
+                    None => processor.process(&pipeline_frame, Direction::Outbound),
+                }
+                .map_err(|error| error.to_string())
             })
             .await
             .unwrap_or_else(|error| Err(error.to_string()));
-            let outcome = match outcome {
-                Ok(outcome) => outcome,
-                Err(error) => {
-                    self.services.cancel_waiter(id.into());
-                    if let Ok(mut processor) = processor.lock() {
-                        processor.cancel_request(id);
-                    }
-                    return Err(error);
-                }
-            };
+            let outcome = outcome?;
             match outcome {
                 FrameOutcome::Forward(frame) => vec![(Direction::Outbound, frame)],
                 FrameOutcome::Inject { frame, injected } => {
@@ -206,46 +209,38 @@ impl ProxyControl {
                     frames
                 }
                 FrameOutcome::Drop => {
-                    self.services.cancel_waiter(id.into());
                     return Err("packet-dropped-by-pipeline".into());
                 }
             }
-        } else {
-            vec![(Direction::Outbound, frame)]
         };
         for (direction, frame) in frames {
             let sender = match direction {
-                Direction::Outbound => &outbound,
-                Direction::Inbound => inbound
-                    .as_ref()
-                    .ok_or("preferred-websocket-flow-has-no-inbound-side")?,
+                Direction::Outbound => Some(&outbound),
+                Direction::Inbound => inbound.as_ref(),
             };
-            if sender.send(Message::Binary(frame.into())).is_err() {
-                self.services.cancel_waiter(id.into());
-                if let Ok(mut processor) = processor.lock() {
-                    processor.cancel_request(id);
-                }
+            if sender.is_none_or(|sender| sender.send(Message::Binary(frame.into())).is_err()) {
                 return Err("websocket-flow-closed".into());
             }
         }
         match tokio::time::timeout(timeout, receiver).await {
             Ok(Ok(response)) => Ok((id, response)),
             Ok(Err(_)) => Err("response-waiter-closed".into()),
-            Err(_) => {
-                self.services.cancel_waiter(id.into());
-                if let Ok(mut processor) = processor.lock() {
-                    processor.cancel_request(id);
-                }
-                Err("timeout".into())
-            }
+            Err(_) => Err("timeout".into()),
         }
     }
 
-    pub fn flows(&self) -> Vec<FlowDumpItem> {
-        let flows = self.flows.lock().unwrap();
-        let preferred = flows
+    fn preferred_flow<'a>(
+        &self,
+        flows: &'a HashMap<SocketAddr, FlowEntry>,
+    ) -> Option<(&'a SocketAddr, &'a FlowEntry)> {
+        let active = self.services.active_flow_id();
+        flows
             .iter()
-            .filter(|(_, flow)| flow.outbound.is_some())
+            .filter(|(_, flow)| {
+                flow.outbound.is_some()
+                    && flow.inbound.is_some()
+                    && (active == 0 || active == flow.info.id)
+            })
             .max_by_key(|(_, flow)| {
                 (
                     flow.business_activity > 0,
@@ -253,7 +248,11 @@ impl ProxyControl {
                     flow.activity,
                 )
             })
-            .map(|(address, _)| *address);
+    }
+
+    pub fn flows(&self) -> Vec<FlowDumpItem> {
+        let flows = self.flows.lock().unwrap();
+        let preferred = self.preferred_flow(&flows).map(|(address, _)| *address);
         flows
             .iter()
             .map(|(address, flow)| FlowDumpItem {
@@ -286,12 +285,16 @@ impl ProxyControl {
         if code != Some(1004) || method == ".lq.Lobby.fetchAmuletActivityData" {
             return Ok(first);
         }
-        self.request(
-            ".lq.Lobby.fetchAmuletActivityData",
-            &json!({"activityId":260511}),
-            timeout,
-        )
-        .await?;
+        let (_, refresh) = self
+            .request(
+                ".lq.Lobby.fetchAmuletActivityData",
+                &json!({"activityId":260511}),
+                timeout,
+            )
+            .await?;
+        if refresh.get("error").is_some() {
+            return Err(format!("resync-failed: {}", refresh["error"]));
+        }
         self.request(method, data, timeout).await
     }
 }
@@ -315,17 +318,17 @@ impl Handler {
         let config = self.config.read().await.clone();
         let mut flows = self.control.flows.lock().expect("flow map poisoned");
         let entry = flows.entry(client).or_insert_with(|| {
-            let info = FlowInfo {
-                id: self.control.activity.fetch_add(1, Ordering::Relaxed),
-                peer_key: client.to_string(),
-                client: client.to_string(),
-                server: server.to_owned(),
-            };
             let processor = FlowProcessor::with_registry(
                 config,
                 self.services.clone(),
                 self.module_registry.clone(),
             );
+            let info = FlowInfo {
+                id: processor.flow_id,
+                peer_key: client.to_string(),
+                client: client.to_string(),
+                server: server.to_owned(),
+            };
             FlowEntry {
                 processor: Arc::new(Mutex::new(processor)),
                 info,
@@ -425,6 +428,7 @@ impl WebSocketHandler for Handler {
                     }
                     None => break,
                 },
+                // Only frames already processed by request_inner or pipeline injection enter this queue.
                 message = injected_rx.recv() => match message {
                     Some(message) => {
                         log_websocket_message(arrow, &uri, client, direction_name, &message, true);
@@ -456,7 +460,7 @@ impl WebSocketHandler for Handler {
                 } else {
                     processor
                         .process(&original, direction)
-                        .unwrap_or_else(|_| FrameOutcome::Forward(original))
+                        .unwrap_or(FrameOutcome::Forward(original))
                 }
             })
             .await
@@ -514,7 +518,8 @@ impl WebSocketHandler for Handler {
             }
         }
         if let Ok(mut processor) = flow.lock() {
-            processor.cancel_suppressed_requests();
+            processor.cancel_requests();
+            self.services.disconnect_game_flow(processor.flow_id);
         }
         if let Ok(mut flows) = self.control.flows.lock() {
             if let Some(entry) = flows.get_mut(&client) {
@@ -711,29 +716,165 @@ pub async fn run(
     };
     let http_connector = crate::upstream::http_connector(upstream)?;
     let websocket_connector = crate::upstream::websocket_connector()?;
+    let listener = tokio::net::TcpListener::bind(address)
+        .await
+        .context("failed to listen for MITM connections")?;
+    let status = services.clone();
     let handler = Handler {
         config,
         module_registry,
         services,
         control,
     };
-    Proxy::builder()
-        .with_addr(address)
+    let proxy = Proxy::builder()
+        .with_listener(listener)
         .with_ca(ca)
         .with_http_connector(http_connector)
         .with_http_handler(handler.clone())
         .with_websocket_handler(handler)
         .with_websocket_connector(websocket_connector)
         .build()
-        .context("failed to build MITM proxy")?
-        .start()
-        .await
-        .context("MITM proxy stopped")
+        .context("failed to build MITM proxy")?;
+    status.set_proxy_status(true, None);
+    proxy.start().await.context("MITM proxy stopped")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn tsumo_stop_restart_cancels_old_waiter_and_failures_back_off() {
+        use crate::{
+            automation::Automation,
+            protocol::{LiqiCodec, MessageType},
+        };
+        let root = std::env::temp_dir().join(format!(
+            "shanten-tsumo-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let (events, _) = tokio::sync::broadcast::channel(32);
+        let services = Arc::new(Services::load(root.join("configs"), events).unwrap());
+        struct Counter(Arc<std::sync::atomic::AtomicU64>);
+        impl crate::pipeline::ExternalPacketModule for Counter {
+            fn notify(&self, _: &crate::pipeline::Packet, _: u64) -> Result<(), String> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+            fn decide(
+                &self,
+                _: &crate::pipeline::Packet,
+                _: u64,
+                _: Duration,
+            ) -> Result<crate::pipeline::ExternalDecision, String> {
+                unreachable!("read-only module")
+            }
+        }
+        let calls = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let registry = Arc::new(ModuleRegistry::default());
+        let mut info = crate::pipeline::PacketModuleInfo::builtin(
+            "audit_counter",
+            vec![crate::pipeline::PacketSubscription {
+                direction: Some(Direction::Outbound),
+                packet_type: Some("Req".into()),
+                method: None,
+                operations: vec![crate::pipeline::PacketOperation::Read],
+            }],
+        );
+        info.builtin = false;
+        info.provider_id = "audit".into();
+        registry
+            .register_external(info, Arc::new(Counter(calls.clone())))
+            .unwrap();
+        let config = Arc::new(RwLock::new(PipelineConfig {
+            schema: 1,
+            modules: vec![crate::pipeline::ModuleConfig {
+                id: "audit_counter".into(),
+                enabled: true,
+                options: Value::Null,
+            }],
+        }));
+        let control = ProxyControl::new(services.clone(), config.clone());
+        let handler = Handler {
+            config,
+            module_registry: registry,
+            services: services.clone(),
+            control: control.clone(),
+        };
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let address = "127.0.0.1:12345".parse().unwrap();
+        let flow = handler
+            .register(address, "test", Direction::Outbound, sender.clone())
+            .await;
+        handler
+            .register(address, "test", Direction::Inbound, sender)
+            .await;
+        let automation = Automation::new(services, control);
+        async fn receive(receiver: &mut mpsc::UnboundedReceiver<Message>) -> u16 {
+            let Message::Binary(frame) =
+                tokio::time::timeout(Duration::from_secs(2), receiver.recv())
+                    .await
+                    .unwrap()
+                    .unwrap()
+            else {
+                panic!("binary request expected")
+            };
+            let request = LiqiCodec::new().parse(&frame).unwrap();
+            assert_eq!(
+                request.method.as_ref(),
+                ".lq.Lobby.amuletActivityGameOperate"
+            );
+            assert_eq!(request.data["type"], 8);
+            request.id.unwrap()
+        }
+        let respond = |id, data: Value| {
+            let frame = LiqiCodec::new()
+                .build(
+                    MessageType::Response,
+                    Some(id),
+                    ".lq.Lobby.amuletActivityGameOperate",
+                    &data,
+                )
+                .unwrap();
+            flow.lock().unwrap().process(&frame, Direction::Inbound)
+        };
+        automation.start_tsumo(10_000, true);
+        automation.start_tsumo(10_000, true);
+        let old = receive(&mut receiver).await;
+        automation.stop_tsumo();
+        automation.start_tsumo(10_000, true);
+        let current = receive(&mut receiver).await;
+        assert_ne!(old, current);
+        let _ = respond(old, json!({}));
+        assert_eq!(automation.tsumo_status().win_count, 0);
+        respond(current, json!({})).unwrap();
+        tokio::task::yield_now().await;
+        assert_eq!(automation.tsumo_status().win_count, 1);
+        automation.stop_tsumo();
+        automation.start_tsumo(50, false);
+        let failed = receive(&mut receiver).await;
+        respond(failed, json!({"error":{"code":1}})).unwrap();
+        assert!(
+            tokio::time::timeout(Duration::from_millis(250), receiver.recv())
+                .await
+                .is_err()
+        );
+        assert_eq!(automation.tsumo_status().win_count, 1);
+        assert!(!automation.tsumo_status().last_reason.is_empty());
+        automation.stop_tsumo();
+        tokio::task::yield_now().await;
+        assert!(!automation.tsumo_status().running);
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            3,
+            "each application request must traverse the pipeline exactly once"
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn intercepts_ip_literal_https_and_tunnels_plain_http() {

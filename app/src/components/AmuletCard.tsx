@@ -1,4 +1,3 @@
-import React from "react";
 import "../styles/theme.css";
 import {type EffectItem} from "../lib/gamestate";
 import {getRegistry} from "../lib/registryStore";

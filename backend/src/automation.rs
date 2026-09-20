@@ -19,7 +19,6 @@ pub struct Automation {
     autorun: Arc<Mutex<AutoStatus>>,
     autorun_running: Arc<AtomicBool>,
     tsumo: Arc<Mutex<TsumoStatus>>,
-    tsumo_running: Arc<AtomicBool>,
 }
 
 struct AutoStatus {
@@ -38,6 +37,8 @@ struct TsumoStatus {
     running: bool,
     last_reason: String,
     win_count: u64,
+    generation: u64,
+    task: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl Automation {
@@ -57,7 +58,6 @@ impl Automation {
             })),
             autorun_running: Arc::new(AtomicBool::new(false)),
             tsumo: Arc::new(Mutex::new(TsumoStatus::default())),
-            tsumo_running: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -171,64 +171,77 @@ impl Automation {
     }
 
     pub fn start_tsumo(&self, interval_ms: u64, reset: bool) {
-        if self.tsumo_running.swap(true, Ordering::SeqCst) {
+        let mut status = self.tsumo.lock().unwrap();
+        if status.running {
             return;
         }
-        {
-            let mut status = self.tsumo.lock().unwrap();
-            status.running = true;
-            if reset {
-                status.win_count = 0;
-            }
+        status.running = true;
+        status.generation += 1;
+        let generation = status.generation;
+        if reset {
+            status.win_count = 0;
         }
-        self.emit_tsumo();
         let this = self.clone();
-        tokio::spawn(async move {
-            while this.tsumo_running.load(Ordering::SeqCst) {
-                match this
+        status.task = Some(tokio::spawn(async move {
+            loop {
+                if !this.tsumo_is_current(generation) {
+                    break;
+                }
+                let response = this
                     .proxy
                     .request_with_retry(
                         ".lq.Lobby.amuletActivityGameOperate",
                         &json!({"activityId":260511,"type":8,"tileList":[]}),
                         Duration::from_secs(12),
                     )
-                    .await
-                {
-                    Ok((_, response)) if response.get("error").is_none() => {
-                        let mut status = this.tsumo.lock().unwrap();
-                        status.win_count += 1;
-                        status.last_reason.clear();
+                    .await;
+                let succeeded = {
+                    let mut status = this.tsumo.lock().unwrap();
+                    if !status.running || status.generation != generation {
+                        break;
                     }
-                    Ok((_, _)) => this.tsumo.lock().unwrap().last_reason = "protocol-error".into(),
-                    Err(error) => this.tsumo.lock().unwrap().last_reason = error,
-                }
+                    match response {
+                        Ok((_, response)) if response.get("error").is_none() => {
+                            status.win_count += 1;
+                            status.last_reason.clear();
+                            true
+                        }
+                        Ok((_, _)) => {
+                            status.last_reason = "protocol-error".into();
+                            false
+                        }
+                        Err(error) => {
+                            status.last_reason = error;
+                            false
+                        }
+                    }
+                };
                 this.emit_tsumo();
-                tokio::time::sleep(Duration::from_millis(interval_ms.clamp(50, 10_000))).await;
+                let delay = if succeeded {
+                    interval_ms.clamp(50, 10_000)
+                } else {
+                    5_000
+                };
+                tokio::time::sleep(Duration::from_millis(delay)).await;
             }
-        });
-    }
-    pub fn stop_tsumo(&self) {
-        self.tsumo_running.store(false, Ordering::SeqCst);
-        self.tsumo.lock().unwrap().running = false;
+        }));
+        drop(status);
         self.emit_tsumo();
     }
-    #[allow(dead_code)]
-    fn fail_autorun(&self, error: String, config: &Value) {
-        self.autorun_running.store(false, Ordering::SeqCst);
-        let mut status = self.autorun.lock().unwrap();
-        status.error = error.clone();
+    pub fn stop_tsumo(&self) {
+        let mut status = self.tsumo.lock().unwrap();
         status.running = false;
-        drop(status);
-        let mail = config.get("email_notify").cloned().unwrap_or(Value::Null);
-        if mail
-            .get("enabled")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-        {
-            std::thread::spawn(move || {
-                let _ = crate::mail::send(&mail, "Shanten Lens 自动运行失败", &error);
-            });
+        status.generation += 1;
+        if let Some(task) = status.task.take() {
+            task.abort();
         }
+        drop(status);
+        self.emit_tsumo();
+    }
+
+    fn tsumo_is_current(&self, generation: u64) -> bool {
+        let status = self.tsumo.lock().unwrap();
+        status.running && status.generation == generation
     }
     fn emit_autorun(&self) {
         let _ = self

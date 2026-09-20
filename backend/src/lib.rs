@@ -10,6 +10,7 @@ pub mod protocol;
 pub mod proxy;
 pub mod runtime;
 pub mod services;
+mod storage;
 pub mod upstream;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

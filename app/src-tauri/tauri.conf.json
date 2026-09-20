@@ -47,7 +47,7 @@
           "identifier": "window-controls",
           "windows": [
             "main",
-            "overlay",
+            "mahjong-soul-hud",
             "settings",
             "splash",
             "msgbox",
@@ -72,6 +72,7 @@
             "core:window:allow-close",
             "core:window:allow-current-monitor",
             "core:window:allow-inner-size",
+            "core:window:allow-scale-factor",
             "core:window:allow-set-size",
             "opener:allow-open-url",
             "opener:allow-default-urls",

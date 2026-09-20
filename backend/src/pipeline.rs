@@ -480,7 +480,7 @@ impl Pipeline {
     }
 
     pub fn process(&mut self, packet: Packet) -> Outcome {
-        self.process_entries(packet, 0)
+        self.process_entries(packet, 0, &mut 16)
     }
 
     pub fn process_after(&mut self, packet: Packet, source: &str) -> Result<Outcome, String> {
@@ -493,13 +493,14 @@ impl Pipeline {
         if !self.config.modules[index].enabled {
             return Err(format!("pipeline source disabled: {source}"));
         }
-        Ok(self.process_entries(packet, index + 1))
+        Ok(self.process_entries(packet, index + 1, &mut 16))
     }
 
-    fn process_entries(&mut self, mut packet: Packet, start: usize) -> Outcome {
+    fn process_entries(&mut self, mut packet: Packet, start: usize, budget: &mut usize) -> Outcome {
         let mut injected = Vec::new();
         let mut revision = 0;
-        for entry in self.config.modules.iter().skip(start) {
+        for index in start..self.config.modules.len() {
+            let entry = self.config.modules[index].clone();
             if !entry.enabled {
                 continue;
             }
@@ -527,15 +528,15 @@ impl Pipeline {
                     ModuleAction::Bypass
                         if registration.allows(&packet, PacketOperation::Bypass) =>
                     {
-                        return Outcome::Forward(packet)
+                        return finish(packet, injected, true)
                     }
                     ModuleAction::Drop if registration.allows(&packet, PacketOperation::Drop) => {
-                        return Outcome::Drop
+                        return finish(packet, injected, false)
                     }
-                    ModuleAction::Inject(mut packets)
+                    ModuleAction::Inject(packets)
                         if registration.allows(&packet, PacketOperation::Inject) =>
                     {
-                        injected.append(&mut packets)
+                        self.process_injections(packets, index + 1, budget, &mut injected);
                     }
                     _ => {}
                 }
@@ -574,13 +575,15 @@ impl Pipeline {
                 }) if expected_revision == revision
                     && registration.allows(&packet, PacketOperation::Edit) =>
                 {
+                    if !valid_packet_data(
+                        &packet.packet_type,
+                        method.as_deref().unwrap_or(&packet.method),
+                        &data,
+                    ) {
+                        continue;
+                    }
                     if let Some(method) = method {
-                        if packet.direction != Direction::Outbound
-                            || packet.packet_type != "Req"
-                            || crate::protocol::LiqiCodec::new()
-                                .build(crate::protocol::MessageType::Request, None, &method, &data)
-                                .is_err()
-                        {
+                        if packet.direction != Direction::Outbound || packet.packet_type != "Req" {
                             continue;
                         }
                         if packet.method != method {
@@ -596,12 +599,12 @@ impl Pipeline {
                 Ok(ExternalDecision::Drop)
                     if registration.allows(&packet, PacketOperation::Drop) =>
                 {
-                    return Outcome::Drop
+                    return finish(packet, injected, false)
                 }
                 Ok(ExternalDecision::Bypass)
                     if registration.allows(&packet, PacketOperation::Bypass) =>
                 {
-                    return Outcome::Forward(packet)
+                    return finish(packet, injected, true)
                 }
                 Ok(ExternalDecision::Inject {
                     packets,
@@ -613,25 +616,43 @@ impl Pipeline {
                     && registration.allows(&packet, PacketOperation::Inject)
                     && (!drop || registration.allows(&packet, PacketOperation::Drop)) =>
                 {
-                    injected.extend(packets);
+                    self.process_injections(packets, index + 1, budget, &mut injected);
                     if drop {
-                        return Outcome::Inject {
-                            packet,
-                            injected,
-                            forward: false,
-                        };
+                        return finish(packet, injected, false);
                     }
                 }
                 _ => {}
             }
         }
-        if injected.is_empty() {
-            Outcome::Forward(packet)
-        } else {
-            Outcome::Inject {
-                packet,
-                injected,
-                forward: true,
+        finish(packet, injected, true)
+    }
+
+    fn process_injections(
+        &mut self,
+        packets: Vec<Packet>,
+        start: usize,
+        budget: &mut usize,
+        output: &mut Vec<Packet>,
+    ) {
+        // ponytail: cap the whole injection tree at 16 packets, not 16 per module.
+        for packet in packets {
+            if *budget == 0 {
+                break;
+            }
+            *budget -= 1;
+            match self.process_entries(packet, start, budget) {
+                Outcome::Forward(packet) => output.push(packet),
+                Outcome::Drop => {}
+                Outcome::Inject {
+                    packet,
+                    injected,
+                    forward,
+                } => {
+                    if forward {
+                        output.push(packet);
+                    }
+                    output.extend(injected);
+                }
             }
         }
     }
@@ -650,8 +671,22 @@ impl Pipeline {
     }
 }
 
+fn finish(packet: Packet, injected: Vec<Packet>, forward: bool) -> Outcome {
+    if !injected.is_empty() {
+        Outcome::Inject {
+            packet,
+            injected,
+            forward,
+        }
+    } else if forward {
+        Outcome::Forward(packet)
+    } else {
+        Outcome::Drop
+    }
+}
+
 fn valid_injected_packet(packet: &Packet) -> bool {
-    match packet.packet_type.as_str() {
+    let valid_shape = match packet.packet_type.as_str() {
         "Req" => packet.direction == Direction::Outbound,
         "Res" => {
             packet.direction == Direction::Inbound
@@ -659,7 +694,19 @@ fn valid_injected_packet(packet: &Packet) -> bool {
         }
         "Notify" => packet.direction == Direction::Inbound && packet.id.is_none(),
         _ => false,
-    }
+    };
+    valid_shape && valid_packet_data(&packet.packet_type, &packet.method, &packet.data)
+}
+
+fn valid_packet_data(kind: &str, method: &str, data: &Value) -> bool {
+    use crate::protocol::{LiqiCodec, MessageType};
+    let kind = match kind {
+        "Req" => MessageType::Request,
+        "Res" => MessageType::Response,
+        "Notify" => MessageType::Notify,
+        _ => return false,
+    };
+    LiqiCodec::new().build(kind, Some(1), method, data).is_ok()
 }
 
 pub fn validate(config: &PipelineConfig) -> Result<(), String> {
@@ -700,17 +747,7 @@ pub fn load(path: &Path) -> Result<PipelineConfig, String> {
 
 pub fn save(path: &Path, config: &PipelineConfig) -> Result<(), String> {
     validate(config)?;
-    let parent = path
-        .parent()
-        .ok_or("pipeline config has no parent directory")?;
-    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-    let temporary = path.with_extension("json.tmp");
-    fs::write(
-        &temporary,
-        serde_json::to_vec_pretty(config).map_err(|error| error.to_string())?,
-    )
-    .map_err(|error| error.to_string())?;
-    fs::rename(temporary, path).map_err(|error| error.to_string())
+    crate::storage::write_json(path, config).map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
@@ -758,6 +795,42 @@ mod tests {
             id: None,
             data: serde_json::json!({}),
         }
+    }
+
+    #[test]
+    fn module_injection_runs_downstream_once_and_respects_drop() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let modules: Vec<Box<dyn PacketModule>> = vec![
+            Box::new(Recorder {
+                id: "source",
+                calls: calls.clone(),
+                action: ModuleAction::Inject(vec![packet()]),
+            }),
+            Box::new(Recorder {
+                id: "edit",
+                calls: calls.clone(),
+                action: ModuleAction::Forward,
+            }),
+            Box::new(Recorder {
+                id: "drop",
+                calls: calls.clone(),
+                action: ModuleAction::Drop,
+            }),
+        ];
+        let outcome = Pipeline::new(
+            PipelineConfig {
+                schema: 1,
+                modules: vec![module("source"), module("edit"), module("drop")],
+            },
+            modules,
+        )
+        .process(packet());
+        // The injection is dropped; the original continues and is forwarded.
+        assert!(matches!(outcome, Outcome::Forward(_)));
+        assert_eq!(
+            *calls.lock().unwrap(),
+            vec!["source", "edit", "drop", "edit", "drop"]
+        );
     }
 
     #[test]

@@ -115,13 +115,13 @@ async function currentUpdatePlatform(): Promise<UpdateInfo["platform"]> {
     return "unknown";
 }
 
-function pickDownloadAsset(assets: UpdateAsset[], targetPlatform: UpdateInfo["platform"]): UpdateAsset | null {
+export function pickDownloadAsset(assets: UpdateAsset[], targetPlatform: UpdateInfo["platform"]): UpdateAsset | null {
     const lowerName = (asset: UpdateAsset) => asset.name.toLowerCase();
     if (targetPlatform === "macos") {
         return assets.find((asset) => lowerName(asset).endsWith(".dmg")) || null;
     }
     if (targetPlatform === "windows") {
-        return assets.find((asset) => {
+        return assets.find((asset) => lowerName(asset).endsWith(".msi")) || assets.find((asset) => {
             const name = lowerName(asset);
             return name.endsWith(".zip") && name.includes("portable");
         }) || assets.find((asset) => lowerName(asset).endsWith(".zip")) || null;

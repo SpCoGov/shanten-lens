@@ -18,7 +18,6 @@ import TodayWinPage from "./pages/TodayWinPage";
 import GameStatePage from "./pages/GameStatePage";
 import GameRecordPage from "./pages/GameRecordPage";
 import * as backendIpc from "./lib/ipc";
-import {type LogLevel, useLogStore} from "./lib/logStore";
 import TileGrid from "./components/TileGrid";
 import Modal from "./components/Modal";
 import Tile from "./components/Tile";
@@ -70,26 +69,6 @@ import PluginsPage from "./pages/PluginsPage";
 import PluginPageOutlet from "./pages/PluginPageOutlet";
 import {startPluginRuntime} from "./lib/pluginRuntime";
 import {usePluginStore, type PluginPage} from "./lib/pluginStore";
-
-type BackendLogPayload =
-    | string
-    | string[]
-    | {
-    kind?: "lines" | "chunk";
-    lines?: string[];
-    id?: number;
-    index?: number;
-    total?: number;
-    text?: string;
-};
-
-const MAX_BACKEND_LOG_CHARS = 12000;
-const BACKEND_LOG_TRUNCATED_SUFFIX = "\n... [truncated in diagnostics view]";
-
-function limitBackendLogLine(line: string) {
-    if (line.length <= MAX_BACKEND_LOG_CHARS) return line;
-    return line.slice(0, MAX_BACKEND_LOG_CHARS) + BACKEND_LOG_TRUNCATED_SUFFIX;
-}
 
 type SouzuSwitchExecutionState = {
     status: "running" | "completed" | "failed";
@@ -357,7 +336,6 @@ function pluginPageTitle(page: PluginPage) {
 }
 
 const OUTER_PADDING = 16;
-const MAIN_GAP = 12;
 const TSUMO_LOOP_INTERVAL_STORAGE_KEY = "sl-tsumo-loop-interval-ms";
 const DEFAULT_TSUMO_LOOP_INTERVAL_MS = 400;
 const MIN_TSUMO_LOOP_INTERVAL_MS = 0;
@@ -1483,7 +1461,7 @@ export default function App() {
                 setWallTileIds(Array.isArray(d.wall_tiles) ? d.wall_tiles : []);
                 setWallStatsTiles(wallList);
 
-                if (!(d.stage === 4 || d.stage === 5 || d.stage === 6 || stage === 7)) {
+                if (!(d.stage === 4 || d.stage === 5 || d.stage === 6 || d.stage === 7)) {
                     setPlanSuuAnkou(null);
                     setPlanChiitoi(null);
                 }
@@ -1573,11 +1551,13 @@ export default function App() {
             }
         };
 
+        let active = true;
         const backendUnlisteners = ([
             "update_config", "update_gamestate", "update_game_record", "discard_recommendation", "souzu_switch_execution",
             "autorun_status", "tsumo_loop_status", "msgbox",
         ] as EventName[]).map((name) => backendIpc.subscribeBackendEvent(name, (data) => handleBackendEvent({type: name, data} as AppBackendEvent)));
         void backendIpc.initializeBackend().then((snapshot) => {
+            if (!active) return;
             setConnected(true);
             handleBackendEvent({type: "update_config", data: snapshot.config});
             handleBackendEvent({type: "update_gamestate", data: snapshot.gameState});
@@ -1585,89 +1565,17 @@ export default function App() {
             handleBackendEvent({type: "tsumo_loop_status", data: snapshot.tsumoLoopStatus});
             return backendIpc.checkVersion();
         }).then((mismatch) => {
-            if (!mismatch || versionMismatchShownRef.current) return;
+            if (!active || !mismatch || versionMismatchShownRef.current) return;
             versionMismatchShownRef.current = true;
             setVersionMismatch({
                 frontendVersion: APP_VERSION,
                 backendVersion: String((mismatch as Partial<VersionMismatch>).backendVersion || "unknown"),
             });
-        }).catch(() => setConnected(false));
-
-        const addLog = useLogStore.getState().addLog;
-        const addLogs = useLogStore.getState().addLogs;
-        let unsubs: Array<() => void> = [];
-        (async () => {
-            const chunkBuffers = new Map<string, {
-                total: number;
-                parts: string[];
-                received: boolean[];
-                chars: number;
-                truncated: boolean;
-            }>();
-
-            const handleBackendLogPayload = (event: string, level: LogLevel, payload: BackendLogPayload) => {
-                if (typeof payload === "string") {
-                    addLog(level, `${event}: ${limitBackendLogLine(payload)}`);
-                    return;
-                }
-
-                if (Array.isArray(payload)) {
-                    addLogs(level, payload.map((line) => `${event}: ${limitBackendLogLine(line)}`));
-                    return;
-                }
-
-                if (!payload || typeof payload !== "object") return;
-
-                if (payload.kind === "lines" && Array.isArray(payload.lines)) {
-                    addLogs(level, payload.lines.map((line) => `${event}: ${limitBackendLogLine(line)}`));
-                    return;
-                }
-
-                if (payload.kind === "chunk" && typeof payload.id === "number" && typeof payload.total === "number") {
-                    const key = `${event}:${payload.id}`;
-                    const bucket = chunkBuffers.get(key) ?? {
-                        total: payload.total,
-                        parts: Array.from({length: payload.total}, () => ""),
-                        received: Array.from({length: payload.total}, () => false),
-                        chars: 0,
-                        truncated: false,
-                    };
-                    bucket.total = payload.total;
-                    if (typeof payload.index === "number" && payload.index >= 0 && payload.index < bucket.parts.length) {
-                        const text = payload.text ?? "";
-                        const remaining = Math.max(0, MAX_BACKEND_LOG_CHARS - bucket.chars);
-                        bucket.parts[payload.index] = remaining > 0 ? text.slice(0, remaining) : "";
-                        bucket.received[payload.index] = true;
-                        bucket.chars += bucket.parts[payload.index].length;
-                        if (text.length > remaining) bucket.truncated = true;
-                    }
-                    chunkBuffers.set(key, bucket);
-                    if (bucket.received.every(Boolean)) {
-                        chunkBuffers.delete(key);
-                        addLog(
-                            level,
-                            `${event}: ${bucket.parts.join("")}${bucket.truncated ? BACKEND_LOG_TRUNCATED_SUFFIX : ""}`,
-                        );
-                    }
-                }
-            };
-
-            const sub = async (event: string, level: LogLevel = "INFO") => {
-                const un = await safeListen<BackendLogPayload>(event, (e) => {
-                    handleBackendLogPayload(event, level, e.payload);
-                });
-                unsubs.push(un);
-            };
-            await sub("backend:spawn", "INFO");
-            await sub("backend:ready", "INFO");
-            await sub("backend:exit", "WARN");
-            await sub("backend:error", "ERROR");
-        })();
+        }).catch(() => { if (active) setConnected(false); });
 
         return () => {
             backendUnlisteners.forEach((unlisten) => unlisten());
-            unsubs.forEach((u) => u());
-            unsubs = [];
+            active = false;
         };
     }, []);
 
@@ -1678,14 +1586,16 @@ export default function App() {
     }, [debugEnabled, route]);
 
     React.useEffect(() => {
+        let active = true;
         let un = () => {
         };
         (async () => {
             un = await safeListen<{ lng: string }>("i18n:set-language", (e) => {
                 setAppLanguage(e.payload.lng);
             });
+            if (!active) un();
         })();
-        return () => un();
+        return () => { active = false; un(); };
     }, []);
 
     const statsHeader = (stage === 4 || stage === 5) ? (

@@ -154,8 +154,8 @@ export default function WanxiangSwitchPage({
     }, []);
     const executePlan = React.useCallback(() => {
         if (!canOperate || !hasExecutablePlan) return;
-        void backendIpc.runSwitch({action: "execute_plan"});
-    }, [canOperate, hasExecutablePlan]);
+        void backendIpc.runSwitch({action: "execute_plan", options: {plan_id: mainData?.plan_id ?? ""}});
+    }, [canOperate, hasExecutablePlan, mainData?.plan_id]);
     const exportCurrentSnapshot = React.useCallback(async () => {
         if (!currentState) {
             pushToast(t("blackhole.export_empty"), "error", 1800);

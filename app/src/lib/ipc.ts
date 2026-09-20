@@ -26,7 +26,7 @@ import {
     type TsumoLoopStatus,
     type VersionMismatch,
 } from "../bindings";
-import {useLogStore, type BackendLogEntry} from "./logStore";
+import {useLogStore} from "./logStore";
 import {setRegistry, type RegistryPayload} from "./registryStore";
 import {setFuseConfig, type FuseConfig} from "./fuseStore";
 import {type AutoRunnerConfig, type AutoRunnerStatus, setAutoConfig, setAutoStatus} from "./autoRunnerStore";
@@ -76,7 +76,10 @@ export type {
 };
 
 export type BackendEventMap = {
-    backend_log: BackendLogEntry;
+    backend_log: BackendSnapshot["backendLogs"][number];
+    proxy_status: {running: boolean; error: string | null};
+    resync_required: null;
+    souzu_switch_control_result: {action: string; ok: boolean; reason?: string};
     update_registry: RegistryPayload;
     update_fuse_config: FuseConfig;
     update_autorun_config: AutoRunnerConfig;
@@ -97,11 +100,24 @@ export type BackendEventMap = {
     ui_toast: {msg?: string; msg_key?: string; msg_values?: Record<string, JsonValue>; kind?: "info" | "success" | "error"; duration?: number};
 };
 
+let eventVersion = 0;
+const latest = new Map<keyof BackendEventMap, {version: number; payload: unknown}>();
+const handlers = new Map<keyof BackendEventMap, Set<(payload: any) => void>>();
+
 export function onBackendEvent<K extends keyof BackendEventMap>(
     event: K,
     handler: (payload: BackendEventMap[K]) => void,
 ): Promise<UnlistenFn> {
-    return listen<BackendEventMap[K]>(`backend:${event}`, ({payload}) => handler(payload));
+    const callbacks = handlers.get(event) ?? new Set();
+    handlers.set(event, callbacks);
+    callbacks.add(handler);
+    return listen<BackendEventMap[K]>(`backend:${event}`, ({payload}) => {
+        latest.set(event, {version: ++eventVersion, payload});
+        handler(payload);
+    }).then((unlisten) => () => { callbacks.delete(handler); unlisten(); }, (error) => {
+        callbacks.delete(handler);
+        throw error;
+    });
 }
 
 export function subscribeBackendEvent<K extends keyof BackendEventMap>(
@@ -110,10 +126,10 @@ export function subscribeBackendEvent<K extends keyof BackendEventMap>(
 ): UnlistenFn {
     let active = true;
     let unlisten: UnlistenFn | undefined;
-    void onBackendEvent(event, handler).then((value) => {
+    void onBackendEvent(event, (payload) => { if (active) handler(payload); }).then((value) => {
         if (active) unlisten = value;
         else value();
-    });
+    }).catch((error) => useLogStore.getState().addLog("ERROR", String(error)));
     return () => {
         active = false;
         unlisten?.();
@@ -184,40 +200,80 @@ function translateToastMessage(data: BackendEventMap["ui_toast"]) {
     return String(t(key, values));
 }
 
+const snapshotEvents = {
+    registry: "update_registry", fuseConfig: "update_fuse_config",
+    autorunConfig: "update_autorun_config", autorunStatus: "autorun_status",
+    config: "update_config", gameState: "update_gamestate",
+    tsumoLoopStatus: "tsumo_loop_status", packetPipeline: "packet_pipeline", proxyStatus: "proxy_status",
+} as const;
 let coreListeners: Promise<UnlistenFn[]> | null = null;
 
-export function initializeBackend() {
+let snapshotRequest: Promise<InitializedBackendSnapshot> | null = null;
+function synchronizedSnapshot(): Promise<InitializedBackendSnapshot> {
+    snapshotRequest ??= readSynchronizedSnapshot().finally(() => { snapshotRequest = null; });
+    return snapshotRequest;
+}
+
+async function readSynchronizedSnapshot(): Promise<InitializedBackendSnapshot> {
+    const version = eventVersion;
+    const logs: BackendSnapshot["backendLogs"] = [];
+    const unlisten = await onBackendEvent("backend_log", (entry) => logs.push(entry));
+    try {
+        const snapshot = await getSnapshot();
+        for (const [field, event] of Object.entries(snapshotEvents)) {
+            const update = latest.get(event);
+            if (update && update.version > version) (snapshot as any)[field] = update.payload;
+        }
+        const known = new Set(snapshot.backendLogs.map((entry) => JSON.stringify(entry)));
+        snapshot.backendLogs.push(...logs.filter((entry) => !known.has(JSON.stringify(entry))).map((entry) => ({...entry, file: entry.file ?? null, line: entry.line ?? null})));
+        useLogStore.getState().setBackendSnapshot(snapshot.backendLogs);
+        return snapshot as unknown as InitializedBackendSnapshot;
+    } finally { unlisten(); }
+}
+
+function applySnapshot(snapshot: InitializedBackendSnapshot) {
+    for (const [field, event] of Object.entries(snapshotEvents)) {
+        const payload = (snapshot as any)[field];
+        handlers.get(event)?.forEach((handler) => handler(payload));
+    }
+}
+
+export async function initializeBackend() {
     if (!coreListeners) {
-        coreListeners = Promise.all([
+        coreListeners = Promise.allSettled([
             onBackendEvent("backend_log", (entry) => useLogStore.getState().addBackendLogs([entry])),
             onBackendEvent("update_registry", setRegistry),
             onBackendEvent("update_fuse_config", setFuseConfig),
             onBackendEvent("update_autorun_config", setAutoConfig),
             onBackendEvent("autorun_status", setAutoStatus),
+            ...(["update_config", "update_gamestate", "tsumo_loop_status", "packet_pipeline"] as const)
+                .map((event) => onBackendEvent(event, () => {})),
+            onBackendEvent("proxy_status", (status) => {
+                if (status.error) pushToast(t("diagnostics.proxy_start_failed", {reason: status.error}), "error", 10000);
+            }),
+            onBackendEvent("souzu_switch_control_result", (result) => {
+                if (!result.ok) pushToast(t("blackhole.control_failed", {reason: result.reason ?? ""}), "error", 5000);
+            }),
+            onBackendEvent("resync_required", () => {
+                void synchronizedSnapshot().then(applySnapshot).catch((error) => useLogStore.getState().addLog("ERROR", String(error)));
+            }),
             onBackendEvent("ui_toast", (data) => {
                 const text = translateToastMessage(data);
                 if (text) pushToast(text, data.kind ?? "info", data.duration ?? 2200);
             }),
-        ]);
+        ]).then((results) => {
+            const failure = results.find((result) => result.status === "rejected");
+            const listeners = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+            if (failure?.status === "rejected") {
+                listeners.forEach((unlisten) => unlisten());
+                coreListeners = null;
+                throw failure.reason;
+            }
+            return listeners;
+        });
     }
-    return getSnapshot().then((snapshot): InitializedBackendSnapshot => {
-        useLogStore.getState().setBackendSnapshot(snapshot.backendLogs);
-        const registry = snapshot.registry as RegistryPayload;
-        const fuseConfig = snapshot.fuseConfig as FuseConfig;
-        const autorunConfig = snapshot.autorunConfig as AutoRunnerConfig;
-        const autorunStatus = snapshot.autorunStatus as AutoRunnerStatus;
-        setRegistry(registry);
-        setFuseConfig(fuseConfig);
-        setAutoConfig(autorunConfig);
-        setAutoStatus(autorunStatus);
-        return {
-            ...snapshot,
-            registry,
-            fuseConfig,
-            autorunConfig,
-            autorunStatus,
-            config: snapshot.config as ConfigTables,
-            gameState: snapshot.gameState as unknown as GameStateData,
-        };
-    });
+    await coreListeners;
+    const snapshot = await synchronizedSnapshot();
+    applySnapshot(snapshot);
+    return snapshot;
 }

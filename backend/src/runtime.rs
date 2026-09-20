@@ -8,7 +8,14 @@ use crate::{
     protocol::{LiqiCodec, MessageType},
 };
 use serde_json::{json, Value};
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+};
+use tokio::sync::oneshot;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FrameOutcome {
@@ -27,12 +34,13 @@ pub struct InjectedFrame {
 }
 
 pub struct FlowProcessor {
+    pub(crate) flow_id: u64,
     codec: LiqiCodec,
     pipeline: Pipeline,
     last_business_signal: bool,
     latest_inbound_id: Option<u16>,
     suppressed_response_ids: HashSet<u16>,
-    services: Option<Arc<Services>>,
+    waiters: HashMap<u16, oneshot::Sender<Value>>,
 }
 
 impl FlowProcessor {
@@ -61,25 +69,28 @@ impl FlowProcessor {
         services: Option<Arc<Services>>,
         registry: Arc<ModuleRegistry>,
     ) -> Self {
-        let modules = builtin_modules(services.clone());
+        static NEXT_FLOW: AtomicU64 = AtomicU64::new(1);
+        let flow_id = NEXT_FLOW.fetch_add(1, Ordering::Relaxed);
+        let modules = builtin_modules(services, flow_id);
         Self {
+            flow_id,
             codec: LiqiCodec::new(),
             pipeline: Pipeline::with_registry(config, modules, registry),
             last_business_signal: false,
             latest_inbound_id: None,
             suppressed_response_ids: HashSet::new(),
-            services,
+            waiters: HashMap::new(),
         }
     }
 }
 
-fn builtin_modules(services: Option<Arc<Services>>) -> Vec<Box<dyn PacketModule>> {
+fn builtin_modules(services: Option<Arc<Services>>, flow_id: u64) -> Vec<Box<dyn PacketModule>> {
     vec![
         Box::new(MethodFilter),
         Box::new(GameRecord(services.clone())),
         Box::new(LimitedTimeActivity),
         Box::new(PacketLogger(services.clone())),
-        Box::new(GameState(services.clone())),
+        Box::new(GameState(services.clone(), flow_id)),
         Box::new(UnlockIllustratedBook(services.clone())),
         Box::new(FuseRules(services.clone())),
         Box::new(AutorunEvents(services)),
@@ -96,7 +107,7 @@ pub fn register_builtin_modules(registry: &ModuleRegistry, config: &PipelineConf
             &[PacketOperation::Inject],
         )],
     ));
-    for module in builtin_modules(None) {
+    for module in builtin_modules(None, 0) {
         let options = config
             .modules
             .iter()
@@ -185,15 +196,27 @@ impl FlowProcessor {
 
     pub fn cancel_request(&mut self, id: u16) {
         self.codec.cancel_pending(id);
+        self.waiters.remove(&id);
+        self.suppressed_response_ids.remove(&id);
     }
 
-    pub fn cancel_suppressed_requests(&mut self) {
-        for id in self.suppressed_response_ids.drain() {
-            self.codec.cancel_pending(id);
-            if let Some(services) = &self.services {
-                services.cancel_waiter(id.into());
-            }
+    pub fn response_waiter(&mut self, id: u16) -> oneshot::Receiver<Value> {
+        let (sender, receiver) = oneshot::channel();
+        self.waiters.insert(id, sender);
+        receiver
+    }
+
+    pub fn cancel_waiting_request(&mut self, id: u16) {
+        // A completed response may already have freed this ID for client traffic.
+        if self.waiters.contains_key(&id) {
+            self.cancel_request(id);
         }
+    }
+
+    pub fn cancel_requests(&mut self) {
+        self.waiters.clear();
+        self.suppressed_response_ids.clear();
+        self.codec = LiqiCodec::new();
     }
 
     pub fn last_business_signal(&self) -> bool {
@@ -230,11 +253,6 @@ impl FlowProcessor {
             && parsed
                 .id
                 .is_some_and(|id| self.suppressed_response_ids.remove(&id));
-        if suppress_response {
-            if let (Some(services), Some(id)) = (&self.services, parsed.id) {
-                services.cancel_waiter(id.into());
-            }
-        }
         let packet = Packet {
             direction,
             packet_type: match parsed.message_type {
@@ -247,14 +265,8 @@ impl FlowProcessor {
             id: parsed.id.map(u32::from),
             data: parsed.data.clone(),
         };
-        let delayed_response = direction == Direction::Inbound
-            && parsed.message_type == MessageType::Response
-            && packet.method == ".lq.Lobby.fetchGameRecord";
-        if let Some(services) = &self.services {
-            if !delayed_response {
-                services.resolve_response(&packet);
-            }
-        }
+        let response =
+            direction == Direction::Inbound && parsed.message_type == MessageType::Response;
         self.last_business_signal = is_business_packet(&packet);
         let pipeline_outcome = match source {
             Some(source) => self
@@ -263,20 +275,12 @@ impl FlowProcessor {
                 .map_err(anyhow::Error::msg)?,
             None => self.pipeline.process(packet),
         };
+        let mut response_data = None;
         let outcome = match pipeline_outcome {
-            Outcome::Drop => {
-                if delayed_response {
-                    if let (Some(services), Some(id)) = (&self.services, parsed.id) {
-                        services.cancel_waiter(id.into());
-                    }
-                }
-                FrameOutcome::Drop
-            }
+            Outcome::Drop => FrameOutcome::Drop,
             Outcome::Forward(packet) => {
-                if delayed_response {
-                    if let Some(services) = &self.services {
-                        services.resolve_response(&packet);
-                    }
+                if response {
+                    response_data = Some(packet.data.clone());
                 }
                 parsed.data = packet.data;
                 FrameOutcome::Forward(if packet.method != parsed.method.as_ref() {
@@ -295,10 +299,8 @@ impl FlowProcessor {
                 injected,
                 forward,
             } => {
-                if delayed_response && forward {
-                    if let Some(services) = &self.services {
-                        services.resolve_response(&packet);
-                    }
+                if response && forward {
+                    response_data = Some(packet.data.clone());
                 }
                 parsed.data = packet.data;
                 let frame = if forward {
@@ -319,27 +321,13 @@ impl FlowProcessor {
                 for packet in injected {
                     let message_type = message_type(&packet.packet_type)?;
                     if message_type == MessageType::Request {
-                        let mut candidate = packet
+                        let candidate = packet
                             .id
                             .and_then(|id| u16::try_from(id).ok())
                             .filter(|id| *id != 0)
                             .unwrap_or(u16::MAX);
-                        let (id, frame) = loop {
-                            let built =
-                                self.build_request_auto(candidate, &packet.method, &packet.data)?;
-                            if self
-                                .services
-                                .as_ref()
-                                .is_none_or(|services| services.reserve_response_id(built.0.into()))
-                            {
-                                break built;
-                            }
-                            self.cancel_request(built.0);
-                            candidate = built.0.wrapping_sub(1);
-                            if candidate == 0 {
-                                candidate = u16::MAX;
-                            }
-                        };
+                        let (id, frame) =
+                            self.build_request_auto(candidate, &packet.method, &packet.data)?;
                         self.suppressed_response_ids.insert(id);
                         frames.push(InjectedFrame {
                             direction: packet.direction,
@@ -363,6 +351,13 @@ impl FlowProcessor {
                 }
             }
         };
+        if response {
+            if let Some(sender) = parsed.id.and_then(|id| self.waiters.remove(&id)) {
+                if let Some(data) = response_data {
+                    let _ = sender.send(data);
+                }
+            }
+        }
         if matches!(
             &outcome,
             FrameOutcome::Drop | FrameOutcome::Inject { frame: None, .. }
@@ -370,7 +365,7 @@ impl FlowProcessor {
             && parsed.message_type == MessageType::Request
         {
             if let Some(id) = parsed.id {
-                self.codec.cancel_pending(id);
+                self.cancel_request(id);
             }
         }
         if !suppress_response {
@@ -454,6 +449,7 @@ impl PacketModule for GameRecord {
     fn process(&mut self, packet: &mut Packet, _options: &Value) -> ModuleAction {
         if let Some(services) = &self.0 {
             services.apply_game_record_override(packet);
+            services.publish_game_record(packet);
         }
         ModuleAction::Forward
     }
@@ -500,7 +496,7 @@ impl PacketModule for LimitedTimeActivity {
     }
 }
 
-struct GameState(Option<Arc<Services>>);
+struct GameState(Option<Arc<Services>>, u64);
 impl PacketModule for GameState {
     fn id(&self) -> &'static str {
         "game_state"
@@ -523,7 +519,7 @@ impl PacketModule for GameState {
     }
     fn process(&mut self, packet: &mut Packet, _options: &Value) -> ModuleAction {
         if let Some(services) = &self.0 {
-            services.update_game_state(packet);
+            services.update_game_state_from_flow(packet, self.1);
             apply_game_response_options(packet, services);
         }
         ModuleAction::Forward
@@ -702,6 +698,24 @@ impl PacketModule for FuseRules {
                 );
             }
         }
+        if packet.method == ".lq.Lobby.amuletActivityGameOperate"
+            && op == 8
+            && enabled(&config, "enable_hanabi_win_guard", true)
+            && effects
+                .iter()
+                .any(|item| item.get("id").and_then(Value::as_u64) == Some(2221))
+            && state
+                .get("ming")
+                .and_then(Value::as_array)
+                .map_or(0, Vec::len)
+                < 2
+        {
+            return confirm(
+                "fuse.guard.hanabiWin.title",
+                "fuse.guard.hanabiWin.message",
+                json!({"hanabiId":2221,"mingCount":state.get("ming").and_then(Value::as_array).map_or(0,Vec::len)}),
+            );
+        }
         if packet.method == ".lq.Lobby.amuletActivityOperate" {
             if op == 3
                 && matches!(stage, 4 | 5)
@@ -763,23 +777,6 @@ impl PacketModule for FuseRules {
                         json!({"selBaseId":selected.map(base).unwrap_or(0),"selRawId":selected.and_then(|v|v.get("id")).and_then(Value::as_u64).unwrap_or(0)}),
                     );
                 }
-            }
-            if op == 8
-                && enabled(&config, "enable_hanabi_win_guard", true)
-                && effects
-                    .iter()
-                    .any(|item| item.get("id").and_then(Value::as_u64) == Some(2221))
-                && state
-                    .get("ming")
-                    .and_then(Value::as_array)
-                    .map_or(0, Vec::len)
-                    < 2
-            {
-                return confirm(
-                    "fuse.guard.hanabiWin.title",
-                    "fuse.guard.hanabiWin.message",
-                    json!({"hanabiId":2221,"mingCount":state.get("ming").and_then(Value::as_array).map_or(0,Vec::len)}),
-                );
             }
             if op == 8 && enabled(&config, "enable_anti_steal_eat", true) {
                 let risky = effects.windows(2).any(|pair| {
@@ -1125,6 +1122,94 @@ mod tests {
             FrameOutcome::Forward(response)
         );
         assert!(!processor.codec.has_pending(7));
+    }
+
+    #[test]
+    fn hanabi_guard_distinguishes_game_operate_from_sort_effect() {
+        let root = temp_root("hanabi");
+        let (events, mut receiver) = broadcast::channel(32);
+        let services = Arc::new(Services::load(root.join("configs"), events).unwrap());
+        services.update_game_state(&Packet {direction:Direction::Inbound,packet_type:"Res".into(),method:".lq.Lobby.fetchAmuletActivityData".into(),id:Some(1),data:json!({"game":{"state":{"current":5},"effect":{"effectList":[{"id":2221}]},"round":{"ming":[]}}})});
+        let mut guard = FuseRules(Some(services.clone()));
+        let mut packet = Packet {
+            direction: Direction::Outbound,
+            packet_type: "Req".into(),
+            method: ".lq.Lobby.amuletActivityOperate".into(),
+            id: Some(2),
+            data: json!({"type":8,"args":[]}),
+        };
+        assert!(matches!(
+            guard.process(&mut packet, &Value::Null),
+            ModuleAction::Forward
+        ));
+        packet.method = ".lq.Lobby.amuletActivityGameOperate".into();
+        let responder = services.clone();
+        let answer = std::thread::spawn(move || {
+            while let Ok(event) = receiver.blocking_recv() {
+                if event["type"] == "msgbox" {
+                    assert_eq!(event["data"]["title"], "fuse.guard.hanabiWin.title");
+                    responder.resolve_confirmation(event["data"]["id"].as_str().unwrap(), false);
+                    return;
+                }
+            }
+        });
+        assert!(matches!(
+            guard.process(&mut packet, &Value::Null),
+            ModuleAction::Drop
+        ));
+        answer.join().unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn waiters_are_per_flow_and_complete_after_state_commit() {
+        let base = temp_root("flow-waiters");
+        let (events, _) = broadcast::channel(16);
+        let services = Arc::new(Services::load(base.clone(), events).unwrap());
+        let config = PipelineConfig {
+            schema: 1,
+            modules: vec![crate::pipeline::ModuleConfig {
+                id: "game_state".into(),
+                enabled: true,
+                options: Value::Null,
+            }],
+        };
+        let mut a = FlowProcessor::with_services(config.clone(), services.clone());
+        let mut b = FlowProcessor::with_services(config, services.clone());
+        let method = ".lq.Lobby.amuletActivityOperate";
+        for processor in [&mut a, &mut b] {
+            processor
+                .build_request(42, method, &json!({"type":3}))
+                .unwrap();
+        }
+        let mut waiting_a = a.response_waiter(42);
+        let mut waiting_b = b.response_waiter(42);
+        let response = LiqiCodec::new()
+            .build(
+                MessageType::Response,
+                Some(42),
+                method,
+                &json!({"events":[{"type":2,"state":{"current":3}}]}),
+            )
+            .unwrap();
+        b.process(&response, Direction::Inbound).unwrap();
+        assert!(waiting_a.try_recv().is_err());
+        assert!(waiting_b.try_recv().is_ok());
+        assert_eq!(services.game_state()["stage"], 3);
+        assert_eq!(services.game_state()["flow_id"], b.flow_id);
+        b.build_request(42, method, &json!({"type":3})).unwrap();
+        b.cancel_waiting_request(42);
+        assert!(
+            b.codec.has_pending(42),
+            "completed request cleanup must not erase a reused client ID"
+        );
+        a.cancel_requests();
+        assert!(matches!(
+            waiting_a.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Closed)
+        ));
+        assert!(!a.codec.has_pending(42));
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]

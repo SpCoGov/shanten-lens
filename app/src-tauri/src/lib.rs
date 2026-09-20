@@ -72,29 +72,30 @@ fn maybe_switch(app: &AppHandle, gate: &GateState) {
     if gate.switched.load(Ordering::SeqCst) {
         return;
     }
-    if gate.backend_ready.load(Ordering::SeqCst) && gate.frontend_ready.load(Ordering::SeqCst) {
-        if gate.switched.swap(true, Ordering::SeqCst) == false {
-            if let Some(progress_state) = app.try_state::<StartupProgressState>() {
-                set_startup_progress(
-                    app,
-                    &progress_state,
-                    StartupProgressPayload {
-                        phase: "ready".into(),
-                        label: "启动完成".into(),
-                        detail: Some("正在进入主界面".into()),
-                        progress: 1.0,
-                        eta_seconds: Some(0),
-                        indeterminate: false,
-                    },
-                );
-            }
-            if let Some(s) = app.get_webview_window("splash") {
-                let _ = s.close();
-            }
-            if let Some(m) = app.get_webview_window("main") {
-                let _ = m.show();
-                let _ = m.set_focus();
-            }
+    if gate.backend_ready.load(Ordering::SeqCst)
+        && gate.frontend_ready.load(Ordering::SeqCst)
+        && !gate.switched.swap(true, Ordering::SeqCst)
+    {
+        if let Some(progress_state) = app.try_state::<StartupProgressState>() {
+            set_startup_progress(
+                app,
+                &progress_state,
+                StartupProgressPayload {
+                    phase: "ready".into(),
+                    label: "启动完成".into(),
+                    detail: Some("正在进入主界面".into()),
+                    progress: 1.0,
+                    eta_seconds: Some(0),
+                    indeterminate: false,
+                },
+            );
+        }
+        if let Some(s) = app.get_webview_window("splash") {
+            let _ = s.close();
+        }
+        if let Some(m) = app.get_webview_window("main") {
+            let _ = m.show();
+            let _ = m.set_focus();
         }
     }
 }
@@ -779,7 +780,9 @@ pub fn run() {
                                 let _ = event_app.emit(&format!("backend:{kind}"), data.clone());
                             }
                         }
-                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                            let _ = event_app.emit("backend:resync_required", ());
+                        }
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                     }
                 }
@@ -809,7 +812,7 @@ pub fn run() {
                 let ah2 = ah.clone();
                 let gate2 = gate.clone();
                 tauri::async_runtime::spawn(async move {
-                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     if !gate2.switched.load(Ordering::SeqCst) {
                         if let Some(progress_state) = ah2.try_state::<StartupProgressState>() {
                             set_startup_progress(

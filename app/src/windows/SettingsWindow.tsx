@@ -1,10 +1,11 @@
 import "../styles/theme.css";
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import * as backendIpc from "../lib/ipc";
 import styles from "./SettingsWindow.module.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import {useTranslation} from "react-i18next";
+import {pushToast} from "../lib/toast";
 import {readTileSkin, setTileSkin, type TileSkin} from "../lib/tileSkin";
 import {readUpdatePrefs, setUpdateUseSystemProxy} from "../lib/updateCheck";
 
@@ -19,9 +20,15 @@ function deepEqual(a: any, b: any) {
     }
 }
 
+function mergeTables(base: Tables, patch: Tables): Tables {
+    const merged = {...base};
+    for (const [table, fields] of Object.entries(patch)) merged[table] = {...merged[table], ...fields};
+    return merged;
+}
+
 export default function SettingsWindow() {
     const {t, i18n} = useTranslation();
-    const appWindow = getCurrentWindow();
+    const appWindow = useMemo(() => getCurrentWindow(), []);
 
     const [serverTables, setServerTables] = useState<Tables | null>(null);
     const [draft, setDraft] = useState<Tables>({});
@@ -29,49 +36,60 @@ export default function SettingsWindow() {
     const [tileSkinState, setTileSkinState] = useState<TileSkin>(readTileSkin());
     const [useSystemProxy, setUseSystemProxy] = useState(() => readUpdatePrefs().useSystemProxy);
 
-    const lastInputRef = useRef(0);
-    const awaitingSyncRef = useRef(false);
-    const saveTimer = useRef<number | null>(null);
+    const pending = useRef<Tables>({});
+    const server = useRef<Tables>({});
+    const inFlight = useRef<Promise<void> | null>(null);
+    const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const closing = useRef(false);
 
-    const IDLE_MS = 1200;
-    const SAVE_DEBOUNCE = 600;
+    const accept = (incoming: Tables) => {
+        server.current = incoming;
+        setServerTables(incoming);
+        setDraft(mergeTables(incoming, pending.current));
+        setActive((current) => current && current in incoming
+            ? current : (SETTINGS_TABLES.find((name) => name in incoming) ?? null));
+    };
+    const flush = async () => {
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        while (inFlight.current) await inFlight.current;
+        if (!Object.keys(pending.current).length) return;
+        const patch = mergeTables({}, pending.current);
+        const save = backendIpc.updateConfig(patch).then(() => {
+            for (const [table, fields] of Object.entries(patch)) {
+                for (const [key, value] of Object.entries(fields)) {
+                    if (deepEqual(pending.current[table]?.[key], value)) delete pending.current[table][key];
+                }
+                if (!Object.keys(pending.current[table] ?? {}).length) delete pending.current[table];
+            }
+            accept(mergeTables(server.current, patch));
+        });
+        inFlight.current = save;
+        try { await save; } finally { inFlight.current = null; }
+        if (Object.keys(pending.current).length) await flush();
+    };
+    const saveError = (error: unknown) => pushToast(t("settings.save_failed", {reason: String(error)}), "error", 5000);
+    const close = async () => {
+        try { await flush(); closing.current = true; await appWindow.close(); }
+        catch (error) { closing.current = false; saveError(error); }
+    };
 
     useEffect(() => {
-        const accept = (incoming: Tables) => {
-            setServerTables(incoming);
-
-            const now = Date.now();
-            const idle = now - lastInputRef.current > IDLE_MS;
-            const notWaiting = !awaitingSyncRef.current;
-            if (idle && notWaiting) setDraft(incoming);
-            awaitingSyncRef.current = false;
-
-            setActive((current) => current && current in incoming
-                ? current
-                : (SETTINGS_TABLES.find((name) => name in incoming) ?? null));
-        };
-        void backendIpc.initializeBackend().then((snapshot) => accept(snapshot.config as Tables));
-        return backendIpc.subscribeBackendEvent("update_config", (config) => accept(config as Tables));
+        let active = true;
+        const unsubscribe = backendIpc.subscribeBackendEvent("update_config", (config) => accept(config as Tables));
+        void backendIpc.initializeBackend().then((snapshot) => { if (active) accept(snapshot.config as Tables); }).catch(saveError);
+        const closeListener = appWindow.onCloseRequested((event) => {
+            if (closing.current) return;
+            event.preventDefault();
+            void close();
+        });
+        return () => { active = false; unsubscribe(); void closeListener.then((unlisten) => unlisten()); };
     }, []);
 
     useEffect(() => {
-        if (!serverTables) return;
-        if (saveTimer.current) window.clearTimeout(saveTimer.current);
-        saveTimer.current = window.setTimeout(() => {
-            if (deepEqual(draft, serverTables)) return;
-            const savedDraft = draft;
-            awaitingSyncRef.current = true;
-            void backendIpc.updateConfig(savedDraft).then(() => {
-                setServerTables(savedDraft);
-                awaitingSyncRef.current = false;
-            }, () => {
-                awaitingSyncRef.current = false;
-            });
-        }, SAVE_DEBOUNCE) as unknown as number;
-        return () => {
-            if (saveTimer.current) window.clearTimeout(saveTimer.current);
-        };
-    }, [draft, serverTables]);
+        if (!Object.keys(pending.current).length) return;
+        saveTimer.current = setTimeout(() => { void flush().catch(saveError); }, 600);
+        return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+    }, [draft]);
 
     useEffect(() => {
         const sync = () => setTileSkinState(readTileSkin());
@@ -84,7 +102,7 @@ export default function SettingsWindow() {
     }, []);
 
     const onChange = (tname: string, key: string, val: any) => {
-        lastInputRef.current = Date.now();
+        pending.current = mergeTables(pending.current, {[tname]: {[key]: val}});
         setDraft((prev) => ({...prev, [tname]: {...(prev[tname] ?? {}), [key]: val}}));
     };
 
@@ -104,9 +122,8 @@ export default function SettingsWindow() {
         descKey: `settings.config.${table}.${key}_desc`,
     });
 
-    const onSync = () => void backendIpc.getSnapshot().then((snapshot) => {
-        setServerTables(snapshot.config as Tables);
-        setDraft(snapshot.config as Tables);
+    const onSync = () => void backendIpc.initializeBackend().then((snapshot) => {
+        accept(snapshot.config as Tables);
     });
 
     const content = (() => {
@@ -225,7 +242,7 @@ export default function SettingsWindow() {
                     <button className={styles.iconBtn} onClick={onSync} title={t("settings.btn_manual_sync") as string}>
                         <span className="ms" aria-hidden="true">sync</span>
                     </button>
-                    <button className={styles.iconBtn} onClick={() => appWindow.close()} title={t("window.close") as string}>
+                    <button className={styles.iconBtn} onClick={() => void close()} title={t("window.close") as string}>
                         <span className="ms" aria-hidden="true">close</span>
                     </button>
                 </div>

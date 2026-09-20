@@ -205,17 +205,26 @@ pub fn quad_catalog(state: &Value, wall_limit: usize) -> Value {
     Value::Array(groups.into_iter().filter(|(_,entries)|entries.len()>=4).map(|(face,entries)|{let positions=entries.into_iter().take(4).map(|entry|json!({"tile_id":entry.id,"source":entry.source,"source_index":entry.index})).collect::<Vec<_>>();json!({"face":face,"tile_positions":positions,"reachable":true})}).collect())
 }
 
-pub fn switch_plan(state: &Value, wall_limit: usize, skip_signatures: &[String]) -> Value {
+pub fn switch_plan(
+    state: &Value,
+    wall_limit: usize,
+    skip_signatures: &[String],
+    algorithm: Option<&str>,
+) -> Value {
     let hand = ids(state.get("hand_tiles"));
     if hand.len() != 13 {
         return json!({"status":"impossible","reason":"switch-hand-must-be-13"});
     }
     let entries = pool(state, wall_limit);
     let has_wanxiang = hand.contains(&1000) || entries.iter().any(|entry| entry.face == "bd");
-    if has_wanxiang {
-        search_wanxiang(state, &entries, skip_signatures)
-    } else {
-        search_souzu(state, &entries, wall_limit, skip_signatures)
+    match algorithm {
+        Some("wanxiang_four_meld_switch") => search_wanxiang(state, &entries, skip_signatures),
+        Some("target_enumeration_search") => {
+            search_souzu(state, &entries, wall_limit, skip_signatures)
+        }
+        None if has_wanxiang => search_wanxiang(state, &entries, skip_signatures),
+        None => search_souzu(state, &entries, wall_limit, skip_signatures),
+        Some(_) => json!({"status":"impossible","reason":"unknown-algorithm"}),
     }
 }
 
@@ -875,7 +884,7 @@ mod tests {
             "replacement_tiles":[1000],"wall_tiles":[],
             "change_tile_count":0,"total_change_tile_count":1,"boss_buff":[]
         });
-        let plan = switch_plan(&state, 36, &[]);
+        let plan = switch_plan(&state, 36, &[], None);
         assert_eq!(plan["status"], "plan");
         assert_eq!(plan["mode"], "wanxiang-four-meld-switch");
     }

@@ -47,6 +47,15 @@ jobs:
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
 
+      - name: Validate release tag
+        if: github.event_name == 'push' || inputs.publish_release
+        shell: bash
+        env:
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node -e 'const version = require("fs").readFileSync("Cargo.toml", "utf8").match(/^version\s*=\s*"([^"]+)"/m)?.[1]; if (!version || process.env.RELEASE_REF_TYPE !== "tag" || process.env.RELEASE_TAG !== "v" + version) { throw new Error("Publish requires the v" + version + " tag"); }'
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
