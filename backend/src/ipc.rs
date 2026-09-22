@@ -186,13 +186,6 @@ pub struct PacketLogSnapshot {
     pub packets: Vec<PacketLogItem>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct VersionMismatch {
-    pub frontend_version: String,
-    pub backend_version: String,
-}
-
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Type)]
 pub struct CommandResult {
     pub ok: bool,

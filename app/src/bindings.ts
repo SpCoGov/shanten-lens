@@ -8,9 +8,6 @@ export const commands = {
 async backendSnapshot() : Promise<BackendSnapshot> {
     return await TAURI_INVOKE("backend_snapshot");
 },
-async backendCheckVersion(version: string) : Promise<VersionMismatch | null> {
-    return await TAURI_INVOKE("backend_check_version", { version });
-},
 async backendGetPacketPipeline() : Promise<PipelineConfig> {
     return await TAURI_INVOKE("backend_get_packet_pipeline");
 },
@@ -186,7 +183,6 @@ export type RegistryPayload = { amulets: RegistryAmulet[]; badges: RegistryBadge
 export type SwitchAction = "start" | "start_debug" | "list_quads" | "validate_manual_debug" | "execute_plan" | "execute_full_plan" | "stop"
 export type SwitchRequest = { action: SwitchAction; options?: Partial<{ [key in string]: JsonValue }> | null; snapshot?: JsonValue | null; quadGroups?: JsonValue | null; structureGroups?: JsonValue | null; notify?: boolean | null }
 export type TsumoLoopStatus = { running: boolean; lastReason: string; winCount: number }
-export type VersionMismatch = { frontendVersion: string; backendVersion: string }
 
 /** tauri-specta globals **/
 
