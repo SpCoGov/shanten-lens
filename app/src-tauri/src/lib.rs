@@ -9,7 +9,7 @@ use serde_json::Value;
 use shanten_backend::embedded::BackendRuntime;
 use shanten_backend::ipc::{
     AmuletActionRequest, AutorunAction, BackendSnapshot, CommandResult, ConfigTables,
-    FlowDumpResult, JsonMap, PacketLogSnapshot, SwitchRequest, TsumoLoopStatus, VersionMismatch,
+    FlowDumpResult, JsonMap, PacketLogSnapshot, SwitchRequest, TsumoLoopStatus,
 };
 use shanten_backend::pipeline::{PacketModuleInfo, PacketOperation, PipelineConfig};
 use shanten_backend::plugins::{
@@ -107,15 +107,6 @@ struct IpcBackendState(pub BackendRuntime);
 #[specta::specta]
 async fn backend_snapshot(state: State<'_, IpcBackendState>) -> Result<BackendSnapshot, String> {
     state.0.snapshot().await
-}
-
-#[tauri::command]
-#[specta::specta]
-fn backend_check_version(
-    version: String,
-    state: State<'_, IpcBackendState>,
-) -> Option<VersionMismatch> {
-    state.0.check_frontend_version(version)
 }
 
 #[tauri::command]
@@ -638,7 +629,6 @@ fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
         .error_handling(tauri_specta::ErrorHandlingMode::Throw)
         .commands(tauri_specta::collect_commands![
             backend_snapshot,
-            backend_check_version,
             backend_get_packet_pipeline,
             backend_get_packet_modules,
             backend_get_plugins,
@@ -718,7 +708,6 @@ pub fn run() {
             set_overlay_panel_regions,
             fetch_latest_release,
             backend_snapshot,
-            backend_check_version,
             backend_get_packet_pipeline,
             backend_get_packet_modules,
             backend_get_plugins,

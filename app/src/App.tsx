@@ -277,11 +277,6 @@ type TutorialStep = {
     targetSelector?: string;
 };
 
-type VersionMismatch = {
-    frontendVersion: string;
-    backendVersion: string;
-};
-
 type UsageNoticeState = {
     checked: boolean;
 };
@@ -843,8 +838,6 @@ export default function App() {
     const themeButtonRef = React.useRef<HTMLButtonElement | null>(null);
     const [connected, setConnected] = React.useState(false);
     const [debugEnabled, setDebugEnabled] = React.useState(false);
-    const [versionMismatch, setVersionMismatch] = React.useState<VersionMismatch | null>(null);
-    const versionMismatchShownRef = React.useRef(false);
     const [usageNotice, setUsageNotice] = React.useState<UsageNoticeState | null>(null);
     const usageNoticeShownOnStartupRef = React.useRef(false);
     const [updateDialog, setUpdateDialog] = React.useState<UpdateDialogState | null>(null);
@@ -1563,14 +1556,6 @@ export default function App() {
             handleBackendEvent({type: "update_gamestate", data: snapshot.gameState});
             handleBackendEvent({type: "autorun_status", data: snapshot.autorunStatus});
             handleBackendEvent({type: "tsumo_loop_status", data: snapshot.tsumoLoopStatus});
-            return backendIpc.checkVersion();
-        }).then((mismatch) => {
-            if (!active || !mismatch || versionMismatchShownRef.current) return;
-            versionMismatchShownRef.current = true;
-            setVersionMismatch({
-                frontendVersion: APP_VERSION,
-                backendVersion: String((mismatch as Partial<VersionMismatch>).backendVersion || "unknown"),
-            });
         }).catch(() => { if (active) setConnected(false); });
 
         return () => {
@@ -1750,7 +1735,7 @@ export default function App() {
     }, [sendAmuletHotkeyAction]);
 
     const handleAmuletHotkey = React.useCallback((event: KeyboardEvent) => {
-        if (hotkeyEditorOpen || sellConfirmTarget || usageNotice || versionMismatch || activeTutorial) return;
+        if (hotkeyEditorOpen || sellConfirmTarget || usageNotice || activeTutorial) return;
         if (!amuletHotkeys.enabled || !canUseAmuletHotkeys) return;
         if (isTypingTarget(event.target)) return;
 
@@ -1832,7 +1817,6 @@ export default function App() {
         stage,
         t,
         usageNotice,
-        versionMismatch,
         activeTutorial,
     ]);
 
@@ -2505,52 +2489,6 @@ export default function App() {
                             </span>
                             {usageNotice.checked ? t("common.continue") : t("app.usage_notice.close_app")}
                         </button>
-                    </div>
-                </div>
-            ) : null}
-            {versionMismatch ? (
-                <div
-                    className="version-mismatch-overlay"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="version-mismatch-title"
-                    onClick={() => setVersionMismatch(null)}
-                >
-                    <button
-                        className="version-mismatch-close"
-                        onClick={() => setVersionMismatch(null)}
-                        aria-label={t("modal.close")}
-                    >
-                        <span className="ms" aria-hidden="true">close</span>
-                    </button>
-                    <div className="version-mismatch-shell" onClick={(event) => event.stopPropagation()}>
-                        <div className="version-mismatch-mark" aria-hidden="true">
-                            <span className="ms">warning</span>
-                        </div>
-
-                        <div className="version-mismatch-copy">
-                            <h2 id="version-mismatch-title">{t("app.version_mismatch.title")}</h2>
-                            <p>{t("app.version_mismatch.message")}</p>
-                        </div>
-
-                        <div className="version-mismatch-grid">
-                            <div className="version-mismatch-card">
-                                <span className="ms" aria-hidden="true">desktop_windows</span>
-                                <div>
-                                    <div className="version-mismatch-label">{t("app.version_mismatch.frontend_label")}</div>
-                                    <div className="version-mismatch-value">{versionMismatch.frontendVersion || APP_VERSION}</div>
-                                </div>
-                            </div>
-                            <div className="version-mismatch-card is-backend">
-                                <span className="ms" aria-hidden="true">dns</span>
-                                <div>
-                                    <div className="version-mismatch-label">{t("app.version_mismatch.backend_label")}</div>
-                                    <div className="version-mismatch-value">{versionMismatch.backendVersion || "unknown"}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <p className="version-mismatch-hint">{t("app.version_mismatch.hint")}</p>
                     </div>
                 </div>
             ) : null}

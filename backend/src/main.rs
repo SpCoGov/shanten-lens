@@ -4,7 +4,6 @@ use shanten_backend::{
     ipc::{
         AmuletAction, AmuletActionRequest, AutorunAction, BackendSnapshot, CommandResult,
         ConfigTables, FlowDumpResult, JsonMap, PacketLogSnapshot, SwitchRequest, TsumoLoopStatus,
-        VersionMismatch,
     },
     logging::{self, LogBuffer},
     pipeline::{self, ModuleRegistry, PacketModuleInfo, PipelineConfig, GAME_RECORD},
@@ -124,13 +123,6 @@ impl BackendRuntime {
             )?,
             tsumo_loop_status: self.state.automation.tsumo_status(),
             packet_log: self.state.services.packet_log_snapshot(),
-        })
-    }
-
-    pub fn check_frontend_version(&self, version: String) -> Option<VersionMismatch> {
-        (!version.is_empty() && version != VERSION).then(|| VersionMismatch {
-            frontend_version: version,
-            backend_version: VERSION.into(),
         })
     }
 
