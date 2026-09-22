@@ -52,6 +52,9 @@
       "runtime_title": "运行时异常",
       "promise_title": "异步任务异常",
       "startup_title": "应用启动异常",
+      "backend_title": "后端运行异常",
+      "backend_message": "后端发生了 Rust panic，当前操作无法继续。请保留下方诊断信息并重启应用。",
+      "restart": "重启应用",
       "message": "应用遇到未处理异常。已保留诊断信息，请重新加载后继续；如问题反复出现，请将下方错误详情提供给开发者。",
       "source": "来源",
       "time": "时间",
@@ -62,7 +65,8 @@
         "render": "界面渲染",
         "runtime": "运行时",
         "promise": "异步任务",
-        "startup": "启动流程"
+        "startup": "启动流程",
+        "backend": "Rust 后端"
       }
     },
     "usage_notice": {
@@ -1441,7 +1445,6 @@
       "game_record": {"title": "牌谱", "description": "注入在线牌谱请求，并用编辑后的牌谱修改响应。"},
       "packet_logger": {"title": "封包日志", "description": "记录封包到日志。"},
       "method_filter": {"title": "方法过滤器", "description": "按方法名旁路封包。"},
-      "limited_time_activity": {"title": "限时活动", "description": "雀魂限时活动辅助。"},
       "game_state": {"title": "游戏状态", "description": "维护青云之志游戏状态。"},
       "unlock_illustrated_book": {"title": "解锁全图鉴", "description": "在图鉴中显示全部护身符、印章和符石。"},
       "fuse_rules": {"title": "熔断规则", "description": "检查并丢弃命中的高风险操作。"},

@@ -25,7 +25,6 @@ const FALLBACK: PipelineConfig = {
         {id: "method_filter", enabled: true, options: {bypass_methods: [".lq.Route.heartbeat"]}},
         {id: "game_record", enabled: true, options: {}},
         {id: "packet_logger", enabled: true, options: {}},
-        {id: "limited_time_activity", enabled: true, options: {}},
         {id: "game_state", enabled: true, options: {}},
         {id: "unlock_illustrated_book", enabled: true, options: {}},
         {id: "fuse_rules", enabled: true, options: {}},

@@ -52,6 +52,9 @@
       "runtime_title": "実行時エラー",
       "promise_title": "非同期処理エラー",
       "startup_title": "アプリ起動エラー",
+      "backend_title": "バックエンドエラー",
+      "backend_message": "バックエンドで Rust panic が発生し、現在の操作を続行できません。下記の診断情報を保存し、アプリを再起動してください。",
+      "restart": "アプリを再起動",
       "message": "未処理のエラーが発生しました。診断情報を保持しています。再読み込みして続行してください。問題が繰り返し発生する場合は、下記の詳細を開発者へ共有してください。",
       "source": "発生元",
       "time": "時刻",
@@ -62,7 +65,8 @@
         "render": "画面描画",
         "runtime": "実行時",
         "promise": "非同期処理",
-        "startup": "起動処理"
+        "startup": "起動処理",
+        "backend": "Rust バックエンド"
       }
     },
     "usage_notice": {
@@ -1441,7 +1445,6 @@
       "game_record": {"title": "牌譜", "description": "オンライン牌譜リクエストを注入し、編集した牌譜でレスポンスを変更します。"},
       "packet_logger": {"title": "パケットログ", "description": "パケットをログに記録します。"},
       "method_filter": {"title": "メソッドフィルター", "description": "メソッド名でパケットをバイパスします。"},
-      "limited_time_activity": {"title": "期間限定イベント", "description": "雀魂の期間限定イベントを支援します。"},
       "game_state": {"title": "ゲーム状態", "description": "青雲の志のゲーム状態を管理します。"},
       "unlock_illustrated_book": {"title": "図鑑全解放", "description": "図鑑にすべてのお守り、印、ルーン石を表示します。"},
       "fuse_rules": {"title": "ヒューズルール", "description": "危険な操作を検査して破棄します。"},

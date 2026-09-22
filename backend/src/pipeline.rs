@@ -393,7 +393,6 @@ impl Default for PipelineConfig {
                 module("method_filter"),
                 module(GAME_RECORD),
                 module("packet_logger"),
-                module("limited_time_activity"),
                 module("game_state"),
                 module("unlock_illustrated_book"),
                 module("fuse_rules"),

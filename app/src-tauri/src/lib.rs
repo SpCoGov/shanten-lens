@@ -18,6 +18,7 @@ use shanten_backend::plugins::{
 use tauri::{AppHandle, Emitter, Manager, State};
 
 mod overlay;
+mod panic_report;
 
 const STARTUP_PROGRESS_EVENT: &str = "startup:progress";
 
@@ -417,12 +418,12 @@ async fn backend_amulet_action(
 
 #[tauri::command]
 #[specta::specta]
-fn backend_start_tsumo_loop(
+async fn backend_start_tsumo_loop(
     interval_ms: u64,
     reset_count: bool,
     state: State<'_, IpcBackendState>,
-) -> TsumoLoopStatus {
-    state.0.start_tsumo_loop(interval_ms, reset_count)
+) -> Result<TsumoLoopStatus, String> {
+    Ok(state.0.start_tsumo_loop(interval_ms, reset_count))
 }
 
 #[tauri::command]
@@ -703,7 +704,9 @@ pub fn run() {
         .manage(StartupProgressState(Arc::new(Mutex::new(
             default_startup_progress(),
         ))))
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(panic_report::guard(tauri::generate_handler![
+            panic_report::get_backend_panic,
+            panic_report::restart_app,
             shutdown_app,
             frontend_ready,
             update_startup_progress,
@@ -757,9 +760,11 @@ pub fn run() {
             backend_open_config_dir,
             backend_open_log_dir,
             backend_open_plugin_dir
-        ])
+        ]))
         .setup(|app| {
-            let runtime_root = app.path().app_data_dir()?.join("configs");
+            let app_data = app.path().app_data_dir()?;
+            panic_report::install(app.handle().clone(), app_data.join("logs/panic.log"));
+            let runtime_root = app_data.join("configs");
             let backend = BackendRuntime::load(runtime_root)?;
             app.manage(IpcBackendState(backend.clone()));
 

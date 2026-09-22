@@ -4214,7 +4214,7 @@ dependencies = [
 
 [[package]]
 name = "shanten-backend"
-version = "3.0.2"
+version = "3.0.3"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4240,7 +4240,7 @@ dependencies = [
 
 [[package]]
 name = "shanten-lens"
-version = "3.0.2"
+version = "3.0.3"
 dependencies = [
  "reqwest 0.12.28",
  "serde",

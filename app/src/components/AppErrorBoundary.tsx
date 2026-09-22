@@ -1,12 +1,14 @@
 import React from "react";
 import {t} from "i18next";
+import {invoke, isTauri} from "@tauri-apps/api/core";
+import {listen} from "@tauri-apps/api/event";
 
 type CapturedError = {
     title: string;
     message: string;
     stack?: string;
     componentStack?: string;
-    source: "render" | "runtime" | "promise" | "startup";
+    source: "render" | "runtime" | "promise" | "startup" | "backend";
     timestamp: string;
 };
 
@@ -62,7 +64,7 @@ function AppErrorDialog({error, onReload}: { error: CapturedError; onReload: () 
 
                 <div className="app-error-copy">
                     <h2 id="app-error-title">{error.title}</h2>
-                    <p>{t("app.error_boundary.message")}</p>
+                    <p>{t(error.source === "backend" ? "app.error_boundary.backend_message" : "app.error_boundary.message")}</p>
                 </div>
 
                 <div className="app-error-meta" aria-label={t("app.error_boundary.metadata")}>
@@ -84,7 +86,7 @@ function AppErrorDialog({error, onReload}: { error: CapturedError; onReload: () 
 
                 <button className="app-error-action" onClick={onReload}>
                     <span className="ms" aria-hidden="true">refresh</span>
-                    {t("app.error_boundary.reload")}
+                    {t(error.source === "backend" ? "app.error_boundary.restart" : "app.error_boundary.reload")}
                 </button>
             </div>
         </div>
@@ -92,6 +94,7 @@ function AppErrorDialog({error, onReload}: { error: CapturedError; onReload: () 
 }
 
 export class AppErrorBoundary extends React.Component<React.PropsWithChildren, AppErrorBoundaryState> {
+    private stopBackendListener?: () => void;
     state: AppErrorBoundaryState = {
         error: null,
     };
@@ -105,9 +108,23 @@ export class AppErrorBoundary extends React.Component<React.PropsWithChildren, A
     componentDidMount() {
         window.addEventListener("error", this.handleRuntimeError);
         window.addEventListener("unhandledrejection", this.handleUnhandledRejection);
+        if (isTauri()) {
+            let active = true;
+            const listener = listen<string>("backend:panic", ({payload}) => {
+                if (active) this.showBackendError(payload);
+            });
+            this.stopBackendListener = () => {
+                active = false;
+                void listener.then((unlisten) => unlisten()).catch(console.error);
+            };
+            void listener.then(() => invoke<string | null>("get_backend_panic")).then((report) => {
+                if (active && report) this.showBackendError(report);
+            }).catch(console.error);
+        }
     }
 
     componentWillUnmount() {
+        this.stopBackendListener?.();
         window.removeEventListener("error", this.handleRuntimeError);
         window.removeEventListener("unhandledrejection", this.handleUnhandledRejection);
     }
@@ -129,19 +146,27 @@ export class AppErrorBoundary extends React.Component<React.PropsWithChildren, A
         });
     };
 
+    private showBackendError = (report: string) => {
+        this.setState({error: toCapturedError(report, "backend", t("app.error_boundary.backend_title"))});
+    };
+
     private handleRuntimeError = (event: ErrorEvent) => {
-        this.setState({
+        this.setState((state) => state.error?.source === "backend" ? null : ({
             error: toCapturedError(event.error ?? event.message, "runtime", t("app.error_boundary.runtime_title")),
-        });
+        }));
     };
 
     private handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-        this.setState({
+        this.setState((state) => state.error?.source === "backend" ? null : ({
             error: toCapturedError(event.reason, "promise", t("app.error_boundary.promise_title")),
-        });
+        }));
     };
 
     private reload = () => {
+        if (this.state.error?.source === "backend") {
+            void invoke("restart_app").catch(console.error);
+            return;
+        }
         window.location.reload();
     };
 
