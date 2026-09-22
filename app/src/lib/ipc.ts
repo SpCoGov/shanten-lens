@@ -24,14 +24,12 @@ import {
     type SwitchAction,
     type SwitchRequest,
     type TsumoLoopStatus,
-    type VersionMismatch,
 } from "../bindings";
 import {useLogStore} from "./logStore";
 import {setRegistry, type RegistryPayload} from "./registryStore";
 import {setFuseConfig, type FuseConfig} from "./fuseStore";
 import {type AutoRunnerConfig, type AutoRunnerStatus, setAutoConfig, setAutoStatus} from "./autoRunnerStore";
 import {pushToast} from "./toast";
-import {APP_VERSION} from "./version";
 import type {GameStateData} from "./gamestate";
 import {t} from "i18next";
 
@@ -72,7 +70,6 @@ export type {
     SwitchAction,
     SwitchRequest,
     TsumoLoopStatus,
-    VersionMismatch,
 };
 
 export type BackendEventMap = {
@@ -137,7 +134,6 @@ export function subscribeBackendEvent<K extends keyof BackendEventMap>(
 }
 
 export const getSnapshot = commands.backendSnapshot;
-export const checkVersion = () => commands.backendCheckVersion(APP_VERSION);
 export const getPacketPipeline = commands.backendGetPacketPipeline;
 export const getPacketModules = commands.backendGetPacketModules;
 export const getPluginScanErrors = commands.backendGetPluginScanErrors;
