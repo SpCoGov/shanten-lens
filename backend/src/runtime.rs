@@ -88,7 +88,6 @@ fn builtin_modules(services: Option<Arc<Services>>, flow_id: u64) -> Vec<Box<dyn
     vec![
         Box::new(MethodFilter),
         Box::new(GameRecord(services.clone())),
-        Box::new(LimitedTimeActivity),
         Box::new(PacketLogger(services.clone())),
         Box::new(GameState(services.clone(), flow_id)),
         Box::new(UnlockIllustratedBook(services.clone())),
@@ -451,47 +450,6 @@ impl PacketModule for GameRecord {
             services.apply_game_record_override(packet);
             services.publish_game_record(packet);
         }
-        ModuleAction::Forward
-    }
-}
-
-struct LimitedTimeActivity;
-impl PacketModule for LimitedTimeActivity {
-    fn id(&self) -> &'static str {
-        "limited_time_activity"
-    }
-
-    fn subscriptions(&self, _options: &Value) -> Vec<PacketSubscription> {
-        method_subscriptions(
-            Direction::Outbound,
-            "Req",
-            &[".lq.Lobby.majClubActivityFinishDay"],
-            &[PacketOperation::Read, PacketOperation::Edit],
-        )
-    }
-
-    fn process(&mut self, packet: &mut Packet, _options: &Value) -> ModuleAction {
-        if packet.direction != Direction::Outbound
-            || packet.packet_type != "Req"
-            || packet.method != ".lq.Lobby.majClubActivityFinishDay"
-        {
-            return ModuleAction::Forward;
-        }
-        let Some(customers) = packet
-            .data
-            .get_mut("customerList")
-            .and_then(Value::as_array_mut)
-        else {
-            return ModuleAction::Forward;
-        };
-        let mut income = 0_u64;
-        for customer in customers.iter_mut().filter_map(Value::as_object_mut) {
-            customer.insert("emo".into(), json!(100));
-            customer.insert("result".into(), json!(1));
-            customer.insert("paymentAmount".into(), json!(500));
-            income += 500;
-        }
-        packet.data["income"] = json!(income);
         ModuleAction::Forward
     }
 }
@@ -999,6 +957,10 @@ pub fn default_module_options(id: &str) -> Value {
 }
 
 pub fn normalize_config(mut config: PipelineConfig) -> PipelineConfig {
+    // The activity module is now provided by the standalone activity plugin.
+    config
+        .modules
+        .retain(|module| module.id != "limited_time_activity");
     let defaults = PipelineConfig::default();
     for module in &mut config.modules {
         if module.options.is_null() {
@@ -1023,6 +985,31 @@ mod tests {
     use prost::Message;
     use std::{fs, path::PathBuf};
     use tokio::sync::broadcast;
+
+    #[test]
+    fn retired_activity_module_is_removed_without_changing_plugin_settings() {
+        let mut config = PipelineConfig::default();
+        config.modules.push(crate::pipeline::ModuleConfig {
+            id: "limited_time_activity".into(),
+            enabled: true,
+            options: Value::Null,
+        });
+        let plugin = crate::pipeline::ModuleConfig {
+            id: "plugin:shanten-lens.activity:main:activities".into(),
+            enabled: false,
+            options: json!({"timeout_ms": 750}),
+        };
+        config.modules.push(plugin.clone());
+        let config = normalize_config(config);
+        assert!(!config
+            .modules
+            .iter()
+            .any(|module| module.id == "limited_time_activity"));
+        assert_eq!(config.modules.last(), Some(&plugin));
+        assert!(!builtin_modules(None, 0)
+            .iter()
+            .any(|module| module.id() == "limited_time_activity"));
+    }
 
     #[derive(Clone, PartialEq, Message)]
     struct Wrapper {
