@@ -166,7 +166,15 @@ export default function DiagnosticsPage() {
                                             <Detail label={t("diagnostics.detail_location")} value={`${selectedLog.file ?? "-"}${selectedLog.line !== undefined ? `:${selectedLog.line}` : ""}`}/>
                                         )}
                                         <Detail label={t("diagnostics.detail_message")} value={selectedLog.msg} block/>
-                                        {selectedLog.fields && Object.keys(selectedLog.fields).length > 0 && <Detail label={t("diagnostics.detail_fields")} value={JSON.stringify(selectedLog.fields, null, 2)} block/>}
+                                        {selectedLog.fields && Object.keys(selectedLog.fields).length > 0 && <>
+                                            <Detail label={t("diagnostics.detail_fields")} value={JSON.stringify(selectedLog.fields, null, 2)} block/>
+                                            <button type="button" className={styles.viewerButton} onClick={() => void openPacketViewerWindow({
+                                                kind: "log", data: selectedLog.fields!, target: selectedLog.target,
+                                                level: selectedLog.level, ts_ms: selectedLog.ts_ms,
+                                            })}>
+                                                {t("diagnostics.open_json_editor")}
+                                            </button>
+                                        </>}
                                     </div>
                                 </aside>
                             )}

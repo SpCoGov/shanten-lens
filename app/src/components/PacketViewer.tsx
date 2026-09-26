@@ -21,10 +21,20 @@ export type PacketViewerPacket = {
     ts_ms?: number;
 };
 
+export type JsonViewerContent = PacketViewerPacket | {
+    kind: "log";
+    data: Record<string, unknown>;
+    target: string;
+    level: string;
+    ts_ms: number;
+};
+
 type Editor = ReturnType<typeof createJSONEditor>;
 
-export default function PacketViewer({packet, onClose, standalone = false}: {packet: PacketViewerPacket; onClose: () => void; standalone?: boolean}) {
+export default function PacketViewer({packet, onClose, standalone = false}: {packet: JsonViewerContent; onClose: () => void; standalone?: boolean}) {
     const {t} = useTranslation();
+    const isLog = "kind" in packet;
+    const title = t(isLog ? "diagnostics.log_fields_editor_title" : "diagnostics.packet_viewer_title");
     const containerRef = React.useRef<HTMLDivElement | null>(null);
     const editorRef = React.useRef<Editor | null>(null);
     const [contentError, setContentError] = React.useState(false);
@@ -33,8 +43,8 @@ export default function PacketViewer({packet, onClose, standalone = false}: {pac
     const [dark, setDark] = React.useState(() => isDarkTheme());
 
     React.useEffect(() => {
-        void backendIpc.getSnapshot().then(() => setConnected(true)).catch(() => setConnected(false));
-    }, []);
+        if (!isLog) void backendIpc.getSnapshot().then(() => setConnected(true)).catch(() => setConnected(false));
+    }, [isLog]);
 
     React.useEffect(() => {
         const observer = new MutationObserver(() => setDark(isDarkTheme()));
@@ -50,6 +60,7 @@ export default function PacketViewer({packet, onClose, standalone = false}: {pac
 
     React.useEffect(() => {
         if (!containerRef.current) return;
+        setContentError(false);
         const editor = createJSONEditor({
             target: containerRef.current,
             props: {
@@ -59,7 +70,7 @@ export default function PacketViewer({packet, onClose, standalone = false}: {pac
                 navigationBar: true,
                 statusBar: true,
                 truncateTextSize: 1_024,
-                ariaLabel: t("diagnostics.packet_editor_label"),
+                ariaLabel: isLog ? title : t("diagnostics.packet_editor_label"),
                 onChange: (_content: Content, _previous: Content, status: OnChangeStatus) => setContentError(Boolean(status.contentErrors)),
             },
         });
@@ -68,7 +79,7 @@ export default function PacketViewer({packet, onClose, standalone = false}: {pac
             editorRef.current = null;
             void editor.destroy();
         };
-    }, [packet, t]);
+    }, [packet, isLog, title, t]);
 
     React.useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -79,6 +90,7 @@ export default function PacketViewer({packet, onClose, standalone = false}: {pac
     }, [onClose]);
 
     const replay = async () => {
+        if ("kind" in packet) return;
         if (contentError || !editorRef.current) {
             pushToast(t("diagnostics.packet_json_invalid"), "error", 2600);
             return;
@@ -100,16 +112,22 @@ export default function PacketViewer({packet, onClose, standalone = false}: {pac
         }
     };
 
-    const replayable = packet.direction === "outbound";
+    const replayable = !isLog && packet.direction === "outbound";
     const dialog = (
-            <section className={`${styles.dialog} ${standalone ? styles.standalone : ""}`} role="dialog" aria-modal={!standalone} aria-label={t("diagnostics.packet_viewer_title")}>
+            <section className={`${styles.dialog} ${standalone ? styles.standalone : ""}`} role="dialog" aria-modal={!standalone} aria-label={title}>
                 <header className={styles.header}>
                     <div>
-                        <h3>{t("diagnostics.packet_viewer_title")}</h3>
+                        <h3>{title}</h3>
                         <div className={styles.meta}>
-                            <span className="selectable"><b>{t("diagnostics.packet_method")}</b>{packet.method}</span>
-                            <span><b>{t("diagnostics.packet_id")}</b>{packet.id == null ? "-" : packet.id}</span>
-                            <span><b>{t("diagnostics.packet_direction")}</b>{t(`diagnostics.direction_${packet.direction}`)}</span>
+                            {isLog ? <>
+                                <span className="selectable"><b>{t("diagnostics.detail_module")}</b>{packet.target}</span>
+                                <span><b>{t("diagnostics.detail_level")}</b>{packet.level}</span>
+                                <span><b>{t("diagnostics.detail_time")}</b>{new Date(packet.ts_ms).toLocaleString()}</span>
+                            </> : <>
+                                <span className="selectable"><b>{t("diagnostics.packet_method")}</b>{packet.method}</span>
+                                <span><b>{t("diagnostics.packet_id")}</b>{packet.id == null ? "-" : packet.id}</span>
+                                <span><b>{t("diagnostics.packet_direction")}</b>{t(`diagnostics.direction_${packet.direction}`)}</span>
+                            </>}
                         </div>
                     </div>
                     <button type="button" className={styles.close} aria-label={t("diagnostics.close_detail")} onClick={onClose}>×</button>
@@ -117,7 +135,7 @@ export default function PacketViewer({packet, onClose, standalone = false}: {pac
                 <div className={`${styles.editor} ${dark ? "jse-theme-dark" : ""}`} ref={containerRef}/>
                 <footer className={styles.footer}>
                     <span className={contentError ? styles.error : undefined}>
-                        {contentError ? t("diagnostics.packet_json_invalid") : t("diagnostics.packet_editor_hint")}
+                        {contentError ? t("diagnostics.packet_json_invalid") : t(isLog ? "diagnostics.log_fields_editor_hint" : "diagnostics.packet_editor_hint")}
                     </span>
                     <div>
                         <button type="button" className={styles.secondary} onClick={onClose}>{t("diagnostics.close_detail")}</button>

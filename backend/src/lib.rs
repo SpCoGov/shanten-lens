@@ -2,6 +2,7 @@
 
 extern crate self as shanten_backend;
 
+mod http_trace;
 pub mod ipc;
 pub mod logging;
 pub mod pipeline;

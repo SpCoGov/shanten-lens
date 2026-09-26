@@ -1,11 +1,11 @@
 import {emitTo, listen} from "@tauri-apps/api/event";
 import {getAllWebviewWindows, WebviewWindow} from "@tauri-apps/api/webviewWindow";
-import type {PacketViewerPacket} from "../components/PacketViewer";
+import type {JsonViewerContent} from "../components/PacketViewer";
 import {pushToast} from "./toast";
 import i18n from "./i18n";
 
 const LABEL = "packet-viewer";
-let pendingPacket: PacketViewerPacket | null = null;
+let pendingPacket: JsonViewerContent | null = null;
 let ready = false;
 let listener: Promise<void> | null = null;
 
@@ -20,7 +20,7 @@ function ensureReadyListener() {
     return listener;
 }
 
-export async function openPacketViewerWindow(packet: PacketViewerPacket) {
+export async function openPacketViewerWindow(packet: JsonViewerContent) {
     pendingPacket = packet;
     try {
         await ensureReadyListener();
@@ -37,7 +37,7 @@ export async function openPacketViewerWindow(packet: PacketViewerPacket) {
         const baseUrl = import.meta.env.DEV ? `${location.origin}/packet-viewer.html` : "packet-viewer.html";
         const window = new WebviewWindow(LABEL, {
             url: `${baseUrl}?theme=${encodeURIComponent(theme)}`,
-            title: String(i18n.t("diagnostics.packet_viewer_title")),
+            title: String(i18n.t("kind" in packet ? "diagnostics.log_fields_editor_title" : "diagnostics.packet_viewer_title")),
             width: 1120,
             height: 780,
             minWidth: 760,
