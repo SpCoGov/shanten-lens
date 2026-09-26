@@ -129,7 +129,7 @@ export default function SettingsWindow() {
     const content = (() => {
         if (!active) return <div className={styles.emptyPane}>{t("settings.loading")}</div>;
         const kv = tables[active] ?? {};
-        const entries = Object.entries(kv);
+        const entries = Object.entries(kv).sort(([a], [b]) => a.localeCompare(b));
         if (entries.length === 0) return <div className={styles.emptyPane}>{t("settings.loading")}</div>;
 
         return (

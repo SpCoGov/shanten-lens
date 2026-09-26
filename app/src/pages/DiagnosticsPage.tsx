@@ -40,18 +40,46 @@ export default function DiagnosticsPage() {
     const [search, setSearch] = React.useState("");
     const [selected, setSelected] = React.useState<LogItem | null>(null);
     const [packets, setPackets] = React.useState<PacketItem[]>([]);
+    const [arrivingPacket, setArrivingPacket] = React.useState<PacketItem | null>(null);
     const [packetDirection, setPacketDirection] = React.useState("");
     const [packetMethod, setPacketMethod] = React.useState("");
     const [packetSearch, setPacketSearch] = React.useState("");
     const [selectedPacket, setSelectedPacket] = React.useState<PacketItem | null>(null);
     const logsRef = React.useRef<HTMLDivElement | null>(null);
     const packetsRef = React.useRef<HTMLDivElement | null>(null);
+    const tabsRef = React.useRef<HTMLDivElement>(null);
+    const directionFilterRef = React.useRef<HTMLDivElement>(null);
+
+    React.useLayoutEffect(() => {
+        const groups = [tabsRef.current, directionFilterRef.current].filter((group): group is HTMLDivElement => group !== null);
+        const update = () => {
+            for (const group of groups) {
+                const active = group.querySelector<HTMLElement>('[aria-selected="true"], [aria-pressed="true"]');
+                if (!active) continue;
+                group.style.setProperty("--tab-left", active.offsetLeft + "px");
+                group.style.setProperty("--tab-width", active.offsetWidth + "px");
+            }
+        };
+        update();
+        const observer = new ResizeObserver(update);
+        for (const group of groups) {
+            observer.observe(group);
+            group.querySelectorAll("button").forEach(button => observer.observe(button));
+        }
+        return () => observer.disconnect();
+    }, [tab, packetDirection]);
+
+    React.useLayoutEffect(() => {
+        // Enter the packet tab with the indicator already at its measured position.
+        directionFilterRef.current?.firstElementChild?.getAnimations().forEach(animation => animation.finish());
+    }, [tab]);
 
     React.useEffect(() => {
         void backendIpc.initializeBackend().then(() => setConn(true)).catch(() => setConn(false));
         void backendIpc.getPacketLog().then((snapshot) => setPackets(snapshot.packets.slice(-PACKET_CAPACITY)));
         const off = backendIpc.subscribeBackendEvent("packet_log_event", (packet) => {
             setPackets((current) => [...current.slice(-(PACKET_CAPACITY - 1)), packet as PacketItem]);
+            setArrivingPacket(packet as PacketItem);
         });
         return off;
     }, []);
@@ -90,6 +118,11 @@ export default function DiagnosticsPage() {
         list.scrollTop = list.scrollHeight;
     }, [filteredLogs.length, filteredPackets.length, tab, tail]);
 
+    const selectTab = (next: Tab) => {
+        setArrivingPacket(null);
+        setTab(next);
+    };
+
     const toggleLevel = (level: LogLevel) => {
         setLevels((current) => {
             const next = new Set(current);
@@ -117,11 +150,12 @@ export default function DiagnosticsPage() {
             </section>
 
             <section className={`mj-panel card ${styles.viewer}`}>
-                <div className={styles.tabs} role="tablist">
-                    <button type="button" role="tab" aria-selected={tab === "logs"} className={tab === "logs" ? styles.tabActive : undefined} onClick={() => setTab("logs")}>
+                <div className={styles.tabs} ref={tabsRef} role="tablist">
+                    <span className={styles.tabIndicator} aria-hidden="true"/>
+                    <button type="button" role="tab" aria-selected={tab === "logs"} className={tab === "logs" ? styles.tabActive : undefined} onClick={() => selectTab("logs")}>
                         {t("diagnostics.tab_logs")}
                     </button>
-                    <button type="button" role="tab" aria-selected={tab === "packets"} className={tab === "packets" ? styles.tabActive : undefined} onClick={() => setTab("packets")}>
+                    <button type="button" role="tab" aria-selected={tab === "packets"} className={tab === "packets" ? styles.tabActive : undefined} onClick={() => selectTab("packets")}>
                         {t("diagnostics.tab_packets")}
                     </button>
                 </div>
@@ -183,7 +217,8 @@ export default function DiagnosticsPage() {
                 ) : (
                     <>
                         <div className={styles.filters}>
-                            <div className={styles.directionFilter} role="group" aria-label={t("diagnostics.packet_direction")}>
+                            <div className={styles.directionFilter} ref={directionFilterRef} role="group" aria-label={t("diagnostics.packet_direction")}>
+                                <span className={`${styles.directionIndicator} ${packetDirection === "outbound" ? styles.directionOutbound : packetDirection === "inbound" ? styles.directionInbound : styles.directionAll}`} aria-hidden="true"/>
                                 <button type="button" className={`${styles.directionAll} ${packetDirection === "" ? styles.directionActive : ""}`} aria-pressed={packetDirection === ""} onClick={() => setPacketDirection("")}>{t("diagnostics.direction_all")}</button>
                                 <button type="button" className={`${styles.directionOutbound} ${packetDirection === "outbound" ? styles.directionActive : ""}`} aria-pressed={packetDirection === "outbound"} onClick={() => setPacketDirection("outbound")}>↑ {t("diagnostics.direction_outbound")}</button>
                                 <button type="button" className={`${styles.directionInbound} ${packetDirection === "inbound" ? styles.directionActive : ""}`} aria-pressed={packetDirection === "inbound"} onClick={() => setPacketDirection("inbound")}>↓ {t("diagnostics.direction_inbound")}</button>
@@ -198,7 +233,7 @@ export default function DiagnosticsPage() {
                             <div ref={packetsRef} className={styles.logList}>
                                 {filteredPackets.length === 0 && <div className={styles.empty}>{t("diagnostics.empty_packets")}</div>}
                                 {filteredPackets.map((packet, index) => (
-                                    <button key={`${packet.ts_ms ?? 0}-${packet.method}-${packet.id ?? "n"}-${index}`} type="button" className={`${styles.packetItem} ${visibleSelectedPacket === packet ? styles.selected : ""} ${packet === packets[packets.length - 1] ? styles.newPacket : ""}`} onClick={() => setSelectedPacket(visibleSelectedPacket === packet ? null : packet)}>
+                                    <button key={`${packet.ts_ms ?? 0}-${packet.method}-${packet.id ?? "n"}-${index}`} type="button" className={`${styles.packetItem} ${visibleSelectedPacket === packet ? styles.selected : ""} ${packet === arrivingPacket ? styles.newPacket : ""}`} onAnimationEnd={() => setArrivingPacket(current => current === packet ? null : current)} onClick={() => setSelectedPacket(visibleSelectedPacket === packet ? null : packet)}>
                                         <span className={styles.ts}>{packetTime(packet)}</span>
                                         <span className={`${styles.direction} ${packet.direction === "outbound" ? styles.outbound : styles.inbound}`}>{packet.direction === "outbound" ? "↑" : "↓"}</span>
                                         <span className={styles.packetType}>{packet.type}</span><span className={`${styles.message} selectable`}>{packet.method}</span>

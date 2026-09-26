@@ -21,6 +21,7 @@
 }
 
 .tabs {
+    position: relative;
     display: flex;
     gap: 4px;
     margin-bottom: 12px;
@@ -35,12 +36,24 @@
     color: var(--muted);
     font: inherit;
     cursor: pointer;
+    transition: color .22s ease;
 }
 
 .tabs button:hover,
 .tabs .tabActive {
-    border-bottom-color: var(--color-ring);
     color: var(--text);
+}
+
+.tabIndicator {
+    position: absolute;
+    left: var(--tab-left, 0px);
+    bottom: 0;
+    width: var(--tab-width, 0px);
+    height: 2px;
+    border-radius: 999px;
+    background: var(--color-ring);
+    transition: left .34s cubic-bezier(.22, .9, .2, 1), width .24s ease;
+    pointer-events: none;
 }
 
 .logHeader {
@@ -176,6 +189,7 @@
 }
 
 .directionFilter {
+    position: relative;
     display: inline-flex;
     gap: 2px;
     padding: 3px;
@@ -185,7 +199,8 @@
 }
 
 .directionFilter button {
-    --direction-color: var(--color-ring);
+    position: relative;
+    z-index: 1;
     height: 24px;
     padding: 0 9px;
     border: 1px solid transparent;
@@ -195,6 +210,7 @@
     font: inherit;
     font-size: 12px;
     cursor: pointer;
+    transition: color .34s ease;
 }
 
 .directionFilter .directionAll { --direction-color: var(--color-ring); }
@@ -206,9 +222,29 @@
 }
 
 .directionFilter .directionActive {
+    color: var(--direction-color);
+}
+
+.directionIndicator {
+    position: absolute;
+    left: var(--tab-left, 0px);
+    top: 3px;
+    width: var(--tab-width, 0px);
+    height: 24px;
+    box-sizing: border-box;
+    border: 1px solid;
+    border-radius: 5px;
     border-color: color-mix(in srgb, var(--direction-color) 42%, transparent);
     background: color-mix(in srgb, var(--direction-color) 14%, transparent);
-    color: var(--direction-color);
+    transition: left .34s cubic-bezier(.22, .9, .2, 1), width .24s ease,
+        background-color .34s ease, border-color .34s ease;
+    pointer-events: none;
+}
+
+.tabs button:focus-visible,
+.directionFilter button:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
 }
 
 .filters .methodSearch {
@@ -391,6 +427,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .tabIndicator,
+    .directionIndicator,
+    .tabs button,
+    .directionFilter button { transition: none; }
+
     .packetItem.newPacket,
     .detailPanel { animation: none; }
 }
