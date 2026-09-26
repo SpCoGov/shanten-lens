@@ -9,7 +9,7 @@ use hudsucker::{
     certificate_authority::CertificateAuthority,
     futures::{Sink, SinkExt, Stream, StreamExt},
     hyper::http::uri::Authority,
-    hyper::Request,
+    hyper::{Request, Response},
     rcgen::{
         date_time_ymd, string::Ia5String, BasicConstraints, CertificateParams, DistinguishedName,
         DnType, IsCa, Issuer, KeyPair, KeyUsagePurpose, SanType,
@@ -36,7 +36,7 @@ use std::{
     time::Duration,
 };
 use tokio::sync::{mpsc, RwLock};
-use tracing::{debug, info, warn};
+use tracing::{debug, info, trace, warn};
 
 type SharedFlow = Arc<Mutex<FlowProcessor>>;
 
@@ -305,6 +305,7 @@ struct Handler {
     module_registry: Arc<ModuleRegistry>,
     services: Arc<Services>,
     control: ProxyControl,
+    http_request: Option<(u64, String)>,
 }
 
 impl Handler {
@@ -349,7 +350,7 @@ impl Handler {
 impl HttpHandler for Handler {
     async fn handle_request(
         &mut self,
-        _context: &HttpContext,
+        context: &HttpContext,
         mut request: Request<Body>,
     ) -> RequestOrResponse {
         let uri_host_is_ip = request
@@ -377,7 +378,34 @@ impl HttpHandler for Handler {
             }
             request = Request::from_parts(parts, body);
         }
-        request.into()
+        static NEXT_HTTP_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let request_id = NEXT_HTTP_ID.fetch_add(1, Ordering::Relaxed);
+        let uri = request.uri().to_string();
+        self.http_request = Some((request_id, uri.clone()));
+        trace!(target: "shanten_backend::http", request_id, client = %context.client_addr,
+            method = %request.method(), %uri, version = ?request.version(), headers = ?request.headers(),
+            "HTTP request");
+        if let Some(uri) = websocket_uri(&request) {
+            trace!(target: "shanten_backend::websocket", request_id, client = %context.client_addr,
+                %uri, method = %request.method(), headers = ?request.headers(), "WebSocket handshake request");
+        }
+        request
+            .map(|body| crate::http_trace::wrap(body, request_id, "outbound"))
+            .into()
+    }
+
+    async fn handle_response(
+        &mut self,
+        context: &HttpContext,
+        response: Response<Body>,
+    ) -> Response<Body> {
+        let Some((request_id, uri)) = &self.http_request else {
+            return response;
+        };
+        trace!(target: "shanten_backend::http", request_id, client = %context.client_addr,
+            %uri, status = response.status().as_u16(), version = ?response.version(), headers = ?response.headers(),
+            "HTTP response");
+        response.map(|body| crate::http_trace::wrap(body, *request_id, "inbound"))
     }
 
     async fn should_intercept(&mut self, _context: &HttpContext, request: &Request<Body>) -> bool {
@@ -394,6 +422,30 @@ impl HttpHandler for Handler {
 
 fn should_intercept_authority(authority: &Authority) -> bool {
     authority.port_u16().unwrap_or(443) != 80
+}
+
+fn websocket_uri(request: &Request<Body>) -> Option<hudsucker::hyper::Uri> {
+    let has_token = |header, token: &str| {
+        request.headers().get_all(header).iter().any(|value| {
+            value.to_str().is_ok_and(|value| {
+                value
+                    .split(',')
+                    .any(|part| part.trim().eq_ignore_ascii_case(token))
+            })
+        })
+    };
+    if !has_token("connection", "upgrade") || !has_token("upgrade", "websocket") {
+        return None;
+    }
+    let mut uri = request.uri().clone().into_parts();
+    uri.scheme = Some(
+        if matches!(request.uri().scheme_str(), Some("https" | "wss")) {
+            "wss".parse().unwrap()
+        } else {
+            "ws".parse().unwrap()
+        },
+    );
+    hudsucker::hyper::Uri::from_parts(uri).ok()
 }
 
 impl WebSocketHandler for Handler {
@@ -417,7 +469,7 @@ impl WebSocketHandler for Handler {
             Direction::Outbound => "outbound",
             Direction::Inbound => "inbound",
         };
-        info!(target: "shanten_backend::hudsucker", %client, direction = direction_name, %uri, "WebSocket flow opened");
+        trace!(target: "shanten_backend::websocket", %client, direction = direction_name, %uri, "WebSocket flow opened");
         loop {
             let message = tokio::select! {
                 message = stream.next() => match message {
@@ -517,6 +569,7 @@ impl WebSocketHandler for Handler {
                 break;
             }
         }
+        trace!(target: "shanten_backend::websocket", %client, direction = direction_name, %uri, "WebSocket flow closed");
         if let Ok(mut processor) = flow.lock() {
             processor.cancel_requests();
             self.services.disconnect_game_flow(processor.flow_id);
@@ -725,6 +778,7 @@ pub async fn run(
         module_registry,
         services,
         control,
+        http_request: None,
     };
     let proxy = Proxy::builder()
         .with_listener(listener)
@@ -742,6 +796,38 @@ pub async fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn websocket_handshake_address_preserves_host_path_and_query() {
+        for (url, expected) in [
+            (
+                "http://example.com:8080/socket?key=123",
+                "ws://example.com:8080/socket?key=123",
+            ),
+            (
+                "https://example.com/socket?key=123",
+                "wss://example.com/socket?key=123",
+            ),
+        ] {
+            let mut request = Request::builder()
+                .uri(url)
+                .header("connection", "keep-alive")
+                .header("connection", " Upgrade ")
+                .header("upgrade", "WebSocket")
+                .body(Body::empty())
+                .unwrap();
+            assert_eq!(websocket_uri(&request).unwrap().to_string(), expected);
+            request.headers_mut().remove("connection");
+            assert!(websocket_uri(&request).is_none());
+            request
+                .headers_mut()
+                .insert("connection", "upgrade".parse().unwrap());
+            request
+                .headers_mut()
+                .insert("upgrade", "h2c".parse().unwrap());
+            assert!(websocket_uri(&request).is_none());
+        }
+    }
 
     #[tokio::test]
     async fn tsumo_stop_restart_cancels_old_waiter_and_failures_back_off() {
@@ -804,6 +890,7 @@ mod tests {
             module_registry: registry,
             services: services.clone(),
             control: control.clone(),
+            http_request: None,
         };
         let (sender, mut receiver) = mpsc::unbounded_channel();
         let address = "127.0.0.1:12345".parse().unwrap();

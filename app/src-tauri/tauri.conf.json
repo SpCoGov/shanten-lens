@@ -79,6 +79,16 @@
             "os:allow-locale",
             "os:allow-platform"
           ]
+        },
+        {
+          "identifier": "json-viewer-title",
+          "windows": ["packet-viewer"],
+          "permissions": ["core:window:allow-set-title"]
+        },
+        {
+          "identifier": "settings-close",
+          "windows": ["settings"],
+          "permissions": ["core:window:allow-destroy"]
         }
       ]
     }

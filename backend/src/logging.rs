@@ -196,7 +196,7 @@ pub fn init(events: broadcast::Sender<Value>, log_dir: &Path) -> anyhow::Result<
     let buffer = Arc::new(LogBuffer::new(events, file));
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         EnvFilter::new(
-            "info,shanten_backend::hudsucker=debug,tao::platform_impl::platform::event_loop::runner=error",
+            "info,shanten_backend::hudsucker=debug,shanten_backend::http=trace,shanten_backend::websocket=trace,tao::platform_impl::platform::event_loop::runner=error",
         )
     });
     tracing_subscriber::registry()
