@@ -187,6 +187,14 @@ pub struct PacketLogSnapshot {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Type)]
+pub struct PacketRecordingStatus {
+    pub active: bool,
+    pub count: u64,
+    pub path: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Type)]
 pub struct CommandResult {
     pub ok: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]

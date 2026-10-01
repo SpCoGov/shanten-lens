@@ -20,6 +20,41 @@
     gap: 12px;
 }
 
+.recordButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 9px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.recordButton[aria-pressed="true"] {
+    color: var(--state-down);
+    border-color: var(--state-down);
+}
+
+.recordButton:disabled {
+    opacity: .5;
+    cursor: default;
+}
+
+.recordingFolderLink {
+    color: var(--link);
+    text-decoration: underline;
+    visibility: hidden;
+}
+
+:global(.toast.visible) .recordingFolderLink {
+    pointer-events: auto;
+    visibility: visible;
+}
+
 .tabs {
     position: relative;
     display: flex;

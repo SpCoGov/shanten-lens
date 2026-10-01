@@ -1,16 +1,16 @@
 export type ToastKind = "info" | "success" | "error";
 
-type ToastPayload = { msg: string; kind?: ToastKind; duration?: number };
+type ToastPayload = { msg: React.ReactNode; kind?: ToastKind; duration?: number };
 
 const EVT = "shanten:toast";
 
-export function pushToast(msg: string, kind: ToastKind = "info", duration = 2200) {
+export function pushToast(msg: React.ReactNode, kind: ToastKind = "info", duration = 2200) {
     const detail: ToastPayload = { msg, kind, duration };
     window.dispatchEvent(new CustomEvent<ToastPayload>(EVT, { detail }));
 }
 
 export function useGlobalToast() {
-    const [toast, setToast] = React.useState<{ msg: string; kind: ToastKind; id: number } | null>(null);
+    const [toast, setToast] = React.useState<{ msg: React.ReactNode; kind: ToastKind; id: number } | null>(null);
     const [visible, setVisible] = React.useState(false);
     const timerRef = React.useRef<number | null>(null);
 

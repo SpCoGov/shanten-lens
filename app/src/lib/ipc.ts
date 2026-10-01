@@ -13,6 +13,7 @@ import {
     type MarketplaceSourceInfo,
     type PacketLogItem,
     type PacketLogSnapshot,
+    type PacketRecordingStatus,
     type PacketModuleInfo,
     type PacketOperation,
     type PacketSubscription,
@@ -59,6 +60,7 @@ export type {
     MarketplaceSourceInfo,
     PacketLogItem,
     PacketLogSnapshot,
+    PacketRecordingStatus,
     PacketModuleInfo,
     PacketOperation,
     PacketSubscription,
@@ -87,6 +89,7 @@ export type BackendEventMap = {
     autorun_status: AutoRunnerStatus;
     tsumo_loop_status: TsumoLoopStatus;
     packet_log_event: PacketLogItem;
+    packet_recording_status: PacketRecordingStatus;
     packet_pipeline: PipelineConfig;
     packet_modules: PacketModuleInfo[];
     plugin_status: PluginInfo[];
@@ -157,6 +160,8 @@ export const checkPluginUpdates = commands.backendCheckPluginUpdates;
 export const updatePlugin = commands.backendUpdatePlugin;
 export const setPacketPipeline = commands.backendSetPacketPipeline;
 export const getPacketLog = commands.backendGetPacketLog;
+export const getPacketRecording = commands.backendGetPacketRecording;
+export const setPacketRecording = commands.backendSetPacketRecording;
 export const replayPacket = commands.backendReplayPacket;
 export const fetchGameRecord = commands.backendFetchGameRecord;
 export const overrideGameRecord = commands.backendOverrideGameRecord;
@@ -175,6 +180,7 @@ export const resolveConfirmation = commands.backendResolveConfirmation;
 export const runSwitch = commands.backendSwitch;
 export const openConfigDir = commands.backendOpenConfigDir;
 export const openLogDir = commands.backendOpenLogDir;
+export const openRecordDir = commands.backendOpenRecordDir;
 export const openPluginDir = commands.backendOpenPluginDir;
 
 function translateToastMessage(data: BackendEventMap["ui_toast"]) {

@@ -77,6 +77,12 @@ async backendSetPacketPipeline(config: PipelineConfig) : Promise<CommandResult> 
 async backendGetPacketLog() : Promise<PacketLogSnapshot> {
     return await TAURI_INVOKE("backend_get_packet_log");
 },
+async backendGetPacketRecording() : Promise<PacketRecordingStatus> {
+    return await TAURI_INVOKE("backend_get_packet_recording");
+},
+async backendSetPacketRecording(active: boolean) : Promise<PacketRecordingStatus> {
+    return await TAURI_INVOKE("backend_set_packet_recording", { active });
+},
 async backendReplayPacket(method: string, payload: Partial<{ [key in string]: JsonValue }>) : Promise<CommandResult> {
     return await TAURI_INVOKE("backend_replay_packet", { method, payload });
 },
@@ -128,6 +134,9 @@ async backendOpenConfigDir() : Promise<null> {
 async backendOpenLogDir() : Promise<null> {
     return await TAURI_INVOKE("backend_open_log_dir");
 },
+async backendOpenRecordDir() : Promise<null> {
+    return await TAURI_INVOKE("backend_open_record_dir");
+},
 async backendOpenPluginDir() : Promise<null> {
     return await TAURI_INVOKE("backend_open_plugin_dir");
 }
@@ -170,6 +179,7 @@ export type PacketLogItem = { direction: Direction; type: string; method: string
 export type PacketLogSnapshot = { packets: PacketLogItem[] }
 export type PacketModuleInfo = { id: string; providerId: string; name: string; description: string | null; builtin: boolean; online: boolean; subscriptionsRevision: number; subscriptions: PacketSubscription[]; invocationCount: number; totalDurationUs: number; timeoutCount: number; droppedReadCount: number }
 export type PacketOperation = "read" | "edit" | "drop" | "bypass" | "inject"
+export type PacketRecordingStatus = { active: boolean; count: number; path: string | null; error: string | null }
 export type PacketSubscription = { direction?: Direction | null; type?: string | null; method?: string | null; operations: PacketOperation[] }
 export type PipelineConfig = { schema: number; modules: ModuleConfig[] }
 export type PluginFrontendBundle = { pluginId: string; source: string | null; entryPath: string | null; defaultLocale: string; locales: Partial<{ [key in string]: JsonValue }>; error: string | null; healthToken: string | null; generation: number }
