@@ -3,7 +3,8 @@ use shanten_backend::{
     automation::Automation,
     ipc::{
         AmuletAction, AmuletActionRequest, AutorunAction, BackendSnapshot, CommandResult,
-        ConfigTables, FlowDumpResult, JsonMap, PacketLogSnapshot, SwitchRequest, TsumoLoopStatus,
+        ConfigTables, FlowDumpResult, JsonMap, PacketLogSnapshot, PacketRecordingStatus,
+        SwitchRequest, TsumoLoopStatus,
     },
     logging::{self, LogBuffer},
     pipeline::{self, ModuleRegistry, PacketModuleInfo, PipelineConfig, GAME_RECORD},
@@ -358,6 +359,14 @@ impl BackendRuntime {
         self.state.services.packet_log_snapshot()
     }
 
+    pub fn packet_recording_status(&self) -> PacketRecordingStatus {
+        self.state.services.packet_recording_status()
+    }
+
+    pub fn set_packet_recording(&self, active: bool) -> Result<PacketRecordingStatus, String> {
+        self.state.services.set_packet_recording(active)
+    }
+
     pub async fn replay_packet(&self, method: String, payload: JsonMap) -> CommandResult {
         if method.is_empty() {
             return failed("invalid-payload");
@@ -638,6 +647,10 @@ impl BackendRuntime {
 
     pub fn open_log_dir(&self) -> Result<(), String> {
         open_directory(&log_dir(&self.runtime_root))
+    }
+
+    pub fn open_record_dir(&self) -> Result<(), String> {
+        open_directory(&self.state.services.record_dir())
     }
 
     pub fn open_plugin_dir(&self) -> Result<(), String> {

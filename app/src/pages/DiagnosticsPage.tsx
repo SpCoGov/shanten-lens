@@ -7,6 +7,7 @@ import {useTranslation} from "react-i18next";
 import type {LogItem, LogLevel} from "../lib/logStore";
 import type {PacketViewerPacket} from "../components/PacketViewer";
 import {openPacketViewerWindow} from "../lib/packetViewerWindow";
+import {pushToast} from "../lib/toast";
 import protoMethods from "virtual:liqi-methods";
 
 const LOG_LEVELS: LogLevel[] = ["ERROR", "WARN", "INFO", "DEBUG", "TRACE", "STDOUT", "STDERR"];
@@ -44,16 +45,22 @@ export default function DiagnosticsPage() {
     const [packetMethod, setPacketMethod] = React.useState("");
     const [packetSearch, setPacketSearch] = React.useState("");
     const [selectedPacket, setSelectedPacket] = React.useState<PacketItem | null>(null);
+    const [recording, setRecording] = React.useState<backendIpc.PacketRecordingStatus | null>(null);
+    const [recordingBusy, setRecordingBusy] = React.useState(false);
     const logsRef = React.useRef<HTMLDivElement | null>(null);
     const packetsRef = React.useRef<HTMLDivElement | null>(null);
 
     React.useEffect(() => {
         void backendIpc.initializeBackend().then(() => setConn(true)).catch(() => setConn(false));
         void backendIpc.getPacketLog().then((snapshot) => setPackets(snapshot.packets.slice(-PACKET_CAPACITY)));
+        void backendIpc.getPacketRecording().then(setRecording).catch((error) => {
+            pushToast(t("diagnostics.packet_recording_failed", {reason: String(error)}), "error", 10000);
+        });
+        const offRecording = backendIpc.subscribeBackendEvent("packet_recording_status", setRecording);
         const off = backendIpc.subscribeBackendEvent("packet_log_event", (packet) => {
             setPackets((current) => [...current.slice(-(PACKET_CAPACITY - 1)), packet as PacketItem]);
         });
-        return off;
+        return () => { off(); offRecording(); };
     }, []);
 
     const targets = React.useMemo(() => Array.from(new Set(logs.map((log) => log.target))).sort(), [logs]);
@@ -99,6 +106,30 @@ export default function DiagnosticsPage() {
         });
     };
 
+    const toggleRecording = async () => {
+        if (!recording || recordingBusy) return;
+        setRecordingBusy(true);
+        try {
+            const status = await backendIpc.setPacketRecording(!recording.active);
+            setRecording(status);
+            if (!status.active) {
+                pushToast(<>
+                    {t(status.error ? "diagnostics.packet_recording_incomplete" : "diagnostics.packet_recording_saved", {count: status.count, reason: status.error})}{" "}
+                    {status.path && <a className={styles.recordingFolderLink} href="#" title={status.path} onClick={(event) => {
+                        event.preventDefault();
+                        void backendIpc.openRecordDir().catch((error) => {
+                            pushToast(t("diagnostics.open_recording_folder_failed", {reason: String(error)}), "error", 10000);
+                        });
+                    }}>{t("diagnostics.open_recording_folder")}</a>}
+                </>, status.error ? "error" : "success", 10000);
+            }
+        } catch (error) {
+            pushToast(t("diagnostics.packet_recording_failed", {reason: String(error)}), "error", 10000);
+        } finally {
+            setRecordingBusy(false);
+        }
+    };
+
     return (
         <div className={`diag-wrap ${styles.page}`}>
             <section className="card diag-top">
@@ -108,6 +139,10 @@ export default function DiagnosticsPage() {
                     <span>: {conn ? t("diagnostics.ipc_connected") : t("diagnostics.ipc_disconnected")}</span>
                 </div>
                 <div className={styles.topActions}>
+                    {tab === "packets" && <button type="button" className={styles.recordButton} aria-pressed={recording?.active ?? false} disabled={!recording || recordingBusy} onClick={() => void toggleRecording()}>
+                        <span className="ms" aria-hidden="true">{recording?.active ? "stop_circle" : "radio_button_checked"}</span>
+                        {t(recording?.active ? "diagnostics.stop_packet_recording" : "diagnostics.start_packet_recording")}
+                    </button>}
                     <button type="button" className={styles.openFolderButton} aria-label={t("diagnostics.open_log_folder")} title={t("diagnostics.open_log_folder")} onClick={() => void backendIpc.openLogDir()}><span className="ms" aria-hidden="true">folder_open</span></button>
                     <label className="tail">
                         <input type="checkbox" checked={tail} onChange={(event) => setTail(event.target.checked)}/>

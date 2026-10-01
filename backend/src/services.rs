@@ -1,6 +1,6 @@
 use crate::storage::write_json;
 use crate::{
-    ipc::{PacketLogItem, PacketLogSnapshot},
+    ipc::{PacketLogItem, PacketLogSnapshot, PacketRecordingStatus},
     logging::JsonLineLog,
     pipeline::Packet,
     protocol::{decode_game_record_base64, encode_game_record_base64},
@@ -9,7 +9,8 @@ use anyhow::Context;
 use serde_json::{json, Map, Value};
 use std::{
     collections::VecDeque,
-    fs,
+    fs::{self, File, OpenOptions},
+    io::Write,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -21,6 +22,11 @@ use tokio::sync::broadcast;
 
 const AMULETS: &str = include_str!("../assets/amulets.json");
 const BADGES: &str = include_str!("../assets/badges.json");
+
+struct PacketRecording {
+    file: File,
+    status: PacketRecordingStatus,
+}
 
 fn defaults() -> Value {
     json!({
@@ -65,6 +71,8 @@ pub struct Services {
     game_state: Arc<Mutex<Value>>,
     packet_log: Arc<Mutex<VecDeque<PacketLogItem>>>,
     packet_log_file: Arc<JsonLineLog>,
+    // ponytail: Serialize file writes for ordering; use a writer queue if disk I/O delays packets.
+    packet_recording: Arc<Mutex<Option<PacketRecording>>>,
     registry: Arc<Mutex<Value>>,
     game_record_override: Arc<Mutex<Option<Value>>>,
     confirmations: Arc<Mutex<std::collections::HashMap<String, mpsc::Sender<bool>>>>,
@@ -103,6 +111,7 @@ impl Services {
             game_state: Arc::new(Mutex::new(empty_game_state())),
             packet_log: Arc::new(Mutex::new(VecDeque::new())),
             packet_log_file: Arc::new(packet_log_file),
+            packet_recording: Arc::new(Mutex::new(None)),
             registry: Arc::new(Mutex::new(registry)),
             game_record_override: Arc::new(Mutex::new(None)),
             confirmations: Arc::new(Mutex::new(std::collections::HashMap::new())),
@@ -310,6 +319,94 @@ impl Services {
                 let _ = self
                     .events
                     .send(event("game_record_override_status", json!(false)));
+            }
+        }
+    }
+
+    pub fn packet_recording_status(&self) -> PacketRecordingStatus {
+        self.packet_recording
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|recording| recording.status.clone())
+            .unwrap_or_default()
+    }
+
+    pub fn record_dir(&self) -> PathBuf {
+        self.root.parent().unwrap_or(&self.root).join("record")
+    }
+
+    pub fn set_packet_recording(&self, active: bool) -> Result<PacketRecordingStatus, String> {
+        let mut recording = self.packet_recording.lock().unwrap();
+        let status = if active {
+            if let Some(recording) = recording.as_ref() {
+                return Ok(recording.status.clone());
+            }
+            let directory = self.record_dir();
+            fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+            let timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|error| error.to_string())?
+                .as_nanos();
+            let path = directory.join(format!("shanten-lens-recording-{timestamp}.jsonl"));
+            let file = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+                .map_err(|error| error.to_string())?;
+            let status = PacketRecordingStatus {
+                active: true,
+                path: Some(path.to_string_lossy().into_owned()),
+                ..Default::default()
+            };
+            *recording = Some(PacketRecording {
+                file,
+                status: status.clone(),
+            });
+            status
+        } else if let Some(mut finished) = recording.take() {
+            if let Err(error) = finished.file.sync_all() {
+                finished.status.error = Some(error.to_string());
+            }
+            finished.status.active = false;
+            finished.status
+        } else {
+            PacketRecordingStatus::default()
+        };
+        let _ = self
+            .events
+            .send(event("packet_recording_status", json!(status)));
+        Ok(status)
+    }
+
+    pub fn record_received_packet(&self, packet: &Packet) {
+        let mut recording = self.packet_recording.lock().unwrap();
+        let Some(recording) = recording.as_mut() else {
+            return;
+        };
+        if recording.status.error.is_some() {
+            return;
+        }
+        let result = serde_json::to_vec(packet)
+            .map_err(|error| error.to_string())
+            .and_then(|mut line| {
+                line.push(b'\n');
+                recording
+                    .file
+                    .write_all(&line)
+                    .map_err(|error| error.to_string())
+            });
+        match result {
+            Ok(()) => recording.status.count += 1,
+            Err(error) => {
+                recording.status.error = Some(error.clone());
+                let _ = self.events.send(event(
+                    "ui_toast",
+                    json!({
+                        "msg_key": "diagnostics.packet_recording_failed",
+                        "msg_values": {"reason": error}, "kind": "error", "duration": 10000
+                    }),
+                ));
             }
         }
     }

@@ -37,6 +37,7 @@ pub struct FlowProcessor {
     pub(crate) flow_id: u64,
     codec: LiqiCodec,
     pipeline: Pipeline,
+    services: Option<Arc<Services>>,
     last_business_signal: bool,
     latest_inbound_id: Option<u16>,
     suppressed_response_ids: HashSet<u16>,
@@ -71,11 +72,12 @@ impl FlowProcessor {
     ) -> Self {
         static NEXT_FLOW: AtomicU64 = AtomicU64::new(1);
         let flow_id = NEXT_FLOW.fetch_add(1, Ordering::Relaxed);
-        let modules = builtin_modules(services, flow_id);
+        let modules = builtin_modules(services.clone(), flow_id);
         Self {
             flow_id,
             codec: LiqiCodec::new(),
             pipeline: Pipeline::with_registry(config, modules, registry),
+            services,
             last_business_signal: false,
             latest_inbound_id: None,
             suppressed_response_ids: HashSet::new(),
@@ -264,6 +266,9 @@ impl FlowProcessor {
             id: parsed.id.map(u32::from),
             data: parsed.data.clone(),
         };
+        if let Some(services) = &self.services {
+            services.record_received_packet(&packet);
+        }
         let response =
             direction == Direction::Inbound && parsed.message_type == MessageType::Response;
         self.last_business_signal = is_business_packet(&packet);

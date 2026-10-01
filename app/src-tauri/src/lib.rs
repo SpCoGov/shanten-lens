@@ -9,7 +9,8 @@ use serde_json::Value;
 use shanten_backend::embedded::BackendRuntime;
 use shanten_backend::ipc::{
     AmuletActionRequest, AutorunAction, BackendSnapshot, CommandResult, ConfigTables,
-    FlowDumpResult, JsonMap, PacketLogSnapshot, SwitchRequest, TsumoLoopStatus,
+    FlowDumpResult, JsonMap, PacketLogSnapshot, PacketRecordingStatus, SwitchRequest,
+    TsumoLoopStatus,
 };
 use shanten_backend::pipeline::{PacketModuleInfo, PacketOperation, PipelineConfig};
 use shanten_backend::plugins::{
@@ -315,6 +316,21 @@ fn backend_get_packet_log(state: State<'_, IpcBackendState>) -> PacketLogSnapsho
 
 #[tauri::command]
 #[specta::specta]
+fn backend_get_packet_recording(state: State<'_, IpcBackendState>) -> PacketRecordingStatus {
+    state.0.packet_recording_status()
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_set_packet_recording(
+    active: bool,
+    state: State<'_, IpcBackendState>,
+) -> Result<PacketRecordingStatus, String> {
+    state.0.set_packet_recording(active)
+}
+
+#[tauri::command]
+#[specta::specta]
 async fn backend_replay_packet(
     method: String,
     payload: JsonMap,
@@ -460,6 +476,12 @@ fn backend_open_config_dir(state: State<'_, IpcBackendState>) -> Result<(), Stri
 #[specta::specta]
 fn backend_open_log_dir(state: State<'_, IpcBackendState>) -> Result<(), String> {
     state.0.open_log_dir()
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_open_record_dir(state: State<'_, IpcBackendState>) -> Result<(), String> {
+    state.0.open_record_dir()
 }
 
 #[tauri::command]
@@ -652,6 +674,8 @@ fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
             backend_update_plugin,
             backend_set_packet_pipeline,
             backend_get_packet_log,
+            backend_get_packet_recording,
+            backend_set_packet_recording,
             backend_replay_packet,
             backend_fetch_game_record,
             backend_override_game_record,
@@ -669,6 +693,7 @@ fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
             backend_switch,
             backend_open_config_dir,
             backend_open_log_dir,
+            backend_open_record_dir,
             backend_open_plugin_dir,
         ])
 }
@@ -731,6 +756,8 @@ pub fn run() {
             backend_update_plugin,
             backend_set_packet_pipeline,
             backend_get_packet_log,
+            backend_get_packet_recording,
+            backend_set_packet_recording,
             backend_replay_packet,
             backend_fetch_game_record,
             backend_override_game_record,
@@ -748,6 +775,7 @@ pub fn run() {
             backend_switch,
             backend_open_config_dir,
             backend_open_log_dir,
+            backend_open_record_dir,
             backend_open_plugin_dir
         ]))
         .setup(|app| {
