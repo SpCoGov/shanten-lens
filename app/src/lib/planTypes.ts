@@ -56,6 +56,18 @@ export type PlanData = {
     mode?: string;
     reason?: string;
     progress?: string;
+    search_progress?: {
+        phase: "preparing" | "enumerating";
+        wall_prefix: number;
+        wall_total: number;
+        targets: number;
+        checks: number;
+        quad_pairs: number;
+        quad_pair_index: number;
+        pruned: number;
+        elapsed_ms: number;
+    };
+    switch_rounds?: Array<{hand: string[]; keep: string[]; replace: string[]}>;
     remaining_changes?: number;
     plan_signature?: string;
     switch_batch_sizes?: number[];

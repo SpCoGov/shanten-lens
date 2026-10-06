@@ -1,5 +1,6 @@
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
+mod souzu;
 
 fn ids(value: Option<&Value>) -> Vec<u64> {
     value
@@ -211,6 +212,24 @@ pub fn switch_plan(
     skip_signatures: &[String],
     algorithm: Option<&str>,
 ) -> Value {
+    switch_plan_with_progress(
+        state,
+        wall_limit,
+        skip_signatures,
+        algorithm,
+        &mut |_| {},
+        &|| false,
+    )
+}
+
+pub fn switch_plan_with_progress(
+    state: &Value,
+    wall_limit: usize,
+    skip_signatures: &[String],
+    algorithm: Option<&str>,
+    progress: &mut dyn FnMut(Value),
+    stopped: &dyn Fn() -> bool,
+) -> Value {
     let hand = ids(state.get("hand_tiles"));
     if hand.len() != 13 {
         return json!({"status":"impossible","reason":"switch-hand-must-be-13"});
@@ -219,11 +238,9 @@ pub fn switch_plan(
     let has_wanxiang = hand.contains(&1000) || entries.iter().any(|entry| entry.face == "bd");
     match algorithm {
         Some("wanxiang_four_meld_switch") => search_wanxiang(state, &entries, skip_signatures),
-        Some("target_enumeration_search") => {
-            search_souzu(state, &entries, wall_limit, skip_signatures)
-        }
+        Some("target_enumeration_search") => souzu::search(state, wall_limit, progress, stopped),
         None if has_wanxiang => search_wanxiang(state, &entries, skip_signatures),
-        None => search_souzu(state, &entries, wall_limit, skip_signatures),
+        None => souzu::search(state, wall_limit, progress, stopped),
         Some(_) => json!({"status":"impossible","reason":"unknown-algorithm"}),
     }
 }
@@ -539,124 +556,6 @@ fn evaluate_souzu_target(state: &Value, entries: &[Entry], target: &[u64]) -> Op
         "remaining_changes":remaining,"per_change_limit":per_change,"plan_signature":signature,
         "considered_tile_count":entries.len()
     }))
-}
-
-fn search_souzu(
-    state: &Value,
-    entries: &[Entry],
-    wall_limit: usize,
-    skip_signatures: &[String],
-) -> Value {
-    let groups = grouped_entries(entries);
-    let quads = groups
-        .iter()
-        .filter(|(face, entries)| *face != "bd" && entries.len() >= 4)
-        .map(|(face, _)| face.clone())
-        .collect::<Vec<_>>();
-    if quads.len() < 2 {
-        return json!({"status":"impossible","reason":"not-enough-reachable-quads","quad_catalog":quad_catalog(state,wall_limit)});
-    }
-    let melds = meld_patterns(&groups);
-    let pairs = groups
-        .iter()
-        .filter(|(face, entries)| *face != "bd" && entries.len() >= 2)
-        .map(|(face, _)| vec![face.clone(), face.clone()])
-        .collect::<Vec<_>>();
-    let singles = groups
-        .keys()
-        .filter(|face| face.ends_with('s'))
-        .cloned()
-        .collect::<Vec<_>>();
-    let mut taatsu = Vec::new();
-    for a in 1..=9 {
-        for b in a + 1..=9 {
-            if b - a <= 2 {
-                let faces = vec![format!("{a}s"), format!("{b}s")];
-                if faces.iter().all(|face| groups.contains_key(face)) {
-                    taatsu.push(faces);
-                }
-            }
-        }
-    }
-    let mut best: Option<Value> = None;
-    let mut seen = HashSet::new();
-    for first in 0..quads.len() {
-        for second in first + 1..quads.len() {
-            let quad_faces = [
-                vec![quads[first].clone(); 4],
-                vec![quads[second].clone(); 4],
-            ]
-            .concat();
-            let mut consider = |concealed: Vec<String>| {
-                let faces = [quad_faces.clone(), concealed].concat();
-                let Some(target) = allocate_ids(&faces, &groups) else {
-                    return;
-                };
-                if !seen.insert(target.clone()) {
-                    return;
-                }
-                let Some(plan) = evaluate_souzu_target(state, entries, &target) else {
-                    return;
-                };
-                if skip_signatures.iter().any(|signature| {
-                    plan.get("plan_signature").and_then(Value::as_str) == Some(signature)
-                }) {
-                    return;
-                }
-                let score = (
-                    plan.get("draws_needed")
-                        .and_then(Value::as_u64)
-                        .unwrap_or(u64::MAX),
-                    plan.get("switch_discards")
-                        .and_then(Value::as_array)
-                        .map_or(usize::MAX, Vec::len),
-                );
-                let old = best.as_ref().map(|plan| {
-                    (
-                        plan.get("draws_needed")
-                            .and_then(Value::as_u64)
-                            .unwrap_or(u64::MAX),
-                        plan.get("switch_discards")
-                            .and_then(Value::as_array)
-                            .map_or(usize::MAX, Vec::len),
-                    )
-                });
-                if old.is_none_or(|old| score < old) {
-                    best = Some(plan);
-                }
-            };
-            for a in 0..melds.len() {
-                for b in a + 1..melds.len() {
-                    for single in &singles {
-                        consider(
-                            [melds[a].clone(), melds[b].clone(), vec![single.clone()]].concat(),
-                        );
-                    }
-                }
-            }
-            for meld in &melds {
-                for pair in &pairs {
-                    for wait in &taatsu {
-                        consider([meld.clone(), wait.clone(), pair.clone()].concat());
-                    }
-                }
-            }
-            let souzu_pairs = pairs
-                .iter()
-                .filter(|pair| pair[0].ends_with('s'))
-                .collect::<Vec<_>>();
-            for meld in &melds {
-                for a in 0..souzu_pairs.len() {
-                    for b in a + 1..souzu_pairs.len() {
-                        consider(
-                            [meld.clone(), souzu_pairs[a].clone(), souzu_pairs[b].clone()].concat(),
-                        );
-                    }
-                }
-            }
-        }
-    }
-    best.unwrap_or_else(|| json!({"status":"impossible","reason":"no-reachable-souzu-tenpai-plan","quad_catalog":quad_catalog(state,wall_limit)}))
 }
 
 fn search_wanxiang(state: &Value, entries: &[Entry], skip_signatures: &[String]) -> Value {

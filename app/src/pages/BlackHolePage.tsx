@@ -68,6 +68,22 @@ function visibleProgress(progress?: string) {
         .join("\n");
 }
 
+function searchProgressText(progress: NonNullable<PlanData["search_progress"]>, detailed: boolean) {
+    const lines = [
+        t(`blackhole.progress_${progress.phase}`),
+        t("blackhole.progress_summary", {
+            seconds: (progress.elapsed_ms / 1000).toFixed(1), checks: progress.checks,
+            speed: (progress.checks * 1000 / Math.max(1, progress.elapsed_ms)).toFixed(1),
+        }),
+    ];
+    if (detailed) lines.push(t("blackhole.progress_details", {
+        prefix: progress.wall_prefix, total: progress.wall_total,
+        pair: progress.quad_pair_index, pairs: progress.quad_pairs,
+        targets: progress.targets, pruned: progress.pruned,
+    }));
+    return lines.join("\n");
+}
+
 export default function BlackHolePage({
                                           stage,
                                           data,
@@ -211,6 +227,11 @@ export default function BlackHolePage({
 
     const viewData = React.useMemo(() => {
         if (!mainData || mainData.status !== "searching") return mainData;
+        if (mainData.search_progress) return {
+            ...mainData,
+            progress: searchProgressText(mainData.search_progress, verboseProgress),
+            search_progress: undefined,
+        };
         if (verboseProgress) {
             return {
                 ...mainData,
@@ -221,7 +242,7 @@ export default function BlackHolePage({
             ...mainData,
             progress: summarizeProgress(mainData.progress),
         };
-    }, [mainData, verboseProgress]);
+    }, [mainData, verboseProgress, t]);
     const consideredWallIds = React.useMemo(
         () => (wallLimit >= 36 ? wallIds : wallIds.slice(0, Math.max(2, wallLimit))),
         [wallIds, wallLimit],
@@ -361,7 +382,7 @@ export function BlackHoleStrategyCard({
             ) : data.status === "searching" ? (
                 <div style={{display: "grid", gap: 12}}>
                     <div className={styles.cardBodyMuted} style={{whiteSpace: "pre-wrap"}}>
-                        {data.progress || t("advisor.searching")}
+                        {data.search_progress ? searchProgressText(data.search_progress, true) : data.progress || t("advisor.searching")}
                     </div>
                     {!hasPlanPreview ? <div style={{padding: "0 12px 12px"}}><SearchParamsBand data={data} onOpenConsideredTiles={onOpenConsideredTiles}/></div> : null}
                     {hasPlanPreview ? <PlanBody data={data} resolveFace={resolveFace} onOpenConsideredTiles={onOpenConsideredTiles}/> : null}

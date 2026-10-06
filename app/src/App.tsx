@@ -5,6 +5,7 @@ import "./styles/theme.css";
 import "./App.css";
 import {invoke} from "@tauri-apps/api/core";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
+import {useLogStore} from "./lib/logStore";
 import FrontendTestPage from "./pages/FrontendTestPage";
 import AutoRunnerPage from "./pages/AutoRunnerPage";
 import FusePage from "./pages/FusePage";
@@ -1556,7 +1557,10 @@ export default function App() {
             handleBackendEvent({type: "update_gamestate", data: snapshot.gameState});
             handleBackendEvent({type: "autorun_status", data: snapshot.autorunStatus});
             handleBackendEvent({type: "tsumo_loop_status", data: snapshot.tsumoLoopStatus});
-        }).catch(() => { if (active) setConnected(false); });
+        }).catch((error) => {
+            useLogStore.getState().addLog("ERROR", String(error));
+            if (active) setConnected(false);
+        });
 
         return () => {
             backendUnlisteners.forEach((unlisten) => unlisten());
@@ -2172,7 +2176,7 @@ export default function App() {
                         )}
                         {route === "autorun" && <AutoRunnerPage/>}
                         {route === "overlay" && <OverlayPage/>}
-                        {route === "diagnostics" && <DiagnosticsPage/>}
+                        {route === "diagnostics" && <DiagnosticsPage connected={connected}/>}
                         {route === "frontend-test" && <FrontendTestPage/>}
                         {route === "about" && (
                             <AboutPage

@@ -177,7 +177,31 @@ export const stopTsumoLoop = commands.backendStopTsumoLoop;
 export const runAutorun = (action: "start" | "stop" | "step" | "probe" | "notify_test_email" | "set_mode", options: {force?: boolean; mode?: "continuous" | "step"} = {}) =>
     commands.backendAutorun(action, options.force ?? false, options.mode ?? null);
 export const resolveConfirmation = commands.backendResolveConfirmation;
-export const runSwitch = commands.backendSwitch;
+const pendingSearches = new Map<SwitchAction, symbol>();
+export async function runSwitch(request: SwitchRequest) {
+    const searching = request.action === "start" || request.action === "start_debug";
+    if (searching && pendingSearches.has(request.action)) return;
+    const token = Symbol();
+    if (searching) pendingSearches.set(request.action, token);
+    try {
+        await commands.backendSwitch(request);
+        if (request.action === "stop") pendingSearches.clear();
+    } catch (error) {
+        const reason = String(error);
+        useLogStore.getState().addLog("ERROR", reason);
+        pushToast(t("blackhole.control_failed", {reason}), "error", 5000);
+        if (searching && pendingSearches.get(request.action) === token) {
+            const result = [{yaku: "souzu_switch", data: {
+                status: "impossible", reason,
+                request_source: request.action === "start_debug" ? "debug" : "live",
+                search_algorithm: request.options?.search_algorithm,
+            }}];
+            handlers.get("discard_recommendation")?.forEach((handler) => handler(result));
+        }
+    } finally {
+        if (pendingSearches.get(request.action) === token) pendingSearches.delete(request.action);
+    }
+}
 export const openConfigDir = commands.backendOpenConfigDir;
 export const openLogDir = commands.backendOpenLogDir;
 export const openRecordDir = commands.backendOpenRecordDir;

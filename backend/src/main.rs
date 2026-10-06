@@ -730,14 +730,33 @@ async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
     match action {
         "start" | "start_debug" => {
             let debug = action == "start_debug";
+            let algorithm = data
+                .get("options")
+                .and_then(|v| v.get("search_algorithm"))
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+            let searching = json!({
+                "status": "searching",
+                "request_source": if debug { "debug" } else { "live" },
+                "search_algorithm": algorithm,
+            });
             let generation = if debug {
-                state.debug_generation.fetch_add(1, Ordering::SeqCst) + 1
+                let generation = state.debug_generation.fetch_add(1, Ordering::SeqCst) + 1;
+                let _ = state.events.send(event(
+                    "discard_recommendation",
+                    json!([{"yaku":"souzu_switch","data":searching}]),
+                ));
+                generation
             } else {
                 let mut current = state.switch_plan.write().await;
                 state
                     .switch_generation
                     .send_modify(|generation| *generation += 1);
-                *current = None;
+                *current = Some(searching.clone());
+                let _ = state.events.send(event(
+                    "discard_recommendation",
+                    json!([{"yaku":"souzu_switch","data":searching}]),
+                ));
                 *state.switch_generation.borrow()
             };
             let snapshot = if action == "start_debug" {
@@ -761,13 +780,25 @@ async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
                 .unwrap_or_default();
             let session = snapshot.get("session_id").cloned().unwrap_or(Value::Null);
             let revision = snapshot.get("revision").cloned().unwrap_or(Value::Null);
-            let algorithm = data
-                .get("options")
-                .and_then(|v| v.get("search_algorithm"))
-                .and_then(Value::as_str)
-                .map(str::to_owned);
+            let result_algorithm = algorithm.clone();
+            let worker_state = state.clone();
             let mut plan = tokio::task::spawn_blocking(move || {
-                recommendations::switch_plan(&snapshot, wall_limit, &skip_signatures, algorithm.as_deref())
+                let stopped = || if debug {
+                    worker_state.debug_generation.load(Ordering::SeqCst) != generation
+                } else {
+                    *worker_state.switch_generation.borrow() != generation
+                };
+                recommendations::switch_plan_with_progress(&snapshot, wall_limit, &skip_signatures, algorithm.as_deref(),
+                    &mut |progress| {
+                        if stopped() { return; }
+                        let _ = worker_state.events.send(event("discard_recommendation", json!([{
+                            "yaku":"souzu_switch", "data": {
+                                "status":"searching", "search_progress":progress,
+                                "search_algorithm":algorithm,
+                                "request_source":if debug {"debug"} else {"live"},
+                            }
+                        }])));
+                    }, &stopped)
             })
             .await
             .unwrap_or_else(|error| {
@@ -799,6 +830,9 @@ async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
                 "{}-{generation}",
                 if debug { "debug" } else { "live" }
             ));
+            if let Some(algorithm) = result_algorithm {
+                plan["search_algorithm"] = json!(algorithm);
+            }
             plan["generation"] = json!(generation);
             plan["session_id"] = session;
             plan["state_revision"] = revision;
@@ -894,14 +928,22 @@ async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
             )]
         }
         "stop" => {
+            let mut current = state.switch_plan.write().await;
             state
                 .switch_generation
                 .send_modify(|generation| *generation += 1);
             state.debug_generation.fetch_add(1, Ordering::SeqCst);
-            *state.switch_plan.write().await = None;
+            let mut stopped = current
+                .take()
+                .unwrap_or_else(|| json!({"request_source":"live"}));
+            stopped["status"] = json!("impossible");
+            stopped["reason"] = json!("stopped-by-user");
             vec![event(
                 "discard_recommendation",
-                json!([{"yaku":"souzu_switch","data":{"status":"impossible","reason":"stopped-by-user"}}]),
+                json!([
+                    {"yaku":"souzu_switch","data":stopped},
+                    {"yaku":"souzu_switch","data":{"status":"impossible","reason":"stopped-by-user","request_source":"debug"}},
+                ]),
             )]
         }
         _ => vec![event(
@@ -1017,6 +1059,10 @@ async fn execute_switch_batches(
             return Err("stopped-by-user".into());
         }
         let discard_ids = value_ids(Some(batch));
+        // The v2.4.1 simulator retains rounds in which no tiles need replacing.
+        if discard_ids.is_empty() {
+            continue;
+        }
         let game = state.services.game_state();
         let hand = value_ids(game.get("hand_tiles"));
         if discard_ids.is_empty() || discard_ids.iter().any(|id| !hand.contains(id)) {
@@ -1314,14 +1360,14 @@ mod audit_tests {
                 ));
                 // Runtime logging is process-global; finish that process before removing its files.
                 let output = std::process::Command::new(std::env::current_exe().unwrap())
-                    .args([
-                        "--exact",
-                        "embedded::audit_tests::debug_cannot_replace_live_plan_and_execution_checks_identity_and_session",
-                        "--nocapture",
-                    ])
-                    .env(CHILD_ROOT, &root)
-                    .output()
-                    .unwrap();
+                .args([
+                    "--exact",
+                    "embedded::audit_tests::debug_cannot_replace_live_plan_and_execution_checks_identity_and_session",
+                    "--nocapture",
+                ])
+                .env(CHILD_ROOT, &root)
+                .output()
+                .unwrap();
                 assert!(output.status.success(), "{output:?}");
                 std::fs::remove_dir_all(root).unwrap();
                 return;
@@ -1333,7 +1379,28 @@ mod audit_tests {
             .unwrap()
             .unwrap();
         let state = &runtime.state;
-        switch_command(state, &json!({"action":"start"})).await;
+        let mut events = runtime.subscribe();
+        runtime
+            .switch(
+                serde_json::from_value(json!({
+                    "action":"start", "options":{"search_algorithm":"target_enumeration_search"}
+                }))
+                .unwrap(),
+            )
+            .await;
+        let searching = events.try_recv().unwrap();
+        assert_eq!(searching["data"][0]["data"]["status"], "searching");
+        assert_eq!(searching["data"][0]["data"]["request_source"], "live");
+        assert_eq!(
+            searching["data"][0]["data"]["search_algorithm"],
+            "target_enumeration_search"
+        );
+        let finished = events.try_recv().unwrap();
+        assert_eq!(finished["data"][0]["data"]["status"], "impossible");
+        assert_eq!(
+            finished["data"][0]["data"]["search_algorithm"],
+            "target_enumeration_search"
+        );
         let live = state.switch_plan.read().await.clone().unwrap();
         switch_command(state, &json!({"action":"start_debug","snapshot":{}})).await;
         switch_command(
@@ -1372,7 +1439,13 @@ mod audit_tests {
         .await;
         assert_eq!(result[0]["data"]["reason"], "stale-plan");
         let mut cancel = state.switch_generation.subscribe();
-        switch_command(state, &json!({"action":"stop"})).await;
+        let stopped = switch_command(state, &json!({"action":"stop"})).await;
+        assert_eq!(stopped[0]["data"][0]["data"]["status"], "impossible");
+        assert_eq!(
+            stopped[0]["data"][0]["data"]["search_algorithm"],
+            "target_enumeration_search"
+        );
+        assert_eq!(stopped[0]["data"][1]["data"]["request_source"], "debug");
         assert!(cancel.has_changed().unwrap());
         cancel.changed().await.unwrap();
         assert!(state.switch_plan.read().await.is_none());
