@@ -7,6 +7,7 @@ import {invoke} from "@tauri-apps/api/core";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
 import {useLogStore} from "./lib/logStore";
 import FrontendTestPage from "./pages/FrontendTestPage";
+import DataSourceConflict from "./components/DataSourceConflict";
 import AutoRunnerPage from "./pages/AutoRunnerPage";
 import FusePage from "./pages/FusePage";
 import AboutPage from "./pages/AboutPage";
@@ -991,6 +992,8 @@ export default function App() {
     const [planWanxiangSwitch, setPlanWanxiangSwitch] = React.useState<PlanData | null>(null);
     const [debugSouzuSwitch, setDebugSouzuSwitch] = React.useState<PlanData | null>(null);
     const [latestGameState, setLatestGameState] = React.useState<GameStateData | null>(null);
+    const [previewSourceConflict, setPreviewSourceConflict] = React.useState(false);
+    const sourceSession = React.useRef<number | undefined>();
     const [latestGameRecord, setLatestGameRecord] = React.useState<Record<string, backendIpc.JsonValue> | null>(null);
     const [amuletHotkeys, setAmuletHotkeys] = React.useState<AmuletHotkeySettings>(() => readAmuletHotkeySettings());
     const [gameMapOpen, setGameMapOpen] = React.useState(false);
@@ -1425,6 +1428,13 @@ export default function App() {
                 setDebugEnabled(debug);
             } else if (pkt.type === "update_gamestate") {
                 const d = pkt.data as GameStateData;
+                if (sourceSession.current !== d.session_id) {
+                    setPlanSouzuSwitch(null);
+                    setPlanWanxiangSwitch(null);
+                    setPlanSuuAnkou(null);
+                    setPlanChiitoi(null);
+                    sourceSession.current = d.session_id;
+                }
                 setLatestGameState(d);
                 const deck = toDeckMap(d.deck_map);
                 setDeckMap(deck);
@@ -1868,6 +1878,7 @@ export default function App() {
 
     return (
         <div className="app">
+            <DataSourceConflict preview={previewSourceConflict} onPreviewClose={() => setPreviewSourceConflict(false)}/>
             <div className="app-ambient" aria-hidden="true">
                 <span className="ambient-orb ambient-orb-a"/>
                 <span className="ambient-orb ambient-orb-b"/>
@@ -2177,7 +2188,7 @@ export default function App() {
                         {route === "autorun" && <AutoRunnerPage/>}
                         {route === "overlay" && <OverlayPage/>}
                         {route === "diagnostics" && <DiagnosticsPage connected={connected}/>}
-                        {route === "frontend-test" && <FrontendTestPage/>}
+                        {route === "frontend-test" && <FrontendTestPage onTestDataSourceConflict={() => setPreviewSourceConflict(true)}/>}
                         {route === "about" && (
                             <AboutPage
                                 onSecretClick={onSecretClick}
@@ -2236,6 +2247,11 @@ export default function App() {
             <i className={`sb-dot ${connected ? "ok" : "warn"}`}/>
               {connected ? t("status.backendConnected") : t("status.backendDisconnected")}
           </span>
+                    {latestGameState?.source === "qyzz" && (
+                        <span className={`badge ${latestGameState.qyzz_connected ? "ok" : "down"}`}>
+                            {t(latestGameState.qyzz_connected ? "qyzz.connected" : "qyzz.disconnected")}
+                        </span>
+                    )}
                 </div>
 
                 <div className="sb-right">

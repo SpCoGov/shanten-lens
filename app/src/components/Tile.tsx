@@ -112,7 +112,12 @@ export default function Tile({
             }}>
                 {isLaizi ? (
                     tileSkin === "tempai-svg" ? (
-                        <div className="mj-tile__laizi-gradient" />
+                        <img
+                            src="/assets/mahjong/tempai-svg/bd.svg"
+                            alt="bd"
+                            draggable={false}
+                            style={{width, height, objectFit: "contain", display: "block", transform: "scale(0.84)"}}
+                        />
                     ) : (
                         <img
                             src={LAIZI_CLASSIC_SRC}

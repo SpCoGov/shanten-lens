@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="276" height="378" viewBox="0 0 92 126">
+  <title>赖子 · 皇冠猫</title>
+  <defs>
+    <linearGradient id="joker-gradient" x1="0" y1="20" x2="0" y2="111" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#78b5d2"/>
+      <stop offset="0.4" stop-color="#80a4e6"/>
+      <stop offset="0.7" stop-color="#977de1"/>
+      <stop offset="1" stop-color="#c955cf"/>
+    </linearGradient>
+  </defs>
+  <g fill="url(#joker-gradient)">
+    <path d="M25.8 33.3 A41.5 41.5 0 1 0 66.6 33.3" fill="none" stroke="url(#joker-gradient)" stroke-width="4" stroke-linecap="round"/>
+    <path d="M31.8 28 C34.5 32.8 38.8 35.8 41.8 29.9 L46 23.3 L50.2 29.9 C53.2 35.8 57.5 32.8 60.2 28 L55.8 53.2 H36.2 Z"/>
+    <circle cx="31.8" cy="27.9" r="3.6"/>
+    <circle cx="46" cy="23.3" r="3.7"/>
+    <circle cx="60.2" cy="27.9" r="3.6"/>
+    <path fill-rule="evenodd" d="
+      M11.3 88.5 C12.4 76.6 15.3 63.7 19.2 54.1 Q20.1 51.6 22.4 53.4 L32 63.8 C40.7 59.1 51.1 59.1 60 63.8 L69.6 53.4 Q71.9 51.6 72.8 54.1 C76.7 63.7 79.6 76.6 80.7 88.5 C73.6 102.2 60.5 109.3 46 109.3 C31.5 109.3 18.4 102.2 11.3 88.5 Z
+      M21.6 59.2 C19.6 63.5 18.3 68.8 17.5 74.5 L28.6 68.8 Z
+      M70.4 59.2 C72.4 63.5 73.7 68.8 74.5 74.5 L63.4 68.8 Z
+      M38.7 79.5 A7.5 7.5 0 1 0 23.7 79.5 A7.5 7.5 0 1 0 38.7 79.5 Z
+      M61.8 79.5 A7.5 7.5 0 1 0 46.8 79.5 A7.5 7.5 0 1 0 61.8 79.5 Z"/>
+  </g>
+</svg>

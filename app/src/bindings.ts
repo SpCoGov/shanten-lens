@@ -8,6 +8,12 @@ export const commands = {
 async backendSnapshot() : Promise<BackendSnapshot> {
     return await TAURI_INVOKE("backend_snapshot");
 },
+async backendDataSources() : Promise<DataSourceStatus> {
+    return await TAURI_INVOKE("backend_data_sources");
+},
+async backendSelectDataSource(source: DataSource, revision: number) : Promise<DataSourceStatus> {
+    return await TAURI_INVOKE("backend_select_data_source", { source, revision });
+},
 async backendGetPacketPipeline() : Promise<PipelineConfig> {
     return await TAURI_INVOKE("backend_get_packet_pipeline");
 },
@@ -159,13 +165,15 @@ export type AutoRunnerStatus = { mode: string | null; running: boolean; runs: nu
 export type AutorunAction = "start" | "stop" | "step" | "probe" | "notify_test_email" | "set_mode"
 export type BackendSnapshot = { version: string; proxyStatus: ProxyStatus; backendLogs: LogEntry[]; packetPipeline: PipelineConfig; fuseConfig: FuseConfig; autorunConfig: AutoRunnerConfig; registry: RegistryPayload; config: Partial<{ [key in string]: Partial<{ [key in string]: JsonValue }> }>; gameState: GameStateData; autorunStatus: AutoRunnerStatus; tsumoLoopStatus: TsumoLoopStatus; packetLog: PacketLogSnapshot }
 export type CommandResult = { ok: boolean; reason?: string | null; error?: string | null; requires_confirmation?: boolean | null; reason_key?: string | null; reason_values?: Partial<{ [key in string]: JsonValue }> | null; action?: string | null; stage?: number | null; cost?: number | null; coin?: number | null; msg_id?: number | null; response?: JsonValue | null }
+export type DataSource = "qyzz" | "packet"
+export type DataSourceStatus = { active: DataSource | null; pending: boolean; qyzz: boolean; packet: boolean; revision: number }
 export type Direction = "outbound" | "inbound"
 export type EmailNotifyConfig = { enabled: boolean; host: string; port: number; ssl: boolean; from: string; pass: string; to: string }
 export type FlowDumpItem = { id: number; peer_key: string; client: string; server: string; websocket: boolean; toServer: boolean; toClient: boolean; is_preferred: boolean; activity: number; business_activity: number }
 export type FlowDumpResult = { ok: boolean; count: number; flows: FlowDumpItem[] }
 export type FuseConfig = { guard_skip_contains: FuseGuardItems; enable_skip_guard: boolean | null; enable_shop_force_pick: boolean | null; enable_ting_ready_skip_guard: boolean | null; enable_prestart_kavi_guard: boolean | null; conduction_min_count: number | null; enable_anti_steal_eat: boolean | null; enable_missing_hand_tile_guard: boolean | null; enable_kavi_plus_buffer_guard: boolean | null; enable_hanabi_win_guard: boolean | null; enable_exit_coin_guard: boolean | null; enable_exit_life_guard: boolean | null }
 export type FuseGuardItems = { amulets: number[]; badges: number[] }
-export type GameStateData = { session_id: number | null; revision: number | null; flow_id: number | null; stage: number; coin: string; point: string | null; target_point: string | null; level: number | null; node: number | null; map_nodes: JsonValue[] | null; deck_map: Partial<{ [key in string]: string }>; hand_tiles: number[]; dora_tiles: number[]; tian_dora_tiles: JsonValue[] | null; ming: JsonValue[] | null; replacement_tiles: number[]; wall_tiles: number[]; ended: boolean | null; desktop_remain: number; locked_tiles: number[]; switch_used_tiles: number[]; effect_list: JsonValue[] | null; goods: JsonValue[] | null; refresh_price: number | null; candidate_effect_list: JsonValue[] | null; boss_buff: number[] | null; shop_buff_list: Partial<{ [key in string]: number }> | null; change_tile_count: number | null; total_change_tile_count: number | null; max_effect_volume: number | null; tile_score_map: Partial<{ [key in string]: string }> | null; fan_value_map: Partial<{ [key in string]: string }> | null; character_id: JsonValue | null; hp: JsonValue | null; max_hp: JsonValue | null; update_reason: string[] | null }
+export type GameStateData = { source: DataSource | null; qyzz_connected: boolean | null; session_id: number | null; revision: number | null; flow_id: number | null; stage: number; coin: string; point: string | null; target_point: string | null; level: number | null; node: number | null; map_nodes: JsonValue[] | null; deck_map: Partial<{ [key in string]: string }>; hand_tiles: number[]; dora_tiles: number[]; tian_dora_tiles: JsonValue[] | null; ming: JsonValue[] | null; replacement_tiles: number[]; wall_tiles: number[]; ended: boolean | null; desktop_remain: number; locked_tiles: number[]; switch_used_tiles: number[]; effect_list: JsonValue[] | null; goods: JsonValue[] | null; refresh_price: number | null; candidate_effect_list: JsonValue[] | null; boss_buff: number[] | null; shop_buff_list: Partial<{ [key in string]: number }> | null; change_tile_count: number | null; total_change_tile_count: number | null; max_effect_volume: number | null; tile_score_map: Partial<{ [key in string]: string }> | null; fan_value_map: Partial<{ [key in string]: string }> | null; character_id: JsonValue | null; hp: JsonValue | null; max_hp: JsonValue | null; update_reason: string[] | null }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LogEntry = { ts_ms: number; level: string; target: string; file: string | null; line: number | null; message: string; fields: Partial<{ [key in string]: JsonValue }> }
 export type MarketplaceInstallBlock = "blocked" | "unsupported_api" | "app_too_old"

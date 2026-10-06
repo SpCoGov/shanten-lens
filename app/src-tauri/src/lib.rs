@@ -646,11 +646,25 @@ fn fetch_latest_release(use_system_proxy: bool) -> Result<String, String> {
     Ok(text)
 }
 
+#[tauri::command]
+#[specta::specta]
+fn backend_data_sources(state: State<'_, IpcBackendState>) -> shanten_backend::ipc::DataSourceStatus {
+    state.0.data_sources()
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_select_data_source(source: shanten_backend::ipc::DataSource, revision: u64, state: State<'_, IpcBackendState>) -> Result<shanten_backend::ipc::DataSourceStatus, String> {
+    state.0.select_data_source(source, revision).await
+}
+
 fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::new()
         .error_handling(tauri_specta::ErrorHandlingMode::Throw)
         .commands(tauri_specta::collect_commands![
             backend_snapshot,
+            backend_data_sources,
+            backend_select_data_source,
             backend_get_packet_pipeline,
             backend_get_packet_modules,
             backend_get_plugins,
@@ -733,6 +747,8 @@ pub fn run() {
             set_overlay_panel_regions,
             fetch_latest_release,
             backend_snapshot,
+            backend_data_sources,
+            backend_select_data_source,
             backend_get_packet_pipeline,
             backend_get_packet_modules,
             backend_get_plugins,

@@ -1,4 +1,20 @@
 {
+  "data_source": {
+    "title": "数据源冲突",
+    "description": "检测到多个数据源，请选择本次使用的数据。",
+    "qyzz": "青云之志IPC",
+    "packet": "雀魂连接",
+    "switching": "正在切换数据源…",
+    "failed": "切换未完成，连接状态可能已变化。请重试。",
+    "selected": "已切换至：{{source}}",
+    "preview_selected": "预览选择：{{source}}（真实连接未改变）",
+    "preview_note": "预览不会切换实际数据源。",
+    "test_trigger": "预览数据源冲突",
+    "close_preview": "关闭预览",
+    "cloud": "云端",
+    "local": "本地"
+  },
+  "qyzz": {"connected": "已连接本机青云之志", "disconnected": "本机青云之志已断开"},
   "nav_editor": {
     "customize": "自定义",
     "done": "完成",

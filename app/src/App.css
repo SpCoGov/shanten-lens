@@ -3125,26 +3125,6 @@ input:invalid, textarea:invalid, select:invalid {
     background: var(--tile-bg);
 }
 
-.mj-tile__laizi-gradient {
-    position: absolute;
-    inset: 0;
-    border-radius: 8px;
-    background: linear-gradient(
-            135deg,
-            #38bdf8 0%,
-            #818cf8 24%,
-            #a855f7 48%,
-            #22c55e 72%,
-            #38bdf8 100%
-    );
-    background-size: 220% 220%;
-    animation: laiziLinearShift 2.4s ease-in-out infinite alternate;
-    filter: saturate(1.08) brightness(1.02);
-    opacity: 0.97;
-    border: none;
-    box-shadow: none;
-}
-
 .row.tight {
     gap: 6px;
 }
@@ -4027,15 +4007,6 @@ input:invalid, textarea:invalid, select:invalid {
     }
     100% {
         box-shadow: 0 0 0 0 transparent;
-    }
-}
-
-@keyframes laiziLinearShift {
-    0% {
-        background-position: 0% 50%;
-    }
-    100% {
-        background-position: 100% 50%;
     }
 }
 

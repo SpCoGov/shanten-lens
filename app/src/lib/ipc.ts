@@ -3,6 +3,8 @@ import {
     commands,
     type AmuletActionRequest,
     type BackendSnapshot,
+    type DataSource,
+    type DataSourceStatus,
     type CommandResult,
     type FlowDumpResult,
     type JsonValue,
@@ -50,6 +52,8 @@ export type InitializedBackendSnapshot = Omit<BackendSnapshot,
 export type {
     AmuletActionRequest,
     BackendSnapshot,
+    DataSource,
+    DataSourceStatus,
     CommandResult,
     FlowDumpResult,
     JsonValue,
@@ -75,6 +79,7 @@ export type {
 };
 
 export type BackendEventMap = {
+    data_source_status: DataSourceStatus;
     backend_log: BackendSnapshot["backendLogs"][number];
     proxy_status: {running: boolean; error: string | null};
     resync_required: null;
@@ -137,6 +142,8 @@ export function subscribeBackendEvent<K extends keyof BackendEventMap>(
 }
 
 export const getSnapshot = commands.backendSnapshot;
+export const getDataSources = commands.backendDataSources;
+export const selectDataSource = commands.backendSelectDataSource;
 export const getPacketPipeline = commands.backendGetPacketPipeline;
 export const getPacketModules = commands.backendGetPacketModules;
 export const getPluginScanErrors = commands.backendGetPluginScanErrors;

@@ -141,6 +141,9 @@ impl ProxyControl {
         config: PipelineConfig,
         source: Option<&'static str>,
     ) -> Result<(u16, Value), String> {
+        if !self.services.packet_processing_allowed() {
+            return Err("qyzz-operation-not-supported-use-game-controls".into());
+        }
         let (processor, outbound, inbound) = {
             let flows = self.flows.lock().map_err(|_| "flow map poisoned")?;
             self.preferred_flow(&flows)
@@ -213,6 +216,9 @@ impl ProxyControl {
                 }
             }
         };
+        if !self.services.packet_processing_allowed() {
+            return Err("data-source-not-selected".into());
+        }
         for (direction, frame) in frames {
             let sender = match direction {
                 Direction::Outbound => Some(&outbound),
