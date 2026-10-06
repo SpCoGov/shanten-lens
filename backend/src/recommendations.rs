@@ -1,6 +1,7 @@
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 mod souzu;
+mod wanxiang;
 
 fn ids(value: Option<&Value>) -> Vec<u64> {
     value
@@ -234,12 +235,11 @@ pub fn switch_plan_with_progress(
     if hand.len() != 13 {
         return json!({"status":"impossible","reason":"switch-hand-must-be-13"});
     }
-    let entries = pool(state, wall_limit);
-    let has_wanxiang = hand.contains(&1000) || entries.iter().any(|entry| entry.face == "bd");
+    let has_wanxiang = hand.contains(&1000);
     match algorithm {
-        Some("wanxiang_four_meld_switch") => search_wanxiang(state, &entries, skip_signatures),
+        Some("wanxiang_four_meld_switch") => wanxiang::search(state, skip_signatures, progress, stopped),
         Some("target_enumeration_search") => souzu::search(state, wall_limit, progress, stopped),
-        None if has_wanxiang => search_wanxiang(state, &entries, skip_signatures),
+        None if has_wanxiang => wanxiang::search(state, skip_signatures, progress, stopped),
         None => souzu::search(state, wall_limit, progress, stopped),
         Some(_) => json!({"status":"impossible","reason":"unknown-algorithm"}),
     }
@@ -389,45 +389,6 @@ fn search_limits(state: &Value) -> (usize, usize) {
     )
 }
 
-fn grouped_entries(entries: &[Entry]) -> HashMap<String, Vec<&Entry>> {
-    let mut groups = HashMap::<String, Vec<&Entry>>::new();
-    for entry in entries {
-        groups.entry(entry.face.clone()).or_default().push(entry);
-    }
-    groups
-}
-
-fn meld_patterns(groups: &HashMap<String, Vec<&Entry>>) -> Vec<Vec<String>> {
-    let mut patterns = Vec::new();
-    for (face, entries) in groups {
-        if face != "bd" && entries.len() >= 3 {
-            patterns.push(vec![face.clone(); 3]);
-        }
-    }
-    for suit in ['m', 'p', 's'] {
-        for rank in 1..=7 {
-            let pattern = (rank..rank + 3)
-                .map(|rank| format!("{rank}{suit}"))
-                .collect::<Vec<_>>();
-            if pattern.iter().all(|face| groups.contains_key(face)) {
-                patterns.push(pattern);
-            }
-        }
-    }
-    patterns
-}
-
-fn allocate_ids(faces: &[String], groups: &HashMap<String, Vec<&Entry>>) -> Option<Vec<u64>> {
-    let mut used = HashMap::<&str, usize>::new();
-    let mut result = Vec::with_capacity(faces.len());
-    for face in faces {
-        let index = used.entry(face).or_default();
-        result.push(groups.get(face)?.get(*index)?.id);
-        *index += 1;
-    }
-    Some(result)
-}
-
 type SwitchBatches = (Vec<Vec<u64>>, Vec<Vec<u64>>);
 
 fn switch_simulation(
@@ -558,120 +519,6 @@ fn evaluate_souzu_target(state: &Value, entries: &[Entry], target: &[u64]) -> Op
     }))
 }
 
-fn search_wanxiang(state: &Value, entries: &[Entry], skip_signatures: &[String]) -> Value {
-    let hand = ids(state.get("hand_tiles"));
-    if !entries
-        .iter()
-        .any(|entry| entry.face == "bd" && entry.source != "wall")
-    {
-        return json!({"status":"impossible","reason":"wanxiang-not-reachable-before-draw"});
-    }
-    let available = entries
-        .iter()
-        .filter(|entry| entry.source != "wall")
-        .cloned()
-        .collect::<Vec<_>>();
-    let groups = grouped_entries(&available);
-    let melds = meld_patterns(&groups);
-    let (remaining, per_change) = search_limits(state);
-    let replacement = available
-        .iter()
-        .filter(|entry| entry.source == "replacement")
-        .map(|entry| entry.id)
-        .collect::<Vec<_>>();
-    let mut best: Option<Value> = None;
-    #[allow(clippy::too_many_arguments)]
-    fn visit(
-        start: usize,
-        chosen: &mut Vec<Vec<String>>,
-        melds: &[Vec<String>],
-        groups: &HashMap<String, Vec<&Entry>>,
-        hand: &[u64],
-        replacement: &[u64],
-        remaining: usize,
-        per_change: usize,
-        skip: &[String],
-        best: &mut Option<Value>,
-    ) {
-        if chosen.len() == 4 {
-            let mut faces = vec!["bd".to_string()];
-            faces.extend(chosen.iter().flatten().cloned());
-            let Some(target) = allocate_ids(&faces, groups) else {
-                return;
-            };
-            let signature = format!(
-                "wanxiang|{}",
-                target
-                    .iter()
-                    .map(u64::to_string)
-                    .collect::<Vec<_>>()
-                    .join(",")
-            );
-            if skip.iter().any(|value| value == &signature) {
-                return;
-            }
-            let Some((discards, incoming)) =
-                switch_simulation(hand, replacement, &target, remaining, per_change)
-            else {
-                return;
-            };
-            let plan = json!({
-                "status":"plan","mode":"wanxiang-four-meld-switch","search_algorithm":"wanxiang_four_meld_switch",
-                "draws_needed":0,"target13":faces,"target14":faces,"discards":discards.first().cloned().unwrap_or_default(),
-                "target_physical_ids":target,
-                "target_physical_faces":faces,
-                "switch_batch_sizes":discards.iter().map(Vec::len).collect::<Vec<_>>(),"switch_discards":discards,
-                "switch_in":incoming,"wall_draws":[],"post_draw_discards":[],"waits":[],"quad_faces":[],
-                "remaining_changes":remaining,"per_change_limit":per_change,"plan_signature":signature
-            });
-            let score = plan
-                .get("switch_discards")
-                .and_then(Value::as_array)
-                .map_or(usize::MAX, Vec::len);
-            let old = best
-                .as_ref()
-                .and_then(|plan| plan.get("switch_discards"))
-                .and_then(Value::as_array)
-                .map_or(usize::MAX, Vec::len);
-            if best.is_none() || score < old {
-                *best = Some(plan);
-            }
-            return;
-        }
-        for index in start..melds.len() {
-            chosen.push(melds[index].clone());
-            visit(
-                index + 1,
-                chosen,
-                melds,
-                groups,
-                hand,
-                replacement,
-                remaining,
-                per_change,
-                skip,
-                best,
-            );
-            chosen.pop();
-        }
-    }
-    visit(
-        0,
-        &mut Vec::new(),
-        &melds,
-        &groups,
-        &hand,
-        &replacement,
-        remaining,
-        per_change,
-        skip_signatures,
-        &mut best,
-    );
-    best.unwrap_or_else(
-        || json!({"status":"impossible","reason":"cannot-form-four-melds-with-wanxiang"}),
-    )
-}
-
 fn souzu_waits(faces: &[String]) -> Vec<String> {
     (1..=9)
         .map(|rank| format!("{rank}s"))
@@ -769,7 +616,7 @@ pub fn discard_recommendations(state: &Value) -> Value {
 mod tests {
     use super::*;
     #[test]
-    fn wanxiang_can_be_selected_from_replacement_tiles() {
+    fn wanxiang_must_already_be_in_hand() {
         let faces = [
             "1m", "2m", "3m", "4m", "5m", "6m", "1p", "2p", "3p", "1s", "2s", "3s",
         ];
@@ -783,8 +630,7 @@ mod tests {
             "replacement_tiles":[1000],"wall_tiles":[],
             "change_tile_count":0,"total_change_tile_count":1,"boss_buff":[]
         });
-        let plan = switch_plan(&state, 36, &[], None);
-        assert_eq!(plan["status"], "plan");
-        assert_eq!(plan["mode"], "wanxiang-four-meld-switch");
+        let plan = switch_plan(&state, 36, &[], Some("wanxiang_four_meld_switch"));
+        assert_eq!(plan["reason"], "wanxiang-not-in-hand");
     }
 }

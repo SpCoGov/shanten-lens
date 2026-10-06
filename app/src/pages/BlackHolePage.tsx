@@ -68,7 +68,7 @@ function visibleProgress(progress?: string) {
         .join("\n");
 }
 
-function searchProgressText(progress: NonNullable<PlanData["search_progress"]>, detailed: boolean) {
+export function searchProgressText(progress: NonNullable<PlanData["search_progress"]>, detailed: boolean) {
     const lines = [
         t(`blackhole.progress_${progress.phase}`),
         t("blackhole.progress_summary", {
@@ -76,7 +76,10 @@ function searchProgressText(progress: NonNullable<PlanData["search_progress"]>, 
             speed: (progress.checks * 1000 / Math.max(1, progress.elapsed_ms)).toFixed(1),
         }),
     ];
-    if (detailed) lines.push(t("blackhole.progress_details", {
+    if (detailed && "meld_total" in progress) lines.push(t("blackhole.progress_wanxiang_details", {
+        index: progress.meld_index, total: progress.meld_total, nodes: progress.nodes,
+    }));
+    if (detailed && "wall_prefix" in progress) lines.push(t("blackhole.progress_details", {
         prefix: progress.wall_prefix, total: progress.wall_total,
         pair: progress.quad_pair_index, pairs: progress.quad_pairs,
         targets: progress.targets, pruned: progress.pruned,
@@ -435,7 +438,7 @@ function PlanBody({
                     userSelect: "none",
                 }}
             >
-                <div className={styles.bandActionLabel}>{t("blackhole.draws_needed_label")}</div>
+                <div className={styles.bandActionLabel}>{t(data.mode === "wanxiang-four-meld-switch" ? "blackhole.wanxiang_draws_needed_label" : "blackhole.draws_needed_label")}</div>
                 <div className={styles.bandValue}>{String(data.draws_needed ?? "-")}</div>
             </div>
 

@@ -5,7 +5,7 @@ import * as backendIpc from "../lib/ipc";
 import type {PlanData, TileId} from "../lib/planTypes";
 import type {GameStateData} from "../lib/gamestate";
 import {buildDebugSnapshotFromState} from "./SouzuSwitchDebugPage";
-import {BlackHoleStrategyCard} from "./BlackHolePage";
+import {BlackHoleStrategyCard, searchProgressText} from "./BlackHolePage";
 
 const LS_VERBOSE = "sl-wanxiang-switch:verbose-progress";
 const LS_WALL_LIMIT = "sl-wanxiang-switch:wall-limit";
@@ -59,7 +59,6 @@ export default function WanxiangSwitchPage({
                                                data,
                                                resolveFace,
                                                handIds,
-                                               replacementIds,
                                                currentState,
                                                onClear,
                                            }: {
@@ -102,11 +101,7 @@ export default function WanxiangSwitchPage({
 
     const planSignature = mainData?.plan_signature || "";
     const canOperate = stage === 5 || stage === 4;
-    const hasWanxiang = React.useMemo(
-        () => [...handIds, ...replacementIds]
-            .some((id) => id === 1000 || resolveFace?.(id) === "bd"),
-        [handIds, replacementIds, resolveFace],
-    );
+    const hasWanxiang = handIds.includes(1000);
     const isSearching = mainData?.status === "searching";
     const canResume = !!planSignature && !isSearching;
     const hasExecutablePlan = mainData?.status === "plan";
@@ -177,7 +172,13 @@ export default function WanxiangSwitchPage({
     }, [onClear]);
 
     const viewData = React.useMemo(() => {
-        if (!mainData || mainData.status !== "searching" || verboseProgress) return mainData;
+        if (!mainData || mainData.status !== "searching") return mainData;
+        if (mainData.search_progress) return {
+            ...mainData,
+            progress: searchProgressText(mainData.search_progress, verboseProgress),
+            search_progress: undefined,
+        };
+        if (verboseProgress) return mainData;
         return {
             ...mainData,
             progress: summarizeProgress(mainData.progress),

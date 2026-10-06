@@ -527,10 +527,7 @@ function isWanxiangPlanData(data: PlanData | null) {
 }
 
 function hasWanxiangInState(gameState: GameStateData | null) {
-    if (!gameState) return false;
-    const deckMap = toDeckMap(gameState.deck_map ?? {});
-    return [...(gameState.hand_tiles ?? []), ...(gameState.replacement_tiles ?? [])]
-        .some((tileId) => tileId === 1000 || deckMap.get(tileId) === "bd");
+    return gameState?.hand_tiles?.includes(1000) ?? false;
 }
 
 function getScoreProjection(gameState: GameStateData | null) {

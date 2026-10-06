@@ -66,6 +66,13 @@ export type PlanData = {
         quad_pair_index: number;
         pruned: number;
         elapsed_ms: number;
+    } | {
+        phase: "wanxiang_preparing" | "wanxiang_searching";
+        meld_total: number;
+        meld_index: number;
+        checks: number;
+        nodes: number;
+        elapsed_ms: number;
     };
     switch_rounds?: Array<{hand: string[]; keep: string[]; replace: string[]}>;
     remaining_changes?: number;

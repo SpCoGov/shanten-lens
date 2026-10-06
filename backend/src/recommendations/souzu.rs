@@ -11,7 +11,7 @@ use std::{
 type Tile = u8;
 type Counts = [usize; 34];
 
-fn tile(face: &str) -> Option<Tile> {
+pub(super) fn tile(face: &str) -> Option<Tile> {
     let face = norm(face);
     let b = face.as_bytes();
     if b.len() != 2 {
