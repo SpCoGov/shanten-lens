@@ -40,7 +40,7 @@ function formatExclusivePackets(flow: MitmFlowSummary, empty: string, limit = 8)
     return entries.length ? entries.map((item) => `${item.packet_type} ${item.method}: ${item.count}`).join("\n") : empty;
 }
 
-export default function FrontendTestPage() {
+export default function FrontendTestPage({onTestDataSourceConflict}: {onTestDataSourceConflict: () => void}) {
     const {t} = useTranslation();
     const [msgboxMessage, setMsgboxMessage] = React.useState(() => t("frontend_test.default_message"));
     const [msgboxTitle, setMsgboxTitle] = React.useState(() => t("frontend_test.default_title"));
@@ -74,6 +74,11 @@ export default function FrontendTestPage() {
     };
 
     return <div className="diag-wrap">
+        <section className="mj-panel card" style={{display: "grid", gap: 12}}>
+            <h3 style={{margin: 0}}>{t("data_source.title")}</h3>
+            <p className="hint" style={{margin: 0}}>{t("data_source.preview_note")}</p>
+            <div><button className="btn" onClick={onTestDataSourceConflict}>{t("data_source.test_trigger")}</button></div>
+        </section>
         <section className="mj-panel card" style={{display: "grid", gap: 12}}>
             <h3 style={{margin: 0}}>{t("frontend_test.flow_title")}</h3>
             <div style={{display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center"}}>

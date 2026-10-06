@@ -1,4 +1,6 @@
 export interface GameStateData {
+    source?: "qyzz" | "packet" | null;
+    qyzz_connected?: boolean | null;
     session_id?: number;
     revision?: number;
     flow_id?: number;

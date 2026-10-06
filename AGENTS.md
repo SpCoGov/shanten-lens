@@ -12,11 +12,12 @@ The backend uses a MITM approach to obtain information from Qingyunzhizhi. The f
 
 The embedded Rust backend is stored in `backend/`.
 
-- `backend/src/main.rs` exposes the backend runtime used by Tauri commands.
+- `backend/src/embedded/` exposes the backend runtime used by Tauri commands, with separate command, plugin, and switch-execution modules.
 - `backend/src/proxy.rs` contains the HTTPS/WebSocket MITM proxy.
 - `backend/src/protocol.rs` contains packet decoding and request/response correlation.
-- `backend/src/runtime.rs` contains the packet-processing and fuse logic.
-- `backend/src/services.rs` contains configuration and game-state services.
+- `backend/src/runtime/` contains frame processing, built-in packet modules, and fuse rules.
+- `backend/src/services/` contains configuration, registries, game state, game records, and packet logging/recording.
+- `backend/src/plugins/` contains plugin lifecycle, manifest validation, marketplace, updates, frontend bundles, and process communication.
 - `backend/src/automation.rs` contains autorun behavior.
 - `backend/assets/` stores the built-in amulet and seal registries.
 
@@ -42,7 +43,7 @@ All frontend code is stored in `app/`.
 
 2. For component colors, define colors in `app/src/styles/theme.css` unless there is a special reason not to. Colors must support the different themes, including light and dark themes. Components should reference theme colors instead of hard-coding color values.
 
-3. When adding or modifying fuse items, update the logic in `backend/src/runtime.rs`. If the change includes configuration items, also update `backend/src/services.rs` and `app/src/lib/fuseStore.ts`, then display the corresponding configuration item in `app/src/pages/FusePage.tsx`.
+3. When adding or modifying fuse items, update the logic in `backend/src/runtime/fuse.rs`. If the change includes configuration items, also update `backend/src/services/config.rs` and `app/src/lib/fuseStore.ts`, then display the corresponding configuration item in `app/src/pages/FusePage.tsx`.
 
 4. When changing shared behavior:
    - update backend logic

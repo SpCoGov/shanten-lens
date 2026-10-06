@@ -16,7 +16,6 @@ pub mod upstream;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod automation;
-#[path = "main.rs"]
 pub mod embedded;
 pub mod mail;
 pub mod recommendations;

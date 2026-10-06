@@ -1,4 +1,20 @@
 {
+  "data_source": {
+    "title": "データソースの競合",
+    "description": "複数のデータソースを検出しました。今回使用するデータを選択してください。",
+    "qyzz": "青雲の志IPC",
+    "packet": "雀魂接続",
+    "switching": "切り替え中…",
+    "failed": "切り替えに失敗しました。接続状態を確認して再試行してください。",
+    "selected": "切り替え先：{{source}}",
+    "preview_selected": "プレビュー選択：{{source}}（実際の接続は変更されません）",
+    "preview_note": "プレビューでは実際のデータソースは切り替わりません。",
+    "test_trigger": "データソース競合をプレビュー",
+    "close_preview": "プレビューを閉じる",
+    "cloud": "クラウド",
+    "local": "ローカル"
+  },
+  "qyzz": {"connected": "ローカル青雲の志に接続済み", "disconnected": "ローカル青雲の志との接続が切れました"},
   "nav_editor": {
     "customize": "カスタマイズ",
     "done": "完了",

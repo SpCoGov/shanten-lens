@@ -4,6 +4,19 @@ use serde_json::Value;
 use specta::Type;
 use std::collections::HashMap;
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Type, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DataSource { Qyzz, Packet }
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Type, PartialEq, Eq)]
+pub struct DataSourceStatus {
+    pub active: Option<DataSource>,
+    pub pending: bool,
+    pub qyzz: bool,
+    pub packet: bool,
+    pub revision: u64,
+}
+
 pub type JsonMap = HashMap<String, Value>;
 pub type ConfigTables = HashMap<String, JsonMap>;
 
@@ -83,6 +96,8 @@ pub struct RegistryPayload {
 #[allow(dead_code)]
 #[derive(Deserialize, Serialize, Type)]
 pub struct GameStateData {
+    source: Option<DataSource>,
+    qyzz_connected: Option<bool>,
     session_id: Option<u64>,
     revision: Option<u64>,
     flow_id: Option<u64>,
