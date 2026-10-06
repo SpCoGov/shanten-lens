@@ -29,13 +29,12 @@ function packetTime(packet: PacketItem) {
     return `${date.toLocaleTimeString([], {hour12: false})}.${date.getMilliseconds().toString().padStart(3, "0")}`;
 }
 
-export default function DiagnosticsPage() {
+export default function DiagnosticsPage({connected}: {connected: boolean}) {
     const {t} = useTranslation();
     const logs = useLogStore((state) => state.logs);
     const clearLogs = useLogStore((state) => state.clearLogs);
     const [tab, setTab] = React.useState<Tab>("logs");
     const [tail, setTail] = React.useState(true);
-    const [conn, setConn] = React.useState(false);
     const [levels, setLevels] = React.useState<Set<LogLevel>>(() => new Set(DEFAULT_LEVELS));
     const [target, setTarget] = React.useState("");
     const [search, setSearch] = React.useState("");
@@ -78,7 +77,6 @@ export default function DiagnosticsPage() {
     }, [tab]);
 
     React.useEffect(() => {
-        void backendIpc.initializeBackend().then(() => setConn(true)).catch(() => setConn(false));
         void backendIpc.getPacketLog().then((snapshot) => setPackets(snapshot.packets.slice(-PACKET_CAPACITY)));
         void backendIpc.getPacketRecording().then(setRecording).catch((error) => {
             pushToast(t("diagnostics.packet_recording_failed", {reason: String(error)}), "error", 10000);
@@ -167,9 +165,9 @@ export default function DiagnosticsPage() {
         <div className={`diag-wrap ${styles.page}`}>
             <section className="card diag-top">
                 <div className="diag-status">
-                    <span className={`dot ${conn ? "ok" : "down"}`}/>
+                    <span className={`dot ${connected ? "ok" : "down"}`}/>
                     <b>{t("diagnostics.ipc_status_label")}</b>
-                    <span>: {conn ? t("diagnostics.ipc_connected") : t("diagnostics.ipc_disconnected")}</span>
+                    <span>: {connected ? t("diagnostics.ipc_connected") : t("diagnostics.ipc_disconnected")}</span>
                 </div>
                 <div className={styles.topActions}>
                     {tab === "packets" && <button type="button" className={styles.recordButton} aria-pressed={recording?.active ?? false} disabled={!recording || recordingBusy} onClick={() => void toggleRecording()}>

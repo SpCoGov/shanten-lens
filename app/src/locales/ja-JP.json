@@ -157,7 +157,6 @@
       }
     },
     "blackhole": {
-    "control_failed": "操作を実行できませんでした：{{reason}}",
       "step_welcome": {
         "title": "花火ガイドへようこそ",
         "body": "花火ガイドは現在の交換局面から実行可能な交換ルートを探索し、ブラックホールと花火を使う際に、より手軽に最適な方針を立てられるよう支援します。"
@@ -767,6 +766,7 @@
     "quad_catalog_item": "カン {{index}}：{{face}}",
     "quad_catalog_empty": "今は一覧に出せるカンがありません。",
     "reason_switch-hand-must-be-13": "現在の手牌が交換段階の13枚ではないため、このガイドを計算できません。",
+    "reason_invalid-search-tiles": "牌面データが不足しているか、花火検索に対応していない牌が含まれています。対局情報を更新してください。",
     "reason_wall-less-than-two-draws": "牌山の残りが2枚未満のため、最初の2ツモ条件を確認できません。",
     "reason_replacement-not-enough": "交換山の残りが不足していて、必要な交換を完了できません。",
     "reason_cannot-form-two-quads": "残りの交換順では、交換終了前に4枚同種のカン候補を2組作れません。",
@@ -782,6 +782,11 @@
     "reason_unknown": "利用できる結果がまだありません。"
   },
   "blackhole": {
+    "control_failed": "操作を実行できませんでした：{{reason}}",
+    "progress_preparing": "目標牌形の列挙検索を準備中",
+    "progress_enumerating": "牌山の先頭から範囲を広げて目標牌形を列挙中",
+    "progress_summary": "経過時間：{{seconds}} 秒\n検証済み候補数：{{checks}}\n検索速度：{{speed}} 回/秒",
+    "progress_details": "牌山の検索範囲：先頭 {{prefix}} / {{total}} 枚\n現在の二槓候補：{{pair}} / {{pairs}}\n列挙済み目標牌形：{{targets}}\n到達不可の二槓候補を除外：{{pruned}}",
     "source_hand": "手牌", "source_replacement": "交換牌の山", "source_wall": "牌山", "source_unknown": "不明な取得元",
     "unlimited": "無制限", "tile_count": "{{count}} 枚", "final_shape": "最終形",
     "title": "花火ガイド",
