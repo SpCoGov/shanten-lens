@@ -26,10 +26,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Windows MSI + portable ZIP
+          - name: Windows NSIS installer
             os: windows-latest
-            artifact_name: shanten-lens-windows-msi
-            artifact_path: app/src-tauri/target/release/bundle/msi/*.msi
+            artifact_name: shanten-lens-windows-nsis
+            artifact_path: |
+              app/src-tauri/target/release/bundle/nsis/*.exe
+              app/src-tauri/target/release/bundle/nsis/*.sig
           - name: macOS DMG
             os: macos-14
             artifact_name: shanten-lens-macos-dmg
@@ -71,32 +73,18 @@ jobs:
         shell: bash
         run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
-      - name: Build Windows MSI
+      - name: Build signed Windows NSIS installer
         if: runner.os == 'Windows'
         shell: cmd
+        env:
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: scripts\build_all.bat
 
       - name: Build macOS DMG
         if: runner.os == 'macOS'
         run: bash scripts/build_macos.sh
-
-      - name: Package Windows portable ZIP
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $version = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"').Matches.Groups[1].Value
-          $portableDir = 'app/src-tauri/target/release/bundle/portable'
-          New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
-          Compress-Archive -LiteralPath 'app/src-tauri/target/release/shanten-lens.exe' -DestinationPath "$portableDir/shanten-lens_${version}_windows_x64_portable.zip" -Force
-
-      - name: Upload Windows portable ZIP
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: shanten-lens-windows-portable
-          path: app/src-tauri/target/release/bundle/portable/*.zip
-          if-no-files-found: error
-          retention-days: 14
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -115,14 +103,24 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: List artifacts
-        run: ls -la artifacts
+      - name: Generate updater manifest
+        run: node scripts/update-manifest.mjs artifacts
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

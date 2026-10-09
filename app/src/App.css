@@ -3643,7 +3643,8 @@ input:invalid, textarea:invalid, select:invalid {
 }
 
 .switch-guide-toggle,
-.switch-guide-number {
+.switch-guide-number,
+.switch-guide-preference-select {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -3704,6 +3705,68 @@ input:invalid, textarea:invalid, select:invalid {
     padding-block: 5px;
 }
 
+.switch-guide-quad-count {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.switch-guide-quad-segments {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--color-divider);
+    border-radius: 10px;
+    background: var(--input-bg);
+}
+
+.switch-guide-quad-segments label {
+    position: relative;
+}
+
+.switch-guide-quad-segments input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+.switch-guide-quad-segments span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
+    padding-inline: 12px;
+    border-radius: 7px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.switch-guide-quad-segments input:not(:checked):not(:disabled) + span:hover {
+    color: var(--text);
+    background: var(--hover-bg);
+}
+
+.switch-guide-quad-segments input:checked + span {
+    color: var(--color-ring);
+    background: var(--panel-bg);
+    box-shadow: var(--shadow-sm);
+}
+
+.switch-guide-quad-segments input:focus-visible + span {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 1px;
+}
+
+.switch-guide-quad-segments input:disabled + span {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
 .switch-guide-utility-bar {
     display: flex;
     align-items: center;
@@ -3715,6 +3778,37 @@ input:invalid, textarea:invalid, select:invalid {
     background: color-mix(in srgb, var(--bg) 42%, var(--panel-bg));
     font-size: 12px;
 }
+
+.switch-guide-preferences {
+    padding: 12px 20px;
+    border-top: 1px solid var(--color-divider);
+    font-size: 12px;
+}
+
+.switch-guide-preferences summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.switch-guide-preferences summary .ms { font-size: 17px; }
+
+.switch-guide-preference-fields {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    margin-top: 12px;
+}
+
+.switch-guide-preferences p { margin: 10px 0 0; color: var(--muted); }
+.switch-guide-preference-select select { width: auto; min-width: 100px; min-height: 34px; padding-block: 5px; }
+.switch-guide-preferences .switch-guide-toggle { white-space: nowrap; }
+.switch-guide-preferences input:disabled ~ span { opacity: .5; cursor: not-allowed; }
 
 .switch-guide-utility-bar button {
     min-height: 28px;
@@ -3859,7 +3953,6 @@ input:invalid, textarea:invalid, select:invalid {
 .route-fuse > *,
 .route-blackhole > *,
 .route-wanxiang > *,
-.route-souzu-debug > *,
 .route-autorun > *,
 .route-settings > *,
 .route-diagnostics > *,

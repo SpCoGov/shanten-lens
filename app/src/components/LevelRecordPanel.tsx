@@ -1,6 +1,6 @@
 import React from "react";
 import {useTranslation} from "react-i18next";
-import type {EffectItem} from "../lib/gamestate";
+import type {EffectItem, GameStateData} from "../lib/gamestate";
 import {compareNumericStrings, formatLargeScaledNumber} from "../lib/bigNumber";
 import {parseFixed2} from "../lib/scoreEngine";
 import {useRegistry} from "../lib/registryStore";
@@ -263,9 +263,11 @@ export function useLevelRecordItems({
 
 export default function LevelRecordPanel({
     level,
+    source,
     items,
 }: {
     level: number;
+    source?: GameStateData["source"];
     items: LevelRecordItem[];
 }) {
     const {t} = useTranslation();
@@ -274,7 +276,7 @@ export default function LevelRecordPanel({
 
     return (
         <aside className="home-record-panel">
-            <div className="home-record-kicker">{t("level_records.level_label", {level: formatLevelIdToLabel(level)})}</div>
+            <div className="home-record-kicker">{t("level_records.level_label", {level: formatLevelIdToLabel(level, source)})}</div>
             <div className="home-record-list">
                 {items.map((item) => {
                     const amulet = item.amuletRegId != null ? registry.amuletById.get(item.amuletRegId) : null;

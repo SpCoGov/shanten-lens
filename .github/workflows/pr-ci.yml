@@ -51,6 +51,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm run build
+          node --test scripts/update.test.mjs
 
       - name: Check Tauri backend
         working-directory: app/src-tauri

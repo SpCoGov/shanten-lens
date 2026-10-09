@@ -18,6 +18,7 @@ use shanten_backend::plugins::{
 };
 use tauri::{AppHandle, Emitter, Manager, State};
 
+mod app_update;
 mod overlay;
 mod panic_report;
 
@@ -729,6 +730,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(app_update::AppUpdater::default())
         .manage(SharedGate(Arc::new(GateState::default())))
         .manage(StartupProgressState(Arc::new(Mutex::new(
             default_startup_progress(),
@@ -736,6 +739,9 @@ pub fn run() {
         .invoke_handler(panic_report::guard(tauri::generate_handler![
             panic_report::get_backend_panic,
             panic_report::restart_app,
+            app_update::app_updater_enabled,
+            app_update::download_app_update,
+            app_update::discard_app_update,
             shutdown_app,
             frontend_ready,
             update_startup_progress,
@@ -882,6 +888,26 @@ pub fn run() {
 
             Ok::<(), Box<dyn std::error::Error>>(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .on_window_event(|window, event| {
+            if cfg!(target_os = "windows") && window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    window.app_handle().exit(0);
+                }
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { code, api, .. } = event {
+                // A panic recovery restart must not install a pending update.
+                if code.is_none() || code == Some(0) {
+                    if let Err(error) = app_update::install_on_exit(app) {
+                        eprintln!("Failed to install update: {error}");
+                        api.prevent_exit();
+                        let _ = app.emit("app-update:install-failed", error);
+                    }
+                }
+            }
+        });
 }

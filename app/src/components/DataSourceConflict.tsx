@@ -5,15 +5,14 @@ import {pushToast} from "../lib/toast";
 import styles from "./DataSourceConflict.module.css";
 import "../fonts/material-symbols.css";
 
-export default function DataSourceConflict({preview, onPreviewClose}: {preview: boolean; onPreviewClose: () => void}) {
+export default function DataSourceConflict() {
     const {t} = useTranslation();
     const dialog = React.useRef<HTMLDialogElement>(null);
     const [status, setStatus] = React.useState<ipc.DataSourceStatus | null>(null);
     const [busy, setBusy] = React.useState(false);
     const [error, setError] = React.useState(false);
     const [closing, setClosing] = React.useState(false);
-    const isPreview = preview && !status?.pending;
-    const open = preview || Boolean(status?.pending);
+    const open = Boolean(status?.pending);
 
     React.useEffect(() => {
         let mounted = true;
@@ -50,13 +49,9 @@ export default function DataSourceConflict({preview, onPreviewClose}: {preview: 
         setBusy(true);
         setError(false);
         try {
-            if (isPreview) {
-                pushToast(t("data_source.preview_selected", {source: t(`data_source.${source}`)}), "success");
-                onPreviewClose();
-            } else if (status?.pending) {
+            if (status?.pending) {
                 const next = await ipc.selectDataSource(source, status.revision);
                 setStatus(previous => !previous || next.revision >= previous.revision ? next : previous);
-                onPreviewClose();
                 pushToast(t("data_source.selected", {source: t(`data_source.${source}`)}), "success");
             }
         } catch {
@@ -67,7 +62,7 @@ export default function DataSourceConflict({preview, onPreviewClose}: {preview: 
 
     return <dialog ref={dialog} className={`${styles.screen} ${closing ? styles.closing : ""}`}
         aria-labelledby="source-conflict-title" aria-describedby="source-conflict-description" aria-busy={busy}
-        onCancel={event => { event.preventDefault(); if (isPreview && !busy) onPreviewClose(); }}>
+        onCancel={event => event.preventDefault()}>
         <div className={styles.content}>
             <div className={styles.signal} aria-hidden="true">
                 <span className={`ms ${styles.endpoint}`}>cloud</span><span className={styles.line}/>
@@ -85,7 +80,6 @@ export default function DataSourceConflict({preview, onPreviewClose}: {preview: 
             </div>
             {busy && <p role="status">{t("data_source.switching")}</p>}
             {error && <p className={styles.error} role="alert">{t("data_source.failed")}</p>}
-            {isPreview && <button className="btn" disabled={busy} onClick={onPreviewClose}>{t("data_source.close_preview")}</button>}
         </div>
     </dialog>;
 }

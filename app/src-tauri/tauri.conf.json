@@ -95,15 +95,28 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": [
-      "msi"
+      "nsis"
     ],
     "icon": [
       "icons/icon.ico"
     ],
     "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      },
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": ["https://github.com/SpCoGov/shanten-lens/releases/latest/download/latest.json"],
+      "windows": {
+        "installMode": "quiet"
       }
     }
   }

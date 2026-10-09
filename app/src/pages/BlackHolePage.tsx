@@ -4,9 +4,8 @@ import {pushToast} from "../lib/toast";
 import * as backendIpc from "../lib/ipc";
 import Tile from "../components/Tile";
 import styles from "../components/AdvisorPanel.module.css";
-import type {PlanData, TileId} from "../lib/planTypes";
-import type {GameStateData} from "../lib/gamestate";
-import {buildDebugSnapshotFromState} from "./SouzuSwitchDebugPage";
+import type {PlanData, SearchPreferences, TileId} from "../lib/planTypes";
+import {buildDebugSnapshotFromState, type GameStateData} from "../lib/gamestate";
 import {t} from "i18next";
 
 const LS_VERBOSE = "sl-blackhole:verbose-progress";
@@ -69,6 +68,7 @@ function visibleProgress(progress?: string) {
 }
 
 export function searchProgressText(progress: NonNullable<PlanData["search_progress"]>, detailed: boolean) {
+    if (progress.phase === "custom_searching") return t("custom_target.progress", {nodes: progress.nodes, draws: progress.wall_prefix});
     const lines = [
         t(`blackhole.progress_${progress.phase}`),
         t("blackhole.progress_summary", {
@@ -110,7 +110,17 @@ export default function BlackHolePage({
     const [verboseProgress, setVerboseProgress] = React.useState<boolean>(() => readBool(LS_VERBOSE, false));
     const [wallLimit, setWallLimit] = React.useState<number>(() => readWallLimit());
     const [wallLimitInput, setWallLimitInput] = React.useState<string>(() => String(readWallLimit()));
-    const searchAlgorithm = DEFAULT_SEARCH_ALGORITHM;
+    const [quadCount, setQuadCount] = React.useState<2 | 3>(() => localStorage.getItem("sl-blackhole:quad-count") === "3" ? 3 : 2);
+    const [preferences, setPreferences] = React.useState<SearchPreferences>(() => {
+        const preferBonus = readBool("sl-blackhole:prefer-dora", false) || readBool("sl-blackhole:prefer-soul", false);
+        return {
+            prefer_dora: preferBonus,
+            prefer_soul: preferBonus,
+            any_waits: readBool("sl-blackhole:any-waits", false),
+            preferred_suit: (["z", "p", "s", "m"] as const).find(suit => suit === localStorage.getItem("sl-blackhole:preferred-suit")) ?? null,
+        };
+    });
+    const searchAlgorithm = quadCount === 3 ? "target_enumeration_three_quads" : DEFAULT_SEARCH_ALGORITHM;
     const [seenSignatures, setSeenSignatures] = React.useState<string[]>([]);
     const [mainData, setMainData] = React.useState<PlanData | null>(null);
     const [quadCatalogData, setQuadCatalogData] = React.useState<PlanData | null>(null);
@@ -119,6 +129,18 @@ export default function BlackHolePage({
 
     React.useEffect(() => localStorage.setItem(LS_VERBOSE, verboseProgress ? "1" : "0"), [verboseProgress]);
     React.useEffect(() => localStorage.setItem(LS_WALL_LIMIT, String(wallLimit)), [wallLimit]);
+    React.useEffect(() => {
+        localStorage.setItem("sl-blackhole:prefer-dora", preferences.prefer_dora ? "1" : "0");
+        localStorage.setItem("sl-blackhole:prefer-soul", preferences.prefer_soul ? "1" : "0");
+        localStorage.setItem("sl-blackhole:any-waits", preferences.any_waits ? "1" : "0");
+        localStorage.setItem("sl-blackhole:preferred-suit", preferences.preferred_suit ?? "");
+    }, [preferences]);
+    const updatePreferences = (patch: Partial<SearchPreferences>) => {
+        setPreferences(previous => ({...previous, ...patch}));
+        setMainData(null);
+        setSeenSignatures([]);
+        onClear?.();
+    };
     React.useEffect(() => {
         if (!data) return;
         if ((data as any).status === "catalog") {
@@ -180,9 +202,10 @@ export default function BlackHolePage({
                 skip_signatures: skipSignatures,
                 wall_limit: nextWallLimit,
                 search_algorithm: searchAlgorithm,
+                preferences: {...preferences, any_waits: preferences.any_waits || quadCount === 3},
             },
         });
-    }, [canOperate, planSignature, resolveWallLimit, searchAlgorithm, seenSignatures, t]);
+    }, [canOperate, planSignature, resolveWallLimit, searchAlgorithm, seenSignatures, preferences, quadCount, t]);
 
     const stopSearch = React.useCallback(() => {
         void backendIpc.runSwitch({action: "stop"});
@@ -292,6 +315,23 @@ export default function BlackHolePage({
                     </div>
 
                     <div className="switch-guide-options">
+                        <div className="switch-guide-quad-count" role="radiogroup" aria-label={t("blackhole.quad_count")}>
+                            <span>{t("blackhole.quad_count")}</span>
+                            <div className="switch-guide-quad-segments">
+                                {([2, 3] as const).map(value => (
+                                    <label key={value} title={t(value === 2 ? "blackhole.two_quads" : "blackhole.three_quads")}>
+                                        <input type="radio" name="blackhole-quad-count" value={value}
+                                               checked={quadCount === value} disabled={isSearching}
+                                               onChange={() => {
+                                                   setQuadCount(value); localStorage.setItem("sl-blackhole:quad-count", String(value));
+                                                   setMainData(null); setSeenSignatures([]);
+                                                   onClear?.();
+                                               }}/>
+                                        <span>{t(value === 2 ? "blackhole.two_quads" : "blackhole.three_quads_short")}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
                         <label className="switch-guide-toggle">
                             <input type="checkbox" checked={verboseProgress} onChange={(e) => setVerboseProgress(e.target.checked)}/>
                             <span className="switch-guide-toggle-track" aria-hidden="true"><span/></span>
@@ -303,6 +343,36 @@ export default function BlackHolePage({
                         </label>
                     </div>
                 </div>
+
+                <details className="switch-guide-preferences">
+                    <summary><span className="ms" aria-hidden="true">tune</span>{t("blackhole.search_preferences")}</summary>
+                    <div className="switch-guide-preference-fields">
+                        <label className="switch-guide-preference-select">
+                            <span>{t("blackhole.preferred_quad_suit")}</span>
+                            <select value={preferences.preferred_suit ?? ""} disabled={isSearching}
+                                    onChange={e => updatePreferences({preferred_suit: e.target.value as SearchPreferences["preferred_suit"] || null})}>
+                                <option value="">{t("blackhole.no_preference")}</option>
+                                {(["z", "p", "s", "m"] as const).map(suit => (
+                                    <option key={suit} value={suit}>{t(suit === "z" ? "about.tile_groups.honors" : `tile.suits.${suit}`)}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="switch-guide-toggle">
+                            <input type="checkbox" checked={preferences.prefer_dora} disabled={isSearching}
+                                   onChange={e => updatePreferences({prefer_dora: e.target.checked, prefer_soul: e.target.checked})}/>
+                            <span className="switch-guide-toggle-track" aria-hidden="true"><span/></span>
+                            <span>{t("blackhole.prefer_bonus")}</span>
+                        </label>
+                        <label className="switch-guide-toggle">
+                            <input type="checkbox" checked={preferences.any_waits || quadCount === 3} disabled={isSearching || quadCount === 3}
+                                   onChange={e => updatePreferences({any_waits: e.target.checked})}/>
+                            <span className="switch-guide-toggle-track" aria-hidden="true"><span/></span>
+                            <span>{t("blackhole.any_waits")}</span>
+                        </label>
+                    </div>
+                    <p>{t("blackhole.priority_early_hint")}</p>
+                    <p>{t("blackhole.any_waits_hint")}</p>
+                </details>
 
                 <div className="switch-guide-utility-bar">
                     <span>{t("blackhole.wall_limit_hint")}</span>
@@ -443,6 +513,23 @@ function PlanBody({
             </div>
 
             {finalResult}
+            {data.search_preferences?.preferred_suit && (
+                <div className={styles.label}>{t(data.mode === "wanxiang-four-meld-switch" ? "blackhole.wanxiang_suit_preference_result" : "blackhole.suit_preference_result", {
+                    suit: t(data.search_preferences.preferred_suit === "z" ? "about.tile_groups.honors" : `tile.suits.${data.search_preferences.preferred_suit}`),
+                    count: data.preferred_suit_count ?? 0,
+                })}</div>
+            )}
+            {data.mode === "wanxiang-four-meld-switch" && data.search_preferences?.preferred_meld_type && (
+                <div className={styles.label}>{t("blackhole.meld_type_preference_result", {
+                    type: t(`blackhole.meld_${data.search_preferences.preferred_meld_type}`),
+                    count: data.preferred_meld_type_count ?? 0,
+                })}</div>
+            )}
+            {(data.search_preferences?.prefer_dora || data.search_preferences?.prefer_soul) && (
+                <div className={styles.label}>{data.mode === "wanxiang-four-meld-switch"
+                    ? t("blackhole.wanxiang_preference_result", {count: data.preferred_meld_count ?? 0})
+                    : t("blackhole.preference_result", {count: data.preferred_quad_count ?? 0})}</div>
+            )}
 
             {batches.map((batch, index) => (
                 <div key={index} className="blackhole-section">

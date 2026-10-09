@@ -7,7 +7,7 @@ import LanguageSwitcher from "../components/LanguageSwitcher";
 import {useTranslation} from "react-i18next";
 import {pushToast} from "../lib/toast";
 import {readTileSkin, setTileSkin, type TileSkin} from "../lib/tileSkin";
-import {readUpdatePrefs, setUpdateUseSystemProxy} from "../lib/updateCheck";
+import {readUpdatePrefs, setUpdateAutoCheck, setUpdateUseSystemProxy} from "../lib/updateCheck";
 
 type Tables = Record<string, Record<string, any>>;
 const SETTINGS_TABLES = ["game", "general", "backend"] as const;
@@ -35,6 +35,7 @@ export default function SettingsWindow() {
     const [active, setActive] = useState<string | null>(null);
     const [tileSkinState, setTileSkinState] = useState<TileSkin>(readTileSkin());
     const [useSystemProxy, setUseSystemProxy] = useState(() => readUpdatePrefs().useSystemProxy);
+    const [autoUpdate, setAutoUpdate] = useState(() => readUpdatePrefs().autoCheck);
 
     const pending = useRef<Tables>({});
     const server = useRef<Tables>({});
@@ -187,6 +188,29 @@ export default function SettingsWindow() {
                             </div>
                         );
                     })}
+                    {active === "general" ? (
+                        <div className={styles.kvRow}>
+                            <label className={styles.settingCopy} htmlFor="update.autoCheck">
+                                <span>{t("update.auto_check_label")}</span>
+                                <small>{t("update.auto_update_desc")}</small>
+                            </label>
+                            <div className={styles.ctrl}>
+                                <label className={styles.toggle}>
+                                    <input
+                                        id="update.autoCheck"
+                                        type="checkbox"
+                                        checked={autoUpdate}
+                                        onChange={(event) => {
+                                            const checked = event.currentTarget.checked;
+                                            setUpdateAutoCheck(checked);
+                                            setAutoUpdate(checked);
+                                        }}
+                                    />
+                                    <span className={styles.toggleTrack} aria-hidden="true"><span/></span>
+                                </label>
+                            </div>
+                        </div>
+                    ) : null}
                     {active === "general" ? (
                         <div className={styles.kvRow}>
                             <label className={styles.settingCopy} htmlFor="update.useSystemProxy">

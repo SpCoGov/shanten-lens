@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import "../styles/theme.css";
 import { useFuse, toggleSelect } from "../lib/fuseStore";
-import { getRegistry } from "../lib/registryStore";
+import { useRegistry } from "../lib/registryStore";
 import { useTranslation } from "react-i18next";
 
 type ItemKind = "amulet" | "badge";
@@ -18,7 +18,7 @@ type Item = {
 export default function FuseBar() {
     const { t } = useTranslation();
     const { config, selected } = useFuse();
-    const reg = getRegistry();
+    const reg = useRegistry();
 
     const items: Item[] = useMemo(() => {
         const aList = (config.guard_skip_contains.amulets ?? []).map((id: number) => ({

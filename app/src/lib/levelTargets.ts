@@ -1,5 +1,18 @@
 import {formatLevelIdToLabel, parseLevelLabelToId} from "./levelFormat";
+import type {GameStateData} from "./gamestate";
+import qyzzStageCatalog from "./qyzzStageCatalog.json";
 export type LevelTargetEntry = {label: string; level: number; target: string};
+
+// Bundled from D:/qyzz/assets/stages/catalog.json; preserve its progression order and score strings.
+const QYZZ_LEVEL_TARGETS: LevelTargetEntry[] = qyzzStageCatalog.levels.map((stage) => ({
+    label: stage.name,
+    level: stage.id,
+    target: stage.target_points,
+}));
+
+export function getOrderedLevelTargets(source?: GameStateData["source"]): LevelTargetEntry[] {
+    return source === "qyzz" ? QYZZ_LEVEL_TARGETS : ORDERED_LEVEL_TARGETS;
+}
 
 const LEVEL_TARGETS: Record<string, string> = {
     "1-1": "200",

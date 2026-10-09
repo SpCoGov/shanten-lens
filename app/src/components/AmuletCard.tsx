@@ -1,6 +1,6 @@
 import "../styles/theme.css";
 import {type EffectItem} from "../lib/gamestate";
-import {getRegistry} from "../lib/registryStore";
+import {useRegistry} from "../lib/registryStore";
 import {t} from "i18next";
 import {calcAmuletPrice} from "../lib/amuletPrice";
 
@@ -34,7 +34,7 @@ export default function AmuletCard({
     upgradeBadge?: boolean;
     showPrice?: boolean;
 }) {
-    const reg = getRegistry();
+    const reg = useRegistry();
     const currentTheme = typeof document !== "undefined" ? document.documentElement.getAttribute("data-theme") : null;
 
     const rawId = item.id;
@@ -73,8 +73,8 @@ export default function AmuletCard({
     const titleText = unknown
         ? t("amulet_card.title_unknown", { regId, rawId })
         : t("amulet_card.title_known", {
-            name: amu!.name,
-            suffix: plus ? t("amulet_card.plus_suffix") : ""
+            name: plus ? amu!.plus_name ?? amu!.name : amu!.name,
+            suffix: plus && !amu!.plus_name ? t("amulet_card.plus_suffix") : ""
         });
     const price = calcAmuletPrice(item);
 

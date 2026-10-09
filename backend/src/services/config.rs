@@ -165,11 +165,12 @@ impl Services {
             "amulets": registry_items(&data_dir.join("amulets.json"), AMULETS, "amulets"),
             "badges": registry_items(&data_dir.join("badges.json"), BADGES, "badges"),
         });
+        let sources = self.data_sources.lock().unwrap();
         let mut current = self.registry.lock().unwrap();
         if *current != registry {
-            *current = registry.clone();
+            *current = registry;
             drop(current);
-            let _ = self.events.send(event("update_registry", registry));
+            let _ = self.events.send(event("update_registry", self.registry_for_source(sources.status.active)));
         }
     }
 }

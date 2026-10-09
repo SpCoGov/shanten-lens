@@ -12,6 +12,17 @@
     --accent-blue: #2563eb;
     --accent-green: #059669;
 
+    --custom-target-accent: var(--accent-blue);
+    --custom-target-tint: color-mix(in srgb, var(--color-ring) 8%, var(--panel-bg));
+    --custom-target-border: color-mix(in srgb, var(--color-ring) 25%, var(--color-border));
+    --custom-target-rack: linear-gradient(160deg, var(--list-item-bg), var(--input-bg));
+    --custom-target-success: color-mix(in srgb, var(--accent-green) 8%, var(--panel-bg));
+    --custom-target-red: #b91c1c;
+    --custom-target-red-tint: color-mix(in srgb, var(--custom-target-red) 10%, var(--panel-bg));
+    --custom-target-soul: #eab308;
+    --custom-target-soul-text: #854d0e;
+    --custom-target-soul-tint: color-mix(in srgb, var(--custom-target-soul) 14%, var(--panel-bg));
+
     --panel-bg: #fff;
     --panel-border: 1px solid var(--color-border);
     --panel-shadow: 0 2px 12px rgba(0, 0, 0, .06);
@@ -122,7 +133,14 @@
     --sl-border-radius: 12px;
 }
 
+:root:is([data-theme="dark"], [data-theme="dark-green"], [data-theme="dark-purple"]) {
+    --custom-target-red: #f87171;
+    --custom-target-soul: #facc15;
+    --custom-target-soul-text: var(--custom-target-soul);
+}
+
 :root[data-theme="dark"] {
+    --custom-target-accent: color-mix(in srgb, var(--color-ring) 70%, var(--color-text));
     --color-bg: #0b0f17;
     --color-text: #e6eaf2;
     --color-muted: #9aa3b2;

@@ -63,8 +63,10 @@ mod tests {
         let game = state.services.game_state();
         assert_eq!(game["source"], "qyzz");
         assert_eq!(game["max_effect_volume"], 10);
-        let algorithm = if game["deck_map"]["1000"] == "bd" { "wanxiang_four_meld_switch" } else { "target_enumeration_search" };
-        super::super::switch::switch_command(&state, &json!({"action":"start", "options":{"search_algorithm":algorithm}})).await;
+        let full_quads = std::env::var("QYZZ_TEST_FULL_PLAN").ok().map(|n| n.parse::<usize>().unwrap());
+        let algorithm = if full_quads == Some(3) { "target_enumeration_three_quads" }
+            else if game["deck_map"]["1000"] == "bd" { "wanxiang_four_meld_switch" } else { "target_enumeration_search" };
+        super::super::switch::switch_command(&state, &json!({"action":"start", "options":{"search_algorithm":algorithm,"wall_limit":36}})).await;
         let plan = state.switch_plan.read().await.clone().unwrap();
         assert_eq!(plan["status"], "plan", "{plan}");
         assert!(plan["switch_discards"].as_array().is_some_and(|batches| !batches.is_empty()));
@@ -72,7 +74,8 @@ mod tests {
         let mut keep = game["hand_tiles"].as_array().unwrap().iter().map(|id| id.as_u64().unwrap()).collect::<Vec<_>>();
         keep.remove(keep.iter().position(|id| *id != 1000).unwrap());
         let incoming = game["replacement_tiles"][0].clone();
-        let executed = super::super::switch::switch_command(&state, &json!({"action":"execute_plan", "options":{"plan_id":plan["plan_id"]}})).await;
+        let action = if full_quads.is_some() { "execute_full_plan" } else { "execute_plan" };
+        let executed = super::super::switch::switch_command(&state, &json!({"action":action, "options":{"plan_id":plan["plan_id"]}})).await;
         assert_eq!(executed[0]["data"]["ok"], true, "{executed:?}");
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
         while state.services.game_state()["qyzz_version"] == game["qyzz_version"] {
@@ -80,8 +83,15 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(30)).await;
         }
         let next = state.services.game_state();
-        assert!(next["hand_tiles"].as_array().unwrap().contains(&incoming));
+        assert!(next["hand_tiles"].as_array().unwrap().contains(&incoming)
+            || (full_quads.is_some() && next["ming"].as_array().unwrap().iter()
+                .any(|meld| meld["tileList"].as_array().unwrap().contains(&incoming))));
         assert_eq!(next["session_id"], game["session_id"]);
+        if let Some(count) = full_quads {
+            assert_eq!(next["ming"].as_array().unwrap().len(), count, "Full plan did not declare every quad: {next}");
+            assert!(!next["used_desktop_tiles"].as_array().unwrap().is_empty(), "Full plan did not discard after switching and declaring quads");
+            println!("Full plan completed: {count} quads and {} discards", next["used_desktop_tiles"].as_array().unwrap().len());
+        }
         assert!(state.qyzz.operate(&game, 101, &keep).await.is_err(), "stale revision was accepted");
         assert!(state.proxy.request(".lq.Lobby.amuletActivityGameOperate", &json!({}), Duration::from_secs(1)).await.is_err());
         state.services.disconnect_qyzz();

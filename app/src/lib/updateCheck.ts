@@ -1,5 +1,5 @@
 import {APP_VERSION} from "./version";
-import {invoke} from "@tauri-apps/api/core";
+import {Channel, invoke} from "@tauri-apps/api/core";
 import {platform} from "@tauri-apps/plugin-os";
 
 export const UPDATE_REPO_OWNER = "SpCoGov";
@@ -26,6 +26,7 @@ export type UpdateInfo = {
     downloadAssetName: string;
     platform: "windows" | "macos" | "unknown";
     assets: UpdateAsset[];
+    canInstall: boolean;
 };
 
 export type UpdateCheckResult =
@@ -121,7 +122,8 @@ export function pickDownloadAsset(assets: UpdateAsset[], targetPlatform: UpdateI
         return assets.find((asset) => lowerName(asset).endsWith(".dmg")) || null;
     }
     if (targetPlatform === "windows") {
-        return assets.find((asset) => lowerName(asset).endsWith(".msi")) || assets.find((asset) => {
+        return assets.find((asset) => lowerName(asset).endsWith("-setup.exe"))
+            || assets.find((asset) => lowerName(asset).endsWith(".msi")) || assets.find((asset) => {
             const name = lowerName(asset);
             return name.endsWith(".zip") && name.includes("portable");
         }) || assets.find((asset) => lowerName(asset).endsWith(".zip")) || null;
@@ -152,7 +154,24 @@ async function parseRelease(release: GitHubRelease): Promise<UpdateInfo | null> 
         downloadAssetName: downloadAsset?.name || "",
         platform: targetPlatform,
         assets,
+        canInstall: await invoke<boolean>("app_updater_enabled").catch(() => false),
     };
+}
+
+export type UpdateProgress = {downloaded: number; total: number | null};
+
+export async function downloadUpdate(update: UpdateInfo, onProgress: (progress: UpdateProgress) => void): Promise<void> {
+    const channel = new Channel<UpdateProgress>();
+    channel.onmessage = onProgress;
+    await invoke("download_app_update", {
+        version: update.version,
+        useSystemProxy: readUpdatePrefs().useSystemProxy,
+        onProgress: channel,
+    });
+}
+
+export async function discardUpdate(): Promise<void> {
+    await invoke("discard_app_update");
 }
 
 async function fetchLatestRelease(useSystemProxy: boolean): Promise<GitHubRelease> {

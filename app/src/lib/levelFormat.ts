@@ -1,8 +1,11 @@
-export function formatLevelIdToLabel(level: unknown): string {
+import type {GameStateData} from "./gamestate";
+
+export function formatLevelIdToLabel(level: unknown, source?: GameStateData["source"]): string {
     const value = Number(level ?? 0);
     if (!Number.isFinite(value) || value <= 0) return "-";
 
     const text = String(Math.trunc(value));
+    if (source === "qyzz" && value > 1000) return `Ex${Math.trunc(value) - 1000}`;
     const exMatch = text.match(/^12(.+)$/);
     if (exMatch) return `Ex${exMatch[1]}`;
 

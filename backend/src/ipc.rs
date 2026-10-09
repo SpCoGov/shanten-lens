@@ -75,6 +75,12 @@ pub struct RegistryAmulet {
     icon_id: u64,
     name: String,
     rarity: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    plus_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sell_price: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    plus_sell_price: Option<u64>,
 }
 
 #[allow(dead_code)]
@@ -89,6 +95,8 @@ pub struct RegistryBadge {
 #[allow(dead_code)]
 #[derive(Deserialize, Serialize, Type)]
 pub struct RegistryPayload {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source: Option<DataSource>,
     amulets: Vec<RegistryAmulet>,
     badges: Vec<RegistryBadge>,
 }

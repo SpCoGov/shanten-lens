@@ -6,15 +6,14 @@ import "./App.css";
 import {invoke} from "@tauri-apps/api/core";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
 import {useLogStore} from "./lib/logStore";
-import FrontendTestPage from "./pages/FrontendTestPage";
 import DataSourceConflict from "./components/DataSourceConflict";
 import AutoRunnerPage from "./pages/AutoRunnerPage";
 import FusePage from "./pages/FusePage";
 import AboutPage from "./pages/AboutPage";
 import BlackHolePage from "./pages/BlackHolePage";
 import WanxiangSwitchPage from "./pages/WanxiangSwitchPage";
-import SouzuSwitchDebugPage from "./pages/SouzuSwitchDebugPage";
 import ScorePage from "./pages/ScorePage";
+import CustomSwitchPage from "./pages/CustomSwitchPage";
 import OverlayPage from "./pages/OverlayPage";
 import TodayWinPage from "./pages/TodayWinPage";
 import GameStatePage from "./pages/GameStatePage";
@@ -56,6 +55,8 @@ import {buildDoraCountByTile} from "./lib/tileHighlights";
 import {APP_VERSION} from "./lib/version";
 import {
     checkForUpdates,
+    downloadUpdate,
+    discardUpdate,
     ignoreUpdateVersion,
     readUpdatePrefs,
     setUpdateAutoCheck,
@@ -271,7 +272,7 @@ async function openSettingsWindow() {
     }
 }
 
-type Route = "home" | "score" | "blackhole" | "wanxiang" | "souzu-debug" | "fuse" | "pipeline" | "plugins" | "plugin" | "today-win" | "gamestate" | "record" | "autorun" | "overlay" | "diagnostics" | "frontend-test" | "about";
+type Route = "home" | "score" | "blackhole" | "wanxiang" | "custom-switch" | "fuse" | "pipeline" | "plugins" | "plugin" | "today-win" | "gamestate" | "record" | "autorun" | "overlay" | "diagnostics" | "about";
 type TutorialId = "home" | "blackhole";
 type TutorialStep = {
     title: string;
@@ -664,8 +665,8 @@ function formatMapNodeValue(value: unknown) {
     return String(value);
 }
 
-function getGameMapNodeLabel(level: unknown, index: number, count: number) {
-    const prefix = formatLevelIdToLabel(level);
+function getGameMapNodeLabel(level: unknown, index: number, count: number, source?: GameStateData["source"]) {
+    const prefix = formatLevelIdToLabel(level, source);
     if (index === 0) return `${prefix}-START`;
     if (index === count - 1 && count > 1) return `${prefix}-BOSS`;
     return `${prefix}-${index}`;
@@ -769,7 +770,7 @@ function GameMapModal({
                     </svg>
                     <div className="game-map-level-pill">
                         <span>{t("game_map.level")}</span>
-                        <strong>{formatLevelIdToLabel(currentState?.level)}</strong>
+                        <strong>{formatLevelIdToLabel(currentState?.level, currentState?.source)}</strong>
                     </div>
                     <div className="game-map-node-pill">
                         <span>{t("game_map.node")}</span>
@@ -800,7 +801,7 @@ function GameMapModal({
                                     ) : null}
                                     <span hidden={Boolean(iconSrc)}>{index + 1}</span>
                                 </div>
-                                <div className="game-map-label">{getGameMapNodeLabel(currentState?.level, index, displayNodes.length)}</div>
+                                <div className="game-map-label">{getGameMapNodeLabel(currentState?.level, index, displayNodes.length, currentState?.source)}</div>
                                 {showNodeDetails ? (
                                     <div className="game-map-node-card">
                                         {showTypeInfo ? (
@@ -839,12 +840,15 @@ export default function App() {
     const {width: homeWidth, containerRef: appMainRef, mounted: homeMounted} = useContainerWidth();
     const themeButtonRef = React.useRef<HTMLButtonElement | null>(null);
     const [connected, setConnected] = React.useState(false);
-    const [debugEnabled, setDebugEnabled] = React.useState(false);
     const [usageNotice, setUsageNotice] = React.useState<UsageNoticeState | null>(null);
     const usageNoticeShownOnStartupRef = React.useRef(false);
     const [updateDialog, setUpdateDialog] = React.useState<UpdateDialogState | null>(null);
     const [latestUpdate, setLatestUpdate] = React.useState<UpdateInfo | null>(null);
     const [updateChecking, setUpdateChecking] = React.useState(false);
+    const [updateDownload, setUpdateDownload] = React.useState<{
+        version: string; status: "downloading" | "ready" | "failed"; percent?: number;
+    } | null>(null);
+    const updateDownloadingRef = React.useRef(false);
     const [tsumoLoopStatus, setTsumoLoopStatus] = React.useState<TsumoLoopStatus>({running: false, lastReason: "", winCount: 0});
     const [tsumoLoopIntervalMs, setTsumoLoopIntervalMs] = React.useState(() => readTsumoLoopIntervalMs());
     const [tsumoLoopSettingsOpen, setTsumoLoopSettingsOpen] = React.useState(false);
@@ -990,9 +994,8 @@ export default function App() {
     const [planChiitoi, setPlanChiitoi] = React.useState<PlanData | null>(null);
     const [planSouzuSwitch, setPlanSouzuSwitch] = React.useState<PlanData | null>(null);
     const [planWanxiangSwitch, setPlanWanxiangSwitch] = React.useState<PlanData | null>(null);
-    const [debugSouzuSwitch, setDebugSouzuSwitch] = React.useState<PlanData | null>(null);
+    const [planCustomSwitch, setPlanCustomSwitch] = React.useState<PlanData | null>(null);
     const [latestGameState, setLatestGameState] = React.useState<GameStateData | null>(null);
-    const [previewSourceConflict, setPreviewSourceConflict] = React.useState(false);
     const sourceSession = React.useRef<number | undefined>();
     const [latestGameRecord, setLatestGameRecord] = React.useState<Record<string, backendIpc.JsonValue> | null>(null);
     const [amuletHotkeys, setAmuletHotkeys] = React.useState<AmuletHotkeySettings>(() => readAmuletHotkeySettings());
@@ -1129,6 +1132,36 @@ export default function App() {
         }
     }, [t]);
 
+    const startUpdateDownload = React.useCallback(async (update: UpdateInfo) => {
+        if (updateDownloadingRef.current) return;
+        updateDownloadingRef.current = true;
+        setUpdateDownload({version: update.version, status: "downloading"});
+        try {
+            await downloadUpdate(update, ({downloaded, total}) => {
+                setUpdateDownload({
+                    version: update.version, status: "downloading",
+                    percent: total ? Math.min(100, Math.floor(downloaded * 100 / total)) : undefined,
+                });
+            });
+            setUpdateDownload({version: update.version, status: "ready"});
+            pushToast(t("update.ready", {version: update.version}), "success", 5000);
+        } catch (error) {
+            console.error("[update-download]", error);
+            setUpdateDownload({version: update.version, status: "failed"});
+            pushToast(t("update.download_failed"), "error", 5000);
+        } finally {
+            updateDownloadingRef.current = false;
+        }
+    }, [t]);
+
+    React.useEffect(() => {
+        const listener = safeListen("app-update:install-failed", () => {
+            setUpdateDownload((current) => current ? {...current, status: "failed"} : current);
+            pushToast(t("update.install_failed"), "error", 6000);
+        });
+        return () => { void listener.then((unlisten) => unlisten()); };
+    }, [t]);
+
     const runUpdateCheck = React.useCallback(async (manual = false) => {
         if (manual) setUpdateChecking(true);
         try {
@@ -1137,6 +1170,10 @@ export default function App() {
             if (result.status === "available") {
                 const prefs = readUpdatePrefs();
                 setLatestUpdate(result.update);
+                if (!manual && result.update.canInstall) {
+                    void startUpdateDownload(result.update);
+                    return;
+                }
                 setUpdateDialog({
                     update: result.update,
                     autoCheck: prefs.autoCheck,
@@ -1154,7 +1191,7 @@ export default function App() {
         } finally {
             if (manual) setUpdateChecking(false);
         }
-    }, [t]);
+    }, [t, startUpdateDownload]);
 
     React.useEffect(() => {
         console.info("[update-check]", "auto", "scheduled");
@@ -1420,17 +1457,15 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
-        type EventName = "update_config" | "update_gamestate" | "update_game_record" | "discard_recommendation" | "souzu_switch_execution" | "autorun_status" | "tsumo_loop_status" | "msgbox";
+        type EventName = "update_gamestate" | "update_game_record" | "discard_recommendation" | "souzu_switch_execution" | "autorun_status" | "tsumo_loop_status" | "msgbox";
         type AppBackendEvent = {[K in EventName]: {type: K; data: backendIpc.BackendEventMap[K]}}[EventName];
         const handleBackendEvent = (pkt: AppBackendEvent) => {
-            if (pkt.type === "update_config") {
-                const debug = !!(pkt.data as any)?.general?.debug;
-                setDebugEnabled(debug);
-            } else if (pkt.type === "update_gamestate") {
+            if (pkt.type === "update_gamestate") {
                 const d = pkt.data as GameStateData;
                 if (sourceSession.current !== d.session_id) {
                     setPlanSouzuSwitch(null);
                     setPlanWanxiangSwitch(null);
+                    setPlanCustomSwitch(null);
                     setPlanSuuAnkou(null);
                     setPlanChiitoi(null);
                     sourceSession.current = d.session_id;
@@ -1486,7 +1521,11 @@ export default function App() {
                     else if (item.yaku === "suuannkou") setPlanSuuAnkou(item.data ?? null);
                     else if (item.yaku === "souzu_switch") {
                         const source = (item.data as any)?.request_source;
-                        if (source === "debug") setDebugSouzuSwitch(item.data ?? null);
+                        if (source === "debug") continue;
+                        if (item.data?.status === "searching" && item.data.search_algorithm !== "custom_target") {
+                            setPlanCustomSwitch(null);
+                        }
+                        if (item.data?.search_algorithm === "custom_target") setPlanCustomSwitch(item.data ?? null);
                         else if (isWanxiangSwitchPlan(item.data)) setPlanWanxiangSwitch(item.data ?? null);
                         else setPlanSouzuSwitch(item.data ?? null);
                     }
@@ -1557,13 +1596,12 @@ export default function App() {
 
         let active = true;
         const backendUnlisteners = ([
-            "update_config", "update_gamestate", "update_game_record", "discard_recommendation", "souzu_switch_execution",
+            "update_gamestate", "update_game_record", "discard_recommendation", "souzu_switch_execution",
             "autorun_status", "tsumo_loop_status", "msgbox",
         ] as EventName[]).map((name) => backendIpc.subscribeBackendEvent(name, (data) => handleBackendEvent({type: name, data} as AppBackendEvent)));
         void backendIpc.initializeBackend().then((snapshot) => {
             if (!active) return;
             setConnected(true);
-            handleBackendEvent({type: "update_config", data: snapshot.config});
             handleBackendEvent({type: "update_gamestate", data: snapshot.gameState});
             handleBackendEvent({type: "autorun_status", data: snapshot.autorunStatus});
             handleBackendEvent({type: "tsumo_loop_status", data: snapshot.tsumoLoopStatus});
@@ -1577,12 +1615,6 @@ export default function App() {
             active = false;
         };
     }, []);
-
-    React.useEffect(() => {
-        if (!debugEnabled && route === "souzu-debug") {
-            setRoute("diagnostics");
-        }
-    }, [debugEnabled, route]);
 
     React.useEffect(() => {
         let active = true;
@@ -1855,6 +1887,7 @@ export default function App() {
         {id:"pipeline", icon:"account_tree", title:t("nav.pipeline"), active:route === "pipeline", tutorial:"nav-pipeline", onClick:() => setRoute("pipeline")},
         {id:"plugins", icon:"extension", title:t("nav.plugins"), active:route === "plugins", tutorial:"nav-plugins", onClick:() => setRoute("plugins")},
         {id:"wanxiang", icon:"all_inclusive", title:t("nav.wanxiang"), active:route === "wanxiang", tutorial:"nav-wanxiang", onClick:() => setRoute("wanxiang")},
+        {id:"custom-switch", icon:"tune", title:t("custom_target.title"), active:route === "custom-switch", onClick:() => setRoute("custom-switch")},
         {id:"overlay", icon:"picture_in_picture", title:t("nav.overlay"), active:route === "overlay", tutorial:"nav-overlay", onClick:() => setRoute("overlay")},
         {id:"diagnostics", icon:"article", title:t("nav.diagnostics"), active:route === "diagnostics", tutorial:"nav-diagnostics", onClick:() => setRoute("diagnostics")},
         {id:"about", icon:"help", title:t("nav.about"), active:route === "about", tutorial:"nav-about", onClick:() => setRoute("about")},
@@ -1862,10 +1895,6 @@ export default function App() {
         {id:"record", icon:"receipt_long", title:t("nav.record"), active:route === "record", tutorial:"nav-record", onClick:() => setRoute("record")},
         {id:"gamestate", icon:"data_object", title:t("nav.gamestate"), active:route === "gamestate", tutorial:"nav-gamestate", onClick:() => setRoute("gamestate")},
         ...pluginPages.map(page => ({id: "plugin:" + page.id, icon:page.icon, title:pluginPageTitle(page), active:route === "plugin" && activePluginPageId === page.id, onClick:() => {setActivePluginPageId(page.id);setRoute("plugin");}})),
-        ...(debugEnabled ? [
-            {id:"frontend-test", icon:"lab_profile", title:t("nav.frontendTest"), active:route === "frontend-test", onClick:() => setRoute("frontend-test")},
-            {id:"souzu-debug", icon:"science", title:t("nav.blackholeDebug"), active:route === "souzu-debug", onClick:() => setRoute("souzu-debug")},
-        ] : []),
         {id:"hotkeys", icon:"keyboard", title:t("amulet_hotkeys.customize"), tutorial:"nav-hotkeys", onClick:() => setHotkeyEditorOpen(true)},
         {id:"refresh", icon:"refresh", title:t("nav.refreshGame"), tutorial:"nav-refresh", onClick:() => void backendIpc.fetchActivity()},
         {id:"settings", icon:"settings", title:t("nav.settings"), onClick:openSettingsWindow},
@@ -1873,12 +1902,12 @@ export default function App() {
     ];
     const navigationDefaults = {
         outside:["home", "score", "blackhole", "more", "spacer", "hotkeys", "refresh", "settings", "theme"],
-        more:["fuse", "pipeline", "plugins", ...pluginPages.map(page => "plugin:" + page.id), "wanxiang", "overlay", "diagnostics", "about", "separator:tools", "today-win", "record", "gamestate", ...(debugEnabled ? ["separator:debug", "frontend-test", "souzu-debug"] : [])],
+        more:["fuse", "pipeline", "plugins", ...pluginPages.map(page => "plugin:" + page.id), "wanxiang", "custom-switch", "overlay", "diagnostics", "about", "separator:tools", "today-win", "record", "gamestate"],
     };
 
     return (
         <div className="app">
-            <DataSourceConflict preview={previewSourceConflict} onPreviewClose={() => setPreviewSourceConflict(false)}/>
+            <DataSourceConflict/>
             <div className="app-ambient" aria-hidden="true">
                 <span className="ambient-orb ambient-orb-a"/>
                 <span className="ambient-orb ambient-orb-b"/>
@@ -1927,11 +1956,11 @@ export default function App() {
                                                             resolveFace={(id) => deckMap.get(id) ?? null}
                                                         />
                                                     ) : (
-                                                        <LevelRecordPanel level={level} items={levelRecordItems}/>
+                                                        <LevelRecordPanel level={level} source={latestGameState?.source} items={levelRecordItems}/>
                                                     )}
                                                 </>
                                             ) : (
-                                                <LevelRecordPanel level={level} items={levelRecordItems}/>
+                                                <LevelRecordPanel level={level} source={latestGameState?.source} items={levelRecordItems}/>
                                             )}
                                         </div>
                                     ),
@@ -2145,6 +2174,7 @@ export default function App() {
                                 level={level}
                                 currentPoint={point}
                                 currentTargetPoint={targetPoint}
+                                source={latestGameState?.source}
                             />
                         )}
                         {route === "fuse" && <FusePage/>}
@@ -2178,17 +2208,12 @@ export default function App() {
                                 onClear={() => setPlanWanxiangSwitch(null)}
                             />
                         )}
-                        {route === "souzu-debug" && (
-                            <SouzuSwitchDebugPage
-                                currentState={latestGameState}
-                                data={debugSouzuSwitch}
-                                onClear={() => setDebugSouzuSwitch(null)}
-                            />
+                        {route === "custom-switch" && (
+                            <CustomSwitchPage currentState={latestGameState} data={planCustomSwitch} onClear={() => setPlanCustomSwitch(null)}/>
                         )}
                         {route === "autorun" && <AutoRunnerPage/>}
                         {route === "overlay" && <OverlayPage/>}
                         {route === "diagnostics" && <DiagnosticsPage connected={connected}/>}
-                        {route === "frontend-test" && <FrontendTestPage onTestDataSourceConflict={() => setPreviewSourceConflict(true)}/>}
                         {route === "about" && (
                             <AboutPage
                                 onSecretClick={onSecretClick}
@@ -2534,7 +2559,15 @@ export default function App() {
 
                         <div className="update-dialog-copy">
                             <h2 id="update-dialog-title">{t("update.dialog_title")}</h2>
-                            <p>{t("update.dialog_body", {version: updateDialog.update.version})}</p>
+                            <p>{t(updateDialog.update.canInstall ? "update.install_body" : "update.dialog_body", {version: updateDialog.update.version})}</p>
+                            {updateDownload?.version === updateDialog.update.version ? (
+                                <div role="status">
+                                    <p>{t(`update.${updateDownload.status === "ready" ? "ready" : updateDownload.status === "failed" ? "download_failed" : "downloading"}`, {version: updateDownload.version})}</p>
+                                    {updateDownload.status === "downloading" ? (
+                                        <progress max={100} value={updateDownload.percent} aria-label={t("update.downloading")}/>
+                                    ) : null}
+                                </div>
+                            ) : null}
                         </div>
 
                         <div className="update-dialog-meta">
@@ -2571,9 +2604,18 @@ export default function App() {
                         <div className="update-dialog-actions">
                             <button
                                 className="nav-btn"
-                                onClick={() => {
-                                    ignoreUpdateVersion(updateDialog.update.version);
-                                    setUpdateDialog(null);
+                                disabled={updateDownload?.status === "downloading"}
+                                onClick={async () => {
+                                    try {
+                                        if (updateDialog.update.canInstall) await discardUpdate();
+                                        ignoreUpdateVersion(updateDialog.update.version);
+                                        setUpdateDialog(null);
+                                        setLatestUpdate(null);
+                                        setUpdateDownload(null);
+                                    } catch (error) {
+                                        console.error("[update-ignore]", error);
+                                        pushToast(t("update.ignore_failed"), "error", 2400);
+                                    }
                                 }}
                             >
                                 {t("update.ignore_version")}
@@ -2581,8 +2623,22 @@ export default function App() {
                             <button className="nav-btn" onClick={() => void openUpdateUrl(updateDialog.update.releaseUrl)}>
                                 {t("update.open_release")}
                             </button>
-                            <button className="nav-btn update-dialog-primary" onClick={() => void openUpdateUrl(updateDialog.update.downloadUrl)}>
-                                {t("update.download_update")}
+                            <button
+                                className="nav-btn update-dialog-primary"
+                                disabled={updateDownload?.status === "downloading"}
+                                onClick={() => {
+                                    if (!updateDialog.update.canInstall) {
+                                        void openUpdateUrl(updateDialog.update.downloadUrl);
+                                    } else if (updateDownload?.version === updateDialog.update.version && updateDownload.status === "ready") {
+                                        void closeProgram();
+                                    } else {
+                                        void startUpdateDownload(updateDialog.update);
+                                    }
+                                }}
+                            >
+                                {t(!updateDialog.update.canInstall ? "update.download_package"
+                                    : updateDownload?.version === updateDialog.update.version && updateDownload.status === "ready"
+                                        ? "update.exit_install" : "update.download_update")}
                             </button>
                         </div>
                     </div>
