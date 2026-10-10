@@ -18,6 +18,6 @@ pnpm exec tauri build --config src-tauri/tauri.macos.conf.json --target universa
 bundle="src-tauri/target/universal-apple-darwin/release/bundle"
 app_bundle="$bundle/macos/Shanten Lens.app"
 executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app_bundle/Contents/Info.plist")
-lipo -verify_arch x86_64 arm64 "$app_bundle/Contents/MacOS/$executable"
+lipo "$app_bundle/Contents/MacOS/$executable" -verify_arch x86_64 arm64
 codesign --verify --deep --strict "$app_bundle"
 echo "Output: $bundle/{macos,dmg}"
