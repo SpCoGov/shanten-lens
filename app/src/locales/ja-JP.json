@@ -112,6 +112,7 @@
       "dark": "ダーク",
       "dark-green": "緑",
       "dark-purple": "神秘版",
+      "custom": "カスタム",
       "toggle": "テーマ切替（現在：{{name}}）"
     },
     "hidden_theme": {
@@ -737,7 +738,31 @@
     "table": {
       "game": "ゲーム",
       "general": "一般",
-      "backend": "バックエンド"
+      "backend": "バックエンド",
+      "appearance": "外観"
+    },
+    "appearance": {
+      "description": "変更はすぐに反映・自動保存され、向聴レンズの他のウィンドウにも同期されます。",
+      "theme": "表示テーマ",
+      "theme_desc": "標準テーマを選ぶか、自分好みの配色に変更できます。",
+      "base": "基本の明るさ",
+      "base_desc": "未変更の色は基本テーマに従い、選択済みの色は保持されます。",
+      "light": "ライト",
+      "colors_title": "カスタム配色",
+      "randomize": "ランダム配色",
+      "reset": "基本の配色に戻す",
+      "colors": {
+        "background": "ページ背景",
+        "panel": "パネル背景",
+        "text": "メインテキスト",
+        "muted": "補助テキスト",
+        "border": "枠線",
+        "accent": "アクセント",
+        "input": "入力欄の背景",
+        "success": "成功状態",
+        "warning": "警告状態",
+        "danger": "エラー状態"
+      }
     },
     "config": {
       "game": {

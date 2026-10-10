@@ -39,7 +39,7 @@ export function createPluginApi(pluginId: string, namespace: string, defaultLoca
             onChange: (callback) => {
                 ensureActive();
                 const observer = new MutationObserver(callback);
-                observer.observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme"]});
+                observer.observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme", "data-custom-theme"]});
                 return track(() => observer.disconnect());
             },
         },

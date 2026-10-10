@@ -5,6 +5,9 @@ import App from "./App";
 import { ensureI18nReady } from "./lib/i18n";
 import {AppErrorBoundary} from "./components/AppErrorBoundary";
 import {t} from "i18next";
+import {initializeTheme} from "./lib/theme";
+
+initializeTheme();
 
 const appErrorBoundaryRef = React.createRef<AppErrorBoundary>();
 const root = ReactDOM.createRoot(document.getElementById("root")!);

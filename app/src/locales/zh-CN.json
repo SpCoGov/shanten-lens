@@ -112,6 +112,7 @@
       "dark": "暗色",
       "dark-green": "绿",
       "dark-purple": "神秘版",
+      "custom": "自定义",
       "toggle": "切换主题（当前：{{name}}）"
     },
     "hidden_theme": {
@@ -737,7 +738,31 @@
     "table": {
       "game": "游戏",
       "general": "常规",
-      "backend": "后端"
+      "backend": "后端",
+      "appearance": "外观"
+    },
+    "appearance": {
+      "description": "修改后立即预览并自动保存，同步到向听镜的其他窗口。",
+      "theme": "界面主题",
+      "theme_desc": "选择内置主题，或调整属于自己的配色。",
+      "base": "基础明暗",
+      "base_desc": "未修改的颜色跟随基础主题，已选颜色会保留。",
+      "light": "浅色",
+      "colors_title": "自定义配色",
+      "randomize": "随机配色",
+      "reset": "恢复基础配色",
+      "colors": {
+        "background": "页面背景",
+        "panel": "面板背景",
+        "text": "主要文字",
+        "muted": "次要文字",
+        "border": "边框",
+        "accent": "强调色",
+        "input": "输入框背景",
+        "success": "成功状态",
+        "warning": "警告状态",
+        "danger": "错误状态"
+      }
     },
     "config": {
       "game": {
