@@ -96,7 +96,7 @@ jobs:
         if: runner.os == 'macOS'
         env:
           MACOS_ARCH: ${{ matrix.macos_arch }}
-        run: lipo -verify_arch "$MACOS_ARCH" app/src-tauri/target/release/shanten-lens
+        run: lipo app/src-tauri/target/release/shanten-lens -verify_arch "$MACOS_ARCH"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
