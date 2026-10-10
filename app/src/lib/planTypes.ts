@@ -1,5 +1,13 @@
 export type TileId = number;
 
+export type SearchPreferences = {
+    prefer_dora: boolean;
+    prefer_soul: boolean;
+    any_waits: boolean;
+    preferred_suit?: "m" | "p" | "s" | "z" | null;
+    preferred_meld_type?: "triplet" | "sequence" | null;
+};
+
 export type QuadCatalogItem = {
     face?: string;
     tile_positions: Array<{
@@ -43,11 +51,19 @@ export type DebugPoolData = {
 };
 
 export type PlanData = {
+    state_revision?: number;
+    resolved_groups?: Array<{quad: boolean; tiles: Array<{id: number; face: string; joker_as?: string | null}>}>;
+    custom_steps?: Array<{kind: "exchange" | "draw" | "discard" | "kan"; tiles: number[]; out?: number[]}>;
     plan_id?: string;
     status?: "win_now" | "plan" | "impossible" | "searching" | "catalog";
     draws_needed?: number | null;
     search_algorithm?: string;
     search_algorithm_label?: string;
+    search_preferences?: SearchPreferences;
+    preferred_quad_count?: number;
+    preferred_meld_count?: number;
+    preferred_suit_count?: number;
+    preferred_meld_type_count?: number;
     target14?: string[];
     target13?: string[];
     target_physical_ids?: TileId[];
@@ -57,6 +73,11 @@ export type PlanData = {
     reason?: string;
     progress?: string;
     search_progress?: {
+        phase: "custom_searching";
+        nodes: number;
+        wall_prefix: number;
+        elapsed_ms: number;
+    } | {
         phase: "preparing" | "enumerating";
         wall_prefix: number;
         wall_total: number;

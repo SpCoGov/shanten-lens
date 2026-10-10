@@ -2,13 +2,15 @@ import React from "react";
 import {useTranslation} from "react-i18next";
 import {pushToast} from "../lib/toast";
 import * as backendIpc from "../lib/ipc";
-import type {PlanData, TileId} from "../lib/planTypes";
-import type {GameStateData} from "../lib/gamestate";
-import {buildDebugSnapshotFromState} from "./SouzuSwitchDebugPage";
+import type {PlanData, SearchPreferences, TileId} from "../lib/planTypes";
+import {buildDebugSnapshotFromState, type GameStateData} from "../lib/gamestate";
 import {BlackHoleStrategyCard, searchProgressText} from "./BlackHolePage";
 
 const LS_VERBOSE = "sl-wanxiang-switch:verbose-progress";
 const LS_WALL_LIMIT = "sl-wanxiang-switch:wall-limit";
+const LS_PREFER_BONUS = "sl-wanxiang-switch:prefer-bonus";
+const LS_PREFERRED_SUIT = "sl-wanxiang-switch:preferred-suit";
+const LS_PREFERRED_MELD_TYPE = "sl-wanxiang-switch:preferred-meld-type";
 const WALL_LIMIT_MIN = 2;
 const WALL_LIMIT_MAX = 36;
 
@@ -73,12 +75,20 @@ export default function WanxiangSwitchPage({
 }) {
     const {t} = useTranslation();
     const [verboseProgress, setVerboseProgress] = React.useState<boolean>(() => readBool(LS_VERBOSE, false));
+    const [preferBonus, setPreferBonus] = React.useState(() => readBool(LS_PREFER_BONUS, false));
+    const [preferredSuit, setPreferredSuit] = React.useState<SearchPreferences["preferred_suit"]>(() =>
+        (["z", "p", "s", "m"] as const).find(suit => suit === localStorage.getItem(LS_PREFERRED_SUIT)) ?? null);
+    const [preferredMeldType, setPreferredMeldType] = React.useState<SearchPreferences["preferred_meld_type"]>(() =>
+        (["triplet", "sequence"] as const).find(type => type === localStorage.getItem(LS_PREFERRED_MELD_TYPE)) ?? null);
     const [wallLimit, setWallLimit] = React.useState<number>(() => readWallLimit());
     const [wallLimitInput, setWallLimitInput] = React.useState<string>(() => String(readWallLimit()));
     const [seenSignatures, setSeenSignatures] = React.useState<string[]>([]);
     const [mainData, setMainData] = React.useState<PlanData | null>(null);
 
     React.useEffect(() => localStorage.setItem(LS_VERBOSE, verboseProgress ? "1" : "0"), [verboseProgress]);
+    React.useEffect(() => localStorage.setItem(LS_PREFER_BONUS, preferBonus ? "1" : "0"), [preferBonus]);
+    React.useEffect(() => localStorage.setItem(LS_PREFERRED_SUIT, preferredSuit ?? ""), [preferredSuit]);
+    React.useEffect(() => localStorage.setItem(LS_PREFERRED_MELD_TYPE, preferredMeldType ?? ""), [preferredMeldType]);
     React.useEffect(() => localStorage.setItem(LS_WALL_LIMIT, String(wallLimit)), [wallLimit]);
     React.useEffect(() => {
         if (!data || !isWanxiangPlanData(data)) return;
@@ -140,9 +150,13 @@ export default function WanxiangSwitchPage({
                 skip_signatures: skipSignatures,
                 wall_limit: nextWallLimit,
                 search_algorithm: "wanxiang_four_meld_switch",
+                preferences: {
+                    prefer_dora: preferBonus, prefer_soul: preferBonus,
+                    preferred_suit: preferredSuit, preferred_meld_type: preferredMeldType,
+                },
             },
         });
-    }, [canOperate, hasWanxiang, planSignature, resolveWallLimit, seenSignatures, t]);
+    }, [canOperate, hasWanxiang, planSignature, resolveWallLimit, seenSignatures, preferBonus, preferredSuit, preferredMeldType, t]);
 
     const stopSearch = React.useCallback(() => {
         void backendIpc.runSwitch({action: "stop"});
@@ -226,6 +240,39 @@ export default function WanxiangSwitchPage({
                         </label>
                     </div>
                 </div>
+
+                <details className="switch-guide-preferences">
+                    <summary><span className="ms" aria-hidden="true">tune</span>{t("blackhole.search_preferences")}</summary>
+                    <div className="switch-guide-preference-fields">
+                        <label className="switch-guide-preference-select">
+                            <span>{t("blackhole.preferred_meld_suit")}</span>
+                            <select value={preferredSuit ?? ""} disabled={isSearching}
+                                    onChange={e => {setPreferredSuit(e.target.value as SearchPreferences["preferred_suit"] || null); clearCache();}}>
+                                <option value="">{t("blackhole.no_preference")}</option>
+                                {(["z", "p", "s", "m"] as const).map(suit => (
+                                    <option key={suit} value={suit}>{t(suit === "z" ? "about.tile_groups.honors" : `tile.suits.${suit}`)}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="switch-guide-preference-select">
+                            <span>{t("blackhole.preferred_meld_type")}</span>
+                            <select value={preferredMeldType ?? ""} disabled={isSearching}
+                                    onChange={e => {setPreferredMeldType(e.target.value as SearchPreferences["preferred_meld_type"] || null); clearCache();}}>
+                                <option value="">{t("blackhole.no_preference")}</option>
+                                {(["triplet", "sequence"] as const).map(type => (
+                                    <option key={type} value={type}>{t(`blackhole.meld_${type}`)}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="switch-guide-toggle">
+                            <input type="checkbox" checked={preferBonus} disabled={isSearching}
+                                   onChange={e => {setPreferBonus(e.target.checked); clearCache();}}/>
+                            <span className="switch-guide-toggle-track" aria-hidden="true"><span/></span>
+                            <span>{t("blackhole.wanxiang_prefer_bonus")}</span>
+                        </label>
+                    </div>
+                    <p>{t("blackhole.wanxiang_preference_hint")}</p>
+                </details>
 
                 <div className="switch-guide-utility-bar">
                     <span>{t("blackhole.wall_limit_hint")}</span>

@@ -37,13 +37,15 @@ Shanten Lens 是一款面向《雀魂》青云之志模式的桌面辅助工具�
 
 该接入不需要代理或证书。连接仅限同一台电脑，自动读取 `%LOCALAPPDATA%/Qyzz/shanten-lens.json` 中的临时端口和随机连接令牌；再次点击游戏连接按钮或退出游戏即可断开。若同时收到本机游戏和原版封包流水线的数据，会显示全屏“数据源冲突”动画，选择其中一个来源后继续。未选来源的状态单独缓存，封包继续转发，但暂停其流水线模块和操作；来源变化会停止自动操作并清除旧换牌方案。断开一个来源后自动使用另一个，再次同时连接时重新选择。
 
-在 **前端测试 → 数据源冲突 → 预览数据源冲突** 可手动触发同一弹窗。预览支持选择、关闭或 Esc 退出，不改变真实数据源。
-
 支持读取完整牌山、换牌堆、手牌、杠、宝牌、魂牌、护身符成长和印章；操作支持换牌、结束换牌、出牌、暗杠。其他功能中的原版协议操作暂不转发到本地游戏。计算器仍使用向听镜自身规则，未声称与本地游戏所有自定义计分完全相同。
+
+花火指导的“一键执行方案”支持换牌后继续两杠或三杠及打牌。最后一次换牌使游戏自动进入出牌阶段时直接继续；仍在换牌阶段时才发送结束换牌请求。
 
 构建本版本：在 `app` 目录运行 `pnpm exec tauri build --no-bundle`，启动 `app/src-tauri/target/release/shanten-lens.exe`。普通旧版程序不包含此接口。
 
 接入回归测试：后端 `cargo test -p shanten-backend --lib`；计算器在 `app` 目录运行 `node scripts/qyzz-score.test.mjs D:/qyzz/test-output/lens-state.json`（先运行游戏的 `tests/lens_bridge_test.gd` 生成数据）。真实双进程换牌测试的启动方法见游戏 README 中的“连接向听镜”。
+
+完整方案的双进程测试：先编译后端测试，在游戏目录启动 `tests/lens_bridge_test.gd -- --serve-lens-test --hanabi-fixture`；追加 `--last-exchange` 可覆盖换牌次数耗尽，追加 `--three-quads` 切换三杠构筑。测试进程设置 `QYZZ_TEST_DISCOVERY=D:/qyzz/test-output/lens-discovery.json`、`QYZZ_TEST_ROOT` 为独立临时目录、`QYZZ_TEST_FULL_PLAN=2` 或 `3`，运行 `cargo test -p shanten-backend real_qyzz_connection_search_and_exchange -- --ignored --nocapture`。这会验证真实游戏中的换牌、结束换牌、杠牌及打牌；不设置 `QYZZ_TEST_FULL_PLAN` 则只验证换牌。
 
 ## 使用须知
 
@@ -223,11 +225,25 @@ pnpm run dev
 scripts\build_all.bat
 ```
 
-脚本会安装锁定版本的前端依赖，并构建包含内嵌 Rust 后端的 MSI 安装包。输出目录：
+脚本会安装锁定版本的前端依赖，并构建当前用户安装的 NSIS 安装包及更新签名。打包前需设置下述签名环境变量。输出目录：
 
 ```text
-app/src-tauri/target/release/bundle/msi/
+app/src-tauri/target/release/bundle/nsis/
 ```
+
+### Windows 自动更新与签名
+
+正式安装版启动后自动检查并下载更新，签名验证通过后，在用户关闭向听镜时静默安装，下次打开即为新版。下载期间关闭程序会直接退出，下次启动重新下载，不会安装未完成的包。设置中可以关闭下次启动时的自动更新；更新窗口可以忽略已下载的版本。配置、证书和插件仍保存在原有应用数据目录中。
+
+旧版需要手动安装一次新的 `*-setup.exe`。原 MSI 用户建议先通过 Windows 卸载旧程序，再安装新版本，避免两套安装记录；保留应用数据。之后无需手动下载或解压。开发构建不自动安装更新。
+
+首次发布前，在 `app` 目录使用 `pnpm exec tauri signer generate -w <仓库外的私钥路径>` 生成并安全备份密钥，密码按提示设置。配置以下 GitHub Actions 变量与密钥，本地打包也使用同名环境变量：
+
+- Repository variable `TAURI_UPDATER_PUBLIC_KEY`：公钥文件内容，编译时嵌入程序。
+- Repository secret `TAURI_SIGNING_PRIVATE_KEY`：私钥文件内容（本地也可使用私钥文件路径）。
+- Repository secret `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`：私钥密码。
+
+私钥不能提交到仓库，后续版本必须继续使用同一密钥。发布工作流上传安装包、`.sig` 和 `latest.json` 到 GitHub Releases；清单缺少对应版本的安装包或签名时会拒绝发布。签名密钥未配置时 Windows 打包会失败，避免发布无法更新的安装版。仅检查代码可使用 `pnpm run build`、`cargo check` 或 `pnpm exec tauri build --no-bundle`，无需私钥。
 
 ### macOS 打包
 

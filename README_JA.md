@@ -209,11 +209,15 @@ pnpm run dev
 scripts\build_all.bat
 ```
 
-スクリプトはロックされたバージョンのフロントエンド依存関係をインストールし、組み込み Rust バックエンドを含む MSI インストーラーをビルドします。出力先：
+スクリプトはロックされたバージョンのフロントエンド依存関係をインストールし、現在のユーザー向け NSIS インストーラーと更新署名をビルドします。出力先：
 
 ```text
-app/src-tauri/target/release/bundle/msi/
+app/src-tauri/target/release/bundle/nsis/
 ```
+
+正式な Windows インストール版は起動時に更新をダウンロード・検証し、終了時に自動インストールします。旧版からは一度だけ `*-setup.exe` の手動インストールが必要です。旧 MSI 版はアプリデータを残してアンインストールしてから移行してください。
+
+ビルド前に `TAURI_UPDATER_PUBLIC_KEY`、`TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` を環境変数として設定します。GitHub Actions では公開鍵を同名の Repository variable、秘密鍵とパスワードを同名の Repository secrets に保存します。鍵の生成とバックアップについては [自動更新と署名の設定](./README.md#windows-自动更新与签名) を参照してください。秘密鍵をリポジトリにコミットしないでください。
 
 ### macOS パッケージ
 

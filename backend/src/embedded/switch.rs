@@ -33,6 +33,19 @@ pub(super) async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
         .unwrap_or(36) as usize;
     match action {
         "start" | "start_debug" => {
+            let preferences = match serde_json::from_value::<recommendations::SearchPreferences>(
+                data.pointer("/options/preferences").cloned().unwrap_or_else(|| json!({})),
+            ) {
+                Ok(preferences) => preferences,
+                Err(_) => return vec![
+                    event("discard_recommendation", json!([{"yaku":"souzu_switch","data":{
+                        "status":"impossible","reason":"invalid-search-preferences",
+                        "search_algorithm":data.pointer("/options/search_algorithm"),
+                        "request_source":if action=="start_debug" {"debug"}else{"live"}
+                    }}])),
+                    event("souzu_switch_control_result", json!({"action":action,"ok":false,"reason":"invalid-search-preferences"})),
+                ],
+            };
             let debug = action == "start_debug";
             let algorithm = data
                 .get("options")
@@ -85,6 +98,7 @@ pub(super) async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
             let session = snapshot.get("session_id").cloned().unwrap_or(Value::Null);
             let revision = snapshot.get("revision").cloned().unwrap_or(Value::Null);
             let result_algorithm = algorithm.clone();
+            let target_groups = data.pointer("/options/target_groups").cloned().unwrap_or(Value::Null);
             let worker_state = state.clone();
             let mut plan = tokio::task::spawn_blocking(move || {
                 let stopped = || if debug {
@@ -92,8 +106,7 @@ pub(super) async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
                 } else {
                     *worker_state.switch_generation.borrow() != generation
                 };
-                recommendations::switch_plan_with_progress(&snapshot, wall_limit, &skip_signatures, algorithm.as_deref(),
-                    &mut |progress| {
+                let mut progress = |progress| {
                         if stopped() { return; }
                         let _ = worker_state.events.send(event("discard_recommendation", json!([{
                             "yaku":"souzu_switch", "data": {
@@ -102,7 +115,13 @@ pub(super) async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
                                 "request_source":if debug {"debug"} else {"live"},
                             }
                         }])));
-                    }, &stopped)
+                    };
+                if algorithm.as_deref() == Some("custom_target") {
+                    recommendations::custom_switch_plan(&snapshot, &target_groups, wall_limit, &mut progress, &stopped)
+                } else {
+                    recommendations::switch_plan_with_preferences(&snapshot, wall_limit, &skip_signatures,
+                        algorithm.as_deref(), &preferences, &mut progress, &stopped)
+                }
             })
             .await
             .unwrap_or_else(|error| {
@@ -114,7 +133,9 @@ pub(super) async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
             } else {
                 *state.switch_generation.borrow()
             };
-            if current_generation != generation || (!debug && state.services.game_state()["session_id"] != session) {
+            if current_generation != generation
+                || (!debug && state.services.game_state()["session_id"] != session)
+            {
                 return vec![];
             }
             if let Some(object) = plan.as_object_mut() {
@@ -409,6 +430,12 @@ async fn execute_switch_batches(
             return Err("stopped-by-user".into());
         }
         let game = state.services.game_state();
+        // The last exchange can enter play directly, without offering a finish operation.
+        if game["stage"] == 5
+            || [1, 4, 8].iter().any(|kind| operation_available(&game, *kind))
+        {
+            return Ok(());
+        }
         if operation_available(&game, 100) {
             let _ = state.services.events.send(event(
                 "souzu_switch_execution",
@@ -441,7 +468,7 @@ async fn execute_switch_batches(
     Err("finish-switch-operation-timeout".into())
 }
 
-fn choose_discard(game: &Value, plan: &Value) -> Option<u64> {
+fn choose_discard(game: &Value, plan: &Value, pending_quads: &[String]) -> Option<u64> {
     let hand = value_ids(game.get("hand_tiles"));
     if let Some(planned) = plan.get("post_draw_discards").and_then(Value::as_array) {
         if let Some(id) = planned
@@ -462,6 +489,9 @@ fn choose_discard(game: &Value, plan: &Value) -> Option<u64> {
     {
         *wanted.entry(face.to_owned()).or_default() += 1;
     }
+    for face in pending_quads {
+        *wanted.entry(face.clone()).or_default() += 4;
+    }
     let mut kept = HashMap::<String, usize>::new();
     for id in hand.iter().copied() {
         let face = deck_face(game, id).unwrap_or("");
@@ -471,7 +501,7 @@ fn choose_discard(game: &Value, plan: &Value) -> Option<u64> {
         }
         *count += 1;
     }
-    hand.last().copied()
+    None
 }
 
 async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), String> {
@@ -494,8 +524,8 @@ async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), Str
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    if pending_quads.len() != 2 {
-        return Err("full-plan-requires-two-quads".into());
+    if !(2..=3).contains(&pending_quads.len()) {
+        return Err("full-plan-requires-two-or-three-quads".into());
     }
     let draws_needed = plan
         .get("draws_needed")
@@ -547,7 +577,7 @@ async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), Str
             return Ok(());
         }
         if operation_available(&game, 1) {
-            let discard = choose_discard(&game, plan).ok_or("no-safe-discard")?;
+            let discard = choose_discard(&game, plan, &pending_quads).ok_or("no-safe-discard")?;
             let _ = state.services.events.send(event(
                 "souzu_switch_execution",
                 json!({"status":"running","phase":"discard","tile_id":discard}),
@@ -566,4 +596,18 @@ async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), Str
         tokio::time::sleep(Duration::from_millis(80)).await;
     }
     Err("full-plan-execution-timeout".into())
+}
+
+#[cfg(test)]
+mod three_quad_execution_tests {
+    use super::*;
+    #[test]
+    fn discard_preserves_pending_quads_and_the_final_wait() {
+        let game = json!({"hand_tiles":[1,2,3,4,5],"deck_map":{"1":"1m","2":"1m","3":"4p","4":"7z","5":"9s"}});
+        let plan = json!({"target13":["4p","7z"]});
+        assert_eq!(choose_discard(&game, &plan, &["1m".into()]), Some(5));
+        assert_eq!(choose_discard(&game, &plan, &[]), Some(1));
+        let full = json!({"target13":["1m","1m","4p","7z","9s"]});
+        assert_eq!(choose_discard(&game, &full, &[]), None);
+    }
 }

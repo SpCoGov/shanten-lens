@@ -50,6 +50,9 @@ impl Services {
         let switched = status.active != sources.status.active || status.pending != sources.status.pending;
         if changed { status.revision += 1; }
         sources.status = status.clone();
+        if switched {
+            let _ = self.events.send(event("update_registry", self.registry_for_source(active)));
+        }
         if switched || (active.is_some() && updated == active) {
             let mut next = match active {
                 Some(DataSource::Qyzz) => {
@@ -99,6 +102,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("lens-sources-{}", std::process::id()));
         let (events, mut received) = tokio::sync::broadcast::channel(64);
         let services = Services::load(root.join("configs"), events).unwrap();
+        let mut packet_registry = services.registry();
         let mut packet = Packet { direction: Direction::Inbound, packet_type: "Res".into(),
             method: ".lq.Lobby.fetchAmuletActivityData".into(), id: Some(1),
             data: json!({"game":{"state":{"current":5},"round":{"hands":[1]}}}) };
@@ -113,7 +117,19 @@ mod tests {
         assert_eq!(services.game_state()["stage"], -1);
         assert!(!services.packet_processing_allowed() && !services.qyzz_operations_allowed());
         assert!(services.select_data_source(DataSource::Qyzz, conflict.revision - 1).is_err());
+        assert_eq!(services.registry(), packet_registry);
         services.select_data_source(DataSource::Qyzz, conflict.revision).unwrap();
+        let local_registry = services.registry();
+        assert_eq!(local_registry["source"], "qyzz");
+        assert_eq!(local_registry["amulets"].as_array().unwrap().len(), 181);
+        assert_eq!(local_registry["badges"], packet_registry["badges"]);
+        // Reload packet data while IPC is active; publish only the active catalog and retain the update.
+        packet_registry["amulets"][0]["name"] = json!("packet-registry-updated");
+        std::fs::write(root.join("data/amulets.json"), serde_json::to_vec(&json!({
+            "schema_version": 1, "version": 999, "items": packet_registry["amulets"],
+        })).unwrap()).unwrap();
+        services.reload_files();
+        assert_eq!(services.registry(), local_registry);
         assert_eq!(services.game_state()["hand_tiles"], json!([2]));
         assert!(!services.packet_processing_allowed());
         packet.data["game"]["round"]["hands"] = json!([3]);
@@ -121,12 +137,14 @@ mod tests {
         assert_eq!(services.game_state()["hand_tiles"], json!([2]));
         assert!(!services.data_source_status().pending);
         services.disconnect_qyzz();
+        assert_eq!(services.registry(), packet_registry);
         assert_eq!(services.game_state()["hand_tiles"], json!([3]));
         assert!(services.packet_processing_allowed());
         services.publish_qyzz_state(&qyzz).unwrap();
         let second = services.data_source_status();
         assert!(second.pending && second.revision > conflict.revision);
         services.select_data_source(DataSource::Packet, second.revision).unwrap();
+        assert_eq!(services.registry(), packet_registry);
         qyzz["qyzz_version"] = json!(2);
         services.publish_qyzz_state(&qyzz).unwrap();
         assert_eq!(services.game_state()["hand_tiles"], json!([3]));
@@ -134,15 +152,24 @@ mod tests {
         services.disconnect_game_flow(99);
         assert!(services.data_source_status().packet);
         services.disconnect_game_flow(7);
+        assert_eq!(services.registry(), local_registry);
         assert_eq!(services.game_state()["source"], "qyzz");
         assert!(services.game_state()["session_id"].as_u64().unwrap() > original_session);
         services.disconnect_qyzz();
+        assert_eq!(services.registry(), packet_registry);
         assert_eq!(services.game_state()["stage"], -1);
         // Also detect the second source when the local connection arrives first.
         services.publish_qyzz_state(&qyzz).unwrap();
         services.update_game_state_from_flow(&packet, 9);
         assert!(services.data_source_status().pending);
-        let conflicts = std::iter::from_fn(|| received.try_recv().ok())
+        let events = std::iter::from_fn(|| received.try_recv().ok()).collect::<Vec<_>>();
+        for (index, event) in events.iter().enumerate().filter(|(_, event)| event["type"] == "update_gamestate") {
+            if event["data"]["source"] == "qyzz" {
+                let registry_event = events[..index].iter().rev().find(|event| event["type"] == "update_registry").unwrap();
+                assert_eq!(registry_event["data"], local_registry);
+            }
+        }
+        let conflicts = events.iter()
             .filter(|event| event["type"] == "data_source_status" && event["data"]["pending"] == true).count();
         assert_eq!(conflicts, 3);
         drop(services);

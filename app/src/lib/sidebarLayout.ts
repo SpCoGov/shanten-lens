@@ -6,6 +6,7 @@ export function normalizeSidebarLayout(value: unknown, defaults: SidebarLayout):
     const seen = new Set<string>();
     const clean = (items: unknown, zone: keyof SidebarLayout) => (Array.isArray(items) ? items : defaults[zone])
         .filter((id): id is string => typeof id === "string" && id.length > 0 && id.length < 512)
+        .filter(id => !["frontend-test", "souzu-debug", "separator:debug"].includes(id))
         .filter(id => { if (id === "separator:plugins" || seen.has(id) || (zone === "more" && (id === "more" || id === "spacer"))) return false; seen.add(id); return true; });
     const result = {outside: clean(saved.outside, "outside"), more: clean(saved.more, "more")};
     // Preserve unavailable plugin IDs so re-enabling restores their position.

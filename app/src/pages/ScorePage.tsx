@@ -4,7 +4,7 @@ import styles from "./ScorePage.module.css";
 import Modal from "../components/Modal";
 import AmuletCard from "../components/AmuletCard";
 import {getAllRegisteredAmuletRules} from "../lib/amuletRuleRegistry";
-import type {EffectItem} from "../lib/gamestate";
+import type {EffectItem, GameStateData} from "../lib/gamestate";
 import {useRegistry} from "../lib/registryStore";
 import {
     calculateCurrentPoint,
@@ -29,7 +29,7 @@ import {
 import {buildDoraCountByTile} from "../lib/tileHighlights";
 import {formatLevelIdToLabel} from "../lib/levelFormat";
 
-import {LEVEL_TARGETS_BY_ID, ORDERED_LEVEL_TARGETS} from "../lib/levelTargets";
+import {getOrderedLevelTargets} from "../lib/levelTargets";
 
 type CustomRuleMap = Record<string, Partial<AmuletRuleConfig>>;
 type TileScoreEntry = { tile: string; score: bigint };
@@ -108,11 +108,6 @@ function isPinzuTile(tile: string | undefined): boolean {
     return /^[0-9]p$/.test(String(tile ?? "").trim());
 }
 
-const LEVEL_LABELS_BY_ID = ORDERED_LEVEL_TARGETS.reduce<Record<number, string>>((acc, item) => {
-    acc[item.level] = item.label;
-    return acc;
-}, {});
-
 function safeDisplayStoredData(raw: string) {
     try {
         return formatFixed2(BigInt(raw || "0"));
@@ -150,6 +145,7 @@ export default function ScorePage({
                                       level,
                                       currentPoint,
                                       currentTargetPoint,
+                                      source,
                                   }: {
     amulets: EffectItem[];
     handTileIds: number[];
@@ -160,8 +156,14 @@ export default function ScorePage({
     level: number;
     currentPoint?: string;
     currentTargetPoint?: string;
+    source?: GameStateData["source"];
 }) {
     const {t} = useTranslation();
+    const levelTargets = getOrderedLevelTargets(source);
+    const projectionMetaByLevel = React.useMemo(
+        () => new Map(levelTargets.map((item) => [item.level, item] as const)),
+        [levelTargets],
+    );
     const [fanText, setFanText] = usePersistentState<string>(FAN_STORAGE_KEY, "1");
     const [winCountText, setWinCountText] = usePersistentState<string>(WIN_COUNT_STORAGE_KEY, "1");
     const [customRules, setCustomRules] = usePersistentState<CustomRuleMap>(RULES_STORAGE_KEY, {});
@@ -249,12 +251,12 @@ export default function ScorePage({
     }, [baseScore, baseFan, level, rules, hasPinzuInHand, soulTileCount]);
 
     const currentLevelLabel = React.useMemo(
-        () => LEVEL_LABELS_BY_ID[level] ?? formatLevelIdToLabel(level || 0),
-        [level],
+        () => projectionMetaByLevel.get(level)?.label ?? formatLevelIdToLabel(level || 0, source),
+        [level, source, projectionMetaByLevel],
     );
 
     const futureProjections = React.useMemo(() => {
-        const startIndex = ORDERED_LEVEL_TARGETS.findIndex((item) => item.level === level);
+        const startIndex = levelTargets.findIndex((item) => item.level === level);
         if (startIndex < 0) return [];
         const runtime = {hasPinzuInHand, soulTileCount: 14};
         const seededRules = cloneResolvedRules(rules);
@@ -264,10 +266,7 @@ export default function ScorePage({
         }
         return projectFuturePoints(
             level,
-            ORDERED_LEVEL_TARGETS.slice(startIndex + 1).map((item) => ({
-                level: item.level,
-                target: LEVEL_TARGETS_BY_ID[item.level],
-            })),
+            levelTargets.slice(startIndex + 1),
             seededResult,
             seededRules,
             baseScore,
@@ -275,12 +274,8 @@ export default function ScorePage({
             winCount,
             runtime,
         );
-    }, [level, rules, baseScore, baseFan, winCount, hasPinzuInHand]);
+    }, [level, levelTargets, rules, baseScore, baseFan, winCount, hasPinzuInHand]);
 
-    const projectionMetaByLevel = React.useMemo(
-        () => new Map(ORDERED_LEVEL_TARGETS.map((item) => [item.level, item] as const)),
-        [],
-    );
     const selectedFutureProjection = React.useMemo(
         () => futureProjections.find((projection) => projection.level === selectedFutureLevel) ?? null,
         [futureProjections, selectedFutureLevel],
@@ -326,8 +321,8 @@ export default function ScorePage({
                 items.push({
                     type: "collapsed", groupKey,
                     hiddenCount: hiddenProjections.length,
-                    startLevel: projectionMetaByLevel.get(hiddenProjections[0]!.level)?.label ?? formatLevelIdToLabel(hiddenProjections[0]!.level),
-                    endLevel: projectionMetaByLevel.get(hiddenProjections[hiddenProjections.length - 1]!.level)?.label ?? formatLevelIdToLabel(hiddenProjections[hiddenProjections.length - 1]!.level),
+                    startLevel: projectionMetaByLevel.get(hiddenProjections[0]!.level)?.label ?? formatLevelIdToLabel(hiddenProjections[0]!.level, source),
+                    endLevel: projectionMetaByLevel.get(hiddenProjections[hiddenProjections.length - 1]!.level)?.label ?? formatLevelIdToLabel(hiddenProjections[hiddenProjections.length - 1]!.level, source),
                     expanded: expandedFutureGroups.includes(groupKey),
                     hiddenProjections,
                 });
@@ -336,7 +331,7 @@ export default function ScorePage({
             index = end + 1;
         }
         return items;
-    }, [expandedFutureGroups, futureProjections, projectionMetaByLevel]);
+    }, [expandedFutureGroups, futureProjections, projectionMetaByLevel, source]);
     const chainBreakIndices = React.useMemo(() => {
         const breaks = new Set<number>();
         for (let index = 1; index < rules.length; index += 1) {
@@ -773,7 +768,7 @@ export default function ScorePage({
                                             <div className="future-collapsed-list">
                                                 {item.hiddenProjections.map((projection) => {
                                                     const meta = projectionMetaByLevel.get(projection.level);
-                                                    const levelLabel = meta?.label ?? formatLevelIdToLabel(projection.level);
+                                                    const levelLabel = meta?.label ?? formatLevelIdToLabel(projection.level, source);
                                                     const targetText = meta?.target;
                                                     return (
                                                         <button
@@ -821,7 +816,7 @@ export default function ScorePage({
 
                             const projection = item.projection;
                             const meta = projectionMetaByLevel.get(projection.level);
-                            const levelLabel = meta?.label ?? formatLevelIdToLabel(projection.level);
+                            const levelLabel = meta?.label ?? formatLevelIdToLabel(projection.level, source);
                             const targetText = meta?.target;
                             return (
                                 <button
@@ -1162,7 +1157,7 @@ export default function ScorePage({
                 open={!!selectedFutureProjection}
                 onClose={() => setSelectedFutureLevel(null)}
                 title={selectedFutureProjection ? t("score.future_growth_detail_title", {
-                    level: projectionMetaByLevel.get(selectedFutureProjection.level)?.label ?? formatLevelIdToLabel(selectedFutureProjection.level),
+                    level: projectionMetaByLevel.get(selectedFutureProjection.level)?.label ?? formatLevelIdToLabel(selectedFutureProjection.level, source),
                 }) : t("score.future_growth_detail_title", {level: "-"})}
                 width={980}
             >

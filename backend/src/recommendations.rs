@@ -2,6 +2,52 @@ use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 mod souzu;
 mod wanxiang;
+mod custom;
+
+pub fn custom_switch_plan(state: &Value, target: &Value, wall_limit: usize,
+    progress: &mut dyn FnMut(Value), stopped: &dyn Fn() -> bool) -> Value {
+    custom::search(state, target, wall_limit, progress, stopped)
+}
+
+#[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
+pub enum TileSuit {
+    #[serde(rename = "m")]
+    Man,
+    #[serde(rename = "p")]
+    Pin,
+    #[serde(rename = "s")]
+    Sou,
+    #[serde(rename = "z")]
+    Honor,
+}
+
+impl TileSuit {
+    fn matches(self, tile: u8) -> bool {
+        tile / 9 == match self {
+            Self::Man => 0,
+            Self::Pin => 1,
+            Self::Sou => 2,
+            Self::Honor => 3,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MeldType {
+    Triplet,
+    Sequence,
+}
+
+#[derive(Clone, Default, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
+pub struct SearchPreferences {
+    pub prefer_dora: bool,
+    pub prefer_soul: bool,
+    pub any_waits: bool,
+    pub preferred_suit: Option<TileSuit>,
+    pub preferred_meld_type: Option<MeldType>,
+}
 
 fn ids(value: Option<&Value>) -> Vec<u64> {
     value
@@ -231,16 +277,30 @@ pub fn switch_plan_with_progress(
     progress: &mut dyn FnMut(Value),
     stopped: &dyn Fn() -> bool,
 ) -> Value {
+    switch_plan_with_preferences(state, wall_limit, skip_signatures, algorithm,
+        &SearchPreferences::default(), progress, stopped)
+}
+
+pub fn switch_plan_with_preferences(
+    state: &Value,
+    wall_limit: usize,
+    skip_signatures: &[String],
+    algorithm: Option<&str>,
+    preferences: &SearchPreferences,
+    progress: &mut dyn FnMut(Value),
+    stopped: &dyn Fn() -> bool,
+) -> Value {
     let hand = ids(state.get("hand_tiles"));
     if hand.len() != 13 {
         return json!({"status":"impossible","reason":"switch-hand-must-be-13"});
     }
     let has_wanxiang = hand.contains(&1000);
     match algorithm {
-        Some("wanxiang_four_meld_switch") => wanxiang::search(state, skip_signatures, progress, stopped),
-        Some("target_enumeration_search") => souzu::search(state, wall_limit, progress, stopped),
-        None if has_wanxiang => wanxiang::search(state, skip_signatures, progress, stopped),
-        None => souzu::search(state, wall_limit, progress, stopped),
+        Some("wanxiang_four_meld_switch") => wanxiang::search(state, skip_signatures, preferences, progress, stopped),
+        Some("target_enumeration_three_quads") => souzu::search_with_preferences(state, wall_limit, 3, skip_signatures, preferences, progress, stopped),
+        Some("target_enumeration_search") => souzu::search_with_preferences(state, wall_limit, 2, skip_signatures, preferences, progress, stopped),
+        None if has_wanxiang => wanxiang::search(state, skip_signatures, preferences, progress, stopped),
+        None => souzu::search_with_preferences(state, wall_limit, 2, skip_signatures, preferences, progress, stopped),
         Some(_) => json!({"status":"impossible","reason":"unknown-algorithm"}),
     }
 }

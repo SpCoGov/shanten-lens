@@ -39,6 +39,23 @@ export interface GameStateData {
     update_reason?: string[];
 }
 
+export function buildDebugSnapshotFromState(state: GameStateData) {
+    return {
+        stage: state.stage,
+        deck_map: state.deck_map || {},
+        dora_tiles: state.dora_tiles ?? [],
+        tian_dora_tiles: state.tian_dora_tiles ?? [],
+        hand_tiles: Array.isArray(state.hand_tiles) ? state.hand_tiles : [],
+        ming: Array.isArray(state.ming) ? state.ming : [],
+        replacement_tiles: Array.isArray(state.replacement_tiles) ? state.replacement_tiles : [],
+        wall_tiles: Array.isArray(state.wall_tiles) ? state.wall_tiles : [],
+        switch_used_tiles: Array.isArray(state.switch_used_tiles) ? state.switch_used_tiles : [],
+        total_change_tile_count: state.total_change_tile_count ?? 0,
+        change_tile_count: state.change_tile_count ?? 0,
+        boss_buff: Array.isArray(state.boss_buff) ? state.boss_buff : [],
+    };
+}
+
 export interface MingItem {
     type: number;
     tileList: number[];

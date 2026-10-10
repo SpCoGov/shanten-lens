@@ -21,7 +21,7 @@ import {
     type AmuletRuleConfig,
 } from "./lib/scoreEngine";
 import {formatLevelIdToLabel} from "./lib/levelFormat";
-import {LEVEL_TARGETS_BY_ID, ORDERED_LEVEL_TARGETS} from "./lib/levelTargets";
+import {getOrderedLevelTargets} from "./lib/levelTargets";
 import {
     readHudEnabled,
     readHudShowBlackhole,
@@ -108,6 +108,7 @@ function HudOverlay() {
                 const arr = Array.isArray(data) ? data : [];
                 for (const item of arr) {
                     if (item?.yaku === "souzu_switch" && item.data?.request_source !== "debug") {
+                        if (item.data?.search_algorithm === "custom_target") continue;
                         if (isWanxiangPlanData(item.data ?? null)) {
                             setWanxiangPlan(item.data ?? null);
                         } else {
@@ -532,7 +533,7 @@ function hasWanxiangInState(gameState: GameStateData | null) {
 
 function getScoreProjection(gameState: GameStateData | null) {
     const level = Number(gameState?.level ?? 0);
-    const currentLevel = level > 0 ? formatLevelIdToLabel(level) : "-";
+    const currentLevel = level > 0 ? formatLevelIdToLabel(level, gameState?.source) : "-";
     const currentPointValue = parseTargetPointValue(gameState?.point ?? "0");
     const currentPoint = currentPointValue == null ? String(gameState?.point ?? "-") : formatFixed2(currentPointValue);
     if (level <= 0 || gameState == null) {
@@ -544,7 +545,7 @@ function getScoreProjection(gameState: GameStateData | null) {
         let finalLevel = currentLevel;
         for (const projection of futureProjections) {
             if (projection.reached !== true) break;
-            finalLevel = formatLevelIdToLabel(projection.level);
+            finalLevel = formatLevelIdToLabel(projection.level, gameState.source);
         }
         return {currentLevel, currentPoint, finalLevel};
     } catch {
@@ -553,7 +554,8 @@ function getScoreProjection(gameState: GameStateData | null) {
 }
 
 function getScorePageFutureProjections(gameState: GameStateData, level: number) {
-    const startIndex = ORDERED_LEVEL_TARGETS.findIndex((item) => item.level === level);
+    const levelTargets = getOrderedLevelTargets(gameState.source);
+    const startIndex = levelTargets.findIndex((item) => item.level === level);
     if (startIndex < 0) return [];
 
     const deckMap = toDeckMap(gameState.deck_map ?? {});
@@ -572,10 +574,7 @@ function getScorePageFutureProjections(gameState: GameStateData, level: number) 
 
     return projectFuturePoints(
         level,
-        ORDERED_LEVEL_TARGETS.slice(startIndex + 1).map((item) => ({
-            level: item.level,
-            target: LEVEL_TARGETS_BY_ID[item.level],
-        })),
+        levelTargets.slice(startIndex + 1),
         seededResult,
         seededRules,
         baseScore,

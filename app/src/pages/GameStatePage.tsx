@@ -128,7 +128,7 @@ export default function GameStatePage({currentState}: { currentState: GameStateD
         if (!currentState) return [];
         return [
             {key: "stage", value: valueOrDash(currentState.stage)},
-            {key: "level", value: formatLevelIdToLabel(currentState.level)},
+            {key: "level", value: formatLevelIdToLabel(currentState.level, currentState.source)},
             {key: "coin", value: valueOrDash(currentState.coin)},
             {key: "point", value: valueOrDash(currentState.point)},
             {key: "target_point", value: valueOrDash(currentState.target_point)},

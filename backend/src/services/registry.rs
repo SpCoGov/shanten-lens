@@ -1,14 +1,46 @@
 use super::Services;
+use crate::ipc::DataSource;
 use crate::storage::write_json;
 use serde_json::{json, Value};
-use std::{fs, path::Path};
+use std::{fs, path::Path, sync::LazyLock};
 
 pub(super) const AMULETS: &str = include_str!("../../assets/amulets.json");
 pub(super) const BADGES: &str = include_str!("../../assets/badges.json");
 
+// Bundled from D:/qyzz/assets/amulets/catalog.json; registry IDs omit the variant digit.
+static QYZZ_AMULETS: LazyLock<Value> = LazyLock::new(|| {
+    let catalog: Value = serde_json::from_str(include_str!("../../assets/qyzz_amulets.json"))
+        .expect("invalid bundled QYZZ amulet catalog");
+    catalog["amulets"].as_array().unwrap().iter().map(|amulet| {
+        let icon = amulet["icon"].as_str().unwrap();
+        let icon_id: u64 = icon.strip_prefix("fu_").and_then(|text| text.strip_suffix(".png"))
+            .and_then(|text| text.parse().ok()).expect("invalid QYZZ amulet icon");
+        let rarity = match amulet["rarity"].as_u64().unwrap() {
+            1 => "PURPLE", 2 => "ORANGE", 3 => "BLUE", 4 => "GREEN", 5 => "GRAY",
+            _ => panic!("invalid QYZZ amulet rarity"),
+        };
+        json!({
+            "id": amulet["data_id"].as_u64().unwrap() / 10,
+            "icon_id": icon_id, "name": amulet["name"], "rarity": rarity,
+            "plus_name": amulet["plus_name"],
+            "sell_price": amulet["sell_price"], "plus_sell_price": amulet["plus_sell_price"],
+        })
+    }).collect()
+});
+
 impl Services {
     pub fn registry(&self) -> Value {
-        self.registry.lock().unwrap().clone()
+        let sources = self.data_sources.lock().unwrap();
+        self.registry_for_source(sources.status.active)
+    }
+
+    pub(super) fn registry_for_source(&self, source: Option<DataSource>) -> Value {
+        let mut registry = self.registry.lock().unwrap().clone();
+        if source == Some(DataSource::Qyzz) {
+            registry["source"] = json!("qyzz");
+            registry["amulets"] = QYZZ_AMULETS.clone();
+        }
+        registry
     }
 }
 
@@ -99,4 +131,38 @@ fn write_registry(path: &Path, value: &Value) -> anyhow::Result<()> {
         fs::create_dir_all(parent)?;
     }
     write_json(path, value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn qyzz_catalog_preserves_ids_icons_names_rarities_and_prices() {
+        let catalog: Value = serde_json::from_str(include_str!("../../assets/qyzz_amulets.json")).unwrap();
+        let rows = QYZZ_AMULETS.as_array().unwrap();
+        assert_eq!(rows.len(), 181);
+        assert!(valid_registry(&json!({"schema_version": 1, "items": *QYZZ_AMULETS}), "amulets"));
+        for (row, original) in rows.iter().zip(catalog["amulets"].as_array().unwrap()) {
+            let id = row["id"].as_u64().unwrap();
+            assert_eq!(id * 10, original["data_id"]);
+            assert_eq!(id * 10 + 1, original["upgrade_id"]);
+            assert_eq!(row["name"], original["name"]);
+            assert_eq!(row["plus_name"], original["plus_name"]);
+            assert_eq!(row["sell_price"], original["sell_price"]);
+            assert_eq!(row["plus_sell_price"], original["plus_sell_price"]);
+            let rarity = ["", "PURPLE", "ORANGE", "BLUE", "GREEN", "GRAY"][original["rarity"].as_u64().unwrap() as usize];
+            assert_eq!(row["rarity"], rarity);
+            assert_eq!(original["plus_rarity"], original["rarity"]);
+            let icon = format!("fu_{:04}.png", row["icon_id"].as_u64().unwrap());
+            assert_eq!(original["icon"], icon);
+            assert!(Path::new(env!("CARGO_MANIFEST_DIR")).join("../app/public/assets/amulet").join(icon).is_file());
+        }
+        let payload = json!({"source": "qyzz", "amulets": *QYZZ_AMULETS, "badges": []});
+        let typed: crate::ipc::RegistryPayload = serde_json::from_value(payload.clone()).unwrap();
+        assert_eq!(serde_json::to_value(typed).unwrap(), payload);
+        let packet = json!({"amulets": [{"id": 1, "name": "legacy", "icon_id": 1, "rarity": "GREEN"}], "badges": []});
+        let typed: crate::ipc::RegistryPayload = serde_json::from_value(packet.clone()).unwrap();
+        assert_eq!(serde_json::to_value(typed).unwrap(), packet);
+    }
 }

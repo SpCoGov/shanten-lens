@@ -1,9 +1,14 @@
 import { useSyncExternalStore } from "react";
+import type {GameStateData} from "./gamestate";
 
-export type Amulet = { id: number; icon_id: number; name: string; rarity: "GREEN"|"BLUE"|"ORANGE"|"PURPLE"|"GRAY" };
+export type Amulet = {
+    id: number; icon_id: number; name: string; rarity: "GREEN"|"BLUE"|"ORANGE"|"PURPLE"|"GRAY";
+    plus_name?: string; sell_price?: number; plus_sell_price?: number;
+};
 export type Badge  = { id: number; icon_id: number; name: string; rarity: "BROWN"|"BLUE"|"RED" };
 
 export type RegistryPayload = {
+    source?: GameStateData["source"];
     amulets: Amulet[];
     badges:  Badge[];
 };
@@ -53,7 +58,7 @@ if (cached) state = buildMaps(cached);
 
 export function setRegistry(payload: RegistryPayload) {
     state = buildMaps(payload);
-    saveToLS(payload);
+    if (payload.source !== "qyzz") saveToLS(payload);
     emit();
 }
 
