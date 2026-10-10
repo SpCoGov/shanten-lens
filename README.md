@@ -251,7 +251,7 @@ app/src-tauri/target/release/bundle/nsis/
 ./scripts/build_macos.sh
 ```
 
-脚本会生成同时支持 Apple 芯片和 Intel 的通用版 `.app` 和 `.dmg`，并校验两种架构。macOS 构建还需要 Xcode Command Line Tools 和 Tauri 对应的系统依赖。输出目录：
+脚本会生成同时支持 Apple 芯片和 Intel 的通用版 `.app` 和 `.dmg`，并校验两种架构、应用签名及 DMG 完整性。当前使用临时签名，尚未做 Apple 公证；首次打开若被拦截，可在“系统设置 → 隐私与安全性”中选择“仍要打开”。macOS 构建还需要 Xcode Command Line Tools 和 Tauri 对应的系统依赖。输出目录：
 
 ```text
 app/src-tauri/target/universal-apple-darwin/release/bundle/macos/
