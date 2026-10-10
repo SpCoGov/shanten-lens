@@ -35,7 +35,7 @@ jobs:
           - name: macOS DMG
             os: macos-14
             artifact_name: shanten-lens-macos-dmg
-            artifact_path: app/src-tauri/target/release/bundle/dmg/*.dmg
+            artifact_path: app/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
     runs-on: ${{ matrix.os }}
 
     steps:
