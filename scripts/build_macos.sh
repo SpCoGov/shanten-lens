@@ -20,4 +20,7 @@ app_bundle="$bundle/macos/Shanten Lens.app"
 executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app_bundle/Contents/Info.plist")
 lipo "$app_bundle/Contents/MacOS/$executable" -verify_arch x86_64 arm64
 codesign --verify --deep --strict "$app_bundle"
+for image in "$bundle/dmg/"*.dmg; do
+  hdiutil verify "$image"
+done
 echo "Output: $bundle/{macos,dmg}"
