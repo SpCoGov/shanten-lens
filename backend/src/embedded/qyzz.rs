@@ -28,8 +28,15 @@ impl QyzzLink {
     }
 }
 
+fn discovery_path(os: &str, env: impl Fn(&str) -> Option<std::ffi::OsString>) -> Option<PathBuf> {
+    let root = PathBuf::from(env(if os == "macos" { "HOME" } else { "LOCALAPPDATA" })?);
+    if !root.is_absolute() { return None; }
+    let root = if os == "macos" { root.join("Library/Application Support") } else { root };
+    Some(root.join("Qyzz/shanten-lens.json"))
+}
+
 fn discovery() -> Option<(u16, String)> {
-    let path = std::env::var_os("LOCALAPPDATA").map(PathBuf::from)?.join("Qyzz/shanten-lens.json");
+    let path = discovery_path(std::env::consts::OS, |name| std::env::var_os(name))?;
     #[cfg(test)]
     let path = std::env::var_os("QYZZ_TEST_DISCOVERY").map(PathBuf::from).unwrap_or(path);
     let bytes = std::fs::read(path).ok()?;
@@ -45,6 +52,23 @@ fn discovery() -> Option<(u16, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn discovery_paths_match_the_game_on_mac_and_windows() {
+        let home = std::env::temp_dir().join("Qyzz Test User");
+        let env = |key: &str| (key == "HOME").then(|| home.clone().into_os_string());
+        assert_eq!(discovery_path("macos", env), Some(home.join("Library/Application Support/Qyzz/shanten-lens.json")));
+        assert_eq!(discovery_path("windows", env), None);
+        let local = std::env::temp_dir().join("Qyzz AppData Local");
+        let env = |key: &str| (key == "LOCALAPPDATA").then(|| local.clone().into_os_string());
+        assert_eq!(discovery_path("windows", env), Some(local.join("Qyzz/shanten-lens.json")));
+        assert_eq!(discovery_path("macos", env), None);
+        for os in ["windows", "macos"] {
+            assert_eq!(discovery_path(os, |_| None), None);
+            assert_eq!(discovery_path(os, |_| Some("".into())), None);
+            assert_eq!(discovery_path(os, |_| Some("relative".into())), None);
+        }
+    }
 
     /// Run alongside tests/lens_bridge_test.gd -- --serve-lens-test in the Qyzz checkout.
     #[tokio::test]
