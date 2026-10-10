@@ -437,3 +437,44 @@
     --sold-pill-bg: color-mix(in srgb, var(--state-ok) 88%, transparent);
     --sold-pill-border: color-mix(in srgb, var(--state-ok) 55%, transparent);
 }
+
+:root[data-custom-theme] {
+    --color-hint: var(--color-muted);
+    --color-cutline: var(--color-border);
+    --color-divider: var(--color-border);
+    --accent-blue: var(--color-ring);
+    --accent-green: var(--state-ok);
+    --link-fg: var(--color-ring);
+    --custom-target-accent: var(--color-ring);
+
+    --list-item-bg: var(--panel-bg);
+    --list-item-hover: color-mix(in srgb, var(--color-text) 6%, var(--panel-bg));
+    --hover-bg: var(--list-item-hover);
+    --elev-bg: var(--panel-bg);
+    --input-border: var(--color-border);
+    --input-disabled-bg: var(--color-bg);
+    --input-hover-bg: color-mix(in srgb, var(--color-ring) 5%, var(--input-bg));
+    --input-active-bg: color-mix(in srgb, var(--color-ring) 8%, var(--input-bg));
+    --input-hover-border: var(--color-ring);
+    --input-focus-ring: 0 0 0 3px color-mix(in srgb, var(--color-ring) 25%, transparent);
+    --input-selected-bg: color-mix(in srgb, var(--color-ring) 16%, var(--input-bg));
+    --input-selected-fg: var(--color-text);
+    --scrollbar-thumb: color-mix(in srgb, var(--color-muted) 40%, transparent);
+    --scrollbar-thumb-alt: color-mix(in srgb, var(--color-muted) 65%, transparent);
+
+    --state-muted: var(--color-muted);
+    --badge-ok-fg: color-mix(in srgb, var(--state-ok) 65%, var(--color-text));
+    --badge-ok-bg: color-mix(in srgb, var(--state-ok) 10%, var(--panel-bg));
+    --badge-ok-border: color-mix(in srgb, var(--state-ok) 40%, var(--color-border));
+    --badge-down-fg: color-mix(in srgb, var(--state-down) 65%, var(--color-text));
+    --badge-down-bg: color-mix(in srgb, var(--state-down) 10%, var(--panel-bg));
+    --badge-down-border: color-mix(in srgb, var(--state-down) 40%, var(--color-border));
+    --danger-weak-bg: var(--badge-down-bg);
+    --danger-weak-border: var(--badge-down-border);
+    --toast-info-border: var(--color-border);
+    --toast-success-border: var(--state-ok);
+    --toast-error-border: var(--state-down);
+    --notice-border: color-mix(in srgb, var(--state-warn) 40%, var(--color-border));
+    --notice-bg: color-mix(in srgb, var(--state-warn) 10%, var(--panel-bg));
+    --notice-fg: color-mix(in srgb, var(--state-warn) 65%, var(--color-text));
+}

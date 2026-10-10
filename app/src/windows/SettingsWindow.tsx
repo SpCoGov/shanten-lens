@@ -4,6 +4,7 @@ import {getCurrentWindow} from "@tauri-apps/api/window";
 import * as backendIpc from "../lib/ipc";
 import styles from "./SettingsWindow.module.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import ThemeSettings from "../components/ThemeSettings";
 import {useTranslation} from "react-i18next";
 import {pushToast} from "../lib/toast";
 import {readTileSkin, setTileSkin, type TileSkin} from "../lib/tileSkin";
@@ -47,7 +48,7 @@ export default function SettingsWindow() {
         server.current = incoming;
         setServerTables(incoming);
         setDraft(mergeTables(incoming, pending.current));
-        setActive((current) => current && current in incoming
+        setActive((current) => current && (current === "appearance" || current in incoming)
             ? current : (SETTINGS_TABLES.find((name) => name in incoming) ?? null));
     };
     const flush = async () => {
@@ -112,10 +113,10 @@ export default function SettingsWindow() {
     }, [draft, serverTables]);
 
     const sidebarItems = useMemo(() => {
-        return SETTINGS_TABLES.filter((name) => name in tables).map((name) => ({
+        return [...SETTINGS_TABLES.filter((name) => name in tables).map((name) => ({
             name,
             changed: !!serverTables && !deepEqual(tables[name], (serverTables[name] ?? {})),
-        }));
+        })), {name: "appearance", changed: false}];
     }, [tables, serverTables]);
 
     const trKey = (table: string, key: string) => ({
@@ -128,6 +129,7 @@ export default function SettingsWindow() {
     });
 
     const content = (() => {
+        if (active === "appearance") return <ThemeSettings/>;
         if (!active) return <div className={styles.emptyPane}>{t("settings.loading")}</div>;
         const kv = tables[active] ?? {};
         const entries = Object.entries(kv).sort(([a], [b]) => a.localeCompare(b));

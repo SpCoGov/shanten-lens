@@ -72,6 +72,7 @@ import PluginsPage from "./pages/PluginsPage";
 import PluginPageOutlet from "./pages/PluginPageOutlet";
 import {startPluginRuntime} from "./lib/pluginRuntime";
 import {usePluginStore, type PluginPage} from "./lib/pluginStore";
+import {readTheme, setTheme, subscribeThemeChanges, type ThemeMode} from "./lib/theme";
 
 type SouzuSwitchExecutionState = {
     status: "running" | "completed" | "failed";
@@ -830,7 +831,6 @@ function GameMapModal({
 
 export default function App() {
     const {t} = useTranslation();
-    type ThemeMode = "auto" | "dark" | "dark-green" | "dark-purple";
     const {toast, visible: toastVisible} = useGlobalToast();
     const {config: autoConfig, status: autoStatus} = useAutoRunner();
     const [route, setRoute] = React.useState<Route>("home");
@@ -1019,43 +1019,23 @@ export default function App() {
     const isAdvisorStage = stage === 2 || stage === 3;
     const effectiveHomeSideMode: HomeSideMode = isAdvisorStage && !hasLevelRecords ? "advisor" : homeSideMode;
 
-    const THEME_ORDER: ThemeMode[] = ["auto", "dark", "dark-green"];
-    const THEME_KEY = "sl-theme";
+    const THEME_ORDER: ThemeMode[] = ["auto", "dark", "dark-green", "custom"];
     const HIDDEN_THEME_CHANCE = 0.01;
     const hiddenThemeClicksRef = React.useRef(0);
     const hiddenThemeClickTimerRef = React.useRef<number | null>(null);
 
-    function applyTheme(t: ThemeMode) {
-        const root = document.documentElement;
+    const [theme, setThemeState] = React.useState(readTheme);
+    React.useEffect(() => subscribeThemeChanges(() => setThemeState(readTheme())), []);
 
-        root.removeAttribute("data-theme");
-
-        if (t === "auto") {
-            const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-            if (prefersDark) {
-                root.setAttribute("data-theme", "dark");
-            }
-            return;
+    const changeTheme = React.useCallback((mode: ThemeMode) => {
+        try {
+            setTheme(mode);
+            return true;
+        } catch (error) {
+            pushToast(t("settings.save_failed", {reason: String(error)}), "error", 5000);
+            return false;
         }
-
-        if (t === "dark" || t === "dark-green" || t === "dark-purple") {
-            root.setAttribute("data-theme", t);
-        }
-    }
-
-    const [theme, setTheme] = React.useState<ThemeMode>(() => {
-        const saved = localStorage.getItem(THEME_KEY) as ThemeMode | null;
-        if (saved === "auto" || saved === "dark" || saved === "dark-green" || saved === "dark-purple") {
-            return saved;
-        }
-        if (saved === "dark") return "dark";
-        return "auto";
-    });
-
-    React.useEffect(() => {
-        applyTheme(theme);
-        localStorage.setItem(THEME_KEY, theme);
-    }, [theme]);
+    }, [t]);
 
     React.useEffect(() => {
         localStorage.setItem(AMULET_HOTKEY_STORAGE_KEY, JSON.stringify(amuletHotkeys));
@@ -1067,8 +1047,7 @@ export default function App() {
 
     const activateHiddenTheme = React.useCallback(() => {
         if (theme === "dark-purple") return;
-        localStorage.setItem(THEME_KEY, "dark-purple");
-        setTheme("dark-purple");
+        if (!changeTheme("dark-purple")) return;
         void openMsgBoxWindow({
             id: `hidden-theme-${Date.now()}`,
             title: "app.hidden_theme.title",
@@ -1076,7 +1055,7 @@ export default function App() {
             okText: "common.ok",
             cancelText: undefined,
         });
-    }, [theme]);
+    }, [theme, changeTheme]);
 
     const closeProgram = React.useCallback(async () => {
         try {
@@ -1314,6 +1293,8 @@ export default function App() {
                 return "forest";
             case "dark-purple":
                 return "auto_awesome";
+            case "custom":
+                return "palette";
             default:
                 return "light_mode";
         }
@@ -1363,7 +1344,7 @@ export default function App() {
             if (docWithTransition.startViewTransition) {
                 root.classList.add("theme-transition-active");
                 const transition = docWithTransition.startViewTransition(() => {
-                    setTheme(nextModeValue);
+                    changeTheme(nextModeValue);
                 });
                 transition.finished.finally(() => {
                     root.classList.remove("theme-transition-active");
@@ -1371,8 +1352,8 @@ export default function App() {
                 return;
             }
         }
-        setTheme(nextModeValue);
-    }, [nextTheme, theme]);
+        changeTheme(nextModeValue);
+    }, [nextTheme, theme, changeTheme]);
 
     React.useEffect(() => {
         const update = (sel: HTMLSelectElement) => {

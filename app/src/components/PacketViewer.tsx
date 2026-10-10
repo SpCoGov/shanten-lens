@@ -160,5 +160,5 @@ export default function PacketViewer({packet, onClose, standalone = false}: {pac
 
 function isDarkTheme() {
     const theme = document.documentElement.getAttribute("data-theme");
-    return Boolean(theme) || window.matchMedia("(prefers-color-scheme: dark)").matches;
+    return Boolean(theme);
 }

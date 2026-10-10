@@ -204,6 +204,82 @@
     text-align: center;
 }
 
+.themeHint {
+    margin: -6px 0 20px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.themeError {
+    color: var(--state-down);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.themeSection .settingCopy > small {
+    white-space: normal;
+}
+
+.themePaletteHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.themePaletteHeader h4 {
+    margin: 0;
+    font-size: 14px;
+}
+
+.themePaletteActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.themePaletteHeader button:disabled {
+    opacity: .5;
+    cursor: default;
+}
+
+.themeColors {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 10px;
+}
+
+.themeColor {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px 15px;
+    border: 1px solid var(--color-divider);
+    border-radius: 11px;
+    background: var(--panel-bg);
+    cursor: pointer;
+}
+
+.themeColor input {
+    width: 46px;
+    height: 36px;
+    flex: 0 0 46px;
+    padding: 3px;
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    background: var(--input-bg);
+    cursor: pointer;
+}
+
+.themeColor input:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+}
+
 .kvRows {
     display: grid;
     gap: 10px;

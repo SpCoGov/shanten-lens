@@ -33,10 +33,9 @@ export async function openPacketViewerWindow(packet: JsonViewerContent) {
         }
 
         ready = false;
-        const theme = document.documentElement.getAttribute("data-theme") || "light";
         const baseUrl = import.meta.env.DEV ? `${location.origin}/packet-viewer.html` : "packet-viewer.html";
         const window = new WebviewWindow(LABEL, {
-            url: `${baseUrl}?theme=${encodeURIComponent(theme)}`,
+            url: baseUrl,
             title: String(i18n.t("kind" in packet ? "diagnostics.log_fields_editor_title" : "diagnostics.packet_viewer_title")),
             width: 1120,
             height: 780,
