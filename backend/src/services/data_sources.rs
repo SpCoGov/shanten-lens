@@ -74,6 +74,9 @@ impl Services {
                     next
                 }
             };
+            if let Some(price) = next["refresh_price"].as_u64() {
+                next["refresh_price"] = json!(price.to_string());
+            }
             let mut current = self.game_state.lock().unwrap();
             let new_session = switched || current["source"] != next["source"]
                 || current["origin_session_id"] != next["origin_session_id"]

@@ -112,7 +112,7 @@ export default function PacketViewer({packet, onClose, standalone = false}: {pac
         }
     };
 
-    const replayable = !isLog && packet.direction === "outbound";
+    const replayable = !isLog && packet.direction === "outbound" && !packet.method.startsWith("qyzz.");
     const dialog = (
             <section className={`${styles.dialog} ${standalone ? styles.standalone : ""}`} role="dialog" aria-modal={!standalone} aria-label={title}>
                 <header className={styles.header}>

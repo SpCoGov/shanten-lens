@@ -12,6 +12,7 @@ mod imp {
     };
 
     use serde::{Deserialize, Serialize};
+    use shanten_backend::ipc::DataSource;
     use tauri::{Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
     use windows::core::BOOL;
     use windows::Win32::{
@@ -36,7 +37,10 @@ mod imp {
         },
     };
 
-    const GAME_PROCESS_NAME: &str = "Jantama_MahjongSoul.exe";
+    const GAME_PROCESSES: [(&str, DataSource); 2] = [
+        ("Jantama_MahjongSoul.exe", DataSource::Packet),
+        ("Qyzz.exe", DataSource::Qyzz),
+    ];
     const ACTIVE_TRACK_INTERVAL: Duration = Duration::from_millis(8);
     const SEARCH_INTERVAL: Duration = Duration::from_millis(750);
     const HUD_PANEL_MAX_WIDTH: i32 = 620;
@@ -154,6 +158,7 @@ mod imp {
             panel_regions: panel_regions.clone(),
         });
 
+        let backend = app.state::<crate::IpcBackendState>().0.clone();
         thread::spawn(move || {
             let hud_hwnd = match overlay.hwnd() {
                 Ok(hwnd) => hwnd,
@@ -162,6 +167,7 @@ mod imp {
             configure_overlay_hwnd(hud_hwnd);
 
             let mut current_game: Option<WindowCandidate> = None;
+            let mut current_source = None;
 
             while !stop.load(Ordering::SeqCst) {
                 if !enabled.load(Ordering::SeqCst) {
@@ -172,11 +178,24 @@ mod imp {
                     continue;
                 }
 
+                let source = backend.data_sources();
+                if source.active != current_source {
+                    current_game = None;
+                    current_source = source.active;
+                }
+                if source.pending {
+                    hide(hud_hwnd);
+                    current_game = None;
+                    update_status(&status, true, None);
+                    thread::sleep(BACKGROUND_IDLE_INTERVAL);
+                    continue;
+                }
+
                 if current_game
                     .map(|w| !is_live_overlay_target(w.hwnd))
                     .unwrap_or(true)
                 {
-                    current_game = find_game_window();
+                    current_game = find_game_window(current_source);
                 }
 
                 let Some(game) = current_game else {
@@ -295,12 +314,18 @@ mod imp {
         }
     }
 
-    fn is_usable_game_window(hwnd: HWND) -> bool {
+    fn is_game_process(name: &str, source: Option<DataSource>) -> bool {
+        GAME_PROCESSES.iter().any(|(expected, kind)| {
+            name.eq_ignore_ascii_case(expected) && source.map_or(true, |source| source == *kind)
+        })
+    }
+
+    fn is_usable_game_window(hwnd: HWND, source: Option<DataSource>) -> bool {
         if !is_live_overlay_target(hwnd) {
             return false;
         }
 
-        process_name_for_window(hwnd).as_deref() == Some(GAME_PROCESS_NAME)
+        process_name_for_window(hwnd).is_some_and(|name| is_game_process(&name, source))
     }
 
     fn is_live_overlay_target(hwnd: HWND) -> bool {
@@ -323,21 +348,25 @@ mod imp {
         }
     }
 
-    fn find_game_window() -> Option<WindowCandidate> {
+    fn find_game_window(source: Option<DataSource>) -> Option<WindowCandidate> {
         struct SearchState {
             found: Option<WindowCandidate>,
+            source: Option<DataSource>,
         }
 
         unsafe extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
             let state = &mut *(lparam.0 as *mut SearchState);
-            if is_usable_game_window(hwnd) {
+            if is_usable_game_window(hwnd, state.source) {
                 state.found = window_pid(hwnd).map(|pid| WindowCandidate { hwnd, pid });
                 return BOOL(0);
             }
             BOOL(1)
         }
 
-        let mut state = SearchState { found: None };
+        let mut state = SearchState {
+            found: None,
+            source,
+        };
         unsafe {
             let _ = EnumWindows(
                 Some(enum_proc),
@@ -573,6 +602,34 @@ mod imp {
             height,
             dpi: unsafe { GetDpiForWindow(hwnd) },
         })
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn game_processes_match_case_insensitively_and_follow_the_selected_source() {
+            for (name, source) in GAME_PROCESSES {
+                for name in [
+                    name.to_string(),
+                    name.to_ascii_lowercase(),
+                    name.to_ascii_uppercase(),
+                ] {
+                    assert!(is_game_process(&name, None));
+                    assert!(is_game_process(&name, Some(source)));
+                    let other = if source == DataSource::Qyzz {
+                        DataSource::Packet
+                    } else {
+                        DataSource::Qyzz
+                    };
+                    assert!(!is_game_process(&name, Some(other)));
+                }
+            }
+            for name in ["", "Qyzz.exe.bak", "NotQyzz.exe", "chrome.exe"] {
+                assert!(!is_game_process(name, None));
+            }
+        }
     }
 
     impl ClientArea {

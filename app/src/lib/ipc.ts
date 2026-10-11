@@ -83,7 +83,7 @@ export type BackendEventMap = {
     backend_log: BackendSnapshot["backendLogs"][number];
     proxy_status: {running: boolean; error: string | null};
     resync_required: null;
-    souzu_switch_control_result: {action: string; ok: boolean; reason?: string};
+    souzu_switch_control_result: {action: string; ok: boolean; reason?: string; reason_key?: string};
     update_registry: RegistryPayload;
     update_fuse_config: FuseConfig;
     update_autorun_config: AutoRunnerConfig;
@@ -285,7 +285,7 @@ export async function initializeBackend() {
                 if (status.error) pushToast(t("diagnostics.proxy_start_failed", {reason: status.error}), "error", 10000);
             }),
             onBackendEvent("souzu_switch_control_result", (result) => {
-                if (!result.ok) pushToast(t("blackhole.control_failed", {reason: result.reason ?? ""}), "error", 5000);
+                if (!result.ok) pushToast(t("blackhole.control_failed", {reason: result.reason_key ? t(result.reason_key) : result.reason ?? ""}), "error", 5000);
             }),
             onBackendEvent("resync_required", () => {
                 void synchronizedSnapshot().then(applySnapshot).catch((error) => useLogStore.getState().addLog("ERROR", String(error)));

@@ -82,8 +82,103 @@ test("the custom editor's static labels and result messages exist in both langua
         }
         for (const kind of ["exchange", "draw", "discard", "kan"]) assert.ok(locale.custom_target[`step_${kind}`]);
         for (const key of ["joker_present", "joker_absent"]) assert.ok(locale.custom_target[key]);
-        for (const reason of ["invalid-target", "hand-size", "joker-state", "wall-limit", "not-reachable", "search-limit"]) {
+        for (const key of ["execute_reason_state_mismatch", "execute_reason_game_ended"]) assert.ok(locale.blackhole[key]);
+        for (const reason of ["invalid-target", "invalid-options", "hand-size", "joker-state", "wall-limit", "not-reachable", "search-limit"]) {
             assert.ok(locale.custom_target[`reason_custom-${reason}`]);
         }
     }
+});
+
+test("custom controls execute live plans and persist, transmit and invalidate the legal-shape filter", async () => {
+    const states = [], requests = [], effects = [], stored = new Map();
+    let cursor = 0, complete, cleared = 0;
+    const react = {
+        createElement: (type, props, ...children) => ({type, props: props ?? {}, children}),
+        useEffect(effect) {effects.push(effect);},
+        useState(initial) {
+            const index = cursor++;
+            if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
+            return [states[index], value => {states[index] = typeof value === "function" ? value(states[index]) : value;}];
+        },
+    };
+    const pageExports = {};
+    const mocks = {
+        react: {default: react}, "react-i18next": {useTranslation: () => ({t: key => key})},
+        "../components/Tile": {default: "Tile"}, "../lib/customTarget": exports,
+        "./CustomSwitchPage.module.css": {default: {}},
+        "../lib/ipc": {runSwitch: request => {
+            requests.push(JSON.parse(JSON.stringify(request)));
+            return new Promise(resolve => {complete = resolve;});
+        }},
+    };
+    runInNewContext(ts.transpileModule(readFileSync(new URL("../src/pages/CustomSwitchPage.tsx", import.meta.url), "utf8"), {
+        compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React},
+    }).outputText, {exports: pageExports, localStorage: {
+        getItem: key => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value),
+    }, require: name => mocks[name]});
+    const state = {stage: 4, revision: 12, hand_tiles: [], deck_map: {}};
+    const plan = {status: "plan", state_revision: 12, plan_id: "live-custom-1", request_source: "live", search_algorithm: "custom_target"};
+    function render(currentState = state, data = plan) {
+        cursor = 0;
+        const found = new Map();
+        function visit(node) {
+            if (Array.isArray(node)) return node.forEach(visit);
+            if (!node || typeof node !== "object") return;
+            if (node.type === "button") {
+                for (const label of ["blackhole.execute_plan", "blackhole.execute_full_plan", "custom_target.start"]) {
+                    if (node.children.includes(label)) found.set(label, node.props);
+                }
+            }
+            if (node.type === "label" && node.props.title === "custom_target.exclude_invalid_shapes_hint") {
+                found.set("custom_target.exclude_invalid_shapes", node.children.find(child => child.type === "input").props);
+            }
+            node.children?.forEach(visit);
+        }
+        visit(pageExports.default({currentState, data, onClear() {cleared++;}}));
+        effects.splice(0).forEach(effect => effect());
+        return found;
+    }
+    for (const [current, data] of [[null, plan], [{...state, stage: 0}, plan], [{...state, revision: 13}, plan],
+        [state, null], [state, {...plan, plan_id: ""}], [state, {...plan, request_source: "debug"}],
+        [state, {...plan, search_algorithm: "target_enumeration_search"}], [state, {...plan, status: "searching"}]]) {
+        for (const key of ["blackhole.execute_plan", "blackhole.execute_full_plan"]) {
+            const button = render(current, data).get(key);
+            assert.equal(button.disabled, true);
+            await button.onClick();
+            assert.equal(requests.length, 0);
+        }
+    }
+    for (const action of ["execute_plan", "execute_full_plan"]) {
+        const button = render().get(`blackhole.${action}`);
+        assert.equal(button.disabled, false);
+        button.onClick();
+        assert.deepEqual(requests.at(-1), {action, options: {plan_id: plan.plan_id}});
+        for (const key of ["blackhole.execute_plan", "blackhole.execute_full_plan", "custom_target.start", "custom_target.exclude_invalid_shapes"]) {
+            assert.equal(render().get(key).disabled, true);
+        }
+        complete();
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(render().get(`blackhole.${action}`).disabled, false);
+    }
+    const option = "custom_target.exclude_invalid_shapes";
+    const storageKey = "sl-custom-switch:exclude-invalid-shapes";
+    assert.equal(render().get(option).checked, false);
+    render().get("custom_target.start").onClick();
+    assert.equal(requests.at(-1).options.exclude_invalid_shapes, false);
+    complete();
+    const beforeToggle = cleared;
+    render().get(option).onChange({target: {checked: true}});
+    assert.equal(cleared, beforeToggle + 1, "Changing the filter clears the old plan");
+    assert.equal(render().get(option).checked, true);
+    assert.equal(stored.get(storageKey), "1");
+    render().get("custom_target.start").onClick();
+    assert.equal(requests.at(-1).options.exclude_invalid_shapes, true);
+    complete();
+    states.length = 0;
+    assert.equal(render().get(option).checked, true, "A remount restores the filter");
+    render(state, {...plan, status: "searching"}).get(option).onChange({target: {checked: false}});
+    assert.deepEqual(requests.at(-1), {action: "stop", notify: false});
+    complete();
+    assert.equal(render().get(option).checked, false);
+    assert.equal(stored.get(storageKey), "0");
 });

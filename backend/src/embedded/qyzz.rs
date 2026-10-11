@@ -1,6 +1,7 @@
 //! Optional connection to the local Qyzz client; uses the existing UI state and solvers.
 use super::State;
-use hudsucker::{futures::{SinkExt, StreamExt}, tokio_tungstenite::{connect_async, tungstenite::Message}};
+use crate::{pipeline::{Direction, Packet}, services::Services};
+use hudsucker::{futures::{SinkExt, StreamExt}, tokio_tungstenite::{connect_async_with_config, tungstenite::{Message, protocol::WebSocketConfig}}};
 use serde_json::{json, Value};
 use std::{collections::HashMap, path::PathBuf, sync::Mutex, time::Duration};
 use tokio::sync::{mpsc, oneshot};
@@ -28,8 +29,15 @@ impl QyzzLink {
     }
 }
 
+fn discovery_path(os: &str, env: impl Fn(&str) -> Option<std::ffi::OsString>) -> Option<PathBuf> {
+    let root = PathBuf::from(env(if os == "macos" { "HOME" } else { "LOCALAPPDATA" })?);
+    if !root.is_absolute() { return None; }
+    let root = if os == "macos" { root.join("Library/Application Support") } else { root };
+    Some(root.join("Qyzz/shanten-lens.json"))
+}
+
 fn discovery() -> Option<(u16, String)> {
-    let path = std::env::var_os("LOCALAPPDATA").map(PathBuf::from)?.join("Qyzz/shanten-lens.json");
+    let path = discovery_path(std::env::consts::OS, |name| std::env::var_os(name))?;
     #[cfg(test)]
     let path = std::env::var_os("QYZZ_TEST_DISCOVERY").map(PathBuf::from).unwrap_or(path);
     let bytes = std::fs::read(path).ok()?;
@@ -42,9 +50,296 @@ fn discovery() -> Option<(u16, String)> {
     Some((port, token.to_owned()))
 }
 
+const MAX_PACKET_BYTES: usize = 128 * 1024 * 1024;
+
+fn redact(value: &mut Value) {
+    match value {
+        Value::Object(fields) => for (key, value) in fields {
+            if matches!(key.as_str(), "secret" | "token" | "credential_hash") { *value = json!("[已隐藏]"); }
+            else { redact(value); }
+        },
+        Value::Array(items) => for value in items { redact(value); },
+        _ => {}
+    }
+}
+
+fn record_packet(services: &Services, direction: Direction, data: &Value) -> Result<(), &'static str> {
+    let kind = data["type"].as_str().ok_or("missing packet type")?;
+    if matches!(kind, "ping" | "pong") { return Ok(()); }
+    let mut packet = if kind == "packet" {
+        let action = data["action"].as_str().filter(|name| !name.is_empty() && name.len() <= 128).ok_or("invalid packet action")?;
+        let direction = match data["direction"].as_str() {
+            Some("outbound") => Direction::Outbound,
+            Some("inbound") => Direction::Inbound,
+            _ => return Err("invalid packet direction"),
+        };
+        if !data["data"].is_object() { return Err("invalid packet data"); }
+        let id = data["data"]["request_id"].as_u64().and_then(|id| u32::try_from(id).ok());
+        Packet { direction, packet_type: if direction == Direction::Outbound { "Req" } else if id.is_some() || data["data"]["compressed_reply"].is_object() { "Res" } else { "Notify" }.into(),
+            method: format!("qyzz.game.{action}"), id, data: data["data"].clone() }
+    } else {
+        let packet_type = match kind { "auth" | "operation" | "ping" => "Req", "authenticated" | "result" | "pong" => "Res", _ => "Notify" };
+        Packet { direction, packet_type: packet_type.into(), method: format!("qyzz.bridge.{kind}"),
+            id: data["id"].as_u64().and_then(|id| u32::try_from(id).ok()), data: data.clone() }
+    };
+    redact(&mut packet.data);
+    // Debug records never enter the game pipeline or get forwarded back to Qyzz.
+    services.record_received_packet(&packet);
+    services.record_packet(&packet);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn discovery_paths_match_the_game_on_mac_and_windows() {
+        let home = std::env::temp_dir().join("Qyzz Test User");
+        let env = |key: &str| (key == "HOME").then(|| home.clone().into_os_string());
+        assert_eq!(discovery_path("macos", env), Some(home.join("Library/Application Support/Qyzz/shanten-lens.json")));
+        assert_eq!(discovery_path("windows", env), None);
+        let local = std::env::temp_dir().join("Qyzz AppData Local");
+        let env = |key: &str| (key == "LOCALAPPDATA").then(|| local.clone().into_os_string());
+        assert_eq!(discovery_path("windows", env), Some(local.join("Qyzz/shanten-lens.json")));
+        assert_eq!(discovery_path("macos", env), None);
+        for os in ["windows", "macos"] {
+            assert_eq!(discovery_path(os, |_| None), None);
+            assert_eq!(discovery_path(os, |_| Some("".into())), None);
+            assert_eq!(discovery_path(os, |_| Some("relative".into())), None);
+        }
+    }
+
+    #[test]
+    fn bridge_and_game_packets_share_diagnostics_without_replay_or_credentials() {
+        let root = std::env::temp_dir().join(format!("qyzz-packet-test-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let (events, _) = tokio::sync::broadcast::channel(32);
+        let services = Services::load(root.join("configs"), events).unwrap();
+        let before = services.game_state();
+        services.set_packet_recording(true).unwrap();
+        let auth = json!({"type":"auth", "token":"bridge-secret", "packet_log":true});
+        record_packet(&services, Direction::Outbound, &auth).unwrap();
+        for (kind, direction) in [("authenticated", Direction::Inbound), ("ping", Direction::Outbound), ("pong", Direction::Inbound), ("operation", Direction::Outbound), ("result", Direction::Inbound), ("state", Direction::Inbound)] {
+            record_packet(&services, direction, &json!({"type":kind,"id":42,"ok":false,"error":"test"})).unwrap();
+        }
+        let request = json!({"type":"packet","direction":"outbound","action":"authenticate","data":{"request_id":7,"args":{"secret":"account-secret","nested":[{"token":"nested-secret","credential_hash":"hash-secret"}]}}});
+        record_packet(&services, Direction::Inbound, &request).unwrap();
+        let padding = "x".repeat(2 * 1024 * 1024 + 1);
+        record_packet(&services, Direction::Inbound, &json!({"type":"packet","direction":"inbound","action":"status","data":{"request_id":7,"result":{"ok":true,"padding":padding}}})).unwrap();
+        record_packet(&services, Direction::Inbound, &json!({"type":"packet","direction":"inbound","action":"server_message","data":{"request_id":-1,"result":{"server_message":{"text":"notice"}}}})).unwrap();
+        for invalid in [json!({"type":"packet","direction":"sideways","action":"status","data":{}}), json!({"type":"packet","direction":"inbound","action":"status","data":[]})] {
+            assert!(record_packet(&services, Direction::Inbound, &invalid).is_err());
+        }
+        let packets = services.packet_log_snapshot().packets;
+        assert_eq!(packets.len(), 8);
+        assert!(!packets.iter().any(|packet| matches!(packet.method.as_str(), "qyzz.bridge.ping" | "qyzz.bridge.pong")));
+        assert_eq!(packets[0].data["token"], "[已隐藏]");
+        assert_eq!(auth["token"], "bridge-secret");
+        assert_eq!(request["data"]["args"]["secret"], "account-secret");
+        assert_eq!(packets[5].method, "qyzz.game.authenticate");
+        assert_eq!(packets[5].direction, Direction::Outbound);
+        assert_eq!(packets[5].id, Some(7));
+        assert_eq!(packets[5].data["args"]["nested"][0]["token"], "[已隐藏]");
+        assert_eq!(packets[6].data["result"]["padding"], padding);
+        assert_eq!(packets[7].packet_type, "Notify");
+        let delta = json!({"request_id":8,"result":{"state_delta":true,"base_version":4,"version":5,"view":{"hand":{"dirty":true,"value":[17,2]}},"events":[]}});
+        record_packet(&services, Direction::Inbound, &json!({"type":"packet","direction":"inbound","action":"exchange","data":delta})).unwrap();
+        let compressed = json!({"compressed_reply":{"encoding":"base64","bytes":3,"data":"AID/"}});
+        record_packet(&services, Direction::Inbound, &json!({"type":"packet","direction":"inbound","action":"compressed_reply","data":compressed})).unwrap();
+        let chunk = json!({"request_id":9,"offset":0,"total":3,"reply_chunk":{"encoding":"base64","bytes":3,"data":"AID/"}});
+        record_packet(&services, Direction::Inbound, &json!({"type":"packet","direction":"inbound","action":"exchange","data":chunk})).unwrap();
+        let raw = services.packet_log_snapshot().packets;
+        assert_eq!(raw[8].data, delta);
+        assert_eq!(raw[9].data, compressed);
+        assert_eq!(raw[9].packet_type, "Res");
+        assert_eq!(raw[10].data, chunk);
+        assert_eq!(raw[10].packet_type, "Res");
+        assert!(packets.iter().all(|packet| !services.can_replay(&packet.method)));
+        assert_eq!(services.game_state(), before);
+        let recording = services.set_packet_recording(false).unwrap();
+        assert_eq!(recording.count, 11);
+        let recorded = std::fs::read_to_string(recording.path.unwrap()).unwrap();
+        for secret in ["bridge-secret", "account-secret", "nested-secret", "hash-secret"] { assert!(!recorded.contains(secret)); }
+        drop(services);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn custom_plans_execute_exchanges_and_zero_to_four_quads() {
+        const CHILD_ROOT: &str = "SHANTEN_CUSTOM_EXECUTION_TEST_ROOT";
+        let root = match std::env::var_os(CHILD_ROOT) {
+            Some(root) => PathBuf::from(root),
+            None => {
+                let root = std::env::temp_dir().join(format!("lens-custom-execution-{}", std::process::id()));
+                let output = std::process::Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", "embedded::qyzz::tests::custom_plans_execute_exchanges_and_zero_to_four_quads", "--nocapture"])
+                    .env(CHILD_ROOT, &root).output().unwrap();
+                assert!(output.status.success(), "{output:?}");
+                std::fs::remove_dir_all(root).unwrap();
+                return;
+            }
+        };
+        let runtime = tokio::task::spawn_blocking(move || super::super::BackendRuntime::load(root.join("configs")))
+            .await.unwrap().unwrap();
+        let state = &runtime.state;
+        let (sender, mut receiver) = mpsc::channel::<Operation>(8);
+        *state.qyzz.sender.lock().unwrap() = Some(sender);
+        let services = state.services.clone();
+        let game_task = tokio::spawn(async move {
+            while let Some(command) = receiver.recv().await {
+                let mut game = services.game_state();
+                let mut hand = game["hand_tiles"].as_array().unwrap().iter().map(|id| id.as_u64().unwrap()).collect::<Vec<_>>();
+                let tiles = command.packet["tiles"].as_array().unwrap().iter().map(|id| id.as_u64().unwrap()).collect::<Vec<_>>();
+                assert_eq!(command.packet["version"], game["qyzz_version"]);
+                let kind = command.packet["operation"].as_u64().unwrap();
+                let timing = game["execution_test_timing"].as_str().unwrap_or("").to_owned();
+                let previous_melds = game["ming"].clone();
+                let draw = match kind {
+                    101 => {
+                        assert!(tiles.iter().all(|id| hand.contains(id)));
+                        let count = hand.len() - tiles.len();
+                        let pool = game["replacement_tiles"].as_array_mut().unwrap();
+                        let incoming = pool.drain(..count).map(|id| id.as_u64().unwrap()).collect::<Vec<_>>();
+                        hand = tiles;
+                        hand.extend(incoming);
+                        game["total_change_tile_count"] = json!(game["total_change_tile_count"].as_u64().unwrap() - 1);
+                        if timing == "auto-finish" && game["total_change_tile_count"] == 0 {
+                            game["stage"] = json!(5);
+                            true
+                        } else { false }
+                    }
+                    100 => { game["stage"] = json!(5); hand.len() == 13 }
+                    1 | 4 => {
+                        assert!(tiles.iter().all(|id| hand.contains(id) && game["deck_map"][id.to_string()] != "bd"));
+                        hand.retain(|id| !tiles.contains(id));
+                        if command.packet["operation"] == 4 {
+                            game["ming"].as_array_mut().unwrap().push(json!({"type":4, "tileList":tiles}));
+                        }
+                        true
+                    }
+                    kind => panic!("unexpected operation {kind}"),
+                };
+                if draw && !game["wall_tiles"].as_array().unwrap().is_empty() {
+                    let tile = game["wall_tiles"].as_array_mut().unwrap().remove(0).as_u64().unwrap();
+                    hand.push(tile);
+                }
+                game["hand_tiles"] = json!(hand);
+                game["next_operation"] = if game["stage"] == 4 {json!([{"type":101},{"type":100}])} else {json!([{"type":1},{"type":4}])};
+                let committed = game.clone();
+                if kind == 4 && !timing.is_empty() { game["ming"] = previous_melds; }
+                if kind == 100 && !timing.is_empty() { game["next_operation"] = json!([{"type":1}]); }
+                game["qyzz_version"] = json!(game["qyzz_version"].as_u64().unwrap() + 1);
+                services.publish_qyzz_state(&game).unwrap();
+                let _ = command.reply.send(Ok(()));
+                if !timing.is_empty() && matches!(kind, 4 | 100) {
+                    tokio::time::sleep(Duration::from_millis(160)).await;
+                    assert!(receiver.try_recv().is_err(), "An operation was sent before the kan/state was confirmed: {game}");
+                    if timing == "missing-kan" && kind == 4 { continue; }
+                    game["ming"] = committed["ming"].clone();
+                    game["next_operation"] = committed["next_operation"].clone();
+                    game["qyzz_version"] = json!(game["qyzz_version"].as_u64().unwrap() + 1);
+                    services.publish_qyzz_state(&game).unwrap();
+                }
+            }
+        });
+        for (quads, joker) in [(0, false), (1, false), (2, false), (3, false), (4, false), (1, true)] {
+            let mut faces = (1..=quads).flat_map(|rank| vec![format!("{rank}m"); 4]).collect::<Vec<_>>();
+            faces.extend(vec!["7z".to_owned(); 14 - quads * 3]);
+            if joker { faces[quads * 4] = "bd".into(); }
+            let replacements = if quads == 0 { 4 } else { 1 };
+            let wall = std::iter::once("6z".to_owned()).chain(faces.iter().skip(13).cloned()).collect::<Vec<_>>();
+            let deck = (1..=13).zip(faces.iter().take(13)).map(|(id, face)| (id.to_string(), json!(if id<=replacements {"9s"} else {face})))
+                .chain(faces.iter().take(replacements).enumerate().map(|(i, face)| ((14+i).to_string(), json!(face))))
+                .chain(wall.iter().enumerate().map(|(i, face)| ((14+replacements+i).to_string(), json!(face))))
+                .collect::<serde_json::Map<_, _>>();
+            let game = json!({"source":"qyzz", "qyzz_run_id":format!("custom-{quads}-{joker}"), "qyzz_version":1, "qyzz_deal_id":1,
+                "stage":4, "deck_map":deck, "hand_tiles":(1..=13).collect::<Vec<_>>(), "replacement_tiles":(14..14+replacements).collect::<Vec<_>>(),
+                "wall_tiles":(14+replacements..16+replacements+quads).collect::<Vec<_>>(), "locked_tiles":[], "dora_tiles":[], "effect_list":[],
+                "ming":[], "boss_buff":[901], "total_change_tile_count":2, "next_operation":[{"type":101},{"type":100}]});
+            state.services.publish_qyzz_state(&game).unwrap();
+            let mut target = (1..=quads).map(|rank| json!({"quad":true,"rule":{"faces":[format!("{rank}m")]}})).collect::<Vec<_>>();
+            target.extend(faces.iter().skip(quads*4).map(|face| json!({"rule":{"faces":[if face=="bd" {"1z"} else {face}],
+                "joker":if face=="bd" {"allow"} else {"exclude"}}})));
+            let replies = super::super::switch::switch_command(state, &json!({"action":"start",
+                "options":{"search_algorithm":"custom_target","target_groups":target,"wall_limit":36}})).await;
+            let plan = &replies[0]["data"][0]["data"];
+            assert_eq!(plan["status"], "plan", "{plan}");
+            assert!(plan["custom_steps"].as_array().unwrap().iter().any(|step| step["kind"] == "discard"));
+            if quads == 0 { assert_eq!(plan["switch_discards"].as_array().unwrap().len(), 2); }
+            let exchanged = super::super::switch::switch_command(state, &json!({"action":"execute_plan","options":{"plan_id":plan["plan_id"]}})).await;
+            assert_eq!(exchanged[0]["data"]["ok"], true, "{exchanged:?}");
+            assert_eq!(state.services.game_state()["stage"], 4);
+            assert_eq!(state.services.game_state()["ming"], json!([]));
+            assert_eq!(state.services.game_state()["wall_tiles"], game["wall_tiles"]);
+            let replies = super::super::switch::switch_command(state, &json!({"action":"start",
+                "options":{"search_algorithm":"custom_target","target_groups":target,"wall_limit":36}})).await;
+            let plan = &replies[0]["data"][0]["data"];
+            assert_eq!(plan["status"], "plan", "{plan}");
+            let result = super::super::switch::switch_command(state, &json!({"action":"execute_full_plan","options":{"plan_id":plan["plan_id"]}})).await;
+            assert_eq!(result[0]["data"]["ok"], true, "{result:?}");
+            let game = state.services.game_state();
+            assert_eq!(game["ming"].as_array().unwrap().len(), quads);
+            assert!(game["hand_tiles"].as_array().unwrap().contains(&json!(14)) || game["ming"].as_array().unwrap().iter()
+                .any(|meld| meld["tileList"].as_array().unwrap().contains(&json!(14))));
+            let stale = super::super::switch::switch_command(state, &json!({"action":"execute_full_plan","options":{"plan_id":plan["plan_id"]}})).await;
+            assert_eq!(stale[0]["data"]["reason"], "stale-plan");
+            if quads == 0 {
+                let replies = super::super::switch::switch_command(state, &json!({"action":"start",
+                    "options":{"search_algorithm":"custom_target","target_groups":target,"wall_limit":36}})).await;
+                let matched = &replies[0]["data"][0]["data"];
+                assert_eq!(matched["custom_steps"], json!([]));
+                let result = super::super::switch::switch_command(state, &json!({"action":"execute_full_plan","options":{"plan_id":matched["plan_id"]}})).await;
+                assert_eq!(result[0]["data"]["ok"], true, "{result:?}");
+                assert_eq!(state.services.game_state(), game);
+            }
+        }
+        for (custom, quads, timing) in [(true, 2, "delayed"), (false, 2, "delayed"), (false, 3, "delayed"),
+            (true, 2, "auto-finish"), (false, 2, "auto-finish"),
+            (false, 2, "empty-wall"),
+            (true, 2, "missing-kan"), (false, 2, "missing-kan")] {
+            let mut hand = vec!["1m"; 4];
+            hand.extend(["5p", "5p", "0p", "5p"]);
+            if quads == 3 { hand.extend(["9s"; 4]); hand.push("5s"); }
+            else { hand.extend(["3s", "3s", "3s", "4s", "5s"]); }
+            let wall = if timing == "empty-wall" { vec!["6z", "4s", "6s"] }
+                else if quads == 3 { vec!["6z", "5s", "6s", "7s", "8s"] }
+                else { vec!["6z", "4s", "6s", "7s", "8s"] };
+            let mut deck = hand.iter().enumerate().map(|(i, face)| ((i+1).to_string(), json!(face)))
+                .chain(wall.iter().enumerate().map(|(i, face)| ((14+i).to_string(), json!(face))))
+                .collect::<serde_json::Map<_, _>>();
+            if timing == "auto-finish" {
+                deck.insert("1".into(), json!("9m"));
+                deck.insert("19".into(), json!("1m"));
+            }
+            let game = json!({"source":"qyzz","qyzz_run_id":format!("timing-{custom}-{quads}-{timing}"),"qyzz_version":1,"qyzz_deal_id":1,
+                "stage":4,"deck_map":deck,"hand_tiles":(1..=13).collect::<Vec<_>>(),"wall_tiles":(14..14+wall.len()).collect::<Vec<_>>(),
+                "replacement_tiles":if timing=="auto-finish" {json!([19])} else {json!([])},
+                "locked_tiles":[],"dora_tiles":[],"effect_list":[],"ming":[],"total_change_tile_count":u8::from(timing=="auto-finish"),
+                "next_operation":[{"type":101},{"type":100}],"execution_test_timing":timing});
+            state.services.publish_qyzz_state(&game).unwrap();
+            let mut groups = vec![json!({"quad":true,"rule":{"faces":["1m"]}}),json!({"quad":true,"rule":{"faces":["5p"]}})];
+            let concealed = ["3s","3s","3s","4s","4s","5s","6s","7s"];
+            groups.extend(concealed.map(|face| json!({"rule":{"faces":[face],"joker":"exclude"}})));
+            let options = if custom {json!({"search_algorithm":"custom_target","target_groups":groups,"wall_limit":36})}
+                else {json!({"search_algorithm":if quads==3 {"target_enumeration_three_quads"} else {"target_enumeration_search"},"wall_limit":36})};
+            let replies = super::super::switch::switch_command(state, &json!({"action":"start","options":options})).await;
+            let plan = &replies[0]["data"][0]["data"];
+            assert_eq!(plan["status"], "plan", "{plan}");
+            let result = super::super::switch::switch_command(state, &json!({"action":"execute_full_plan","options":{"plan_id":plan["plan_id"]}})).await;
+            if timing == "missing-kan" {
+                assert_eq!(result[0]["data"]["ok"], false, "{result:?}");
+                assert_eq!(result[0]["data"]["reason"], "execution-state-mismatch");
+                assert_eq!(result[0]["data"]["reason_key"], "blackhole.execute_reason_state_mismatch");
+                let game = state.services.game_state();
+                assert_eq!(game["ming"], json!([]), "An unconfirmed kan was counted as completed");
+                assert_eq!(game["wall_tiles"].as_array().unwrap().len(), 3, "Execution kept discarding after a missing kan");
+            } else {
+                assert_eq!(result[0]["data"]["ok"], true, "{result:?}");
+                assert_eq!(state.services.game_state()["ming"].as_array().unwrap().len(), quads);
+            }
+        }
+        game_task.abort();
+    }
 
     /// Run alongside tests/lens_bridge_test.gd -- --serve-lens-test in the Qyzz checkout.
     #[tokio::test]
@@ -94,6 +389,18 @@ mod tests {
         }
         assert!(state.qyzz.operate(&game, 101, &keep).await.is_err(), "stale revision was accepted");
         assert!(state.proxy.request(".lq.Lobby.amuletActivityGameOperate", &json!({}), Duration::from_secs(1)).await.is_err());
+        let packets = state.services.packet_log_snapshot().packets;
+        for method in ["qyzz.bridge.auth", "qyzz.bridge.authenticated", "qyzz.bridge.state", "qyzz.bridge.operation", "qyzz.bridge.result", "qyzz.game.exchange"] {
+            assert!(packets.iter().any(|packet| packet.method == method), "missing live debug traffic: {method}");
+        }
+        assert!(!packets.iter().any(|packet| matches!(packet.method.as_str(), "qyzz.bridge.ping" | "qyzz.bridge.pong")));
+        assert!(!packets.iter().any(|packet| packet.method == "qyzz.game.lens_state"), "state conversion must stay in the game client");
+        assert!(packets.iter().any(|packet| packet.method == "qyzz.game.exchange" && packet.direction == Direction::Outbound));
+        let exchange = packets.iter().find(|packet| packet.method == "qyzz.game.exchange" && packet.direction == Direction::Inbound).unwrap();
+        assert_eq!(exchange.data["result"]["state_delta"], true);
+        assert_eq!(exchange.data["result"]["view"]["hand"]["dirty"], true);
+        assert!(exchange.data["result"]["view"].get("stage_rows").is_none(), "diagnostics must not expand the wire delta");
+        assert_eq!(packets.iter().find(|packet| packet.method == "qyzz.bridge.auth").unwrap().data["token"], "[已隐藏]");
         state.services.disconnect_qyzz();
         assert_eq!(state.services.game_state()["stage"], -1);
         assert_eq!(state.services.game_state()["qyzz_connected"], false);
@@ -104,9 +411,12 @@ mod tests {
 pub(super) async fn run(state: &State) {
     loop {
         if let Some((port, token)) = discovery() {
-            let connection = tokio::time::timeout(Duration::from_secs(2), connect_async(format!("ws://127.0.0.1:{port}"))).await;
+            let config = WebSocketConfig::default().max_message_size(Some(MAX_PACKET_BYTES)).max_frame_size(Some(MAX_PACKET_BYTES));
+            let connection = tokio::time::timeout(Duration::from_secs(2), connect_async_with_config(format!("ws://127.0.0.1:{port}"), Some(config), false)).await;
             if let Ok(Ok((mut socket, _))) = connection {
-                if socket.send(Message::Text(json!({"type":"auth", "token":token}).to_string().into())).await.is_ok() {
+                let auth = json!({"type":"auth", "token":token, "packet_log":true});
+                if socket.send(Message::Text(auth.to_string().into())).await.is_ok() {
+                    let _ = record_packet(&state.services, Direction::Outbound, &auth);
                     let (sender, mut receiver) = mpsc::channel::<Operation>(4);
                     let mut waiting = HashMap::<u64, oneshot::Sender<Result<(), String>>>::new();
                     let mut serial = 0u64;
@@ -120,8 +430,10 @@ pub(super) async fn run(state: &State) {
                                 last_message = tokio::time::Instant::now();
                                 if message.is_close() { break; }
                                 let Message::Text(text) = message else { continue; };
-                                if text.len() > 2 * 1024 * 1024 { break; }
+                                if text.len() > MAX_PACKET_BYTES { break; }
                                 let Ok(data) = serde_json::from_str::<Value>(&text) else { break; };
+                                if data["type"] == "packet" && !authenticated { break; }
+                                if record_packet(&state.services, Direction::Inbound, &data).is_err() { break; }
                                 match data["type"].as_str() {
                                     Some("authenticated") if data["protocol"] == 1 => {
                                         authenticated = true;
@@ -155,10 +467,13 @@ pub(super) async fn run(state: &State) {
                                 command.packet["id"] = json!(serial);
                                 waiting.insert(serial, command.reply);
                                 if socket.send(Message::Text(command.packet.to_string().into())).await.is_err() { break; }
+                                let _ = record_packet(&state.services, Direction::Outbound, &command.packet);
                             }
                             _ = heartbeat.tick() => {
                                 if last_message.elapsed() > Duration::from_secs(15) { break; }
-                                if socket.send(Message::Text(json!({"type":"ping"}).to_string().into())).await.is_err() { break; }
+                                let ping = json!({"type":"ping"});
+                                if socket.send(Message::Text(ping.to_string().into())).await.is_err() { break; }
+                                let _ = record_packet(&state.services, Direction::Outbound, &ping);
                             }
                         }
                     }

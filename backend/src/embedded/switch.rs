@@ -99,6 +99,7 @@ pub(super) async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
             let revision = snapshot.get("revision").cloned().unwrap_or(Value::Null);
             let result_algorithm = algorithm.clone();
             let target_groups = data.pointer("/options/target_groups").cloned().unwrap_or(Value::Null);
+            let exclude_invalid_shapes = data.pointer("/options/exclude_invalid_shapes").cloned().unwrap_or(json!(false));
             let worker_state = state.clone();
             let mut plan = tokio::task::spawn_blocking(move || {
                 let stopped = || if debug {
@@ -117,7 +118,10 @@ pub(super) async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
                         }])));
                     };
                 if algorithm.as_deref() == Some("custom_target") {
-                    recommendations::custom_switch_plan(&snapshot, &target_groups, wall_limit, &mut progress, &stopped)
+                    match serde_json::from_value::<bool>(exclude_invalid_shapes) {
+                        Ok(exclude) => recommendations::custom_switch_plan(&snapshot, &target_groups, wall_limit, exclude, &mut progress, &stopped),
+                        Err(_) => json!({"status":"impossible","reason":"custom-invalid-options"}),
+                    }
                 } else {
                     recommendations::switch_plan_with_preferences(&snapshot, wall_limit, &skip_signatures,
                         algorithm.as_deref(), &preferences, &mut progress, &stopped)
@@ -243,13 +247,19 @@ pub(super) async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
                 Ok(()) => (true, String::new()),
                 Err(reason) => (false, reason),
             };
+            let reason_key = match reason.as_str() {
+                "execution-state-mismatch" => "blackhole.execute_reason_state_mismatch",
+                "execution-game-ended" => "blackhole.execute_reason_game_ended",
+                _ => "",
+            };
             let _ = state.services.events.send(event(
                 "souzu_switch_execution",
-                json!({"status":if ok{"completed"}else{"failed"},"phase":"done","reason":reason}),
+                json!({"status":if ok{"completed"}else{"failed"},"phase":"done","reason":reason,"reason_key":reason_key,
+                    "execution_kind":if action=="execute_full_plan" {"full_plan"}else{"switch"}}),
             ));
             vec![event(
                 "souzu_switch_control_result",
-                json!({"action":action,"ok":ok,"reason":reason}),
+                json!({"action":action,"ok":ok,"reason":reason,"reason_key":reason_key}),
             )]
         }
         "stop" => {
@@ -312,48 +322,33 @@ pub(super) async fn plan_is_current(state: &State, plan: &Value) -> bool {
             .is_some_and(|current| current.get("plan_id").and_then(Value::as_str) == id)
 }
 
-async fn wait_for_game_change(
-    state: &State,
-    plan: &Value,
-    old_hand: &[u64],
-    old_change_count: u64,
-    timeout: Duration,
-) -> Result<(), String> {
-    let deadline = Instant::now() + timeout;
-    while Instant::now() < deadline {
-        if !plan_is_current(state, plan).await {
-            return Err("stopped-by-user".into());
-        }
-        let game = state.services.game_state();
-        let hand = value_ids(game.get("hand_tiles"));
-        let change_count = game
-            .get("change_tile_count")
-            .and_then(Value::as_u64)
-            .unwrap_or(0);
-        if hand != old_hand || change_count != old_change_count {
-            return Ok(());
-        }
-        tokio::time::sleep(Duration::from_millis(80)).await;
-    }
-    Err("game-state-update-timeout".into())
-}
-
 async fn send_game_operation(
     state: &State,
+    plan: &Value,
+    game: &Value,
     operation_type: u64,
     tile_list: &[u64],
 ) -> Result<(), String> {
-    let game = state.services.game_state();
-    if game["source"] == "qyzz" {
-        return state.qyzz.operate(&game, operation_type, tile_list).await;
+    if !plan_is_current(state, plan).await {
+        return Err("stopped-by-user".into());
     }
+    let current = state.services.game_state();
+    if current["revision"] != game["revision"] || current["session_id"] != game["session_id"]
+        || game["ended"] == true || !operation_available(game, operation_type) {
+        return Err("execution-state-mismatch".into());
+    }
+    if game["source"] == "qyzz" {
+        return state.qyzz.operate(game, operation_type, tile_list).await;
+    }
+    // A resync may change the hand; never replay a mutating request against the new state.
+    let (method, data) = if operation_type == 100 {
+        (".lq.Lobby.amuletActivityOperate", json!({"activityId":260511,"type":3,"args":[]}))
+    } else {
+        (".lq.Lobby.amuletActivityGameOperate", json!({"activityId":260511,"type":operation_type,"tileList":tile_list}))
+    };
     match state
         .proxy
-        .request_with_retry(
-            ".lq.Lobby.amuletActivityGameOperate",
-            &json!({"activityId":260511,"type":operation_type,"tileList":tile_list}),
-            Duration::from_secs(12),
-        )
+        .request(method, &data, Duration::from_secs(12))
         .await
     {
         Ok((_, response)) if response.get("error").is_none() => Ok(()),
@@ -402,23 +397,28 @@ async fn execute_switch_batches(
             .copied()
             .filter(|id| !discard_ids.contains(id))
             .collect::<Vec<_>>();
-        let old_change_count = game
-            .get("change_tile_count")
-            .and_then(Value::as_u64)
-            .unwrap_or(0);
+        let incoming_batches = plan.get("switch_in");
+        let incoming = value_ids(if incoming_batches.and_then(|batches| batches.get(0)).is_some_and(Value::is_number) {
+            incoming_batches
+        } else { incoming_batches.and_then(|batches| batches.get(index)) });
+        if incoming.len() != discard_ids.len() {
+            return Err("switch-plan-no-longer-matches-hand".into());
+        }
+        let mut expected = keep.clone();
+        expected.extend(incoming);
+        let mut expected_hands = vec![expected.clone()];
+        if let Some(draw) = value_ids(game.get("wall_tiles")).first() {
+            expected.push(*draw);
+            expected_hands.push(expected);
+        }
         let _ = state.services.events.send(event(
             "souzu_switch_execution",
-            json!({"status":"running","phase":"switch","batch_index":index+1,"batch_total":batches.len(),"batch_count":batches.len()}),
+            json!({"status":"running","phase":"switch","phase_key":"blackhole.execute_phase_sending",
+                "execution_kind":if finish_switch {"full_plan"}else{"switch"},
+                "batch_index":index+1,"batch_total":batches.len(),"batch_count":batches.len()}),
         ));
-        send_game_operation(state, 101, &keep).await?;
-        wait_for_game_change(
-            state,
-            plan,
-            &hand,
-            old_change_count,
-            Duration::from_secs(12),
-        )
-        .await?;
+        send_game_operation(state, plan, &game, 101, &keep).await?;
+        wait_for_execution_state(state, plan, &expected_hands, &meld_ids(&game), None).await?;
     }
     if !finish_switch {
         return Ok(());
@@ -434,34 +434,18 @@ async fn execute_switch_batches(
         if game["stage"] == 5
             || [1, 4, 8].iter().any(|kind| operation_available(&game, *kind))
         {
+            wait_for_play_turn(state, plan, &game).await?;
             return Ok(());
         }
         if operation_available(&game, 100) {
             let _ = state.services.events.send(event(
                 "souzu_switch_execution",
-                json!({"status":"running","phase":"finish-switch"}),
+                json!({"status":"running","phase":"finish-switch","execution_kind":"full_plan",
+                    "phase_key":"blackhole.execute_phase_finish_switch"}),
             ));
-            if game["source"] == "qyzz" {
-                return state.qyzz.operate(&game, 100, &[]).await;
-            }
-            match state
-                .proxy
-                .request_with_retry(
-                    ".lq.Lobby.amuletActivityOperate",
-                    &json!({"activityId":260511,"type":3,"args":[]}),
-                    Duration::from_secs(12),
-                )
-                .await
-            {
-                Ok((_, response)) if response.get("error").is_none() => return Ok(()),
-                Ok((_, response)) => {
-                    return Err(format!(
-                        "protocol-error: {}",
-                        response.get("error").unwrap_or(&Value::Null)
-                    ))
-                }
-                Err(error) => return Err(error),
-            }
+            send_game_operation(state, plan, &game, 100, &[]).await?;
+            wait_for_play_turn(state, plan, &game).await?;
+            return Ok(());
         }
         tokio::time::sleep(Duration::from_millis(80)).await;
     }
@@ -470,15 +454,6 @@ async fn execute_switch_batches(
 
 fn choose_discard(game: &Value, plan: &Value, pending_quads: &[String]) -> Option<u64> {
     let hand = value_ids(game.get("hand_tiles"));
-    if let Some(planned) = plan.get("post_draw_discards").and_then(Value::as_array) {
-        if let Some(id) = planned
-            .iter()
-            .filter_map(Value::as_u64)
-            .find(|id| hand.contains(id))
-        {
-            return Some(id);
-        }
-    }
     let mut wanted = HashMap::<String, usize>::new();
     for face in plan
         .get("target13")
@@ -487,24 +462,31 @@ fn choose_discard(game: &Value, plan: &Value, pending_quads: &[String]) -> Optio
         .flatten()
         .filter_map(Value::as_str)
     {
-        *wanted.entry(face.to_owned()).or_default() += 1;
+        *wanted.entry(recommendations::norm(face)).or_default() += 1;
     }
     for face in pending_quads {
-        *wanted.entry(face.clone()).or_default() += 4;
+        *wanted.entry(recommendations::norm(face)).or_default() += 4;
     }
     let mut kept = HashMap::<String, usize>::new();
+    let mut safe = Vec::new();
     for id in hand.iter().copied() {
-        let face = deck_face(game, id).unwrap_or("");
-        let count = kept.entry(face.to_owned()).or_default();
-        if *count >= wanted.get(face).copied().unwrap_or(0) {
-            return Some(id);
+        let face = recommendations::norm(deck_face(game, id)?);
+        if face == "bd" { continue; }
+        let count = kept.entry(face.clone()).or_default();
+        if *count >= wanted.get(&face).copied().unwrap_or(0) {
+            safe.push(id);
+        } else {
+            *count += 1;
         }
-        *count += 1;
     }
-    None
+    value_ids(plan.get("post_draw_discards")).into_iter().find(|id| safe.contains(id))
+        .or_else(|| safe.first().copied())
 }
 
 async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), String> {
+    if plan["search_algorithm"] == "custom_target" {
+        return execute_custom_switch_plan(state, plan).await;
+    }
     if plan
         .get("mode")
         .and_then(Value::as_str)
@@ -512,7 +494,6 @@ async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), Str
     {
         return Err("wanxiang-plan-has-no-full-kan-execution".into());
     }
-    execute_switch_batches(state, plan, true).await?;
     let mut pending_quads = plan
         .get("quad_faces")
         .and_then(Value::as_array)
@@ -520,7 +501,7 @@ async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), Str
             values
                 .iter()
                 .filter_map(Value::as_str)
-                .map(str::to_owned)
+                .map(recommendations::norm)
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
@@ -531,71 +512,190 @@ async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), Str
         .get("draws_needed")
         .and_then(Value::as_u64)
         .unwrap_or(0) as usize;
-    let deadline = Instant::now() + Duration::from_secs(180);
-    let mut post_kan_discards = 0usize;
-    while Instant::now() < deadline {
-        if !plan_is_current(state, plan).await {
-            return Err("stopped-by-user".into());
-        }
-        let game = state.services.game_state();
+    let wall_size = value_ids(state.services.game_state().get("wall_tiles")).len();
+    execute_switch_batches(state, plan, true).await?;
+    let mut game = state.services.game_state();
+    let mut draws = wall_size.saturating_sub(value_ids(game.get("wall_tiles")).len());
+    loop {
+        game = wait_for_execution_state(state, plan, &[value_ids(game.get("hand_tiles"))], &meld_ids(&game), None).await?;
         let hand = value_ids(game.get("hand_tiles"));
         if let Some((quad_index, quad_ids)) =
             pending_quads.iter().enumerate().find_map(|(index, face)| {
                 let ids = hand
                     .iter()
                     .copied()
-                    .filter(|id| deck_face(&game, *id) == Some(face.as_str()))
+                    .filter(|id| deck_face(&game, *id).is_some_and(|raw| recommendations::norm(raw) == *face))
                     .take(4)
                     .collect::<Vec<_>>();
                 (ids.len() == 4).then_some((index, ids))
             })
         {
-            if operation_available(&game, 4) {
-                let _ = state.services.events.send(event(
-                    "souzu_switch_execution",
-                    json!({"status":"running","phase":"kan","quad_face":pending_quads[quad_index]}),
-                ));
-                send_game_operation(state, 4, &quad_ids).await?;
-                let change_count = game
-                    .get("change_tile_count")
-                    .and_then(Value::as_u64)
-                    .unwrap_or(0);
-                wait_for_game_change(state, plan, &hand, change_count, Duration::from_secs(12))
-                    .await?;
-                pending_quads.remove(quad_index);
-                continue;
-            }
-        }
-        if pending_quads.is_empty()
-            && (operation_available(&game, 8)
-                || game
-                    .get("ting_list")
-                    .and_then(Value::as_array)
-                    .is_some_and(|values| !values.is_empty())
-                || post_kan_discards >= draws_needed)
-        {
-            return Ok(());
-        }
-        if operation_available(&game, 1) {
-            let discard = choose_discard(&game, plan, &pending_quads).ok_or("no-safe-discard")?;
+            // Keep a complete quad intact while the operation list catches up.
+            game = wait_for_execution_state(state, plan, &[hand], &meld_ids(&game), Some(4)).await?;
             let _ = state.services.events.send(event(
                 "souzu_switch_execution",
-                json!({"status":"running","phase":"discard","tile_id":discard}),
+                json!({"status":"running","phase":"kan","execution_kind":"full_plan",
+                    "phase_key":"blackhole.execute_phase_kan","quad_face":pending_quads[quad_index]}),
             ));
-            send_game_operation(state, 1, &[discard]).await?;
-            let change_count = game
-                .get("change_tile_count")
-                .and_then(Value::as_u64)
-                .unwrap_or(0);
-            wait_for_game_change(state, plan, &hand, change_count, Duration::from_secs(12)).await?;
-            if pending_quads.is_empty() {
-                post_kan_discards += 1;
-            }
+            game = execute_play_operation(state, plan, &game, 4, &quad_ids).await?;
+            draws += 1;
+            pending_quads.remove(quad_index);
             continue;
+        }
+        if draws >= draws_needed + 2 {
+            return Err("execution-state-mismatch".into());
+        }
+        game = wait_for_execution_state(state, plan, &[hand.clone()], &meld_ids(&game), Some(1)).await?;
+        let discard = choose_discard(&game, plan, &pending_quads).ok_or("no-safe-discard")?;
+        let mut retained = hand.iter().filter(|&&id| id != discard)
+            .map(|&id| deck_face(&game, id).map(recommendations::norm).unwrap_or_default()).collect::<Vec<_>>();
+        let mut target = plan["target13"].as_array().into_iter().flatten()
+            .filter_map(Value::as_str).map(recommendations::norm).collect::<Vec<_>>();
+        retained.sort();
+        target.sort();
+        let final_discard = pending_quads.is_empty() && retained == target;
+        if final_discard && (operation_available(&game, 8)
+            || game["ting_list"].as_array().is_some_and(|values| !values.is_empty())) {
+            return Ok(());
+        }
+        let _ = state.services.events.send(event(
+            "souzu_switch_execution",
+            json!({"status":"running","phase":"discard","execution_kind":"full_plan",
+                "phase_key":"blackhole.execute_phase_auto_discard","reason_values":{"tile_id":discard}}),
+        ));
+        game = execute_play_operation(state, plan, &game, 1, &[discard]).await?;
+        draws += 1;
+        if final_discard { return Ok(()); }
+    }
+}
+
+fn meld_ids(game: &Value) -> Vec<Vec<u64>> {
+    let mut melds = game["ming"].as_array().into_iter().flatten().map(|meld| {
+        let mut tiles = value_ids(meld.get("tileList"));
+        tiles.sort_unstable();
+        tiles
+    }).collect::<Vec<_>>();
+    melds.sort_unstable();
+    melds
+}
+
+async fn wait_for_execution_state(
+    state: &State,
+    plan: &Value,
+    expected_hands: &[Vec<u64>],
+    expected_melds: &[Vec<u64>],
+    operation: Option<u64>,
+) -> Result<Value, String> {
+    let mut expected_hands = expected_hands.to_vec();
+    for hand in &mut expected_hands { hand.sort_unstable(); }
+    let mut expected_melds = expected_melds.to_vec();
+    for meld in &mut expected_melds { meld.sort_unstable(); }
+    expected_melds.sort_unstable();
+    let deadline = Instant::now() + Duration::from_secs(12);
+    while Instant::now() < deadline {
+        if !plan_is_current(state, plan).await {
+            return Err("stopped-by-user".into());
+        }
+        let game = state.services.game_state();
+        if game["ended"] == true {
+            return Err("execution-game-ended".into());
+        }
+        let mut hand = value_ids(game.get("hand_tiles"));
+        hand.sort_unstable();
+        if expected_hands.contains(&hand) && meld_ids(&game) == expected_melds
+            && operation.is_none_or(|kind| operation_available(&game, kind)) {
+            return Ok(game);
         }
         tokio::time::sleep(Duration::from_millis(80)).await;
     }
-    Err("full-plan-execution-timeout".into())
+    Err("execution-state-mismatch".into())
+}
+
+async fn wait_for_play_turn(state: &State, plan: &Value, game: &Value) -> Result<Value, String> {
+    let mut hand = value_ids(game.get("hand_tiles"));
+    let melds = meld_ids(game);
+    if hand.len() + melds.len() * 3 == 13 {
+        hand.push(*value_ids(game.get("wall_tiles")).first().ok_or("execution-state-mismatch")?);
+    }
+    if hand.len() + melds.len() * 3 != 14 { return Err("execution-state-mismatch".into()); }
+    wait_for_execution_state(state, plan, &[hand], &melds, Some(1)).await
+}
+
+async fn execute_play_operation(state: &State, plan: &Value, game: &Value, kind: u64, tiles: &[u64]) -> Result<Value, String> {
+    let mut hand = value_ids(game.get("hand_tiles"));
+    let mut melds = meld_ids(game);
+    if game["stage"] != 5 || hand.len() + melds.len() * 3 != 14
+        || !matches!((kind, tiles.len()), (1, 1) | (4, 4))
+        || tiles.iter().enumerate().any(|(i, id)| tiles[..i].contains(id)
+            || !hand.contains(id) || deck_face(game, *id).is_none_or(|face| face == "bd"))
+        || (kind == 4 && tiles.iter().any(|&id| recommendations::norm(deck_face(game, id).unwrap_or(""))
+            != recommendations::norm(deck_face(game, tiles[0]).unwrap_or("")))) {
+        return Err("execution-state-mismatch".into());
+    }
+    hand.retain(|id| !tiles.contains(id));
+    if kind == 4 { melds.push(tiles.to_vec()); }
+    if let Some(draw) = value_ids(game.get("wall_tiles")).first() { hand.push(*draw); }
+    send_game_operation(state, plan, game, kind, tiles).await?;
+    // A reply or a changed hand is not proof that the requested kan/discard was applied.
+    wait_for_execution_state(state, plan, &[hand], &melds, None).await
+}
+
+async fn execute_custom_switch_plan(state: &State, plan: &Value) -> Result<(), String> {
+    let steps = plan["custom_steps"].as_array().ok_or("custom-missing-steps")?;
+    let mut hand = value_ids(plan.get("initial_hand"));
+    let mut melds = meld_ids(&state.services.game_state());
+    if hand.is_empty() {
+        return Err("custom-missing-hand".into());
+    }
+    if !steps.is_empty() {
+        execute_switch_batches(state, plan, true).await?;
+    }
+    for step in steps {
+        let tiles = value_ids(step.get("tiles"));
+        let kind = step["kind"].as_str().ok_or("custom-invalid-step")?;
+        if kind == "exchange" {
+            let out = value_ids(step.get("out"));
+            hand.retain(|id| !out.contains(id));
+            hand.extend(tiles);
+            continue;
+        }
+        let operation = match kind {
+            "draw" => None,
+            "discard" if tiles.len() == 1 => Some(1),
+            "kan" if tiles.len() == 4 => Some(4),
+            _ => return Err("custom-invalid-step".into()),
+        };
+        let _ = state.services.events.send(event("souzu_switch_execution", json!({
+            "status":"running", "phase":kind, "execution_kind":"full_plan",
+            "phase_key":format!("blackhole.execute_phase_{kind}"),
+            "reason_values":{"tile_id":tiles.first()},
+        })));
+        if kind == "draw" {
+            // Finishing exchanges, discarding and declaring kan draw automatically.
+            hand.extend(tiles);
+            wait_for_execution_state(state, plan, &[hand.clone()], &melds, None).await?;
+        } else {
+            let game = wait_for_execution_state(state, plan, &[hand.clone()], &melds, operation).await?;
+            if tiles.iter().any(|id| !hand.contains(id) || deck_face(&game, *id) == Some("bd")) {
+                return Err("custom-step-no-longer-matches-hand".into());
+            }
+            execute_play_operation(state, plan, &game, operation.unwrap(), &tiles).await?;
+            if kind == "kan" { melds.push(tiles.clone()); }
+            hand.retain(|id| !tiles.contains(id));
+        }
+    }
+    let game = wait_for_execution_state(state, plan, &[hand.clone()], &melds, None).await?;
+    let mut actual = hand;
+    for meld in game["ming"].as_array().into_iter().flatten() {
+        actual.extend(value_ids(meld.get("tileList")));
+    }
+    let mut target = value_ids(plan.get("target_physical_ids"));
+    actual.sort_unstable();
+    target.sort_unstable();
+    if actual != target {
+        return Err("custom-target-mismatch".into());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -609,5 +709,8 @@ mod three_quad_execution_tests {
         assert_eq!(choose_discard(&game, &plan, &[]), Some(1));
         let full = json!({"target13":["1m","1m","4p","7z","9s"]});
         assert_eq!(choose_discard(&game, &full, &[]), None);
+        let red_quad = json!({"hand_tiles":[1,2,3,4,5,1000],"deck_map":{"1":"5p","2":"0p","3":"5p","4":"5p","5":"9s","1000":"bd"}});
+        let planned = json!({"target13":[],"post_draw_discards":[2,1000]});
+        assert_eq!(choose_discard(&red_quad, &planned, &["5p".into()]), Some(5));
     }
 }

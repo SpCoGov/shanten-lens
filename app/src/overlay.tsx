@@ -7,6 +7,7 @@ import {ensureI18nReady} from "./lib/i18n";
 import {t} from "i18next";
 import * as backendIpc from "./lib/ipc";
 import type {PlanData} from "./lib/planTypes";
+import {readWanxiangPreferences} from "./lib/wanxiangSettings";
 import type {EffectItem, GameStateData} from "./lib/gamestate";
 import {toDeckMap} from "./lib/gamestate";
 import {
@@ -38,6 +39,7 @@ type ExecutionState = {
     batch_count: number;
     batch_index: number;
     reason: string;
+    reason_key: string;
     phase: string;
 };
 
@@ -68,7 +70,9 @@ function sendSouzuAction(action: backendIpc.SwitchAction, planId?: string) {
 function sendWanxiangAction(action: backendIpc.SwitchAction, planId?: string) {
     void backendIpc.runSwitch({
         action,
-        options: action === "start" ? {wall_limit: 36, search_algorithm: WANXIANG_SEARCH_ALGORITHM} : {plan_id: planId ?? ""},
+        options: action === "start" ? {
+            wall_limit: 36, search_algorithm: WANXIANG_SEARCH_ALGORITHM, preferences: readWanxiangPreferences(),
+        } : {plan_id: planId ?? ""},
     });
 }
 
@@ -125,6 +129,7 @@ function HudOverlay() {
                         batch_count: Math.max(0, Number(d.batch_count || 0)),
                         batch_index: Math.max(0, Number(d.batch_index || 0)),
                         reason: String(d.reason || ""),
+                        reason_key: String(d.reason_key || ""),
                         phase: String(d.phase || ""),
                     });
                 }
@@ -510,7 +515,7 @@ function progressText(plan: PlanData | null, execution: ExecutionState | null) {
         return `${t("overlay.blackhole_executing")} ${current}/${total}`;
     }
     if (execution?.status === "completed") return t("overlay.blackhole_execution_done");
-    if (execution?.status === "failed") return execution.reason || t("overlay.blackhole_execution_failed");
+    if (execution?.status === "failed") return (execution.reason_key ? t(execution.reason_key) : execution.reason) || t("overlay.blackhole_execution_failed");
     if (plan?.status === "searching") return plan.progress || t("advisor.searching");
     if (plan?.status === "plan") return t("advisor.badge_switch_plan");
     if (plan?.status === "impossible") return t("advisor.impossible");

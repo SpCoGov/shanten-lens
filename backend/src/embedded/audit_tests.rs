@@ -88,6 +88,9 @@ async fn debug_cannot_replace_live_plan_and_execution_checks_identity_and_sessio
     let invalid_custom = switch_command(state, &json!({"action":"start_debug",
         "options":{"search_algorithm":"custom_target","target_groups":[]}})).await;
     assert_eq!(invalid_custom[0]["data"][0]["data"]["reason"], "custom-invalid-target");
+    let invalid_options = switch_command(state, &json!({"action":"start_debug",
+        "options":{"search_algorithm":"custom_target","exclude_invalid_shapes":"true"}})).await;
+    assert_eq!(invalid_options[0]["data"][0]["data"]["reason"], "custom-invalid-options");
     for preferences in [json!({"any_waits":"invalid"}), json!({"preferred_suit":"x"}), json!({"preferred_meld_type":"quad"})] {
         let invalid = switch_command(state, &json!({"action":"start_debug","options":{"preferences":preferences}})).await;
         assert_eq!(invalid[0]["data"][0]["data"]["reason"], "invalid-search-preferences");

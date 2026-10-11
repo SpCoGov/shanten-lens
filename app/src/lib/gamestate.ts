@@ -24,7 +24,7 @@ export interface GameStateData {
     switch_used_tiles: number[];
     effect_list?: EffectItem[];
     goods?: GoodsItem[];
-    refresh_price?: number;
+    refresh_price?: string;
     candidate_effect_list?: CandidateEffectRef[];
     boss_buff?: number[];
     shop_buff_list?: Record<number, number>;

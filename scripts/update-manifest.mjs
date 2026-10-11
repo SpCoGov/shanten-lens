@@ -19,7 +19,7 @@ export function createUpdateManifest(directory, version, repository) {
         platforms: {
             "windows-x86_64": {
                 signature,
-                url: `https://github.com/${repository}/releases/download/v${version}/${encodeURIComponent(installer)}`,
+                url: `https://github.com/${repository}/releases/download/v${version}/${encodeURIComponent(installer.replaceAll(" ", "."))}`,
             },
         },
     };

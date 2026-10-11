@@ -134,6 +134,7 @@ impl Services {
     }
 
     pub fn can_replay(&self, method: &str) -> bool {
+        if method.starts_with("qyzz.") { return false; }
         self.packet_log.lock().unwrap().iter().any(|packet| {
             packet.direction == crate::pipeline::Direction::Outbound
                 && packet.packet_type == "Req"
