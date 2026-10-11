@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {mkdtempSync, readFileSync, rmSync, writeFileSync} from "node:fs";
+import {mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {dirname, join, resolve} from "node:path";
 import {test} from "node:test";
@@ -24,6 +24,37 @@ test("release manifest requires one matching installer and its signature", () =>
         assert.throws(() => createUpdateManifest(directory, "3.0.6", "SpCoGov/shanten-lens"));
         writeFileSync(join(directory, "Other_3.0.5_x64-setup.exe"), "ambiguous installer");
         assert.throws(() => createUpdateManifest(directory, "3.0.5", "SpCoGov/shanten-lens"));
+    } finally {
+        assert.equal(dirname(directory), resolve(tmpdir()));
+        rmSync(directory, {recursive: true});
+    }
+});
+
+test("release manifest finds a signed installer in nested artifacts and rejects duplicates", () => {
+    const directory = mkdtempSync(join(tmpdir(), "shanten-update-test-"));
+    try {
+        const nsis = join(directory, "windows_3.2.0_artifacts", "nsis");
+        const portable = join(directory, "windows_3.2.0_artifacts", "portable");
+        for (const path of [nsis, portable]) mkdirSync(path, {recursive: true});
+        const name = "Shanten Lens_3.2.0_x64-setup.exe";
+        writeFileSync(join(nsis, name), "installer");
+        writeFileSync(join(portable, "shanten-lens_3.2.0_windows_x64_portable.zip"), "portable");
+        writeFileSync(join(directory, "Shanten Lens_3.2.0_aarch64.dmg"), "macOS installer");
+        assert.throws(() => createUpdateManifest(directory, "3.2.0", "SpCoGov/shanten-lens"));
+        writeFileSync(join(nsis, `${name}.sig`), "nested-signature\n");
+        const manifest = createUpdateManifest(directory, "3.2.0", "SpCoGov/shanten-lens");
+        assert.equal(manifest.platforms["windows-x86_64"].signature, "nested-signature");
+        assert.equal(manifest.platforms["windows-x86_64"].url,
+            "https://github.com/SpCoGov/shanten-lens/releases/download/v3.2.0/Shanten.Lens_3.2.0_x64-setup.exe");
+        const wrongVersion = join(nsis, "Shanten Lens_3.1.0_x64-setup.exe");
+        renameSync(join(nsis, name), wrongVersion);
+        writeFileSync(`${wrongVersion}.sig`, "old-signature");
+        assert.throws(() => createUpdateManifest(directory, "3.2.0", "SpCoGov/shanten-lens"),
+            /Expected exactly one Windows x64 installer/);
+        renameSync(wrongVersion, join(nsis, name));
+        writeFileSync(join(directory, name), "duplicate installer");
+        assert.throws(() => createUpdateManifest(directory, "3.2.0", "SpCoGov/shanten-lens"),
+            /Expected exactly one Windows x64 installer/);
     } finally {
         assert.equal(dirname(directory), resolve(tmpdir()));
         rmSync(directory, {recursive: true});
