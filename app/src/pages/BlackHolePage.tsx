@@ -567,7 +567,7 @@ function PlanFinalResult({
 
     return (
         <div style={{display: "grid", gap: 14}}>
-            <FinalShapeGroup quadFaces={data.quad_faces || []} tenpaiFaces={data.target13 || []}/>
+            <FinalShapeGroup quadFaces={data.quad_faces || []} tenpaiFaces={data.target13 || []} resolvedGroups={data.resolved_groups}/>
             <TileGroup title={t("advisor.wall_draw_sequence")} ids={data.wall_draws || []} resolveFace={resolveFace}/>
             <FaceChipList title={t("advisor.final_waits")} faces={data.waits || []}/>
         </div>
@@ -783,9 +783,12 @@ function TileGroup({
     );
 }
 
-function FinalShapeGroup({quadFaces, tenpaiFaces}: { quadFaces: string[]; tenpaiFaces: string[] }) {
+function FinalShapeGroup({quadFaces, tenpaiFaces, resolvedGroups}: {
+    quadFaces: string[]; tenpaiFaces: string[]; resolvedGroups?: PlanData["resolved_groups"];
+}) {
     const {t} = useTranslation();
     const quadTiles = quadFaces.flatMap((face) => [face, face, face, face]);
+    const handGroups = resolvedGroups?.length ? resolvedGroups.map(group => group.tiles.map(tile => tile.face)) : [tenpaiFaces];
     if (!quadTiles.length && !tenpaiFaces.length) {
         return null;
     }
@@ -825,13 +828,13 @@ function FinalShapeGroup({quadFaces, tenpaiFaces}: { quadFaces: string[]; tenpai
                     />
                 ) : null}
 
-                {tenpaiFaces.length > 0 ? (
-                    <div style={{display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center"}}>
-                        {tenpaiFaces.map((face, index) => (
+                {tenpaiFaces.length > 0 ? handGroups.map((faces, groupIndex) => (
+                    <div key={groupIndex} style={{display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center"}}>
+                        {faces.map((face, index) => (
                             <Tile key={`tenpai-${face}-${index}`} tile={face} width={44} height={58}/>
                         ))}
                     </div>
-                ) : (
+                )) : (
                     <div className={styles.cardBodyMuted} style={{padding: 0}}>-</div>
                 )}
             </div>

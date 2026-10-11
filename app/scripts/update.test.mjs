@@ -15,11 +15,12 @@ test("release manifest requires one matching installer and its signature", () =>
         writeFileSync(join(directory, name), "installer");
         assert.throws(() => createUpdateManifest(directory, "3.0.5", "SpCoGov/shanten-lens"));
         writeFileSync(join(directory, `${name}.sig`), "signed-package\n");
+        writeFileSync(join(directory, "shanten-lens_3.0.5_windows_x64_portable.zip"), "portable");
         const manifest = createUpdateManifest(directory, "3.0.5", "SpCoGov/shanten-lens");
         assert.equal(manifest.version, "3.0.5");
         assert.equal(manifest.platforms["windows-x86_64"].signature, "signed-package");
         assert.equal(manifest.platforms["windows-x86_64"].url,
-            "https://github.com/SpCoGov/shanten-lens/releases/download/v3.0.5/Shanten%20Lens_3.0.5_x64-setup.exe");
+            "https://github.com/SpCoGov/shanten-lens/releases/download/v3.0.5/Shanten.Lens_3.0.5_x64-setup.exe");
         assert.throws(() => createUpdateManifest(directory, "3.0.6", "SpCoGov/shanten-lens"));
         writeFileSync(join(directory, "Other_3.0.5_x64-setup.exe"), "ambiguous installer");
         assert.throws(() => createUpdateManifest(directory, "3.0.5", "SpCoGov/shanten-lens"));

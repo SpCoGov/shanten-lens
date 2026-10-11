@@ -1,5 +1,5 @@
 //! v2.5.0 physical-meld enumeration and first-reachable DFS, without wall draws.
-//! Rank reachable plans by replacement depth, then preferred suit, meld type and bonus tiles.
+//! Every reachable plan is ready without wall draws; rank by suit, meld type and bonus tiles.
 use super::{
     deck, face, ids, norm, pool, search_limits, souzu, Entry, MeldType, SearchPreferences, SwitchBatches,
 };
@@ -28,7 +28,7 @@ struct Search<'a> {
     checks: usize,
     nodes: usize,
     preference_limits: [usize; 3],
-    best_rank: Option<(usize, Reverse<[usize; 3]>)>,
+    best_preferred: Option<[usize; 3]>,
 }
 
 impl Search<'_> {
@@ -112,7 +112,10 @@ impl Search<'_> {
                 }
             }
         }
-        result.sort_unstable_by_key(|meld| meld.key);
+        result.sort_unstable_by_key(|meld| (Reverse(meld.preferred), meld.key));
+        self.preference_limits = std::array::from_fn(|i| {
+            result.iter().filter(|meld| meld.preferred[i] != 0).count().min(4)
+        });
         Some(result)
     }
 
@@ -120,7 +123,6 @@ impl Search<'_> {
         &mut self,
         start: usize,
         chosen: &mut Vec<u64>,
-        depth: usize,
         preferred: [usize; 3],
         melds: &[Meld],
         seen: &mut HashMap<String, [usize; 3]>,
@@ -132,13 +134,13 @@ impl Search<'_> {
         self.nodes += 1;
         self.progress(false, false);
         let slots = 4 - chosen.len() / 3;
-        // Later replacement tiles cannot improve depth; each remaining meld adds at most one match.
+        // All candidates need zero wall draws; each remaining meld adds at most one match.
         if self.preference_limits != [0; 3]
             && self
-                .best_rank
+                .best_preferred
                 .is_some_and(|best| {
-                    let upper = std::array::from_fn(|i| preferred[i] + slots * self.preference_limits[i]);
-                    (depth, Reverse(upper)) >= best
+                    let upper = std::array::from_fn(|i| (preferred[i] + slots).min(self.preference_limits[i]));
+                    upper <= best
                 })
         {
             return None;
@@ -167,7 +169,7 @@ impl Search<'_> {
             plan["preferred_suit_count"] = json!(preferred[0]);
             plan["preferred_meld_type_count"] = json!(preferred[1]);
             plan["preferred_meld_count"] = json!(preferred[2]);
-            self.best_rank = Some((depth, Reverse(preferred)));
+            self.best_preferred = Some(preferred);
             return Some(plan);
         }
         if melds.len() < slots {
@@ -178,14 +180,6 @@ impl Search<'_> {
             // Check even when every remaining meld overlaps and recursion is skipped.
             if (self.stopped)() {
                 return Some(stopped());
-            }
-            // Melds are ordered by their latest physical tile, hence by replacement depth.
-            if self.preference_limits != [0; 3]
-                && self
-                    .best_rank
-                    .is_some_and(|(depth, _)| melds[index].key.1 > depth)
-            {
-                break;
             }
             if chosen.is_empty() {
                 self.meld_index = index + 1;
@@ -198,7 +192,6 @@ impl Search<'_> {
             let found = self.visit(
                 index + 1,
                 chosen,
-                depth.max(melds[index].key.1),
                 std::array::from_fn(|i| preferred[i] + melds[index].preferred[i]),
                 melds,
                 seen,
@@ -308,12 +301,8 @@ pub(super) fn search(
         meld_index: 0,
         checks: 0,
         nodes: 0,
-        preference_limits: [
-            usize::from(preferences.preferred_suit.is_some()),
-            usize::from(preferences.preferred_meld_type.is_some()),
-            usize::from(preferences.prefer_dora || preferences.prefer_soul),
-        ],
-        best_rank: None,
+        preference_limits: [0; 3],
+        best_preferred: None,
     };
     search.progress(true, true);
     if should_stop() {
@@ -340,16 +329,21 @@ pub(super) fn search(
         .filter(|entry| entry.source == "replacement")
         .map(|entry| entry.id)
         .collect::<Vec<_>>();
-    let result = search.visit(0, &mut Vec::new(), 0, [0; 3], &melds,
+    let result = search.visit(0, &mut Vec::new(), [0; 3], &melds,
         &mut skip.iter().cloned().map(|signature| (signature, [usize::MAX; 3])).collect(), &mut |meld_ids, signature| {
         let target = candidate_ids(std::iter::once(1000).chain(meld_ids.iter().copied()).collect(), &deck);
         let (discards, incoming) = simulate(&hand, &target, &replacement, rounds, limit, &deck)?;
         let faces = target.iter().map(|&id| norm(face(&deck, id))).collect::<Vec<_>>();
-        let depth = replacement.iter().enumerate().filter(|(_, id)| meld_ids.contains(id)).map(|(i, _)| i + 1).max().unwrap_or(0);
+        let resolved = meld_ids.chunks_exact(3).chain(std::iter::once([1000].as_slice())).map(|group| {
+            let mut group = group.to_vec();
+            group.sort_unstable_by_key(|&id| (souzu::tile(face(&deck, id)), id));
+            json!({"quad":false,"tiles":group.iter().map(|&id| json!({"id":id,"face":face(&deck,id)})).collect::<Vec<_>>()})
+        }).collect::<Vec<_>>();
         Some(json!({
             "status":"plan","mode":"wanxiang-four-meld-switch","search_algorithm":"wanxiang_four_meld_switch",
-            "draws_needed":depth,"target13":faces,"target14":faces,
+            "draws_needed":0,"target13":faces,"target14":faces,
             "target_physical_ids":target,"target_physical_faces":faces,
+            "resolved_groups":resolved,
             "discards":discards.first().cloned().unwrap_or_default(),
             "switch_batch_sizes":discards.iter().map(Vec::len).collect::<Vec<_>>(),
             "switch_discards":discards,"switch_in":incoming,"wall_draws":[],"post_draw_discards":[],
@@ -378,7 +372,7 @@ mod tests {
     }
 
     fn plan(state: &Value, preferences: &SearchPreferences, skip: &[String]) -> Value {
-        super::super::switch_plan_with_preferences(
+        let result = super::super::switch_plan_with_preferences(
             state,
             36,
             skip,
@@ -386,7 +380,32 @@ mod tests {
             preferences,
             &mut |_| {},
             &|| false,
-        )
+        );
+        if result["status"] == "plan" {
+            let (rounds, limit) = search_limits(state);
+            let batches = result["switch_discards"].as_array().unwrap();
+            assert!(batches.len() <= rounds);
+            let replacement = pool(state, 0).into_iter().filter(|entry| entry.source == "replacement")
+                .map(|entry| entry.id).collect::<Vec<_>>();
+            let mut actual = ids(state.get("hand_tiles"));
+            let mut cursor = 0;
+            for (out, incoming) in batches.iter().zip(result["switch_in"].as_array().unwrap()) {
+                let out = ids(Some(out));
+                let incoming = ids(Some(incoming));
+                assert!(!out.is_empty() && out.len() <= limit);
+                assert!(out.iter().all(|id| actual.contains(id)));
+                assert_eq!(out.len(), incoming.len());
+                assert_eq!(incoming, replacement[cursor..cursor + incoming.len()]);
+                cursor += incoming.len();
+                actual.retain(|id| !out.contains(id));
+                actual.extend(incoming);
+            }
+            actual.sort_unstable();
+            let mut target = ids(result.get("target_physical_ids"));
+            target.sort_unstable();
+            assert_eq!(actual, target);
+        }
+        result
     }
 
     #[test]
@@ -405,6 +424,21 @@ mod tests {
             assert_eq!(result["preferred_suit_count"], 3);
             assert_eq!(result["preferred_meld_type_count"], expected, "{result}");
             assert_eq!(result["preferred_meld_count"], bonus); // Meld type takes priority over bonus count.
+            let groups = result["resolved_groups"].as_array().unwrap();
+            assert_eq!(groups.len(), 5);
+            assert_eq!(groups[4]["tiles"], json!([{"id":1000,"face":"bd"}]));
+            let triplets = groups[..4].iter().filter(|group| {
+                let tiles = group["tiles"].as_array().unwrap();
+                assert_eq!(tiles.len(), 3);
+                tiles.iter().all(|tile| tile["face"] == tiles[0]["face"])
+            }).count();
+            assert_eq!(if kind == MeldType::Triplet { triplets } else { 4 - triplets }, expected);
+            let mut grouped_ids = groups.iter().flat_map(|group| group["tiles"].as_array().unwrap())
+                .map(|tile| tile["id"].as_u64().unwrap()).collect::<Vec<_>>();
+            grouped_ids.sort_unstable();
+            let mut target = ids(result.get("target_physical_ids"));
+            target.sort_unstable();
+            assert_eq!(grouped_ids, target);
         }
         for (suit, preferred_suit) in [('m', super::super::TileSuit::Man), ('p', super::super::TileSuit::Pin), ('s', super::super::TileSuit::Sou), ('z', super::super::TileSuit::Honor)] {
             let hand = (1..=4).flat_map(|rank| vec![format!("{rank}{suit}"); 3]).collect::<Vec<_>>();
@@ -420,20 +454,35 @@ mod tests {
             assert_eq!(result["preferred_suit_count"], 4, "{result}");
         }
 
-        let snapshot = state(&["1m", "2m", "3m", "1p", "2p", "3p", "1s", "2s", "3s", "4m", "6m", "7m"], &["5m", "1z", "1z", "1z"]);
+        let mut snapshot = state(&["1m", "2m", "3m", "1p", "2p", "3p", "1s", "2s", "3s", "4m", "6m", "7m"], &["5m", "1z", "1z", "1z"]);
         let preferences = SearchPreferences {
             preferred_suit: Some(super::super::TileSuit::Honor),
             preferred_meld_type: Some(MeldType::Triplet), ..Default::default()
         };
         let result = plan(&snapshot, &preferences, &[]);
-        assert_eq!(result["draws_needed"], 1, "{result}");
+        assert_eq!(result["draws_needed"], 0, "{result}");
+        assert_eq!(result["preferred_suit_count"], 1);
+        assert_eq!(result["preferred_meld_type_count"], 1);
+        assert_eq!(result["switch_batch_sizes"], json!([3, 1]));
+        assert_ne!(result["plan_signature"], plan(&snapshot, &SearchPreferences::default(), &[])["plan_signature"]);
+
+        // A different decomposition can reach the honor triplet in one larger exchange.
+        snapshot["total_change_tile_count"] = json!(1);
+        let result = plan(&snapshot, &preferences, &[]);
+        assert_eq!(result["preferred_suit_count"], 1, "{result}");
+        assert_eq!(result["switch_batch_sizes"], json!([4]));
+
+        // With the three-tile limit, the last honor tile is no longer reachable.
+        snapshot["boss_buff"] = json!([901]);
+        let result = plan(&snapshot, &preferences, &[]);
+        assert_eq!(result["draws_needed"], 0, "{result}");
         assert_eq!(result["preferred_suit_count"], 0);
         assert_eq!(result["preferred_meld_type_count"], 0);
         assert_eq!(result["plan_signature"], plan(&snapshot, &SearchPreferences::default(), &[])["plan_signature"]);
     }
 
     #[test]
-    fn preferred_melds_break_ties_without_delaying_the_plan() {
+    fn preferred_melds_ignore_exchange_depth_but_preserve_reachability() {
         let hand = [
             "1m", "2m", "3m", "1p", "2p", "3p", "1s", "2s", "3s", "4m", "6m", "7m",
         ];
@@ -454,42 +503,43 @@ mod tests {
             preferences.prefer_dora = dora;
             preferences.prefer_soul = soul;
             let preferred = plan(&snapshot, &preferences, &[]);
-            assert_eq!(preferred["draws_needed"], 1);
+            assert_eq!(preferred["draws_needed"], 0);
             assert_eq!(preferred["preferred_meld_count"], 1); // Dora+soul counts once per meld.
             assert!(ids(preferred.get("target_physical_ids")).contains(&12));
             assert_eq!(preferred["search_preferences"]["prefer_dora"], dora);
-            // The executable batches still produce exactly the returned physical hand.
-            let mut actual = ids(snapshot.get("hand_tiles"));
-            for (out, incoming) in preferred["switch_discards"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .zip(preferred["switch_in"].as_array().unwrap())
-            {
-                actual.retain(|id| !ids(Some(out)).contains(id));
-                actual.extend(ids(Some(incoming)));
-            }
-            actual.sort_unstable();
-            let mut target = ids(preferred.get("target_physical_ids"));
-            target.sort_unstable();
-            assert_eq!(actual, target);
             let skip = vec![preferred["plan_signature"].as_str().unwrap().to_owned()];
             let next = plan(&snapshot, &preferences, &skip);
             assert_eq!(next["status"], "plan");
-            assert_eq!(next["draws_needed"], 1);
+            assert_eq!(next["draws_needed"], 0);
             assert_ne!(next["plan_signature"], preferred["plan_signature"]);
         }
 
-        // A later preferred sequence must not displace an earlier ordinary one.
+        // Extra exchanges do not delay tenpai: both hands need zero wall draws.
         snapshot = state(&hand, &["5m", "8m"]);
         snapshot["tian_dora_tiles"] = json!(["8m"]);
-        let early = plan(&snapshot, &preferences, &[]);
-        assert_eq!(early["draws_needed"], 1);
-        assert_eq!(early["preferred_meld_count"], 0);
-        assert_eq!(
+        let later = plan(&snapshot, &preferences, &[]);
+        assert_eq!(later["draws_needed"], 0);
+        assert_eq!(later["preferred_meld_count"], 1);
+        assert_eq!(later["switch_batch_sizes"], json!([1, 1]));
+        assert!(ids(later.get("target_physical_ids")).contains(&14));
+        assert_ne!(
             plan(&snapshot, &default, &[])["plan_signature"],
-            early["plan_signature"]
+            later["plan_signature"]
         );
+
+        snapshot["total_change_tile_count"] = json!(1);
+        let single_batch = plan(&snapshot, &preferences, &[]);
+        assert_eq!(single_batch["preferred_meld_count"], 1);
+        assert_eq!(single_batch["switch_batch_sizes"], json!([2]));
+
+        snapshot = state(&hand, &["5m", "7z", "6z", "8m"]);
+        snapshot["tian_dora_tiles"] = json!(["8m"]);
+        snapshot["boss_buff"] = json!([901]);
+        snapshot["total_change_tile_count"] = json!(1);
+        let reachable = plan(&snapshot, &preferences, &[]);
+        assert_eq!(reachable["status"], "plan");
+        assert_eq!(reachable["draws_needed"], 0);
+        assert_eq!(reachable["preferred_meld_count"], 0);
 
         // Red preference must select the red physical five, not any normal five.
         snapshot = state(
@@ -499,10 +549,14 @@ mod tests {
             &["6p"],
         );
         let red = plan(&snapshot, &preferences, &[]);
-        assert_eq!(red["draws_needed"], 1);
+        assert_eq!(red["draws_needed"], 0);
         assert_eq!(red["preferred_meld_count"], 1);
         assert!(ids(red.get("target_physical_ids")).contains(&12));
         assert!(!ids(red.get("target_physical_ids")).contains(&11));
+        assert!(red["resolved_groups"].as_array().unwrap().iter().any(|group| {
+            group["tiles"].as_array().unwrap().iter().map(|tile| tile["face"].as_str().unwrap())
+                .collect::<Vec<_>>() == ["4p", "0p", "6p"]
+        }));
 
         // Identical physical tiles can form three preferred sequences or one preferred triplet.
         snapshot = state(

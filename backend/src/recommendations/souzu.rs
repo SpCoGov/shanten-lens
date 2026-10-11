@@ -1201,6 +1201,52 @@ mod three_quad_tests {
     }
 
     #[test]
+    fn earlier_tenpai_wins_even_when_it_needs_deeper_replacements() {
+        for (quad_count, hand, wall, replacement) in [
+            (2, ["1m", "1m", "1m", "1m", "2p", "2p", "2p", "2p", "1s", "2s", "3s", "8s", "9s"],
+                ["4s", "5s", "6s", "7s"], "6s"),
+            (3, ["1z", "1z", "1z", "1z", "2z", "2z", "2z", "2z", "3z", "3z", "3z", "3z", "9s"],
+                ["1s", "2s", "4s", "3s"], "3s"),
+        ] {
+            let mut snapshot = state(&hand, &wall);
+            snapshot["deck_map"]["100"] = json!("7z");
+            snapshot["deck_map"]["101"] = json!(replacement);
+            snapshot["replacement_tiles"] = json!([100, 101]);
+            snapshot["tian_dora_tiles"] = json!([hand[0]]);
+            for preferences in [SearchPreferences::default(), SearchPreferences {
+                prefer_soul: true, preferred_suit: Some(TileSuit::Man), ..Default::default()
+            }] {
+                snapshot["total_change_tile_count"] = json!(1);
+                let shallow = search_with_preferences(&snapshot, 36, quad_count, &[], &preferences, &mut |_| {}, &|| false);
+                assert_eq!(shallow["status"], "plan", "{shallow}");
+                assert_eq!(shallow["draws_needed"], quad_count + 1, "{shallow}");
+
+                snapshot["total_change_tile_count"] = json!(2);
+                let early = search_with_preferences(&snapshot, 36, quad_count, &[], &preferences, &mut |_| {}, &|| false);
+                assert_eq!(early["status"], "plan", "{early}");
+                assert_eq!(early["draws_needed"], quad_count, "{early}");
+                assert_eq!(early["switch_in"], json!([[100], [101]]));
+                assert!(shallow["switch_batch_sizes"].as_array().unwrap().iter()
+                    .map(|size| size.as_u64().unwrap()).sum::<u64>() < 2);
+
+                let mut current = ids(snapshot.get("hand_tiles"));
+                for (out, incoming) in early["switch_discards"].as_array().unwrap().iter()
+                    .zip(early["switch_in"].as_array().unwrap()) {
+                    let out = ids(Some(out));
+                    assert!(out.iter().all(|id| current.contains(id)));
+                    current.retain(|id| !out.contains(id));
+                    current.extend(ids(Some(incoming)));
+                }
+                assert_eq!(current.len(), 13);
+                current.extend(ids(early.get("wall_draws")));
+                let actual = current.iter().map(|id| tile(snapshot["deck_map"][id.to_string()].as_str().unwrap()).unwrap()).collect::<Vec<_>>();
+                let target = early["target14"].as_array().unwrap().iter().map(|face| tile(face.as_str().unwrap()).unwrap()).collect::<Vec<_>>();
+                assert_eq!(counts(&actual), counts(&target));
+            }
+        }
+    }
+
+    #[test]
     fn preferences_break_ties_without_delaying_tenpai_and_fall_back() {
         let mut s = state(
             &[

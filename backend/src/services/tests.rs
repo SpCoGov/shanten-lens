@@ -14,6 +14,44 @@ fn temp_root(name: &str) -> PathBuf {
 }
 
 #[test]
+fn refresh_price_is_a_string_in_snapshots_and_events_for_both_sources() {
+    let root = temp_root("refresh-price");
+    let (events, mut received) = broadcast::channel(64);
+    let services = Services::load(root.join("configs"), events).unwrap();
+    let initial = serde_json::from_value::<crate::ipc::GameStateData>(services.game_state()).unwrap();
+    assert_eq!(serde_json::to_value(initial).unwrap()["refresh_price"], "0");
+    for price in [json!(2), json!("2"), json!("18446744073709551616")] {
+        let expected = price.as_str().map(str::to_owned).unwrap_or_else(|| price.to_string());
+        let packet = Packet {
+            direction: crate::pipeline::Direction::Inbound,
+            packet_type: "Res".into(),
+            method: ".lq.Lobby.fetchAmuletActivityData".into(),
+            id: Some(1),
+            data: json!({"game":{"shop":{"refreshPrice":price}}}),
+        };
+        services.update_game_state_from_flow(&packet, 1);
+        let state = serde_json::from_value::<crate::ipc::GameStateData>(services.game_state()).unwrap();
+        assert_eq!(serde_json::to_value(state).unwrap()["refresh_price"], expected);
+        services.disconnect_game_flow(1);
+        services.publish_qyzz_state(&json!({
+            "source":"qyzz", "qyzz_run_id":"test", "qyzz_version":1, "qyzz_deal_id":1,
+            "deck_map":{}, "hand_tiles":[], "wall_tiles":[], "locked_tiles":[],
+            "replacement_tiles":[], "dora_tiles":[], "effect_list":[], "refresh_price":price,
+        })).unwrap();
+        let state = serde_json::from_value::<crate::ipc::GameStateData>(services.game_state()).unwrap();
+        assert_eq!(serde_json::to_value(state).unwrap()["refresh_price"], expected);
+        services.disconnect_qyzz();
+    }
+    while let Ok(event) = received.try_recv() {
+        if event["type"] == "update_gamestate" {
+            assert!(event["data"]["refresh_price"].is_string());
+        }
+    }
+    drop(services);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn failed_giveup_preserves_state_and_other_flows_cannot_apply_deltas() {
     let root = temp_root("failed-giveup");
     let (events, _) = broadcast::channel(16);

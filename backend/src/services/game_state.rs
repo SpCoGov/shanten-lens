@@ -10,7 +10,7 @@ pub(super) fn empty_game_state() -> Value {
         "desktop_remain": 0, "locked_tiles": [], "coin": "0", "point": "0", "target_point": "0",
         "level": 0, "node": 0, "map_nodes": [], "effect_list": [], "candidate_effect_list": [],
         "record": {}, "ting_list": [], "character_id": 0, "hp": 0, "max_hp": 0,
-        "next_operation": [], "goods": [], "refresh_price": 0, "change_tile_count": 0,
+        "next_operation": [], "goods": [], "refresh_price": "0", "change_tile_count": 0,
         "total_change_tile_count": 0, "max_effect_volume": 0, "boss_buff": [], "shop_buff_list": {},
         "tile_score_map": {}, "fan_value_map": {}, "update_reason": []
     })

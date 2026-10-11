@@ -4,9 +4,9 @@ mod souzu;
 mod wanxiang;
 mod custom;
 
-pub fn custom_switch_plan(state: &Value, target: &Value, wall_limit: usize,
+pub fn custom_switch_plan(state: &Value, target: &Value, wall_limit: usize, exclude_invalid_shapes: bool,
     progress: &mut dyn FnMut(Value), stopped: &dyn Fn() -> bool) -> Value {
-    custom::search(state, target, wall_limit, progress, stopped)
+    custom::search(state, target, wall_limit, exclude_invalid_shapes, progress, stopped)
 }
 
 #[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
@@ -67,7 +67,7 @@ fn face(deck: &Map<String, Value>, id: u64) -> &str {
         .and_then(Value::as_str)
         .unwrap_or("")
 }
-fn norm(value: &str) -> String {
+pub(crate) fn norm(value: &str) -> String {
     match value {
         "0m" => "5m".into(),
         "0p" => "5p".into(),

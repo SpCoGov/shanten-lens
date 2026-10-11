@@ -217,6 +217,8 @@ app/src-tauri/target/release/bundle/nsis/
 
 正式な Windows インストール版は起動時に更新をダウンロード・検証し、終了時に自動インストールします。旧版からは一度だけ `*-setup.exe` の手動インストールが必要です。旧 MSI 版はアプリデータを残してアンインストールしてから移行してください。
 
+GitHub Releases では `shanten-lens_<バージョン>_windows_x64_portable.zip` も配布します。展開後に `shanten-lens.exe` を実行してください。ポータブル版は更新公開鍵を含まない既定の設定で別途ビルドし、終了時の自動インストールは行いません。更新時は新しい ZIP をダウンロードして置き換えてください。
+
 ビルド前に `TAURI_UPDATER_PUBLIC_KEY`、`TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` を環境変数として設定します。GitHub Actions では公開鍵を同名の Repository variable、秘密鍵とパスワードを同名の Repository secrets に保存します。鍵の生成とバックアップについては [自動更新と署名の設定](./README.md#windows-自动更新与签名) を参照してください。秘密鍵をリポジトリにコミットしないでください。
 
 ### macOS パッケージ

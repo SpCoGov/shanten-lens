@@ -129,7 +129,7 @@ pub struct GameStateData {
     switch_used_tiles: Vec<u64>,
     effect_list: Option<Vec<Value>>,
     goods: Option<Vec<Value>>,
-    refresh_price: Option<u64>,
+    refresh_price: Option<String>,
     candidate_effect_list: Option<Vec<Value>>,
     boss_buff: Option<Vec<u64>>,
     shop_buff_list: Option<HashMap<String, u64>>,

@@ -98,6 +98,7 @@ struct Search<'a> {
     state: &'a Value,
     groups: &'a [Group],
     entries: &'a [Entry],
+    exclude_invalid_shapes: bool,
     emit: &'a mut dyn FnMut(Value),
     stopped: &'a dyn Fn() -> bool,
     started: Instant,
@@ -162,13 +163,38 @@ impl Search<'_> {
                         .collect::<Vec<_>>()
                 })
                 .collect::<Vec<_>>();
+            let joker_group = selected.iter().position(|tiles| tiles.iter().any(|&i| self.entries[i].face == "bd"));
+            let mut joker_as = joker_group.and_then(|g| self.groups[g].rule.joker_face());
+            if self.exclude_invalid_shapes {
+                let mut counts = [0u8; 34];
+                for (_, tiles) in self.groups.iter().zip(selected.iter()).filter(|(group, _)| !group.quad) {
+                    for &i in tiles {
+                        if let Some(tile) = souzu::tile(&self.entries[i].face) {
+                            counts[tile as usize] += 1;
+                        }
+                    }
+                }
+                if let Some(g) = joker_group {
+                    joker_as = (0..34).find_map(|tile| {
+                        let face = format!("{}{}", tile % 9 + 1, ['m', 'p', 's', 'z'][tile / 9]);
+                        if !self.groups[g].rule.ordinary(&face, &[false; 34], &[false; 34]) { return None; }
+                        counts[tile] += 1;
+                        let valid = legal_shape(&counts, quads.len());
+                        counts[tile] -= 1;
+                        valid.then_some(face)
+                    });
+                    if joker_as.is_none() { return None; }
+                } else if !legal_shape(&counts, quads.len()) {
+                    return None;
+                }
+            }
             let (steps, discards, incoming, draws) =
                 simulate(self.state, self.entries, &target, &quads, self.prefix)?;
             let resolved = selected.iter().enumerate().map(|(g, selected)| json!({
                 "quad":self.groups[g].quad,
                 "tiles":selected.iter().map(|&i| json!({"id":self.entries[i].id,
                     "face":face(&deck(self.state),self.entries[i].id),
-                    "joker_as":if self.entries[i].face=="bd" {self.groups[g].rule.joker_face()}else{None},
+                    "joker_as":if self.entries[i].face=="bd" {joker_as.clone()}else{None},
                 })).collect::<Vec<_>>()
             })).collect::<Vec<_>>();
             return Some(
@@ -215,6 +241,25 @@ impl Search<'_> {
         }
         None
     }
+}
+
+fn legal_shape(counts: &[u8; 34], quads: usize) -> bool {
+    if quads == 0 {
+        if counts.iter().filter(|&&count| count == 2).count() == 7
+            && counts.iter().all(|&count| count == 0 || count == 2) {
+            return true;
+        }
+        let orphans = [0, 8, 9, 17, 18, 26, 27, 28, 29, 30, 31, 32, 33];
+        if orphans.iter().all(|&tile| (1..=2).contains(&counts[tile]))
+            && orphans.iter().filter(|&&tile| counts[tile] == 2).count() == 1
+            && counts.iter().enumerate().all(|(tile, &count)| count == 0 || orphans.contains(&tile)) {
+            return true;
+        }
+    }
+    let faces = counts.iter().enumerate().flat_map(|(tile, &count)|
+        vec![format!("{}{}", tile % 9 + 1, ['m', 'p', 's', 'z'][tile / 9]); count as usize]
+    ).collect::<Vec<_>>();
+    super::can_form_melds_and_pair(&faces, 4 - quads)
 }
 
 // A necessary matching check prunes overlapping ranges before enumerating physical assignments.
@@ -343,6 +388,7 @@ pub(super) fn search(
     state: &Value,
     target: &Value,
     wall_limit: usize,
+    exclude_invalid_shapes: bool,
     emit: &mut dyn FnMut(Value),
     stopped: &dyn Fn() -> bool,
 ) -> Value {
@@ -424,6 +470,7 @@ pub(super) fn search(
         state: &state,
         groups: &groups,
         entries: &entries,
+        exclude_invalid_shapes,
         emit,
         stopped,
         started: now,
@@ -530,7 +577,73 @@ mod tests {
             .collect::<Vec<_>>())
     }
     fn run(state: &Value, target: &Value) -> Value {
-        search(state, target, 36, &mut |_| {}, &|| false)
+        search(state, target, 36, false, &mut |_| {}, &|| false)
+    }
+
+    #[test]
+    fn legal_shape_filter_accepts_three_forms_and_rejects_nonwinning_tiles() {
+        let cases = [
+            (["1m","2m","3m","4m","0m","6m","7p","8p","9p","2s","2s","2s","7z","7z"], true),
+            (["1m","1m","3m","3m","5p","0p","7p","7p","2s","2s","4s","4s","7z","7z"], true),
+            (["1m","9m","1p","9p","1s","9s","1z","2z","3z","4z","5z","6z","7z","7z"], true),
+            (["1m","2m","3m","4m","5m","6m","7m","8m","9m","1p","2p","3p","4p","5p"], false),
+            (["1m","2m","3m","1p","2p","3p","1s","2s","3s","1z","2z","3z","7z","7z"], false),
+            (["8m","9m","1p","2p","3p","4p","5s","6s","7s","1z","1z","1z","7z","7z"], false),
+            (["1z","1z","1z","1z","2z","2z","3z","3z","4z","4z","5z","5z","6z","6z"], false),
+        ];
+        for (hand, valid) in cases {
+            let s = state(&hand, &[], &[], 0);
+            let target = exact(&hand);
+            assert_eq!(run(&s, &target)["status"], "plan");
+            let filtered = search(&s, &target, 36, true, &mut |_| {}, &|| false);
+            assert_eq!(filtered["status"] == "plan", valid, "{hand:?}: {filtered}");
+        }
+    }
+
+    #[test]
+    fn legal_shape_filter_counts_declared_quads_as_melds() {
+        for quads in 0..=4 {
+            let mut faces = (1..=quads).flat_map(|rank| vec![format!("{rank}m"); 4]).collect::<Vec<_>>();
+            faces.extend((0..4-quads).flat_map(|_| ["5p", "6p", "7p"].map(str::to_owned)));
+            faces.extend(["7z".to_owned(), "7z".to_owned()]);
+            let refs = faces.iter().map(String::as_str).collect::<Vec<_>>();
+            let s = state(&refs[..13], &[], &refs[13..], 0);
+            let mut target = (1..=quads).map(|rank| json!({"quad":true,"rule":{"faces":[format!("{rank}m")]}})).collect::<Vec<_>>();
+            target.extend(refs[quads*4..].iter().map(|face| json!({"rule":{"faces":[face],"joker":"exclude"}})));
+            let plan = search(&s, &json!(target), 36, true, &mut |_| {}, &|| false);
+            replay(&s, &plan);
+            if quads == 4 {
+                let last = faces.len() - 1;
+                faces[last] = "6z".into();
+                let refs = faces.iter().map(String::as_str).collect::<Vec<_>>();
+                let s = state(&refs[..13], &[], &refs[13..], 0);
+                target.last_mut().unwrap()["rule"]["faces"] = json!(["6z"]);
+                assert_eq!(search(&s, &json!(target), 36, true, &mut |_| {}, &|| false)["reason"], "custom-not-reachable");
+            }
+        }
+    }
+
+    #[test]
+    fn legal_shape_filter_tries_allowed_joker_faces_and_continues_searching() {
+        let hand = ["bd","1m","2m","3m","4m","0m","6m","7p","8p","9p","2s","2s","2s","7z"];
+        let s = state(&hand, &[], &[], 0);
+        let mut target = exact(&hand);
+        target[0]["rule"] = json!({"faces":["1m","7z"],"joker":"allow"});
+        assert_eq!(run(&s, &target)["resolved_groups"][0]["tiles"][0]["joker_as"], "1m");
+        let filtered = search(&s, &target, 36, true, &mut |_| {}, &|| false);
+        replay(&s, &filtered);
+        assert_eq!(filtered["resolved_groups"][0]["tiles"][0]["joker_as"], "7z");
+        target[0]["rule"]["faces"] = json!(["1m"]);
+        assert_eq!(search(&s, &target, 36, true, &mut |_| {}, &|| false)["reason"], "custom-not-reachable");
+        let hand = ["1m","2m","3m","4m","5m","6m","7p","8p","9p","2s","2s","2s","7z"];
+        let s = state(&hand, &[], &["6z","7z"], 0);
+        let mut target = exact(&hand);
+        target.as_array_mut().unwrap().push(json!({"rule":{"suits":["z"]}}));
+        assert_eq!(run(&s, &target)["draws_needed"], 1);
+        let filtered = search(&s, &target, 36, true, &mut |_| {}, &|| false);
+        replay(&s, &filtered);
+        assert_eq!(filtered["draws_needed"], 2);
+        assert!(filtered["custom_steps"].as_array().unwrap().iter().any(|step| step["kind"] == "discard" && step["tiles"] == json!([14])));
     }
     fn replay(state: &Value, plan: &Value) {
         assert_eq!(plan["status"], "plan", "{plan}");
@@ -768,7 +881,7 @@ mod tests {
         replay(&s, &plan);
         assert!(plan["search_nodes"].as_u64().unwrap() < 100);
         assert_eq!(
-            search(&s, &target, 36, &mut |_| {}, &|| true)["reason"],
+            search(&s, &target, 36, false, &mut |_| {}, &|| true)["reason"],
             "stopped-by-user"
         );
         for invalid in [

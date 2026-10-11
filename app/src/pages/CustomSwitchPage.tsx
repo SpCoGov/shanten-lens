@@ -8,6 +8,7 @@ import * as backendIpc from "../lib/ipc";
 import styles from "./CustomSwitchPage.module.css";
 
 const STORAGE_KEY = "sl-custom-switch:target-v1";
+const EXCLUDE_INVALID_SHAPES_KEY = "sl-custom-switch:exclude-invalid-shapes";
 const SUITS = ["m", "p", "s", "z"];
 
 function readTarget(): TargetGroup[] {
@@ -27,17 +28,26 @@ export default function CustomSwitchPage({currentState, data, onClear}: {
     const [selected, setSelected] = React.useState<number[]>(() => groups.length ? [0] : []);
     const [multiSelect, setMultiSelect] = React.useState(false);
     const [wallLimit, setWallLimit] = React.useState(36);
+    const [executing, setExecuting] = React.useState(false);
+    const [excludeInvalidShapes, setExcludeInvalidShapes] = React.useState(() => {
+        try { return localStorage.getItem(EXCLUDE_INVALID_SHAPES_KEY) === "1"; } catch { return false; }
+    });
     const searching = data?.status === "searching";
     const size = targetSize(groups);
     const quads = groups.filter(group => group.quad).length;
     const active = groups[selected[0]];
     const ready = currentState && [4, 5].includes(currentState.stage);
     const stale = data?.status === "plan" && data.state_revision !== currentState?.revision;
+    const canExecute = ready && data?.status === "plan" && data.request_source === "live"
+        && data.search_algorithm === "custom_target" && !!data.plan_id && !stale && !executing;
     const valid = size === 14 && quads <= 4;
     const hasJoker = currentState?.hand_tiles.some(id => currentState.deck_map[String(id)] === "bd") ?? false;
     React.useEffect(() => {
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(groups)); } catch {}
     }, [groups]);
+    React.useEffect(() => {
+        try { localStorage.setItem(EXCLUDE_INVALID_SHAPES_KEY, excludeInvalidShapes ? "1" : "0"); } catch {}
+    }, [excludeInvalidShapes]);
     React.useEffect(() => {
         if (searching && !ready) void backendIpc.runSwitch({action: "stop", notify: false});
     }, [searching, ready]);
@@ -45,6 +55,15 @@ export default function CustomSwitchPage({currentState, data, onClear}: {
     function clearResult() {
         if (searching) void backendIpc.runSwitch({action: "stop", notify: false});
         onClear();
+    }
+    async function execute(action: "execute_plan" | "execute_full_plan") {
+        if (!canExecute) return;
+        setExecuting(true);
+        try {
+            await backendIpc.runSwitch({action, options: {plan_id: data!.plan_id!}});
+        } finally {
+            setExecuting(false);
+        }
     }
     function changeGroups(next: TargetGroup[]) {
         clearResult();
@@ -91,10 +110,25 @@ export default function CustomSwitchPage({currentState, data, onClear}: {
                 </label>
                 {searching ? <button className="switch-guide-button is-danger" onClick={() => void backendIpc.runSwitch({action: "stop"})}>
                     <span className="ms" aria-hidden="true">stop_circle</span>{t("advisor.stop_search")}
-                </button> : <button className="switch-guide-button is-primary" disabled={!ready || !valid} onClick={() => {
+                </button> : <button className="switch-guide-button is-primary" disabled={!ready || !valid || executing} onClick={() => {
                     onClear();
-                    void backendIpc.runSwitch({action: "start", options: {search_algorithm: "custom_target", target_groups: groups, wall_limit: wallLimit}});
+                    void backendIpc.runSwitch({action: "start", options: {search_algorithm: "custom_target", target_groups: groups,
+                        wall_limit: wallLimit, exclude_invalid_shapes: excludeInvalidShapes}});
                 }}><span className="ms" aria-hidden="true">manage_search</span>{t("custom_target.start")}</button>}
+                <button className="switch-guide-button is-success" disabled={!canExecute} onClick={() => void execute("execute_plan")}>
+                    <span className="ms" aria-hidden="true">play_arrow</span>{t("blackhole.execute_plan")}
+                </button>
+                <button className="switch-guide-button is-success" disabled={!canExecute} onClick={() => void execute("execute_full_plan")}>
+                    <span className="ms" aria-hidden="true">fast_forward</span>{t("blackhole.execute_full_plan")}
+                </button>
+            </div>
+            <div className="switch-guide-options">
+                <label className="switch-guide-toggle" title={t("custom_target.exclude_invalid_shapes_hint")}>
+                    <input type="checkbox" checked={excludeInvalidShapes} disabled={executing}
+                        onChange={event => {clearResult(); setExcludeInvalidShapes(event.target.checked);}}/>
+                    <span className="switch-guide-toggle-track" aria-hidden="true"><span/></span>
+                    <span>{t("custom_target.exclude_invalid_shapes")}</span>
+                </label>
             </div>
         </section>
         <div className={styles.editor}>
@@ -222,7 +256,7 @@ export default function CustomSwitchPage({currentState, data, onClear}: {
         </div>
         <section className={`panel ${styles.results}`} aria-live="polite">
             <div className={styles.sectionHeading}><div className={styles.heading}><span className="ms" aria-hidden="true">route</span><h2>{t("custom_target.result")}</h2></div>
-                {data?.status === "plan" && <span className={styles.resultBadge}>{t("custom_target.manual")}</span>}
+                {data?.status === "plan" && <span className={styles.resultBadge}>{t("custom_target.steps")}</span>}
             </div>
             {searching && <div className={styles.empty}><span className={`ms ${styles.searchIcon}`} aria-hidden="true">manage_search</span>
                 <strong>{t("advisor.searching")}</strong><p>{progress?.phase === "custom_searching" ? t("custom_target.progress", {nodes: progress.nodes, draws: progress.wall_prefix}) : t("custom_target.search_hint")}</p>
