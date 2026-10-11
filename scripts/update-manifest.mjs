@@ -1,5 +1,5 @@
 import {readFileSync, readdirSync, writeFileSync} from "node:fs";
-import {resolve, join} from "node:path";
+import {basename, resolve, join} from "node:path";
 import {pathToFileURL} from "node:url";
 
 export function createUpdateManifest(directory, version, repository) {
@@ -7,8 +7,8 @@ export function createUpdateManifest(directory, version, repository) {
         throw new Error("Invalid release version");
     }
     if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error("Invalid repository");
-    const installers = readdirSync(directory).filter((name) => name.endsWith("_x64-setup.exe"));
-    if (installers.length !== 1 || !installers[0].includes(`_${version}_`)) {
+    const installers = readdirSync(directory, {recursive: true}).filter((name) => name.endsWith("_x64-setup.exe"));
+    if (installers.length !== 1 || !basename(installers[0]).includes(`_${version}_`)) {
         throw new Error("Expected exactly one Windows x64 installer matching the release version");
     }
     const installer = installers[0];
@@ -19,7 +19,7 @@ export function createUpdateManifest(directory, version, repository) {
         platforms: {
             "windows-x86_64": {
                 signature,
-                url: `https://github.com/${repository}/releases/download/v${version}/${encodeURIComponent(installer.replaceAll(" ", "."))}`,
+                url: `https://github.com/${repository}/releases/download/v${version}/${encodeURIComponent(basename(installer).replaceAll(" ", "."))}`,
             },
         },
     };

@@ -155,6 +155,6 @@ jobs:
         with:
           tag_name: ${{ inputs.release_tag || github.ref_name }}
           make_latest: legacy
-          files: artifacts/*
+          files: artifacts/**/*
           generate_release_notes: true
           fail_on_unmatched_files: true
