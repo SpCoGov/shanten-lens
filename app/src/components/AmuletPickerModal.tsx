@@ -31,6 +31,7 @@ export default function AmuletPickerModal({
     }, [open]);
 
     const list = amulets.filter((a) => {
+        if (a.metadata?.deprecated) return false;
         const okR = rarity === "ALL" ? true : a.rarity === rarity;
         const key = q.trim().toLowerCase();
         const okQ = key ? a.name.toLowerCase().includes(key) || String(a.id).includes(key) : true;

@@ -260,6 +260,18 @@ app/src-tauri/target/release/bundle/macos/
 app/src-tauri/target/release/bundle/dmg/
 ```
 
+## 自动更新协议与注册表
+
+`.github/workflows/auto-game-data.yml` 每天检查雀魂 Unity 客户端，也支持手动运行和 `update_available` 仓库事件。它生成 `proto/liqi.proto`、`backend/assets/amulets.json`、`backend/assets/badges.json`，有变化时使用固定分支 `feat/update-game-data` 创建或更新 PR，不自动合并。
+
+注册表的 `metadata` 保留简体中文（`chs`）、繁体中文（`chs_t`）、日文（`jp`）、英文（`en`）、韩文（`kr`）的 `names` 与 `descriptions`，以及上游原始 `data_id`、购买价 `price`、售价 `sell_price`、图片文件名 `icon_name`、图片 ID `icon_id`、弃用状态 `deprecated` 和稀有度 `rarity`。护身符的 `plus_metadata` 保存 Plus 版的独立数据；弃用条目仍保留，选择器只显示未弃用条目。缺少翻译保留为空字符串；上游印章表没有价格，价格字段为 `null`。
+
+原有顶层字段保持兼容，`name` 仍优先使用日文，缺少日文时使用简体中文；保留已有历史 ID，仅在条目变化时增加注册表版本。本机青云之志的 `qyzz_amulets.json` 快照、图片和计分规则不在这个任务的更新范围内。
+
+本地运行：`python -m pip install -r scripts/requirements-game-data.txt`，然后执行 `python scripts/update_game_data.py`。已有 Unity 解包目录可通过 `--from-raw <raw目录>` 离线验证；`--output-root <目录>` 用于包含现有协议和注册表的临时副本。
+
+仓库需要在 **Settings → Actions → General → Workflow permissions** 开启允许 Actions 创建 PR 的选项。工作流使用 `GITHUB_TOKEN`，自动创建的 PR 不会触发额外的 PR CI；因此这个任务先运行生成后的 Rust 后端测试，通过后才开 PR。
+
 ## 项目校验
 
 Rust 后端测试：

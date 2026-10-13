@@ -70,6 +70,30 @@ pub struct AutoRunnerConfig {
 
 #[allow(dead_code)]
 #[derive(Deserialize, Serialize, Type)]
+pub struct RegistryTranslations {
+    chs: String,
+    chs_t: String,
+    jp: String,
+    en: String,
+    kr: String,
+}
+
+#[allow(dead_code)]
+#[derive(Deserialize, Serialize, Type)]
+pub struct RegistryMetadata {
+    data_id: u64,
+    names: RegistryTranslations,
+    descriptions: RegistryTranslations,
+    price: Option<u64>,
+    sell_price: Option<u64>,
+    icon_name: String,
+    icon_id: u64,
+    deprecated: bool,
+    rarity: String,
+}
+
+#[allow(dead_code)]
+#[derive(Deserialize, Serialize, Type)]
 pub struct RegistryAmulet {
     id: u64,
     icon_id: u64,
@@ -81,6 +105,10 @@ pub struct RegistryAmulet {
     sell_price: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     plus_sell_price: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<RegistryMetadata>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    plus_metadata: Option<RegistryMetadata>,
 }
 
 #[allow(dead_code)]
@@ -90,6 +118,8 @@ pub struct RegistryBadge {
     icon_id: u64,
     name: String,
     rarity: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<RegistryMetadata>,
 }
 
 #[allow(dead_code)]

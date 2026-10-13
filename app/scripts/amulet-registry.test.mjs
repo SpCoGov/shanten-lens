@@ -66,4 +66,37 @@ test("IPC amulets refresh cards and prices without replacing the packet cache", 
     assert.equal(card({item}).props.title, "packet name+");
     assert.equal(price.calcAmuletPrice({id: 1671}), 9);
     assert.equal(cache.get("shanten:registry:v1"), cachedPacket);
+
+    const metadata = {
+        data_id: 1670, icon_id: 155, icon_name: "fu_0155.png", deprecated: false, rarity: "ORANGE",
+        names: {chs: "护符", chs_t: "護符", jp: "お守り", en: "Amulet", kr: "부적"},
+        descriptions: {chs: "描述", chs_t: "描述", jp: "説明", en: "<b>{0}</b>", kr: ""},
+        price: 18, sell_price: 9,
+    };
+    const rich = {
+        amulets: [{...packet.amulets[0], metadata}, {...packet.amulets[0], id: 168, metadata: {...metadata, deprecated: true}}],
+        badges: [{...packet.badges[0], metadata: {...metadata, price: null, sell_price: null}},
+            {...packet.badges[0], id: 600060, metadata: {...metadata, deprecated: true}}],
+    };
+    registry.setRegistry(rich);
+    const restored = load("../src/lib/registryStore.ts", {react});
+    assert.equal(JSON.stringify(restored.getAmulet(167).metadata), JSON.stringify(metadata));
+    assert.equal(restored.getBadge(600050).metadata.sell_price, null);
+    assert.equal(restored.getAmulet(168).metadata.deprecated, true);
+    const uiReact = {useState: (value) => [value, () => {}], useEffect: () => {}};
+    for (const kind of ["Amulet", "Badge"]) {
+        const picker = load(`../src/components/${kind}PickerModal.tsx`, {
+            react: {default: uiReact}, "react/jsx-runtime": {jsx, jsxs: jsx}, "../styles/theme.css": {},
+            "./Modal": {default: "modal"}, "../lib/registryStore": {useRegistry: registry.getRegistry},
+            "react-i18next": {useTranslation: () => ({t: (key) => key})},
+        }).default;
+        const images = [];
+        const visit = (node) => {
+            if (Array.isArray(node)) return node.forEach(visit);
+            if (node?.type === "img") images.push(node);
+            if (node?.props?.children) visit(node.props.children);
+        };
+        visit(picker({open: true, onClose() {}, onSelect() {}}));
+        assert.equal(images.length, 1, `${kind} picker hides retired items but keeps them in the registry`);
+    }
 });
