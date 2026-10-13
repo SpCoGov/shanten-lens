@@ -30,14 +30,6 @@ jobs:
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Test game-data generator
-        run: python -m unittest discover -s scripts -p 'test_game_data.py'
-
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 

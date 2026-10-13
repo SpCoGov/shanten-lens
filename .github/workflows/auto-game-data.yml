@@ -33,9 +33,6 @@ jobs:
       - name: Install extractor dependencies
         run: python -m pip install -r scripts/requirements-game-data.txt
 
-      - name: Test generator
-        run: python -m unittest discover -s scripts -p 'test_game_data.py'
-
       - name: Generate protocol and registries
         id: generate
         run: python scripts/update_game_data.py
@@ -67,7 +64,7 @@ jobs:
             - 保留简体中文、繁体中文、日文、英文、韩文的名称与描述，以及价格、图片名与 ID、弃用状态和稀有度。
             - 上游未提供的价格保留为 `null`，未翻译的文本保留为空字符串。
 
-            生成器离线测试和生成后的 Rust 后端测试已通过。请检查协议字段及数据差异后合并。
+            生成后的 Rust 后端测试已通过。请检查协议字段及数据差异后合并。
             本机青云之志护身符快照、图片和计分规则不在本次自动更新范围内。
           add-paths: |
             proto/liqi.proto

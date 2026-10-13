@@ -1,621 +1,301 @@
-# Copyright 2026 Shinkuan (Akagi). Licensed under Apache-2.0; see LICENSE.
-# Adapted from SpCoGov/Akagi@3df41dcf80532fce546570fe06bcfd54ce3a4ec1.
-# Modified to extract shanten-lens registries and fail on unresolved proto fields.
-"""Unity client download and pure liqi descriptor reconstruction."""
-
+"""Read Unity TextAssets and turn their Lua descriptors into a validated schema."""
 from __future__ import annotations
 
+import ast
 import json
-import posixpath
 import re
 import warnings
-from dataclasses import dataclass, field
-from urllib.parse import urljoin, urlsplit
+from pathlib import PurePosixPath
+from urllib.error import HTTPError
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
 
-try:  # only needed for the Unity download path; offline mode works without it
-    import requests
-except ModuleNotFoundError:  # pragma: no cover
-    requests = None
-
+from google.protobuf import descriptor_pb2 as pb, descriptor_pool
 
 CLIENT_URL = "https://game.maj-soul.com/1/"
-TEXTURE_PROFILES = ("ASTC", "DXT")
-LUA_XOR_KEY = b"wrelupqezdfrqdsd"
-UNITY_FALLBACK_VERSION = "2022.3.62f2c1"
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+_QUOTED = r'''"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*' '''.strip()
+_VALUE = rf"(?:{_QUOTED}|\{{[^{{}}]*\}}|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?)"
+_LUA_DATA = re.compile(
+    rf"(?P<comment>--[^\r\n]*)|"
+    rf"(?P<import>local\s+(?P<alias>\w+)\s*=\s*require\s*\(?\s*(?P<path>{_QUOTED}))|"
+    r"(?P<declaration>(?P<variable>\w+)\s*=\s*\w+\.(?P<kind>Descriptor|FieldDescriptor|EnumDescriptor|EnumValueDescriptor)\s*\(\s*\))|"
+    rf"(?P<assignment>(?P<owner>\w+)\.(?P<attribute>\w+)\s*=\s*(?P<value>{_VALUE}))|"
+    rf"(?P<string>{_QUOTED})"
 )
-
-PROTOL_PREFIX = "LuaByte/Lua/Protol/"
-PROTO_CONFIG_ASSET = "MyAssets/docs/proto_config.bytes"
-
-# Wire-protocol package. `lq.config` and `lqc` (excel) are game-data, excluded.
-WIRE_PACKAGE = "lq"
-
-# FieldDescriptorProto.Type numbering (descriptor.proto), as emitted in the Lua.
-PROTO_TYPE_NAMES = {
-    1: "double", 2: "float", 3: "int64", 4: "uint64", 5: "int32",
-    6: "fixed64", 7: "fixed32", 8: "bool", 9: "string", 10: "group",
-    11: "message", 12: "bytes", 13: "uint32", 14: "enum", 15: "sfixed32",
-    16: "sfixed64", 17: "sint32", 18: "sint64",
-}
-LABEL_REPEATED = 3
-
-# If any of these is missing after extraction, the run fails loudly rather than
-# writing a truncated schema.
-REQUIRED_MESSAGES = (
-    "ResAuthGame", "ActionPrototype", "ReqSelfOperation", "ResSyncGame",
-    "RecordNewRound", "ReqChiPengGang", "OptionalOperationList", "Wrapper",
-    "ResEnterGame", "GameEndResult",
-)
+_ATTRIBUTES = {"name", "full_name", "fields", "nested_types", "enum_types", "values",
+               "number", "label", "type", "message_type", "enum_type", "containing_type",
+               "extensions", "is_extendable", "has_default_value", "default_value", "index", "cpp_type"}
 
 
-# --------------------------------------------------------------------------- #
-# Model
-# --------------------------------------------------------------------------- #
-@dataclass
-class Field:
-    name: str
-    number: int
-    label: int
-    type_code: int
-    index: int = 0
-    # Raw Lua reference to a message/enum type: "b.ERROR" or a local var name.
-    type_ref: str | None = None
-    # Resolved fully-qualified type name, e.g. ".lq.Error".
-    type_fqn: str | None = None
-
-    @property
-    def repeated(self) -> bool:
-        return self.label == LABEL_REPEATED
+def _literal(value: str):
+    if value.startswith(("'", '"')):
+        return ast.literal_eval(value)
+    if value.startswith("{"):
+        elements = value[1:-1].strip()
+        return [item.strip() for item in elements.split(",")] if elements else []
+    if value in ("true", "false", "nil"):
+        return {"true": True, "false": False, "nil": None}[value]
+    if re.fullmatch(r"-?\d+", value):
+        return int(value)
+    return float(value) if re.fullmatch(r"-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?", value) else value
 
 
-@dataclass
-class EnumValue:
-    name: str
-    number: int
-    index: int = 0
-
-
-@dataclass
-class Enum:
-    var: str
-    name: str
-    full_name: str
-    values: list[EnumValue] = field(default_factory=list)
-
-
-@dataclass
-class Message:
-    var: str
-    name: str
-    full_name: str
-    fields: list[Field] = field(default_factory=list)
-    nested_messages: list["Message"] = field(default_factory=list)
-    nested_enums: list[Enum] = field(default_factory=list)
-    has_containing_type: bool = False
-
-
-@dataclass
-class Module:
-    name: str          # e.g. "com_struct_pb"
-    package: str        # e.g. "lq"
-    imports: dict[str, str]                    # alias -> module name
-    messages_by_var: dict[str, Message]
-    enums_by_var: dict[str, Enum]
-    top_messages: list[Message]
-    top_enums: list[Enum]
-
-
-# --------------------------------------------------------------------------- #
-# Lua ProtoDeclare parsing (pure)
-# --------------------------------------------------------------------------- #
-_DECL_RE = {
-    "message": re.compile(r"(\w+)\s*=\s*\w+\.Descriptor\(\)"),
-    "enum": re.compile(r"(\w+)\s*=\s*\w+\.EnumDescriptor\(\)"),
-    "enum_value": re.compile(r"(\w+)\s*=\s*\w+\.EnumValueDescriptor\(\)"),
-    "field": re.compile(r"(\w+)\s*=\s*\w+\.FieldDescriptor\(\)"),
-}
-_IMPORT_RE = re.compile(r"local\s+(\w+)\s*=\s*require\(?[\"'](Protol\.[^\"']+)[\"']\)?")
-_STR_PROP_RE = re.compile(r"(\w+)\.(\w+)\s*=\s*\"((?:\\.|[^\"\\])*)\"")
-_NUM_PROP_RE = re.compile(r"(\w+)\.(\w+)\s*=\s*(-?\d+)(?![\w.])")
-_REF_PROP_RE = re.compile(r"(\w+)\.(message_type|enum_type|containing_type)\s*=\s*(\w+(?:\.\w+)?)")
-_LIST_PROP_RE = re.compile(r"(\w+)\.(fields|nested_types|enum_types|values)\s*=\s*\{")
-
-
-def _find_matching_brace(text: str, open_idx: int) -> int:
-    depth, i, quote, escaped = 0, open_idx, None, False
-    while i < len(text):
-        c = text[i]
-        if quote:
-            if escaped:
-                escaped = False
-            elif c == "\\":
-                escaped = True
-            elif c == quote:
-                quote = None
-        elif c in "\"'":
-            quote = c
-        elif c == "{":
-            depth += 1
-        elif c == "}":
-            depth -= 1
-            if depth == 0:
-                return i
-        i += 1
-    raise ValueError(f"unbalanced brace at {open_idx}")
-
-
-def _unescape(value: str) -> str:
-    return re.sub(
-        r"\\(\d{1,3}|.)",
-        lambda m: chr(int(m.group(1))) if m.group(1).isdigit()
-        else {"n": "\n", "r": "\r", "t": "\t", "\\": "\\", '"': '"', "'": "'"}.get(
-            m.group(1), m.group(1)
-        ),
-        value,
-    )
-
-
-def parse_lua_module(module_name: str, source: str) -> Module:
-    """Parse one `Protol.*_pb.lua` descriptor script into a Module."""
-    kinds: dict[str, str] = {}
-    for kind, rx in _DECL_RE.items():
-        for var in rx.findall(source):
-            # A var is declared once; first declaration wins its kind.
-            kinds.setdefault(var, kind)
-
-    props: dict[str, dict[str, object]] = {v: {} for v in kinds}
-
-    for var, prop, val in _STR_PROP_RE.findall(source):
-        if var in props:
-            props[var][prop] = _unescape(val)
-    for var, prop, val in _NUM_PROP_RE.findall(source):
-        if var in props and prop not in props[var]:
-            props[var][prop] = int(val)
-    for var, prop, val in _REF_PROP_RE.findall(source):
-        if var in props:
-            props[var][prop] = val
-    for m in _LIST_PROP_RE.finditer(source):
-        var, prop = m.group(1), m.group(2)
-        if var not in props:
-            continue
-        open_idx = m.end() - 1
-        close_idx = _find_matching_brace(source, open_idx)
-        props[var][prop] = re.findall(r"\w+", source[open_idx + 1:close_idx])
-
-    imports = {alias: mod.split(".", 1)[1] for alias, mod in _IMPORT_RE.findall(source)}
-
-    enums_by_var: dict[str, Enum] = {}
-    for var, kind in kinds.items():
-        if kind != "enum":
-            continue
-        p = props[var]
-        if not isinstance(p.get("name"), str) or not isinstance(p.get("full_name"), str):
-            continue
-        enum = Enum(var=var, name=p["name"], full_name=p["full_name"])
-        for vv in p.get("values", []):
-            if kinds.get(vv) != "enum_value":
+def read_protocol(sources: dict[str, str], config: dict) -> pb.FileDescriptorProto:
+    nodes, imports = {}, {}
+    for module, source in sorted(sources.items()):
+        imports[module] = {}
+        properties = []
+        for match in _LUA_DATA.finditer(source):
+            if match["import"]:
+                imports[module][match["alias"]] = _literal(match["path"]).rsplit(".", 1)[-1]
+            elif match["declaration"]:
+                key = (module, match["variable"])
+                if key in nodes:
+                    raise ValueError(f"duplicate descriptor: {key}")
+                nodes[key] = {"kind": match["kind"]}
+            elif match["assignment"]:
+                properties.append((match["owner"], match["attribute"], match["value"]))
+        for owner, attribute, value in properties:
+            node = nodes.get((module, owner))
+            if node is None:
                 continue
-            vp = props[vv]
-            if isinstance(vp.get("name"), str) and isinstance(vp.get("number"), int):
-                enum.values.append(
-                    EnumValue(vp["name"], vp["number"], int(vp.get("index", 0)))
-                )
-        enum.values.sort(key=lambda x: x.index)
-        enums_by_var[var] = enum
+            if attribute not in _ATTRIBUTES or attribute in node:
+                raise ValueError(f"unsupported or duplicate descriptor property: {owner}.{attribute}")
+            node[attribute] = _literal(value)
 
-    messages_by_var: dict[str, Message] = {}
-    for var, kind in kinds.items():
-        if kind != "message":
+    def reference(module, value, kind):
+        if not isinstance(value, str) or not re.fullmatch(r"\w+(?:\.\w+)?", value):
+            raise ValueError(f"invalid descriptor reference: {value}")
+        if "." in value:
+            alias, variable = value.split(".")
+            module = imports[module].get(alias)
+        else:
+            variable = value
+        node = nodes.get((module, variable))
+        if node is None or node["kind"] != kind:
+            raise ValueError(f"unresolved {kind}: {module}/{value}")
+        return node
+
+    types = {}
+    for (module, variable), node in nodes.items():
+        if node["kind"] not in ("Descriptor", "EnumDescriptor"):
             continue
-        p = props[var]
-        if not isinstance(p.get("name"), str) or not isinstance(p.get("full_name"), str):
+        full_name = node.get("full_name", "")
+        if not full_name.startswith(".lq.") or full_name.startswith((".lq.config.", ".lq.lqc.")):
             continue
-        messages_by_var[var] = Message(
-            var=var, name=p["name"], full_name=p["full_name"],
-            has_containing_type=isinstance(p.get("containing_type"), str),
-        )
+        if not re.fullmatch(r"\.lq(?:\.[A-Za-z_]\w*)+", full_name) or node.get("name") != full_name.rsplit(".", 1)[-1]:
+            raise ValueError(f"invalid type name: {full_name}")
+        if full_name in types:
+            raise ValueError(f"duplicate protocol type: {full_name}")
+        types[full_name] = (module, node)
+    if not types:
+        raise ValueError("no lq protocol descriptors")
 
-    for var, msg in messages_by_var.items():
-        p = props[var]
-        for fv in p.get("fields", []):
-            if kinds.get(fv) != "field":
+    schema = pb.FileDescriptorProto(name="liqi.proto", package="lq", syntax="proto3")
+    messages = {}
+    children = {}
+    for full_name, (_, node) in types.items():
+        children.setdefault((full_name.rsplit(".", 1)[0], node["kind"]), set()).add(full_name)
+    for full_name, (module, node) in sorted(types.items()):
+        parent = full_name.rsplit(".", 1)[0]
+        container = schema if parent == ".lq" else messages.get(parent)
+        if container is None:
+            raise ValueError(f"missing containing message: {full_name}")
+        if node.get("containing_type") is not None:
+            declared_parent = reference(module, node["containing_type"], "Descriptor")
+            if declared_parent.get("full_name") != parent:
+                raise ValueError(f"incorrect containing message: {full_name}")
+        if node["kind"] == "Descriptor":
+            target = container.message_type.add() if parent == ".lq" else container.nested_type.add()
+            target.name = node["name"]
+            messages[full_name] = target
+        else:
+            target = container.enum_type.add(name=node["name"])
+            for value in node["values"]:
+                entry = reference(module, value, "EnumValueDescriptor")
+                if type(entry["number"]) is not int:
+                    raise ValueError(f"invalid enum number: {full_name}")
+                target.value.add(name=entry["name"], number=entry["number"])
+            if len({value.number for value in target.value}) != len(target.value):
+                target.options.allow_alias = True
+
+    for full_name, target in messages.items():
+        module, node = types[full_name]
+        if node.get("is_extendable") or node.get("extensions"):
+            raise ValueError(f"proto3 extensions are unsupported: {full_name}")
+        for attribute, kind in (("nested_types", "Descriptor"), ("enum_types", "EnumDescriptor")):
+            linked = [reference(module, value, kind).get("full_name") for value in node.get(attribute, [])]
+            if len(set(linked)) != len(linked) or set(linked) != children.get((full_name, kind), set()):
+                raise ValueError(f"incorrect {attribute}: {full_name}")
+        for value in node["fields"]:
+            field = reference(module, value, "FieldDescriptor")
+            if field.get("has_default_value"):
+                raise ValueError(f"proto3 explicit defaults are unsupported: {full_name}")
+            if any(type(field[key]) is not int for key in ("number", "label", "type")):
+                raise ValueError(f"invalid field number, label or type: {full_name}.{field['name']}")
+            output = target.field.add(name=field["name"], number=field["number"], label=field["label"], type=field["type"])
+            if output.type in (pb.FieldDescriptorProto.TYPE_MESSAGE, pb.FieldDescriptorProto.TYPE_ENUM):
+                kind = "Descriptor" if output.type == pb.FieldDescriptorProto.TYPE_MESSAGE else "EnumDescriptor"
+                key = "message_type" if output.type == pb.FieldDescriptorProto.TYPE_MESSAGE else "enum_type"
+                output.type_name = reference(module, field.get(key), kind).get("full_name", "")
+
+    omitted = []
+    for service_name, methods in sorted(config.get("service", {}).items()):
+        service = pb.ServiceDescriptorProto(name=service_name)
+        for method_name, method in sorted(methods.items()):
+            input_type, output_type = ".lq." + method["request"], ".lq." + method["response"]
+            if input_type not in messages or output_type not in messages:
+                omitted.append(f"{service_name}.{method_name}")
                 continue
-            fp = props[fv]
-            if not all(isinstance(fp.get(k), int) for k in ("number", "label", "type")):
-                continue
-            if not isinstance(fp.get("name"), str):
-                continue
-            msg.fields.append(Field(
-                name=fp["name"], number=fp["number"], label=fp["label"],
-                type_code=fp["type"], index=int(fp.get("index", 0)),
-                type_ref=fp.get("message_type") or fp.get("enum_type"),
-            ))
-        msg.fields.sort(key=lambda x: x.number)
-        for nv in p.get("nested_types", []):
-            if nv in messages_by_var:
-                msg.nested_messages.append(messages_by_var[nv])
-        for ev in p.get("enum_types", []):
-            if ev in enums_by_var:
-                msg.nested_enums.append(enums_by_var[ev])
-
-    nested_msg_vars = {n.var for m in messages_by_var.values() for n in m.nested_messages}
-    nested_enum_vars = {e.var for m in messages_by_var.values() for e in m.nested_enums}
-    top_messages = [
-        m for v, m in messages_by_var.items()
-        if v not in nested_msg_vars and not m.has_containing_type
-    ]
-    top_enums = [e for v, e in enums_by_var.items() if v not in nested_enum_vars]
-
-    package = ""
-    for item in list(messages_by_var.values()) + list(enums_by_var.values()):
-        parts = item.full_name.lstrip(".").split(".")
-        if len(parts) > 1:
-            package = ".".join(parts[:-1])
-            break
-
-    return Module(
-        name=module_name, package=package, imports=imports,
-        messages_by_var=messages_by_var, enums_by_var=enums_by_var,
-        top_messages=top_messages, top_enums=top_enums,
-    )
+            service.method.add(name=method_name, input_type=input_type, output_type=output_type)
+        if service.method:
+            schema.service.add().CopyFrom(service)
+    if omitted:
+        print(f"[protocol] omitted {len(omitted)} RPCs without shipped message descriptors: {', '.join(omitted)}")
+    try:
+        descriptor_pool.DescriptorPool().Add(schema)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"invalid protocol descriptors: {error}") from error
+    return schema
 
 
-def resolve_types(modules: dict[str, Module]) -> None:
-    """Resolve each field's message/enum ref to a fully-qualified `.lq.X` name."""
-    for module in modules.values():
-        for msg in module.messages_by_var.values():
-            for fld in msg.fields:
-                if fld.type_ref:
-                    fld.type_fqn = _resolve_ref(fld.type_ref, module, modules)
+def render_schema(schema: pb.FileDescriptorProto) -> str:
+    lines = ['syntax = "proto3";', "", "package lq;", ""]
 
+    def enum(item, indent):
+        lines.append(indent + f"enum {item.name} {{")
+        if item.options.allow_alias:
+            lines.append(indent + "    option allow_alias = true;")
+        for value in item.value:
+            lines.append(indent + f"    {value.name} = {value.number};")
+        lines.append(indent + "}")
 
-def _resolve_ref(ref: str, module: Module, modules: dict[str, Module]) -> str | None:
-    if "." not in ref:
-        target = module.messages_by_var.get(ref) or module.enums_by_var.get(ref)
-        return target.full_name if target else None
-    alias, var = ref.split(".", 1)
-    other = modules.get(module.imports.get(alias, ""))
-    if not other:
-        return None
-    target = other.messages_by_var.get(var) or other.enums_by_var.get(var)
-    return target.full_name if target else None
+    def message(item, indent):
+        lines.append(indent + f"message {item.name} {{")
+        for child in sorted(item.enum_type, key=lambda child: child.name):
+            enum(child, indent + "    ")
+        for child in sorted(item.nested_type, key=lambda child: child.name):
+            message(child, indent + "    ")
+        for field in sorted(item.field, key=lambda field: field.number):
+            kind = field.type_name or pb.FieldDescriptorProto.Type.Name(field.type).removeprefix("TYPE_").lower()
+            label = "repeated " if field.label == pb.FieldDescriptorProto.LABEL_REPEATED else ""
+            lines.append(indent + f"    {label}{kind} {field.name} = {field.number};")
+        lines.append(indent + "}")
 
-
-# --------------------------------------------------------------------------- #
-# proto3 rendering (pure)
-# --------------------------------------------------------------------------- #
-def _proto_type(fld: Field) -> str:
-    if fld.type_code in (11, 14):          # message / enum
-        if not fld.type_fqn:
-            raise ValueError(f"unresolved protobuf field: {fld.name} ({fld.type_ref})")
-        return fld.type_fqn
-    if fld.type_code not in PROTO_TYPE_NAMES or fld.type_code == 10:
-        raise ValueError(f"unsupported protobuf field type: {fld.type_code}")
-    return PROTO_TYPE_NAMES[fld.type_code]
-
-
-def _render_enum(enum: Enum, indent: int, out: list[str]) -> None:
-    pad = " " * indent
-    out.append(f"{pad}enum {enum.name} {{")
-    numbers = [v.number for v in enum.values]
-    if len(numbers) != len(set(numbers)):
-        out.append(f"{pad}    option allow_alias = true;")
-    for v in enum.values:
-        out.append(f"{pad}    {v.name} = {v.number};")
-    out.append(f"{pad}}}")
-
-
-def _render_message(msg: Message, indent: int, out: list[str]) -> None:
-    pad = " " * indent
-    out.append(f"{pad}message {msg.name} {{")
-    for enum in msg.nested_enums:
-        _render_enum(enum, indent + 4, out)
-    for nested in sorted(msg.nested_messages, key=lambda m: m.name):
-        _render_message(nested, indent + 4, out)
-    for fld in sorted(msg.fields, key=lambda f: f.number):
-        prefix = "repeated " if fld.repeated else ""
-        out.append(f"{pad}    {prefix}{_proto_type(fld)} {fld.name} = {fld.number};")
-    out.append(f"{pad}}}")
-
-
-def render_proto(modules: dict[str, Module], services: dict[str, dict]) -> str:
-    """Render one flat proto3 file for the wire package, plus service blocks."""
-    wire = [m for m in modules.values() if m.package == WIRE_PACKAGE]
-
-    seen: dict[str, str] = {}
-    enums: list[Enum] = []
-    messages: list[Message] = []
-    for module in wire:
-        for enum in module.top_enums:
-            if enum.full_name in seen:
-                raise ValueError(f"duplicate enum {enum.full_name} in {module.name}/{seen[enum.full_name]}")
-            seen[enum.full_name] = module.name
-            enums.append(enum)
-        for msg in module.top_messages:
-            if msg.full_name in seen:
-                raise ValueError(f"duplicate message {msg.full_name} in {module.name}/{seen[msg.full_name]}")
-            seen[msg.full_name] = module.name
-            messages.append(msg)
-
-    lines = ['syntax = "proto3";', "", f"package {WIRE_PACKAGE};", ""]
-    for enum in sorted(enums, key=lambda e: e.full_name):
-        _render_enum(enum, 0, lines)
+    for item in sorted(schema.enum_type, key=lambda item: item.name):
+        enum(item, "")
         lines.append("")
-    for msg in sorted(messages, key=lambda m: m.full_name):
-        _render_message(msg, 0, lines)
+    for item in sorted(schema.message_type, key=lambda item: item.name):
+        message(item, "")
         lines.append("")
-
-    for service_name in sorted(services):
-        lines.append(f"service {service_name} {{")
-        for method in sorted(services[service_name]):
-            spec = services[service_name][method]
-            lines.append(
-                f"    rpc {method} ({spec['request']}) returns ({spec['response']});"
-            )
-        lines.append("}")
-        lines.append("")
-
+    for service in schema.service:
+        lines.append(f"service {service.name} {{")
+        for method in service.method:
+            lines.append(f"    rpc {method.name} ({method.input_type.removeprefix('.lq.')}) returns ({method.output_type.removeprefix('.lq.')});")
+        lines.extend(["}", ""])
     return "\n".join(lines).rstrip() + "\n"
 
 
-def filter_services(
-    services: dict[str, dict], message_names: set[str]
-) -> tuple[dict[str, dict], list[str]]:
-    """Drop methods whose request/response type is not in the message set.
-
-    `proto_config.bytes` lists internal debug/test RPCs (e.g. *ActivityDebug)
-    whose message types are stripped from the shipped descriptors. Those never
-    occur in real traffic, so they are skipped (and reported) rather than
-    breaking proto compilation or the rpc-map.
-    """
-    resolved: dict[str, dict] = {}
-    skipped: list[str] = []
-    for service_name in sorted(services):
-        keep: dict[str, dict] = {}
-        for method in sorted(services[service_name]):
-            spec = services[service_name][method]
-            if spec["request"] in message_names and spec["response"] in message_names:
-                keep[method] = spec
-            else:
-                skipped.append(f"{service_name}.{method}")
-        if keep:
-            resolved[service_name] = keep
-    return resolved, skipped
-
-
-def build_rpc_map(services: dict[str, dict]) -> dict[str, dict]:
-    """Flat rpc-map keyed by `.lq.Service.method` (services already resolved)."""
-    rpc_map: dict[str, dict] = {}
-    for service_name in sorted(services):
-        for method in sorted(services[service_name]):
-            spec = services[service_name][method]
-            rpc_map[f".{WIRE_PACKAGE}.{service_name}.{method}"] = {
-                "req": f".{WIRE_PACKAGE}.{spec['request']}",
-                "resp": f".{WIRE_PACKAGE}.{spec['response']}",
-            }
-    return rpc_map
-
-
-def collect_message_names(modules: dict[str, Module]) -> set[str]:
-    names: set[str] = set()
-    for module in modules.values():
-        if module.package != WIRE_PACKAGE:
-            continue
-        for msg in module.messages_by_var.values():
-            if not msg.has_containing_type:
-                names.add(msg.name)
-    return names
-
-
-def build_outputs(
-    lua_sources: dict[str, str], proto_config: dict
-) -> tuple[str, dict]:
-    """Pure end-to-end: Lua sources + proto_config JSON -> (proto text, rpc-map)."""
-    modules = {name: parse_lua_module(name, src) for name, src in lua_sources.items()}
-    resolve_types(modules)
-
-    services_raw = proto_config.get("service", {})
-    services: dict[str, dict] = {}
-    for service_name, methods in services_raw.items():
-        norm = {}
-        for method, spec in methods.items():
-            if isinstance(spec, dict) and "request" in spec and "response" in spec:
-                norm[method] = {"request": spec["request"], "response": spec["response"]}
-        if norm:
-            services[service_name] = norm
-
-    message_names = collect_message_names(modules)
-    resolved_services, skipped = filter_services(services, message_names)
-    if skipped:
-        print(f"[extract] skipped {len(skipped)} debug/test RPCs with stripped "
-              f"types: {', '.join(skipped)}")
-
-    proto_text = render_proto(modules, resolved_services)
-    rpc_map = build_rpc_map(resolved_services)
-
-    for required in REQUIRED_MESSAGES:
-        if required not in message_names:
-            raise SystemExit(f"required message missing from extraction: {required}")
-
-    return proto_text, rpc_map
-
-
-# --------------------------------------------------------------------------- #
-# Unity bundle download (IO)
-# --------------------------------------------------------------------------- #
-def _session() -> requests.Session:
-    s = requests.Session()
-    s.headers.update({"User-Agent": USER_AGENT})
-    return s
-
-
-def _get_bytes(s: requests.Session, url: str, timeout: int = 60) -> bytes:
-    r = s.get(url, timeout=timeout)
-    r.raise_for_status()
-    return r.content
-
-
-def _join(base: str, *parts: str) -> str:
-    cur = base.rstrip("/") + "/"
-    for p in parts:
-        cur = urljoin(cur, p.lstrip("/"))
-    return cur
-
-
-def _origin(url: str) -> str:
-    p = urlsplit(url)
-    return f"{p.scheme}://{p.netloc}"
-
-
-def _choose_url(entries: list[dict]) -> str:
-    ordered = sorted(
-        entries, key=lambda e: (e.get("Priority", 0), e.get("weight", 0)), reverse=True
-    )
-    return ordered[0]["url"]
+def build_outputs(lua_sources: dict[str, str], proto_config: dict) -> tuple[str, dict]:
+    schema = read_protocol(lua_sources, proto_config)
+    required = {"Wrapper", "ActionPrototype", "RecordNewRound", "OptionalOperationList",
+                "ResAuthGame", "ResEnterGame", "ReqSelfOperation", "ResSyncGame", "ReqChiPengGang", "GameEndResult"}
+    missing = required - {message.name for message in schema.message_type}
+    if missing:
+        raise ValueError(f"required protocol messages missing: {sorted(missing)}")
+    rpc = {f".lq.{service.name}.{method.name}": {"req": method.input_type, "resp": method.output_type}
+           for service in schema.service for method in service.method}
+    return render_schema(schema), rpc
 
 
 def wanted_excel(path: str) -> bool:
-    return bool(re.fullmatch(
-        r"LuaByte/Lua/Excels/(?:Data/(?:amulet/amulet_(?:effect|badge)(?:_b\d+)?|str/event(?:_b\d+)?)"
-        r"|Langs/str_event_(?:jp|chs|chs_t|en|kr))\.lua\.bytes", path
-    ))
+    relative = path.removeprefix("LuaByte/Lua/Excels/")
+    return path != relative and bool(re.fullmatch(
+        r"Data/(?:amulet/amulet_(?:effect|badge)|str/event)(?:_b\d+)?\.lua\.bytes|"
+        r"Langs/str_event_(?:chs|chs_t|jp|en|kr)\.lua\.bytes", relative))
+
+
+def decode_lua(data: bytes) -> str:
+    key = b"wrelupqezdfrqdsd"
+    for payload in (data, bytes(byte ^ key[index % len(key)] for index, byte in enumerate(data))):
+        try:
+            text = payload.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            continue
+        if re.match(r"\s*(?:--|local\b|return\b|module\s*\()", text):
+            return text
+    raise ValueError("TextAsset is neither plain nor XOR-encoded Lua")
 
 
 def fetch_from_unity(timeout: int = 60) -> tuple[dict[str, str], dict, dict[str, str], dict[str, str]]:
-    """Download and decode the Protol Lua sources + proto_config.bytes.
+    import UnityPy
 
-    Returns (protocol Lua, service config, selected Excel Lua, metadata).
-    """
-    import UnityPy  # imported lazily so the pure logic is testable without it
-
-    UnityPy.config.FALLBACK_UNITY_VERSION = UNITY_FALLBACK_VERSION
+    UnityPy.config.FALLBACK_UNITY_VERSION = "2022.3.62f2c1"
     warnings.filterwarnings("ignore", message="No valid Unity version found.*")
 
-    s = _session()
-    html = _get_bytes(s, CLIENT_URL, timeout).decode("utf-8", "replace")
-    loader = re.search(r"Build/([^\"']+?\.loader\.js)", html)
-    pv = re.search(r"productVersion\s*:\s*[\"']([^\"']+)[\"']", html)
-    if not loader or "-WebGL-release-" not in loader.group(1):
-        raise SystemExit("could not locate Unity WebGL loader in client HTML")
-    issuer = loader.group(1).split("-WebGL-release-", 1)[0]
-    product_version = pv.group(1) if pv else "unknown"
-    print(f"[extract] issuer={issuer} productVersion={product_version}")
+    def download(url):
+        with urlopen(Request(url, headers={"User-Agent": "shanten-lens-data-updater"}), timeout=timeout) as response:
+            return response.read()
 
-    cbs = json.loads(_get_bytes(
-        s, _join(_origin(CLIENT_URL), f"assetbundles/clientBundleSettings/{issuer}-release.json"), timeout
-    ))
-    wh = cbs["warehouses"][0]
-    whs = json.loads(_get_bytes(
-        s, _join(_choose_url(wh["urls"]), wh["warehouseSettingPath"]), timeout
-    ))
-    bundle_base = _join(_choose_url(whs["urls"]), whs["bundlePath"]).rstrip("/") + "/"
+    def address(entries, path):
+        preferred = max(entries, key=lambda entry: (entry.get("Priority", 0), entry.get("weight", 0)))
+        return urljoin(preferred["url"].rstrip("/") + "/", path)
 
-    profile_base, bundle_hash = None, None
-    for profile in TEXTURE_PROFILES:
-        base = _join(bundle_base, profile) + "/"
+    html = download(CLIENT_URL).decode("utf-8")
+    loader = re.search(r"([\w]+)-WebGL-release-[^\"'\s]+\.loader\.js", html)
+    version = re.search(r"productVersion\s*:\s*[\"']([^\"']+)", html)
+    if loader is None or version is None:
+        raise ValueError("client HTML has no Unity loader or product version")
+    issuer = loader[1]
+    settings = json.loads(download(urljoin(CLIENT_URL, f"/assetbundles/clientBundleSettings/{issuer}-release.json")))
+    warehouse = settings["warehouses"][0]
+    settings = json.loads(download(address(warehouse["urls"], warehouse["warehouseSettingPath"])))
+    base = address(settings["urls"], settings["bundlePath"]).rstrip("/") + "/"
+    for profile in ("ASTC", "DXT"):
+        bundle_base = urljoin(base, profile + "/")
         try:
-            h = _get_bytes(s, _join(base, "bundle_hash.txt"), timeout).decode().strip()
-        except requests.RequestException:
-            continue
-        if h:
-            profile_base, bundle_hash = base, h
+            bundle_hash = download(urljoin(bundle_base, "bundle_hash.txt")).decode("ascii").strip()
+            manifest = UnityPy.load(download(urljoin(bundle_base, "bundle_info_so.majset")))
             break
-    if not profile_base:
-        raise SystemExit("no usable texture profile (ASTC/DXT)")
-    print(f"[extract] profile_base={profile_base} bundle_hash={bundle_hash}")
-
-    info = _get_bytes(s, _join(profile_base, "bundle_info_so.majset"), timeout)
-    bundle_infos, asset_infos = _read_bundle_info(UnityPy, info)
-
-    wanted: dict[int, list[str]] = {}
-    for asset in asset_infos:
-        path = asset.get("assetPath")
-        idx = asset.get("ownerBundleIndex")
-        if not isinstance(path, str) or idx is None:
-            continue
-        if path.startswith(PROTOL_PREFIX) and path.endswith(".lua.bytes"):
-            wanted.setdefault(int(idx), []).append(path)
-        elif path == PROTO_CONFIG_ASSET:
-            wanted.setdefault(int(idx), []).append(path)
-        elif wanted_excel(path):
-            wanted.setdefault(int(idx), []).append(path)
-
-    lua_sources: dict[str, str] = {}
-    excel_sources: dict[str, str] = {}
-    proto_config: dict | None = None
-    for idx, paths in sorted(wanted.items()):
-        name = bundle_infos[idx]["name"]
-        assets = _extract_text_assets(UnityPy, _get_bytes(s, _join(profile_base, name), timeout))
-        for path in paths:
-            data = _lookup_asset(assets, path)
-            if data is None:
-                raise ValueError(f"missing TextAsset for {path} in {name}")
-            if path == PROTO_CONFIG_ASSET:
-                proto_config = json.loads(data.decode("utf-8", "replace"))
-            elif path.startswith(PROTOL_PREFIX):
-                module_name = posixpath.basename(path)[: -len(".lua.bytes")]
-                lua_sources[module_name] = _decode_lua(data).decode("utf-8", "surrogateescape")
-            else:
-                excel_sources[path] = _decode_lua(data).decode("utf-8", "surrogateescape")
-
-    if proto_config is None:
-        raise SystemExit("proto_config.bytes not found in the Unity bundles")
-    if not lua_sources:
-        raise SystemExit("no Protol descriptor Lua found in the Unity bundles")
-
-    meta = {"product_version": product_version, "bundle_hash": bundle_hash, "issuer": issuer}
-    return lua_sources, proto_config, excel_sources, meta
-
-
-def _read_bundle_info(unitypy, data: bytes) -> tuple[list[dict], list[dict]]:
-    env = unitypy.load(data)
-    for obj in env.objects:
-        if obj.type.name != "MonoBehaviour":
-            continue
-        tree = obj.read_typetree()
-        if "bundleInfos" in tree and "assetInfos" in tree:
-            return tree["bundleInfos"], tree["assetInfos"]
-    raise SystemExit("BundleInfoSO not found in bundle_info_so.majset")
-
-
-def _extract_text_assets(unitypy, data: bytes) -> dict[str, bytes]:
-    env = unitypy.load(data)
-    out: dict[str, bytes] = {}
-    for obj in env.objects:
-        if obj.type.name != "TextAsset":
-            continue
-        ta = obj.read()
-        name = getattr(ta, "m_Name", "")
-        script = getattr(ta, "m_Script", "")
-        if not name:
-            continue
-        out[name] = script if isinstance(script, bytes) else script.encode("utf-8", "surrogateescape")
-    return out
-
-
-def _lookup_asset(assets: dict[str, bytes], asset_path: str) -> bytes | None:
-    base = posixpath.basename(asset_path)
-    for candidate in (base, base[: -len(".bytes")] if base.endswith(".bytes") else base,
-                      posixpath.splitext(base)[0]):
-        if candidate in assets:
-            return assets[candidate]
-    return None
-
-
-def _looks_like_lua(data: bytes) -> bool:
-    sample = data[:4096]
-    if not sample:
-        return False
-    printable = sum(b in (9, 10, 13) or 32 <= b <= 126 for b in sample)
-    if printable / len(sample) < 0.85:
-        return False
-    return sample.lstrip().startswith((b"--", b"local", b"return", b"module", b"function"))
-
-
-def _decode_lua(data: bytes) -> bytes:
-    if _looks_like_lua(data):
-        return data
-    return bytes(b ^ LUA_XOR_KEY[i % len(LUA_XOR_KEY)] for i, b in enumerate(data))
+        except HTTPError as error:
+            if error.code != 404:
+                raise
+    else:
+        raise ValueError("no supported Unity texture profile")
+    if not re.fullmatch(r"[0-9a-fA-F]{32,64}", bundle_hash):
+        raise ValueError("invalid Unity bundle hash")
+    indexes = [obj.read_typetree() for obj in manifest.objects if obj.type.name == "MonoBehaviour"]
+    indexes = [item for item in indexes if item.get("m_Name") == "BundleInfoSO"]
+    if len(indexes) != 1:
+        raise ValueError("expected one BundleInfoSO resource index")
+    index = indexes[0]
+    selected = {}
+    for asset in index["assetInfos"]:
+        path = asset["assetPath"]
+        if re.fullmatch(r"LuaByte/Lua/Protol/\w+_pb\.lua\.bytes", path) or wanted_excel(path) or path == "MyAssets/docs/proto_config.bytes":
+            if path in selected:
+                raise ValueError(f"duplicate resource address: {path}")
+            owner = asset["ownerBundleIndex"]
+            if type(owner) is not int or not 0 <= owner < len(index["bundleInfos"]):
+                raise ValueError(f"invalid resource bundle index: {path}")
+            selected[path] = owner
+    assets = {}
+    for owner in sorted(set(selected.values())):
+        bundle = UnityPy.load(download(urljoin(bundle_base, index["bundleInfos"][owner]["name"])))
+        container = dict(bundle.container.items())
+        for path, asset_owner in selected.items():
+            if asset_owner != owner:
+                continue
+            reader = container.get(path.lower())
+            if reader is None or reader.type.name != "TextAsset":
+                raise ValueError(f"missing TextAsset: {path}")
+            payload = reader.read().m_Script
+            assets[path] = payload.encode("utf-8", "surrogateescape") if isinstance(payload, str) else bytes(payload)
+    lua = {PurePosixPath(path).name.removesuffix(".lua.bytes"): decode_lua(payload)
+           for path, payload in assets.items() if path.startswith("LuaByte/Lua/Protol/")}
+    excels = {path: decode_lua(payload) for path, payload in assets.items() if wanted_excel(path)}
+    config = json.loads(assets["MyAssets/docs/proto_config.bytes"])
+    meta = {"product_version": version[1], "bundle_hash": bundle_hash, "issuer": issuer}
+    print(f"[client] {meta}; protocol modules={len(lua)}, Excel assets={len(excels)}")
+    return lua, config, excels, meta

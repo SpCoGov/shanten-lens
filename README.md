@@ -270,7 +270,7 @@ app/src-tauri/target/release/bundle/dmg/
 
 本地运行：`python -m pip install -r scripts/requirements-game-data.txt`，然后执行 `python scripts/update_game_data.py`。已有 Unity 解包目录可通过 `--from-raw <raw目录>` 离线验证；`--output-root <目录>` 用于包含现有协议和注册表的临时副本。
 
-仓库需要在 **Settings → Actions → General → Workflow permissions** 开启允许 Actions 创建 PR 的选项。工作流使用 `GITHUB_TOKEN`，自动创建的 PR 不会触发额外的 PR CI；因此这个任务先运行生成器测试及生成后的 Rust 后端测试，通过后才开 PR。
+仓库需要在 **Settings → Actions → General → Workflow permissions** 开启允许 Actions 创建 PR 的选项。工作流使用 `GITHUB_TOKEN`，自动创建的 PR 不会触发额外的 PR CI；因此这个任务先运行生成后的 Rust 后端测试，通过后才开 PR。
 
 ## 项目校验
 

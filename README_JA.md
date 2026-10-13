@@ -244,7 +244,7 @@ app/src-tauri/target/release/bundle/dmg/
 
 ローカルでは `python -m pip install -r scripts/requirements-game-data.txt` の後、`python scripts/update_game_data.py` を実行します。既存の Unity 展開ディレクトリは `--from-raw <rawディレクトリ>` で検証できます。`--output-root <ディレクトリ>` は既存のプロトコルとレジストリを含む一時コピー用です。
 
-リポジトリの **Settings → Actions → General → Workflow permissions** で Actions による PR 作成を許可してください。`GITHUB_TOKEN` で作成された PR は追加の PR CI を起動しないため、このタスク内で生成器と生成後の Rust バックエンドをテストしてから PR を作成します。
+リポジトリの **Settings → Actions → General → Workflow permissions** で Actions による PR 作成を許可してください。`GITHUB_TOKEN` で作成された PR は追加の PR CI を起動しないため、このタスク内で生成後の Rust バックエンドをテストしてから PR を作成します。
 
 ## プロジェクトの検証
 
