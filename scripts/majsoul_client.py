@@ -480,7 +480,7 @@ def _choose_url(entries: list[dict]) -> str:
 def wanted_excel(path: str) -> bool:
     return bool(re.fullmatch(
         r"LuaByte/Lua/Excels/(?:Data/(?:amulet/amulet_(?:effect|badge)(?:_b\d+)?|str/event(?:_b\d+)?)"
-        r"|Langs/str_event_(?:jp|chs))\.lua\.bytes", path
+        r"|Langs/str_event_(?:jp|chs|chs_t|en|kr))\.lua\.bytes", path
     ))
 
 

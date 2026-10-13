@@ -92,7 +92,6 @@ fn valid_registry(value: &Value, kind: &str) -> bool {
         _ => return false,
     };
     let mut ids = std::collections::HashSet::new();
-    let mut names = std::collections::HashSet::new();
     items.iter().all(|item| {
         let Some(row) = item.as_object() else {
             return false;
@@ -122,7 +121,12 @@ fn valid_registry(value: &Value, kind: &str) -> bool {
             && !name.is_empty()
             && allowed_rarities.contains(&rarity.to_ascii_uppercase().as_str())
             && ids.insert(id)
-            && names.insert(name.to_ascii_lowercase())
+            && ["metadata", "plus_metadata"].iter().all(|key| {
+                row.get(*key).is_none_or(|details| {
+                    serde_json::from_value::<crate::ipc::RegistryMetadata>(details.clone()).is_ok()
+                        && details["rarity"].as_str().is_some_and(|rarity| allowed_rarities.contains(&rarity))
+                })
+            })
     })
 }
 
@@ -136,6 +140,49 @@ fn write_registry(path: &Path, value: &Value) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn multilingual_metadata_survives_ipc_and_duplicate_names_use_distinct_ids() {
+        let details = json!({
+            "data_id": 30, "icon_id": 4, "icon_name": "fu_0004.png", "rarity": "ORANGE",
+            "price": 18, "sell_price": 9, "deprecated": false,
+            "names": {"chs": "护符", "chs_t": "護符", "jp": "お守り", "en": "Amulet", "kr": "부적"},
+            "descriptions": {"chs": "描述", "chs_t": "描述", "jp": "説明", "en": "<b>{0}</b>", "kr": ""},
+        });
+        let mut plus = details.clone();
+        plus["data_id"] = json!(31);
+        plus["sell_price"] = json!(12);
+        plus["deprecated"] = json!(true);
+        let amulet = json!({"id": 3, "name": "お守り", "icon_id": 4, "rarity": "ORANGE",
+                            "metadata": details, "plus_metadata": plus});
+        let mut badge_details = details.clone();
+        badge_details["data_id"] = json!(600010);
+        badge_details["icon_id"] = json!(600010);
+        badge_details["icon_name"] = json!("badge_600010.png");
+        badge_details["rarity"] = json!("BROWN");
+        badge_details["price"] = Value::Null;
+        badge_details["sell_price"] = Value::Null;
+        let badge = json!({"id": 600010, "name": "印", "icon_id": 600010, "rarity": "BROWN", "metadata": badge_details});
+        let mut retired = badge.clone();
+        retired["id"] = json!(600020);
+        retired["metadata"]["deprecated"] = json!(true);
+        let badges = json!({"schema_version": 1, "items": [badge, retired]});
+        assert!(valid_registry(&badges, "badges"));
+        let payload = json!({"amulets": [amulet], "badges": badges["items"]});
+        let typed: crate::ipc::RegistryPayload = serde_json::from_value(payload.clone()).unwrap();
+        assert_eq!(serde_json::to_value(typed).unwrap(), payload);
+        let mut invalid = badges.clone();
+        invalid["items"][1]["id"] = json!(600010);
+        assert!(!valid_registry(&invalid, "badges"));
+        for bad in [json!("9"), json!(-1)] {
+            invalid = badges.clone();
+            invalid["items"][0]["metadata"]["sell_price"] = bad;
+            assert!(!valid_registry(&invalid, "badges"));
+        }
+        invalid = badges.clone();
+        invalid["items"][0]["metadata"]["names"].as_object_mut().unwrap().remove("kr");
+        assert!(!valid_registry(&invalid, "badges"));
+    }
 
     #[test]
     fn qyzz_catalog_preserves_ids_icons_names_rarities_and_prices() {

@@ -1,11 +1,13 @@
 import { useSyncExternalStore } from "react";
 import type {GameStateData} from "./gamestate";
+import type {RegistryMetadata} from "../bindings";
 
 export type Amulet = {
     id: number; icon_id: number; name: string; rarity: "GREEN"|"BLUE"|"ORANGE"|"PURPLE"|"GRAY";
     plus_name?: string; sell_price?: number; plus_sell_price?: number;
+    metadata?: RegistryMetadata | null; plus_metadata?: RegistryMetadata | null;
 };
-export type Badge  = { id: number; icon_id: number; name: string; rarity: "BROWN"|"BLUE"|"RED" };
+export type Badge  = { id: number; icon_id: number; name: string; rarity: "BROWN"|"BLUE"|"RED"; metadata?: RegistryMetadata | null };
 
 export type RegistryPayload = {
     source?: GameStateData["source"];

@@ -31,6 +31,7 @@ export default function BadgePickerModal({
     }, [open]);
 
     const list = badges.filter((b) => {
+        if (b.metadata?.deprecated) return false;
         const okR = rar === "ALL" ? true : b.rarity === rar;
         const key = q.trim().toLowerCase();
         const okQ = key ? b.name.toLowerCase().includes(key) || String(b.id).includes(key) : true;

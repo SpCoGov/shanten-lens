@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EXCEL = "LuaByte/Lua/Excels/"
 AMULET_RARITIES = {1: "PURPLE", 2: "ORANGE", 3: "BLUE", 4: "GREEN", 5: "GRAY"}
 BADGE_RARITIES = {1: "BROWN", 2: "BLUE", 3: "RED"}
+LANGUAGES = ("chs", "chs_t", "jp", "en", "kr")
 REQUIRED_RPC = {
     ".lq.Lobby.fetchAmuletActivityData", ".lq.Lobby.amuletActivityOperate",
     ".lq.Lobby.amuletActivityGameOperate", ".lq.Lobby.amuletActivityGiveup",
@@ -198,24 +199,51 @@ def integer(value, name: str, minimum: int = 0) -> int:
 
 def build_registries(sources: dict[str, str]) -> tuple[list[dict], list[dict]]:
     languages = {}
-    for language in ("jp", "chs"):
+    for language in LANGUAGES:
         tables = local_tables(sources[f"{EXCEL}Langs/str_event_{language}.lua.bytes"])
         languages[language] = next(iter(tables.values()))
+        if not isinstance(languages[language], list):
+            raise ValueError(f"invalid language table: {language}")
     texts = {row["id"]: row for row in load_sheet(sources, "str/event")}
 
-    def name(text_id):
+    def translations(text_id):
         row = texts[integer(text_id, "text ID", 1)]
-        for language in ("jp", "chs"):
+        result = {}
+        for language in LANGUAGES:
             index = integer(row[language], "language index", 1)
+            if index > len(languages[language]):
+                raise ValueError(f"language index out of range: {language}/{text_id}")
             text = languages[language][index - 1]
-            if isinstance(text, str) and text.strip():
-                return text.strip()
-        raise ValueError(f"missing translated name: {text_id}")
+            if not isinstance(text, str):
+                raise ValueError(f"invalid translated text: {language}/{text_id}")
+            result[language] = text
+        return result
+
+    def name(names):
+        for language in ("jp", "chs"):
+            if names[language].strip():
+                return names[language].strip()
+        raise ValueError("missing translated name")
 
     def icon(value, prefix):
         if not isinstance(value, str) or not (match := re.fullmatch(prefix + r"(\d+)", value)):
             raise ValueError(f"invalid icon: {value}")
         return integer(int(match[1]), "icon ID", 1)
+
+    def metadata(row, name_field, desc_field, image_field, prefix, rarities):
+        deprecated = integer(row.get("deprecated") or 0, "deprecated flag")
+        if deprecated not in (0, 1):
+            raise ValueError(f"unsupported deprecated flag: {deprecated}")
+        icon_id = icon(row[image_field], prefix)
+        return {"data_id": integer(row["id"], "data ID", 1),
+                "names": translations(row[name_field]), "descriptions": translations(row[desc_field]),
+                "price": integer(row["price"], "price") if row.get("price") is not None else None,
+                "sell_price": integer(row["sell_price"], "sell price") if row.get("sell_price") is not None else None,
+                "icon_name": row[image_field] + ".png", "icon_id": icon_id,
+                "deprecated": bool(deprecated), "rarity": rarities[integer(row["rarity"], "rarity", 1)]}
+
+    def amulet_metadata(row):
+        return metadata(row, "name", "desc", "card_image", "fu_", AMULET_RARITIES)
 
     effects = {row["id"]: row for row in load_sheet(sources, "amulet/amulet_effect")}
     amulets = []
@@ -227,25 +255,28 @@ def build_registries(sources: dict[str, str]) -> tuple[list[dict], list[dict]]:
             if raw_id - 1 not in effects:
                 raise ValueError(f"amulet variant has no base: {raw_id}")
             continue
-        if integer(row.get("deprecated") or 0, "deprecated flag"):
-            continue
-        item = {"id": raw_id // 10, "icon_id": icon(row["card_image"], "fu_"),
-                "name": name(row["name"]), "rarity": AMULET_RARITIES[integer(row["rarity"], "amulet rarity", 1)],
-                "sell_price": integer(row["sell_price"], "sell price")}
+        details = amulet_metadata(row)
+        item = {"id": raw_id // 10, "icon_id": details["icon_id"],
+                "name": name(details["names"]), "rarity": details["rarity"],
+                "sell_price": integer(row["sell_price"], "sell price"), "metadata": details}
         if upgrade := row["upgrade"]:
             if integer(upgrade, "upgrade ID") != raw_id + 1:
                 raise ValueError(f"unsupported amulet upgrade: {raw_id} -> {upgrade}")
             plus = effects[upgrade]
-            item.update(plus_name=name(plus["name"]),
-                        plus_sell_price=integer(plus["sell_price"], "plus sell price"))
+            details = amulet_metadata(plus)
+            item.update(plus_name=name(details["names"]),
+                        plus_sell_price=integer(plus["sell_price"], "plus sell price"),
+                        plus_metadata=details)
+        elif raw_id + 1 in effects:
+            raise ValueError(f"unlinked amulet variant: {raw_id + 1}")
         amulets.append(item)
-    badges = [{"id": integer(row["id"], "badge ID", 1),
-               "icon_id": icon(row["badge_image"], "badge_"),
-               "name": name(row["badge_name"]), "rarity": BADGE_RARITIES[integer(row["rarity"], "badge rarity", 1)]}
-              for row in load_sheet(sources, "amulet/amulet_badge")
-              if not integer(row.get("deprecated") or 0, "deprecated flag")]
+    badges = []
+    for row in load_sheet(sources, "amulet/amulet_badge"):
+        details = metadata(row, "badge_name", "badge_desc", "badge_image", "badge_", BADGE_RARITIES)
+        badges.append({"id": details["data_id"], "icon_id": details["icon_id"],
+                       "name": name(details["names"]), "rarity": details["rarity"], "metadata": details})
     if not amulets or not badges:
-        raise ValueError("empty active amulet or badge registry")
+        raise ValueError("empty amulet or badge registry")
     return amulets, badges
 
 
@@ -253,13 +284,13 @@ def updated_registry(previous: dict, incoming: list[dict], meta: dict) -> dict:
     if previous.get("schema_version") != 1:
         raise ValueError("unsupported registry schema")
     old = {row["id"]: row for row in previous["items"]}
+    if len(old) != len(previous["items"]) or len({row["id"] for row in incoming}) != len(incoming):
+        raise ValueError("duplicate registry IDs")
     merged = dict(old)
     for item in incoming:
         merged[item["id"]] = {**old.get(item["id"], {}), **item}
     # Keep historical IDs so saved configurations and past game records still resolve.
     items = [merged[key] for key in sorted(merged)]
-    if len({row["name"].casefold() for row in items}) != len(items):
-        raise ValueError("duplicate registry names")
     if merged == old:
         return previous
     return {**previous, "schema_version": 1, "version": integer(previous["version"], "registry version") + 1,

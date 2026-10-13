@@ -62,8 +62,10 @@ jobs:
 
             - 客户端版本：`${{ steps.generate.outputs.product_version }}`
             - 资源哈希：`${{ steps.generate.outputs.bundle_hash }}`
-            - 上游有效护身符：${{ steps.generate.outputs.amulet_count }} 项
-            - 上游有效印章：${{ steps.generate.outputs.badge_count }} 项
+            - 上游护身符：${{ steps.generate.outputs.amulet_count }} 项（含弃用条目及 Plus 版）
+            - 上游印章：${{ steps.generate.outputs.badge_count }} 项（含弃用条目）
+            - 保留简体中文、繁体中文、日文、英文、韩文的名称与描述，以及价格、图片名与 ID、弃用状态和稀有度。
+            - 上游未提供的价格保留为 `null`，未翻译的文本保留为空字符串。
 
             生成器离线测试和生成后的 Rust 后端测试已通过。请检查协议字段及数据差异后合并。
             本机青云之志护身符快照、图片和计分规则不在本次自动更新范围内。

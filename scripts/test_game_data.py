@@ -1,4 +1,5 @@
 """Offline regression tests for the client-data updater."""
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -44,27 +45,55 @@ class GameDataTests(unittest.TestCase):
         sources[path + "_b2.lua.bytes"] = 'r[40]=Pack({40},get)'
         self.assertEqual(updater.load_sheet(sources, "amulet/amulet_effect"), [{"id": 30}, {"id": 40}])
 
-    def test_registries_group_variants_resolve_names_and_skip_deprecated_rows(self):
-        texts = [{"id": index, "jp": index, "chs": index} for index in range(1, 4)]
+    def test_registries_preserve_all_languages_variants_and_deprecated_rows(self):
+        texts = [{"id": index, **dict.fromkeys(updater.LANGUAGES, index)} for index in range(1, 7)]
         effects = [
-            {"id": 30, "card_image": "fu_0004", "name": 1, "rarity": 2, "sell_price": 9, "upgrade": 31},
-            {"id": 31, "name": 2, "sell_price": 12},
-            {"id": 40, "deprecated": 1},
+            {"id": 30, "card_image": "fu_0004", "name": 1, "desc": 4, "rarity": 2,
+             "price": 18, "sell_price": 9, "upgrade": 31},
+            {"id": 31, "card_image": "fu_0005", "name": 2, "desc": 5, "rarity": 1,
+             "price": 24, "sell_price": 12, "deprecated": 1},
+            {"id": 40, "card_image": "fu_0006", "name": 1, "desc": 4, "rarity": 3,
+             "price": 0, "sell_price": 0, "deprecated": 1, "upgrade": None},
         ]
-        badges = [{"id": 600010, "badge_image": "badge_600010", "badge_name": 3, "rarity": 1},
-                  {"id": 600020, "deprecated": 1}]
-        sources = {updater.EXCEL + f"Langs/str_event_{lang}.lua.bytes":
-                   'local names={"護符","護符+","印"}' for lang in ("jp", "chs")}
+        badges = [{"id": 600010, "badge_image": "badge_600010", "badge_name": 3, "badge_desc": 6, "rarity": 1},
+                  {"id": 600020, "badge_image": "badge_600020", "badge_name": 3,
+                   "badge_desc": 6, "rarity": 2, "deprecated": 1}]
+        sources = {}
+        for lang in updater.LANGUAGES:
+            values = ["" if lang == "jp" else f"base-{lang}", f"plus-{lang}", f"badge-{lang}",
+                      f"<b>desc-{lang}</b>\n{{0}}", f"plus-desc-{lang}", "" if lang == "kr" else f"badge-desc-{lang}"]
+            sources[updater.EXCEL + f"Langs/str_event_{lang}.lua.bytes"] = "local texts=" + json.dumps(values, ensure_ascii=False).replace("[", "{").replace("]", "}")
         tables = {"str/event": texts, "amulet/amulet_effect": effects, "amulet/amulet_badge": badges}
         with patch.object(updater, "load_sheet", side_effect=lambda _, name: tables[name]):
             amulets, seals = updater.build_registries(sources)
-            self.assertEqual(amulets, [{"id": 3, "icon_id": 4, "name": "護符", "rarity": "ORANGE",
-                                       "sell_price": 9, "plus_name": "護符+", "plus_sell_price": 12}])
-            self.assertEqual(seals, [{"id": 600010, "icon_id": 600010, "name": "印", "rarity": "BROWN"}])
+            base, retired = amulets
+            self.assertEqual((base["id"], base["name"], base["plus_name"], base["plus_sell_price"]), (3, "base-chs", "plus-jp", 12))
+            self.assertEqual(base["metadata"], {
+                "data_id": 30, "names": {lang: "" if lang == "jp" else f"base-{lang}" for lang in updater.LANGUAGES},
+                "descriptions": {lang: f"<b>desc-{lang}</b>\n{{0}}" for lang in updater.LANGUAGES},
+                "price": 18, "sell_price": 9, "icon_name": "fu_0004.png", "icon_id": 4,
+                "deprecated": False, "rarity": "ORANGE",
+            })
+            plus = base["plus_metadata"]
+            self.assertEqual((plus["data_id"], plus["price"], plus["sell_price"], plus["icon_name"], plus["rarity"]), (31, 24, 12, "fu_0005.png", "PURPLE"))
+            self.assertEqual(plus["descriptions"]["en"], "plus-desc-en")
+            self.assertTrue(plus["deprecated"])
+            self.assertTrue(retired["metadata"]["deprecated"])
+            self.assertEqual(retired["metadata"]["sell_price"], 0)
+            self.assertEqual([seal["id"] for seal in seals], [600010, 600020])
+            self.assertEqual(seals[0]["name"], seals[1]["name"])
+            self.assertTrue(seals[1]["metadata"]["deprecated"])
+            self.assertIsNone(seals[0]["metadata"]["sell_price"])
+            self.assertIsNone(seals[0]["metadata"]["price"])
+            self.assertEqual(seals[0]["metadata"]["descriptions"]["kr"], "")
             effects[0]["rarity"] = True
             with self.assertRaises(ValueError):
                 updater.build_registries(sources)
             effects[0]["rarity"] = 2
+            texts[0]["en"] = 99
+            with self.assertRaises(ValueError):
+                updater.build_registries(sources)
+            texts[0]["en"] = 1
             effects[0]["upgrade"] = 99
             with self.assertRaises(ValueError):
                 updater.build_registries(sources)
@@ -82,6 +111,14 @@ class GameDataTests(unittest.TestCase):
         self.assertEqual(new["version"], 8)
         self.assertEqual(new["items"][1], old["items"][1])
         self.assertIs(updater.updated_registry(new, incoming, {**meta, "bundle_hash": "other"}), new)
+        incoming[0]["metadata"] = {"descriptions": {"en": "new description"}}
+        updated = updater.updated_registry(new, incoming, meta)
+        self.assertEqual(updated["version"], 9)
+        self.assertIs(updater.updated_registry(updated, incoming, meta), updated)
+        same_name = [{"id": 10, "name": "歴史", "deprecated": True}]
+        self.assertEqual(len(updater.updated_registry(old, same_name, meta)["items"]), 3)
+        with self.assertRaises(ValueError):
+            updater.updated_registry(old, incoming * 2, meta)
 
     def test_failed_validation_leaves_all_outputs_untouched(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -116,6 +153,8 @@ class GameDataTests(unittest.TestCase):
                      "Data/amulet/amulet_badge.lua.bytes", "Data/str/event_b31.lua.bytes", "Langs/str_event_jp.lua.bytes"):
             self.assertTrue(client.wanted_excel(updater.EXCEL + path))
         self.assertFalse(client.wanted_excel(updater.EXCEL + "Data/amulet/amulet_goods.lua.bytes"))
+        for lang in updater.LANGUAGES:
+            self.assertTrue(client.wanted_excel(updater.EXCEL + f"Langs/str_event_{lang}.lua.bytes"))
 
     def test_client_metadata_cannot_inject_workflow_outputs(self):
         for meta in ({"product_version": "4.0.47\nchanged=false", "bundle_hash": "a" * 40},
