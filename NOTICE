@@ -1,0 +1,6 @@
+The Unity protocol extractor in scripts/majsoul_client.py is adapted from:
+Akagi v3, Copyright 2026 Shinkuan, licensed under Apache License 2.0.
+https://github.com/SpCoGov/Akagi/tree/3df41dcf80532fce546570fe06bcfd54ce3a4ec1
+
+The extractor is modified for shanten-lens asset selection and validation.
+The Apache License 2.0 text is provided in LICENSE.

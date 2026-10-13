@@ -234,6 +234,16 @@ app/src-tauri/target/release/bundle/macos/
 app/src-tauri/target/release/bundle/dmg/
 ```
 
+## プロトコルとレジストリの自動更新
+
+`.github/workflows/auto-game-data.yml` は毎日、手動実行、または `update_available` イベントで雀魂 Unity クライアントを確認します。`proto/liqi.proto`、`backend/assets/amulets.json`、`backend/assets/badges.json` に変更があれば、固定ブランチ `feat/update-game-data` の PR を作成・更新します。自動マージは行いません。
+
+日本語名を使用し、未翻訳の場合は中国語名を使用します。既存の履歴 ID は保持し、項目が変わった場合だけレジストリのバージョンを増やします。本機ゲームの `qyzz_amulets.json`、画像、計算ルールは更新対象に含みません。
+
+ローカルでは `python -m pip install -r scripts/requirements-game-data.txt` の後、`python scripts/update_game_data.py` を実行します。既存の Unity 展開ディレクトリは `--from-raw <rawディレクトリ>` で検証できます。`--output-root <ディレクトリ>` は既存のプロトコルとレジストリを含む一時コピー用です。
+
+リポジトリの **Settings → Actions → General → Workflow permissions** で Actions による PR 作成を許可してください。`GITHUB_TOKEN` で作成された PR は追加の PR CI を起動しないため、このタスク内で生成器と生成後の Rust バックエンドをテストしてから PR を作成します。
+
 ## プロジェクトの検証
 
 Rust バックエンドのテスト：
