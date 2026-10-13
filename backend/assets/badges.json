@@ -1,36 +1,912 @@
 {
   "schema_version": 1,
-  "version": 2,
+  "version": 3,
   "items": [
-    { "id": 600010, "icon_id": 600010, "name": "濃霧の印", "rarity": "BROWN"},
-    { "id": 600020, "icon_id": 600020, "name": "口封じの印", "rarity": "BROWN"},
-    { "id": 600030, "icon_id": 600030, "name": "見通しの印", "rarity": "BROWN"},
-    { "id": 600040, "icon_id": 600040, "name": "封鎖の印", "rarity": "BROWN"},
-    { "id": 600050, "icon_id": 600050, "name": "金塊の印", "rarity": "BROWN"},
-    { "id": 600060, "icon_id": 600060, "name": "利息の印", "rarity": "BROWN"},
-    { "id": 600070, "icon_id": 600070, "name": "先導の印", "rarity": "BROWN"},
-    { "id": 600220, "icon_id": 600220, "name": "金運の印", "rarity": "BROWN"},
-    { "id": 600230, "icon_id": 600230, "name": "決闘の印", "rarity": "BROWN"},
-    { "id": 600240, "icon_id": 600240, "name": "閃光の印", "rarity": "BROWN"},
-
-    { "id": 600080, "icon_id": 600080, "name": "再生の印", "rarity": "BLUE"},
-    { "id": 600090, "icon_id": 600090, "name": "成長の印", "rarity": "BLUE"},
-    { "id": 600110, "icon_id": 600110, "name": "幸福の印", "rarity": "BLUE"},
-    { "id": 600120, "icon_id": 600120, "name": "交換の印", "rarity": "BLUE"},
-    { "id": 600130, "icon_id": 600130, "name": "忠犬の印", "rarity": "BLUE"},
-    { "id": 600140, "icon_id": 600140, "name": "植物の印", "rarity": "BLUE"},
-    { "id": 600150, "icon_id": 600150, "name": "仲良しの印", "rarity": "BLUE"},
-    { "id": 600250, "icon_id": 600250, "name": "治療の印", "rarity": "BLUE"},
-    { "id": 600260, "icon_id": 600260, "name": "博識しの印", "rarity": "BLUE"},
-    { "id": 600270, "icon_id": 600270, "name": "ソウルの印", "rarity": "BLUE"},
-    { "id": 600280, "icon_id": 600280, "name": "運命の印", "rarity": "BLUE"},
-
-    { "id": 600160, "icon_id": 600160, "name": "拡張の印", "rarity": "RED"},
-    { "id": 600180, "icon_id": 600180, "name": "こだまの印", "rarity": "RED"},
-    { "id": 600190, "icon_id": 600190, "name": "天使の印", "rarity": "RED"},
-    { "id": 600210, "icon_id": 600210, "name": "臨時の印", "rarity": "RED"},
-    { "id": 600290, "icon_id": 600290, "name": "大地の印", "rarity": "RED"},
-    { "id": 600300, "icon_id": 600300, "name": "生命の印", "rarity": "RED"},
-    { "id": 600310, "icon_id": 600310, "name": "悪魔の印", "rarity": "RED"}
-  ]
+    {
+      "id": 600010,
+      "icon_id": 600010,
+      "name": "濃霧の印",
+      "rarity": "BROWN",
+      "metadata": {
+        "data_id": 600010,
+        "names": {
+          "chs": "迷雾印章",
+          "chs_t": "迷霧印章",
+          "jp": "濃霧の印",
+          "en": "Seal of Fog",
+          "kr": "안개 도장"
+        },
+        "descriptions": {
+          "chs": "x{0}番。关卡结束时，有{1}%概率印章消失。如果没有消失，则获得x{2}番，消失概率+{3}%",
+          "chs_t": "x{0}番。關卡結束時，有{1}%概率印章消失。如果沒有消失，則獲得x{2}番，消失概率+{3}%",
+          "jp": "x{0}飜。ステージクリア時、{1}%の確率でスタンプが消滅する。消滅しなかった場合、x{2}飜獲得、消滅確率+{3}%。",
+          "en": "x{0} Han. At the end of the level, the Seal has a {1}% chance of disappearing. If it remains, gain x{2} Han and the chance of it disappearing +{3}%.",
+          "kr": "x{0}판. 스테이지 종료 시, {1}%의 확률로 도장이 소멸한다. 만약 소멸하지 않았다면 x{2}판을 획득하고 소멸 확률 +{3}%."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600010.png",
+        "icon_id": 600010,
+        "deprecated": false,
+        "rarity": "BROWN"
+      }
+    },
+    {
+      "id": 600020,
+      "icon_id": 600020,
+      "name": "口封じの印",
+      "rarity": "BROWN",
+      "metadata": {
+        "data_id": 600020,
+        "names": {
+          "chs": "禁言印章",
+          "chs_t": "禁言印章",
+          "jp": "口封じの印",
+          "en": "Seal of Silence",
+          "kr": "채금 도장"
+        },
+        "descriptions": {
+          "chs": "如果本护身符在本关卡和牌时没有生效，关卡结束时获得8星币",
+          "chs_t": "如果本護身符在本關卡和牌時沒有生效，關卡結束時獲得8星幣",
+          "jp": "このスタンプが付いたお守りが、ステージ中の各和了時に効果を発動しなかった場合、ステージクリア時に勝ち星8を獲得する。",
+          "en": "If the talisman's effect fails to trigger upon winning, get 8 Star Coins at the end of the level.",
+          "kr": "본 부적이 스테이지에서 효과가 발생하지 않았다면, 스테이지 종료 시 8스타코인을 획득한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600020.png",
+        "icon_id": 600020,
+        "deprecated": false,
+        "rarity": "BROWN"
+      }
+    },
+    {
+      "id": 600030,
+      "icon_id": 600030,
+      "name": "見通しの印",
+      "rarity": "BROWN",
+      "metadata": {
+        "data_id": 600030,
+        "names": {
+          "chs": "明目印章",
+          "chs_t": "明目印章",
+          "jp": "見通しの印",
+          "en": "Seal of Clarity",
+          "kr": "개안 도장"
+        },
+        "descriptions": {
+          "chs": "公开牌数量+3",
+          "chs_t": "公開牌數量+3",
+          "jp": "公開する牌の枚数+3枚。",
+          "en": "Opened tile count +3.",
+          "kr": "공개패 수 +3."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600030.png",
+        "icon_id": 600030,
+        "deprecated": false,
+        "rarity": "BROWN"
+      }
+    },
+    {
+      "id": 600040,
+      "icon_id": 600040,
+      "name": "封鎖の印",
+      "rarity": "BROWN",
+      "metadata": {
+        "data_id": 600040,
+        "names": {
+          "chs": "锁链印章",
+          "chs_t": "鎖鏈印章",
+          "jp": "封鎖の印",
+          "en": "Seal of Chains",
+          "kr": "사슬 도장"
+        },
+        "descriptions": {
+          "chs": "锁定3张待摸牌",
+          "chs_t": "鎖定3張待摸牌",
+          "jp": "ツモ牌を3枚ロックする。",
+          "en": "Locks 3 tiles in the Tile Wall.",
+          "kr": "남은 패 3장을 고정한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600040.png",
+        "icon_id": 600040,
+        "deprecated": false,
+        "rarity": "BROWN"
+      }
+    },
+    {
+      "id": 600050,
+      "icon_id": 600050,
+      "name": "金塊の印",
+      "rarity": "BROWN",
+      "metadata": {
+        "data_id": 600050,
+        "names": {
+          "chs": "镀金印章",
+          "chs_t": "鍍金印章",
+          "jp": "金塊の印",
+          "en": "Seal of Gold",
+          "kr": "도금 도장"
+        },
+        "descriptions": {
+          "chs": "本护身符的出售价格为初始的2倍",
+          "chs_t": "本護身符的出售價格為初始的2倍",
+          "jp": "このお守りを売却する時、売却額2倍。",
+          "en": "The selling price of the talisman is its original value x2.",
+          "kr": "본 부적의 판매 가격이 초기 가격의 2배가 된다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600050.png",
+        "icon_id": 600050,
+        "deprecated": false,
+        "rarity": "BROWN"
+      }
+    },
+    {
+      "id": 600060,
+      "icon_id": 600060,
+      "name": "利息の印",
+      "rarity": "BROWN",
+      "metadata": {
+        "data_id": 600060,
+        "names": {
+          "chs": "利息印章",
+          "chs_t": "利息印章",
+          "jp": "利息の印",
+          "en": "Seal of Interest",
+          "kr": "이자 도장"
+        },
+        "descriptions": {
+          "chs": "额外获得1份过关奖励",
+          "chs_t": "額外獲得1份過關獎勵",
+          "jp": "クリア報酬をもう1度獲得する。",
+          "en": "Level rewards +100%.",
+          "kr": "스테이지 클리어 보상 1개를 추가로 획득한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600060.png",
+        "icon_id": 600060,
+        "deprecated": false,
+        "rarity": "BROWN"
+      }
+    },
+    {
+      "id": 600070,
+      "icon_id": 600070,
+      "name": "先導の印",
+      "rarity": "BROWN",
+      "metadata": {
+        "data_id": 600070,
+        "names": {
+          "chs": "指引印章",
+          "chs_t": "指引印章",
+          "jp": "先導の印",
+          "en": "Seal of Guidance",
+          "kr": "계시 도장"
+        },
+        "descriptions": {
+          "chs": "提高护身符包中神话和传说护身符的出现概率",
+          "chs_t": "提高護身符包中神話和傳說護身符的出現概率",
+          "jp": "お守りパックからスーパーレアとウルトラレアのお守りの出現確率が上がる。",
+          "en": "Increases the chance of finding Legendary and Mythical talismans in talisman packs.",
+          "kr": "부적팩 중 신화와 전설 레어도의 부적의 출현 확률이 증가한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600070.png",
+        "icon_id": 600070,
+        "deprecated": false,
+        "rarity": "BROWN"
+      }
+    },
+    {
+      "id": 600080,
+      "icon_id": 600080,
+      "name": "再生の印",
+      "rarity": "BLUE",
+      "metadata": {
+        "data_id": 600080,
+        "names": {
+          "chs": "再生印章",
+          "chs_t": "再生印章",
+          "jp": "再生の印",
+          "en": "Seal of Regeneration",
+          "kr": "재생 도장"
+        },
+        "descriptions": {
+          "chs": "关卡结束时，随机获得1张相同品质的护身符",
+          "chs_t": "關卡結束時，隨機獲得1張相同品質的護身符",
+          "jp": "ステージクリア時、同じレア度のお守りをランダムに1枚獲得する。",
+          "en": "At the end of the level, obtain one random talisman of the same rarity.",
+          "kr": "스테이지 종료 시, 레어도가 같은 부적 1장을 랜덤으로 획득한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600080.png",
+        "icon_id": 600080,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 600090,
+      "icon_id": 600090,
+      "name": "成長の印",
+      "rarity": "BLUE",
+      "metadata": {
+        "data_id": 600090,
+        "names": {
+          "chs": "成长印章",
+          "chs_t": "成長印章",
+          "jp": "成長の印",
+          "en": "Seal of Growth",
+          "kr": "성장 도장"
+        },
+        "descriptions": {
+          "chs": "3个关卡结束时，本护身符自动升级，印章消失",
+          "chs_t": "3個關卡結束時，本護身符自動升級，印章消失",
+          "jp": "ステージを3回クリアすると、このお守りが強化される。その時、このスタンプは消滅する。",
+          "en": "After clearing 3 levels, the talisman automatically upgrades and this Seal disappears.",
+          "kr": "스테이지 3개 종료 시, 본 부적이 자동으로 레벨업하며 도장이 소멸된다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600090.png",
+        "icon_id": 600090,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 600100,
+      "icon_id": 600100,
+      "name": "生命の印",
+      "rarity": "BLUE",
+      "metadata": {
+        "data_id": 600100,
+        "names": {
+          "chs": "生命印章",
+          "chs_t": "生命印章",
+          "jp": "生命の印",
+          "en": "Seal of Life",
+          "kr": "생명 도장"
+        },
+        "descriptions": {
+          "chs": "游戏结束时，本护身符消失并视为通过关卡",
+          "chs_t": "遊戲結束時，本護身符消失並視為通過關卡",
+          "jp": "ゲームオーバーになった時、このお守りが消滅する代わりにステージクリアになる。",
+          "en": "At the end of the level, the talisman disappears, and it counts as a level clear.",
+          "kr": "게임 종료 시, 본 부적이 사라지며 스테이지 클리어가 된다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600100.png",
+        "icon_id": 600100,
+        "deprecated": true,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 600110,
+      "icon_id": 600110,
+      "name": "幸福の印",
+      "rarity": "BLUE",
+      "metadata": {
+        "data_id": 600110,
+        "names": {
+          "chs": "幸福印章",
+          "chs_t": "幸福印章",
+          "jp": "幸福の印",
+          "en": "Seal of Happiness",
+          "kr": "행복 도장"
+        },
+        "descriptions": {
+          "chs": "出售本护身符时，当前商店中展示的护身符包免费",
+          "chs_t": "出售本護身符時，當前商店中展示的護身符包免費",
+          "jp": "このお守りを売却した場合、その時展示されているお守りパックがすべて無料になる。",
+          "en": "Selling the talisman makes all talisman packs currently on display in the Shop FREE.",
+          "kr": "본 부적 판매 시, 현재 상점에서 나오는 부적팩이 무료가 된다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600110.png",
+        "icon_id": 600110,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 600120,
+      "icon_id": 600120,
+      "name": "交換の印",
+      "rarity": "BLUE",
+      "metadata": {
+        "data_id": 600120,
+        "names": {
+          "chs": "易手印章",
+          "chs_t": "易手印章",
+          "jp": "交換の印",
+          "en": "Seal of Exchange",
+          "kr": "교환 도장"
+        },
+        "descriptions": {
+          "chs": "换牌次数+1",
+          "chs_t": "換牌次數+1",
+          "jp": "入替回数+1。",
+          "en": "Tile exchanges +1.",
+          "kr": "패 교환 횟수 +1."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600120.png",
+        "icon_id": 600120,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 600130,
+      "icon_id": 600130,
+      "name": "忠犬の印",
+      "rarity": "BLUE",
+      "metadata": {
+        "data_id": 600130,
+        "names": {
+          "chs": "汪汪印章",
+          "chs_t": "汪汪印章",
+          "jp": "忠犬の印",
+          "en": "Seal of Woof",
+          "kr": "멍멍 도장"
+        },
+        "descriptions": {
+          "chs": "和牌时，有33%概率获得2星币",
+          "chs_t": "和牌時，有33%概率獲得2星幣",
+          "jp": "和了時、33%の確率で勝ち星を2獲得する。",
+          "en": "When winning, there is a 33% chance of earning 2 Star Coins.",
+          "kr": "화료 시, 33%의 확률로 2스타코인 획득."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600130.png",
+        "icon_id": 600130,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 600140,
+      "icon_id": 600140,
+      "name": "植物の印",
+      "rarity": "BLUE",
+      "metadata": {
+        "data_id": 600140,
+        "names": {
+          "chs": "绿植印章",
+          "chs_t": "綠植印章",
+          "jp": "植物の印",
+          "en": "Seal of Plants",
+          "kr": "식물 도장"
+        },
+        "descriptions": {
+          "chs": "和牌时，使随机1张牌的基础分值+5",
+          "chs_t": "和牌時，使隨機1張牌的基礎分值+5",
+          "jp": "和了時、ランダムな牌1枚のスコア+5。",
+          "en": "When winning, the basic PT of one random tile type +5.",
+          "kr": "화료 시, 랜덤 1장 패의 기본 점수 +5."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600140.png",
+        "icon_id": 600140,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 600150,
+      "icon_id": 600150,
+      "name": "仲良しの印",
+      "rarity": "BLUE",
+      "metadata": {
+        "data_id": 600150,
+        "names": {
+          "chs": "朋友印章",
+          "chs_t": "朋友印章",
+          "jp": "仲良しの印",
+          "en": "Seal of Friendship",
+          "kr": "친구 도장"
+        },
+        "descriptions": {
+          "chs": "提高自己持有护身符和印章的出现概率",
+          "chs_t": "提高自己持有護身符和印章的出現概率",
+          "jp": "自分が既に所持しているお守りおよびスタンプの出現確率が上がる。",
+          "en": "Increases the appearance rate of talismans and seals that you already own.",
+          "kr": "자신이 소유한 부적과 도장의 출현 확률이 증가한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600150.png",
+        "icon_id": 600150,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 600160,
+      "icon_id": 600160,
+      "name": "拡張の印",
+      "rarity": "RED",
+      "metadata": {
+        "data_id": 600160,
+        "names": {
+          "chs": "膨胀印章",
+          "chs_t": "膨脹印章",
+          "jp": "拡張の印",
+          "en": "Seal of Expansion",
+          "kr": "확대 도장"
+        },
+        "descriptions": {
+          "chs": "占据2个护身符槽，它的效果会触发2次",
+          "chs_t": "佔據2個護身符槽，它的效果會觸發2次",
+          "jp": "所持枠を2枠占拠する代わりに、効果が2回発動する。",
+          "en": "The talisman counts as occupying 2 talisman slots, and its effect triggers twice.",
+          "kr": "부적 2개 자리를 차지하지만, 효과가 2번 발동한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600160.png",
+        "icon_id": 600160,
+        "deprecated": false,
+        "rarity": "RED"
+      }
+    },
+    {
+      "id": 600170,
+      "icon_id": 600170,
+      "name": "伝導の印",
+      "rarity": "RED",
+      "metadata": {
+        "data_id": 600170,
+        "names": {
+          "chs": "传导印章",
+          "chs_t": "傳導印章",
+          "jp": "伝導の印",
+          "en": "Seal of Conduction",
+          "kr": "전도 도장"
+        },
+        "descriptions": {
+          "chs": "如果左侧相邻护身符的效果在和牌时被触发，本护身符同步触发1次",
+          "chs_t": "如果左側相鄰護身符的效果在和牌時被觸發，本護身符同步觸發1次",
+          "jp": "和了時、左隣のお守りが効果を発動した場合、このお守りの効果も1度発動する。",
+          "en": "If the effect of its left talisman triggers upon winning, this talisman's effect will also trigger once.",
+          "kr": "화료 시, 왼쪽에 인접한 부적의 효과가 발동했다면 본 부적도 함께 발동한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600170.png",
+        "icon_id": 600170,
+        "deprecated": true,
+        "rarity": "RED"
+      }
+    },
+    {
+      "id": 600180,
+      "icon_id": 600180,
+      "name": "こだまの印",
+      "rarity": "RED",
+      "metadata": {
+        "data_id": 600180,
+        "names": {
+          "chs": "回响印章",
+          "chs_t": "回響印章",
+          "jp": "こだまの印",
+          "en": "Seal of Echoes",
+          "kr": "에코 도장"
+        },
+        "descriptions": {
+          "chs": "关卡开始时，获得1张本护身符的完全版复制（关卡结束时消失）",
+          "chs_t": "關卡開始時，獲得1張本護身符的完全版複製（關卡結束時消失）",
+          "jp": "ステージ開始時、このお守りのコピーを獲得する。（コピーされたお守りは、ステージクリア時に消滅する）",
+          "en": "At the start of the level, obtain a full copy of the talisman (the copy disappears at the end of the level).",
+          "kr": "스테이지 시작 시, 부적 1장의 완전 복제본을 획득한다. (스테이지 종료 시 소멸)"
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600180.png",
+        "icon_id": 600180,
+        "deprecated": false,
+        "rarity": "RED"
+      }
+    },
+    {
+      "id": 600190,
+      "icon_id": 600190,
+      "name": "天使の印",
+      "rarity": "RED",
+      "metadata": {
+        "data_id": 600190,
+        "names": {
+          "chs": "天使印章",
+          "chs_t": "天使印章",
+          "jp": "天使の印",
+          "en": "Seal of Angels",
+          "kr": "천사 도장"
+        },
+        "descriptions": {
+          "chs": "本护身符获得效果时，效果量加倍",
+          "chs_t": "本護身符獲得效果時，效果量加倍",
+          "jp": "このお守りが効果を獲得する時、獲得する効果の量が2倍になる。",
+          "en": "When the talisman gains an effect, the effect value is doubled.",
+          "kr": "본 부적이 효과 획득 시, 효과량이 두 배가 된다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600190.png",
+        "icon_id": 600190,
+        "deprecated": false,
+        "rarity": "RED"
+      }
+    },
+    {
+      "id": 600200,
+      "icon_id": 600200,
+      "name": "王牌の印",
+      "rarity": "RED",
+      "metadata": {
+        "data_id": 600200,
+        "names": {
+          "chs": "王牌印章",
+          "chs_t": "王牌印章",
+          "jp": "王牌の印",
+          "en": "Seal of Ace",
+          "kr": "제왕 도장"
+        },
+        "descriptions": {
+          "chs": "本护身符被放置在最右侧时，和牌时将无视条件直接触发效果",
+          "chs_t": "本護身符被放置在最右側時，和牌時將無視條件直接觸發效果",
+          "jp": "このお守りが一番右に配置される場合、発動条件を無視して和了時に効果を発動する。",
+          "en": "When the talisman is placed in the rightmost slot, its effect triggers unconditionally upon winning.",
+          "kr": "본 부적이 제일 오른쪽에 위치한다면, 화료 시에 무조건 효과가 발동한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600200.png",
+        "icon_id": 600200,
+        "deprecated": true,
+        "rarity": "RED"
+      }
+    },
+    {
+      "id": 600210,
+      "icon_id": 600210,
+      "name": "臨時の印",
+      "rarity": "RED",
+      "metadata": {
+        "data_id": 600210,
+        "names": {
+          "chs": "临时印章",
+          "chs_t": "臨時印章",
+          "jp": "臨時の印",
+          "en": "Echoed Seal",
+          "kr": "임시 도장"
+        },
+        "descriptions": {
+          "chs": "关卡结束时，使本护身符消失（无法被其他效果影响）",
+          "chs_t": "關卡結束時，使本護身符消失（無法被其他效果影響）",
+          "jp": "このお守りはステージクリア時に消滅する。このスタンプの効果は、他の効果によって上書き・無効化されない。",
+          "en": "The talisman disappears at the end of the level (cannot be changed or removed by other effects).",
+          "kr": "스테이지 종료 시 소멸. (다른 효과와 중첩되거나 삭제할 수 없음)"
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600210.png",
+        "icon_id": 600210,
+        "deprecated": false,
+        "rarity": "RED"
+      }
+    },
+    {
+      "id": 600220,
+      "icon_id": 600220,
+      "name": "金運の印",
+      "rarity": "BROWN",
+      "metadata": {
+        "data_id": 600220,
+        "names": {
+          "chs": "来财印章",
+          "chs_t": "來財印章",
+          "jp": "金運の印",
+          "en": "Seal of Fortune",
+          "kr": "부자 도장"
+        },
+        "descriptions": {
+          "chs": "每打出1张万子牌时，获得1星币",
+          "chs_t": "每打出1張萬子牌時，獲得1星幣",
+          "jp": "萬子の牌を1枚打つ度に、勝ち星を1獲得する。",
+          "en": "Gain 1 Star Coin for every Man tile discarded.",
+          "kr": "만수패를 1장 버릴 때마다, 1 스타코인 획득한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600220.png",
+        "icon_id": 600220,
+        "deprecated": false,
+        "rarity": "BROWN"
+      }
+    },
+    {
+      "id": 600230,
+      "icon_id": 600230,
+      "name": "決闘の印",
+      "rarity": "BROWN",
+      "metadata": {
+        "data_id": 600230,
+        "names": {
+          "chs": "决斗印章",
+          "chs_t": "決鬥印章",
+          "jp": "決闘の印",
+          "en": "Seal of Combat",
+          "kr": "결투 도장"
+        },
+        "descriptions": {
+          "chs": "苦战：x5番",
+          "chs_t": "苦戰：x5番",
+          "jp": "苦戦時:x5飜。",
+          "en": "Fierce Battle: x5 Han.",
+          "kr": "고전: x5판"
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600230.png",
+        "icon_id": 600230,
+        "deprecated": false,
+        "rarity": "BROWN"
+      }
+    },
+    {
+      "id": 600240,
+      "icon_id": 600240,
+      "name": "閃光の印",
+      "rarity": "BROWN",
+      "metadata": {
+        "data_id": 600240,
+        "names": {
+          "chs": "闪光印章",
+          "chs_t": "閃光印章",
+          "jp": "閃光の印",
+          "en": "Seal of Radiance",
+          "kr": "섬광 도장"
+        },
+        "descriptions": {
+          "chs": "关卡开始时，额外翻开1张宝牌指示牌（最多10张）",
+          "chs_t": "關卡開始時，額外翻開1張寶牌指示牌（最多10張）",
+          "jp": "ステージ開始時、追加でドラ表示牌を1枚めくる。",
+          "en": "At the start of the level, reveal 1 extra Dora indicator (up to 10 total).",
+          "kr": "스테이시 시작 시, 도라표시패 1장을 추가로 공개한다(최대 10장)."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600240.png",
+        "icon_id": 600240,
+        "deprecated": false,
+        "rarity": "BROWN"
+      }
+    },
+    {
+      "id": 600250,
+      "icon_id": 600250,
+      "name": "治療の印",
+      "rarity": "BLUE",
+      "metadata": {
+        "data_id": 600250,
+        "names": {
+          "chs": "治疗印章",
+          "chs_t": "治療印章",
+          "jp": "治療の印",
+          "en": "Seal of Healing",
+          "kr": "치료 도장"
+        },
+        "descriptions": {
+          "chs": "关卡结束时，恢复3点生命值",
+          "chs_t": "關卡結束時，恢復3點生命值",
+          "jp": "ステージ終了時、体力を3回復する。",
+          "en": "At the end of the level, restore 3 HP.",
+          "kr": "스테이지 종료 시, 체력을 3점 회복한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600250.png",
+        "icon_id": 600250,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 600260,
+      "icon_id": 600260,
+      "name": "博識の印",
+      "rarity": "BLUE",
+      "metadata": {
+        "data_id": 600260,
+        "names": {
+          "chs": "博识印章",
+          "chs_t": "博識印章",
+          "jp": "博識の印",
+          "en": "Seal of Knowledge",
+          "kr": "박식 도장"
+        },
+        "descriptions": {
+          "chs": "关卡开始时，尽可能将1张字牌加入手牌",
+          "chs_t": "關卡開始時，儘可能將1張字牌加入手牌",
+          "jp": "ステージ開始時、手牌の中の数牌1枚を強制的に牌山の字牌と交換する。",
+          "en": "At the start of the level, automatically swap 1 number tile in your hand for an Honor tile from the Tile Pool.",
+          "kr": "스테이지 시작 시, 손패에 있는 수패 1장을 패 창고의 자패 1장과 강제로 교환한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600260.png",
+        "icon_id": 600260,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 600270,
+      "icon_id": 600270,
+      "name": "ソウルの印",
+      "rarity": "BLUE",
+      "metadata": {
+        "data_id": 600270,
+        "names": {
+          "chs": "灵魂印章",
+          "chs_t": "靈魂印章",
+          "jp": "ソウルの印",
+          "en": "Seal of Souls",
+          "kr": "영혼 도장"
+        },
+        "descriptions": {
+          "chs": "和牌时，本印章获得每张魂牌额外+1番的效果（当前每张魂牌{0}番）",
+          "chs_t": "和牌時，本印章獲得每張魂牌額外+1番的效果（當前每張魂牌{0}番）",
+          "jp": "和了時、魂牌1枚につき+1飜（現在は{0}飜）。",
+          "en": "Upon winning, each Soul tile grants an additional +1 Han (currently +{0} Han per Soul tile).",
+          "kr": "화료 시, 보유한 혼패 1장당 +1판을 추가 획득한다(현재 혼패 1장당 {0}판)."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600270.png",
+        "icon_id": 600270,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 600280,
+      "icon_id": 600280,
+      "name": "運命の印",
+      "rarity": "BLUE",
+      "metadata": {
+        "data_id": 600280,
+        "names": {
+          "chs": "命运印章",
+          "chs_t": "命運印章",
+          "jp": "運命の印",
+          "en": "Seal of Fate",
+          "kr": "명운 도장"
+        },
+        "descriptions": {
+          "chs": "强化转盘与交易事件中的正面效果",
+          "chs_t": "強化轉盤與交易事件中的正面效果",
+          "jp": "イベント「ルーレット」と「物々交換」での有利効果を強化する。",
+          "en": "Enhances positive effects in Lucky Wheel and Trade events.",
+          "kr": "룰렛 및 무역에서 발생하는 유리한 효과를 강화한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600280.png",
+        "icon_id": 600280,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 600290,
+      "icon_id": 600290,
+      "name": "大地の印",
+      "rarity": "RED",
+      "metadata": {
+        "data_id": 600290,
+        "names": {
+          "chs": "大地印章",
+          "chs_t": "大地印章",
+          "jp": "大地の印",
+          "en": "Seal of Earth",
+          "kr": "대지 도장"
+        },
+        "descriptions": {
+          "chs": "和牌时，所有生效的役种在本轮游戏中的基础番数+1",
+          "chs_t": "和牌時，所有生效的役種在本輪遊戲中的基礎番數+1",
+          "jp": "今回の挑戦中、和了時に達成した役の基礎飜数+1。",
+          "en": "Upon winning, all scored yaku permanently gain +1 base Han for the rest of this run.",
+          "kr": "화료 시, 이번 게임에서 적용된 모든 역의 기본 판수에 +1 추가한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600290.png",
+        "icon_id": 600290,
+        "deprecated": false,
+        "rarity": "RED"
+      }
+    },
+    {
+      "id": 600300,
+      "icon_id": 600300,
+      "name": "生命の印",
+      "rarity": "RED",
+      "metadata": {
+        "data_id": 600300,
+        "names": {
+          "chs": "生命印章",
+          "chs_t": "生命印章",
+          "jp": "生命の印",
+          "en": "Seal of Vitality",
+          "kr": "생명 도장"
+        },
+        "descriptions": {
+          "chs": "抵消1次在关卡中受到的致命伤害，生效后本印章和护身符消失",
+          "chs_t": "抵消1次在關卡中受到的致命傷害，生效后本印章和護身符消失",
+          "jp": "ステージ中で致命的なダメージを受けた際、1度だけ無効化する。発動後、このスタンプとお守りは消滅する。",
+          "en": "Negates one instance of fatal DMG taken during the level. When triggered, this seal and talisman disappear.",
+          "kr": "스테이지에서 받은 치명적인 피해를 1회 무효화한다. 효과가 발동하면 도장과 부적은 소멸한다."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600300.png",
+        "icon_id": 600300,
+        "deprecated": false,
+        "rarity": "RED"
+      }
+    },
+    {
+      "id": 600310,
+      "icon_id": 600310,
+      "name": "悪魔の印",
+      "rarity": "RED",
+      "metadata": {
+        "data_id": 600310,
+        "names": {
+          "chs": "恶魔印章",
+          "chs_t": "惡魔印章",
+          "jp": "悪魔の印",
+          "en": "Seal of the Demon",
+          "kr": "악마 도장"
+        },
+        "descriptions": {
+          "chs": "和牌时，额外触发本护身符1次效果并受到2点伤害（生命不足时不生效）",
+          "chs_t": "和牌時，額外觸發本護身符1次效果並受到2點傷害（生命不足時不生效）",
+          "jp": "和了時、追加でお守り効果を1回発動し、2ダメージを受ける（体力不足の場合は発動しない）",
+          "en": "Upon winning, trigger this talisman's effect an extra time and take 2 DMG (does not activate if HP is insufficient).",
+          "kr": "화료 시, 부적 효과가 1회 추가 발동하며 2점의 피해를 입는다(체력 부족시 미발동)."
+        },
+        "price": null,
+        "sell_price": null,
+        "icon_name": "badge_600310.png",
+        "icon_id": 600310,
+        "deprecated": false,
+        "rarity": "RED"
+      }
+    }
+  ],
+  "source": {
+    "client_url": "https://game.maj-soul.com/1/",
+    "product_version": "4.0.47",
+    "bundle_hash": "32a94aec59119f2bc06bb675989674a810cdeaa7",
+    "issuer": "chs_t",
+    "name_language": "jp"
+  }
 }
