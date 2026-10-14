@@ -109,6 +109,10 @@ pub struct RegistryAmulet {
     metadata: Option<RegistryMetadata>,
     #[serde(skip_serializing_if = "Option::is_none")]
     plus_metadata: Option<RegistryMetadata>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    names: Option<RegistryTranslations>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    plus_names: Option<RegistryTranslations>,
 }
 
 #[allow(dead_code)]

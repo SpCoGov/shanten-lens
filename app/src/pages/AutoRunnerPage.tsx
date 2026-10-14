@@ -308,7 +308,8 @@ export default function AutoRunnerPage() {
         if (target.kind === "amulet") {
             const rawId = target.id * 10 + (target.plus ? 1 : 0);
             const effectItem = {id: rawId, volume: 1, badge: target.badge != null ? {id: target.badge} : undefined} as any;
-            const amuletName = amuletById.get(target.id)?.name ?? `ID ${target.id}`;
+            const amulet = amuletById.get(target.id);
+            const amuletName = target.plus && amulet?.plus_name ? amulet.plus_name : `${amulet?.name ?? `ID ${target.id}`}${target.plus ? "+" : ""}`;
             const badgeName = target.badge != null ? (badgeById.get(target.badge)?.name ?? String(target.badge)) : t("autorun.target_any_badge");
 
             return (
@@ -323,7 +324,7 @@ export default function AutoRunnerPage() {
                     <div className="target-card-main">
                         <AmuletCard item={effectItem} scale={0.7}/>
                         <div className="target-card-copy">
-                            <div><b>{t("autorun.target_amulet_label")}</b>{`：${amuletName}${target.plus ? "+" : ""}`}</div>
+                            <div><b>{t("autorun.target_amulet_label")}</b>{`：${amuletName}`}</div>
                             <div><b>{t("autorun.target_badge_label")}</b>{`：${badgeName}`}</div>
                         </div>
                     </div>
@@ -358,8 +359,9 @@ export default function AutoRunnerPage() {
     const detailTitle = React.useMemo(() => {
         if (!detailTarget) return "";
         if (detailTarget.kind === "amulet") {
-            const amuletName = amuletById.get(detailTarget.id)?.name ?? `ID ${detailTarget.id}`;
-            return t("autorun.target_judge_title", {name: `${amuletName}${detailTarget.plus ? "+" : ""}`});
+            const amulet = amuletById.get(detailTarget.id);
+            const amuletName = detailTarget.plus && amulet?.plus_name ? amulet.plus_name : `${amulet?.name ?? `ID ${detailTarget.id}`}${detailTarget.plus ? "+" : ""}`;
+            return t("autorun.target_judge_title", {name: amuletName});
         }
         return t("autorun.target_judge_title", {name: badgeById.get(detailTarget.id)?.name ?? `ID ${detailTarget.id}`});
     }, [detailTarget, amuletById, badgeById, t]);
@@ -429,7 +431,8 @@ export default function AutoRunnerPage() {
                 {effectList.map((item, idx) => {
                     const rawId = Number(item?.id ?? 0);
                     const regId = Math.floor(rawId / 10);
-                    const amuletName = amuletById.get(regId)?.name ?? `ID ${regId || rawId}`;
+                    const amulet = amuletById.get(regId);
+                    const amuletName = (rawId % 10 === 1 ? amulet?.plus_name : amulet?.name) ?? amulet?.name ?? `ID ${regId || rawId}`;
                     return (
                         <div key={`${record.seq}-${item?.uid ?? idx}`} style={{display: "grid", gap: 6, justifyItems: "center", minWidth: 0}}>
                             <AmuletCard item={item} scale={0.56}/>
@@ -466,7 +469,8 @@ export default function AutoRunnerPage() {
     const candidateLabel = React.useCallback((item: Record<string, unknown>) => {
         const rawId = Number(item.raw_id ?? item.selected_raw_id ?? item.id ?? 0);
         const regId = Number(item.reg_id ?? (rawId > 0 ? Math.floor(rawId / 10) : 0));
-        const amuletName = amuletById.get(regId)?.name ?? `ID ${regId || rawId || "-"}`;
+        const amulet = amuletById.get(regId);
+        const amuletName = (rawId % 10 === 1 ? amulet?.plus_name : amulet?.name) ?? amulet?.name ?? `ID ${regId || rawId || "-"}`;
         const badgeId = Number(item.badge_id ?? item.selected_badge_id ?? item.badgeId ?? 0);
         const badgeName = badgeId > 0 ? (badgeById.get(badgeId)?.name ?? String(badgeId)) : t("autorun.target_any_badge");
         return `${amuletName} / ${badgeName}`;
