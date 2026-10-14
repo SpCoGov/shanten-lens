@@ -38,7 +38,22 @@ impl Services {
         let mut registry = self.registry.lock().unwrap().clone();
         if source == Some(DataSource::Qyzz) {
             registry["source"] = json!("qyzz");
-            registry["amulets"] = QYZZ_AMULETS.clone();
+            let mut amulets = QYZZ_AMULETS.clone();
+            for amulet in amulets.as_array_mut().unwrap() {
+                let Some(upstream) = registry["amulets"].as_array().and_then(|rows| rows.iter().find(|row| row["id"] == amulet["id"])) else {
+                    continue;
+                };
+                for (metadata, output, original) in [("metadata", "names", "name"), ("plus_metadata", "plus_names", "plus_name")] {
+                    if !amulet[original].is_string() {
+                        continue;
+                    }
+                    if let Some(mut names) = upstream[metadata]["names"].as_object().cloned() {
+                        names.insert("chs".into(), amulet[original].clone());
+                        amulet[output] = Value::Object(names);
+                    }
+                }
+            }
+            registry["amulets"] = amulets;
         }
         registry
     }
@@ -127,6 +142,9 @@ fn valid_registry(value: &Value, kind: &str) -> bool {
                         && details["rarity"].as_str().is_some_and(|rarity| allowed_rarities.contains(&rarity))
                 })
             })
+            && ["names", "plus_names"].iter().all(|key| {
+                row.get(*key).is_none_or(|names| serde_json::from_value::<crate::ipc::RegistryTranslations>(names.clone()).is_ok())
+            })
     })
 }
 
@@ -140,6 +158,35 @@ fn write_registry(path: &Path, value: &Value) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn qyzz_borrows_translated_names_without_replacing_custom_catalog_data() {
+        let root = std::env::temp_dir().join(format!("lens-registry-names-{}", std::process::id()));
+        let (events, _) = tokio::sync::broadcast::channel(16);
+        let services = Services::load(root.join("configs"), events).unwrap();
+        let names = json!({"chs": "upstream-zh", "chs_t": "upstream-tw", "jp": "upstream-ja", "en": "upstream-en", "kr": ""});
+        let packet = json!({"amulets": [{"id": 167, "name": "upstream", "icon_id": 1, "rarity": "GRAY", "sell_price": 999,
+            "metadata": {"names": names}, "plus_metadata": {"names": names}}], "badges": []});
+        *services.registry.lock().unwrap() = packet.clone();
+        let local = services.registry_for_source(Some(DataSource::Qyzz));
+        let row = local["amulets"].as_array().unwrap().iter().find(|row| row["id"] == 167).unwrap();
+        let original = QYZZ_AMULETS.as_array().unwrap().iter().find(|row| row["id"] == 167).unwrap();
+        for key in ["name", "plus_name", "sell_price", "plus_sell_price", "icon_id", "rarity"] {
+            assert_eq!(row[key], original[key]);
+        }
+        assert_eq!(row["names"]["chs"], original["name"]);
+        assert_eq!(row["plus_names"]["chs"], original["plus_name"]);
+        assert_eq!(row["names"]["jp"], "upstream-ja");
+        assert_eq!(row["plus_names"]["en"], "upstream-en");
+        assert!(row["metadata"].is_null());
+        let mut invalid = json!({"schema_version": 1, "items": [row]});
+        assert!(valid_registry(&invalid, "amulets"));
+        invalid["items"][0]["names"]["kr"] = json!(42);
+        assert!(!valid_registry(&invalid, "amulets"));
+        assert_eq!(services.registry_for_source(None), packet);
+        let typed: crate::ipc::RegistryPayload = serde_json::from_value(local.clone()).unwrap();
+        assert_eq!(serde_json::to_value(typed).unwrap(), local);
+    }
 
     #[test]
     fn multilingual_metadata_survives_ipc_and_duplicate_names_use_distinct_ids() {

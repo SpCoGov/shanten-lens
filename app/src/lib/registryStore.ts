@@ -1,11 +1,13 @@
 import { useSyncExternalStore } from "react";
+import i18n from "i18next";
 import type {GameStateData} from "./gamestate";
-import type {RegistryMetadata} from "../bindings";
+import type {RegistryMetadata, RegistryTranslations} from "../bindings";
 
 export type Amulet = {
     id: number; icon_id: number; name: string; rarity: "GREEN"|"BLUE"|"ORANGE"|"PURPLE"|"GRAY";
     plus_name?: string; sell_price?: number; plus_sell_price?: number;
     metadata?: RegistryMetadata | null; plus_metadata?: RegistryMetadata | null;
+    names?: RegistryTranslations | null; plus_names?: RegistryTranslations | null;
 };
 export type Badge  = { id: number; icon_id: number; name: string; rarity: "BROWN"|"BLUE"|"RED"; metadata?: RegistryMetadata | null };
 
@@ -30,16 +32,28 @@ let state: State = {
     amuletById: new Map(),
     badgeById: new Map(),
 };
+let payload: RegistryPayload = { amulets: [], badges: [] };
 
 const subs = new Set<() => void>();
 const emit = () => subs.forEach(fn => fn());
 
 function buildMaps(next: RegistryPayload): State {
+    const language = (i18n.resolvedLanguage || i18n.language || "zh-CN").replace(/_/g, "-").toLowerCase();
+    const key: keyof RegistryMetadata["names"] = language.startsWith("zh")
+        ? /^zh-(?:tw|hk|mo|hant)(?:-|$)/.test(language) ? "chs_t" : "chs"
+        : language.startsWith("ja") ? "jp" : language.startsWith("ko") ? "kr" : language.startsWith("en") ? "en" : "chs";
+    const name = (names: RegistryTranslations | null | undefined, fallback: string) => names?.[key]?.trim() || fallback;
+    const amulets = next.amulets.map((amulet) => ({
+        ...amulet,
+        name: name(amulet.names ?? amulet.metadata?.names, amulet.name),
+        plus_name: name(amulet.plus_names ?? amulet.plus_metadata?.names, amulet.plus_name ?? "") || undefined,
+    }));
+    const badges = next.badges.map((badge) => ({ ...badge, name: name(badge.metadata?.names, badge.name) }));
     const amuletById = new Map<number, Amulet>();
     const badgeById  = new Map<number, Badge>();
-    for (const a of next.amulets) amuletById.set(a.id, a);
-    for (const b of next.badges)  badgeById.set(b.id, b);
-    return { amulets: next.amulets, badges: next.badges, amuletById, badgeById };
+    for (const a of amulets) amuletById.set(a.id, a);
+    for (const b of badges)  badgeById.set(b.id, b);
+    return { amulets, badges, amuletById, badgeById };
 }
 
 function saveToLS(next: RegistryPayload) {
@@ -56,11 +70,20 @@ function loadFromLS(): RegistryPayload | null {
 }
 
 const cached = loadFromLS();
-if (cached) state = buildMaps(cached);
-
-export function setRegistry(payload: RegistryPayload) {
+if (cached) {
+    payload = cached;
     state = buildMaps(payload);
-    if (payload.source !== "qyzz") saveToLS(payload);
+}
+
+i18n.on("languageChanged", () => {
+    state = buildMaps(payload);
+    emit();
+});
+
+export function setRegistry(next: RegistryPayload) {
+    payload = next;
+    state = buildMaps(next);
+    if (next.source !== "qyzz") saveToLS(next);
     emit();
 }
 

@@ -97,7 +97,7 @@ export default function AmuletEditorModal({
                                 className="hint"
                                 style={{fontSize: 12, display: "inline-flex", alignItems: "center"}}
                             >
-                                {amuletId != null ? (reg ? ` ${reg.name}` : t("amulet_editor.unknownId")) : t("amulet_editor.notSelected")}
+                                {amuletId != null ? (reg ? ` ${plus ? reg.plus_name ?? reg.name : reg.name}` : t("amulet_editor.unknownId")) : t("amulet_editor.notSelected")}
                             </span>
                         </div>
                     </div>

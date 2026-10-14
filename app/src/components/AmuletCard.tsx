@@ -131,7 +131,7 @@ export default function AmuletCard({
             {!unknown && iconPath && (
                 <img
                     src={iconPath}
-                    alt={amu!.name}
+                    alt={plus ? amu!.plus_name ?? amu!.name : amu!.name}
                     style={{
                         position: "absolute",
                         inset: ICON_INSET,
