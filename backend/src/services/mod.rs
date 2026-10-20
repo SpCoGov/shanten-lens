@@ -1,6 +1,5 @@
 //! Shared configuration, game state, packet records and UI events.
 mod config;
-mod game_record;
 mod game_state;
 mod packets;
 mod registry;
@@ -39,7 +38,6 @@ pub struct Services {
     // ponytail: Serialize file writes for ordering; use a writer queue if disk I/O delays packets.
     packet_recording: Arc<Mutex<Option<PacketRecording>>>,
     registry: Arc<Mutex<Value>>,
-    game_record_override: Arc<Mutex<Option<Value>>>,
     confirmations: Arc<Mutex<std::collections::HashMap<String, mpsc::Sender<bool>>>>,
     next_confirmation: Arc<AtomicU64>,
     pub events: broadcast::Sender<Value>,
@@ -79,7 +77,6 @@ impl Services {
             packet_log_file: Arc::new(packet_log_file),
             packet_recording: Arc::new(Mutex::new(None)),
             registry: Arc::new(Mutex::new(registry)),
-            game_record_override: Arc::new(Mutex::new(None)),
             confirmations: Arc::new(Mutex::new(std::collections::HashMap::new())),
             next_confirmation: Arc::new(AtomicU64::new(1)),
             events,

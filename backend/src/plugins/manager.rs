@@ -449,6 +449,14 @@ impl PluginManager {
         Ok(())
     }
 
+    pub fn injection_source(&self, id: &str, module_id: &str, method: &str) -> anyhow::Result<String> {
+        let plugins = self.plugins.lock().unwrap();
+        let plugin = plugins.get(id).ok_or_else(|| anyhow::anyhow!("unknown plugin: {id}"))?;
+        anyhow::ensure!(plugin.choice.enabled, "plugin is disabled");
+        let provider = plugin.provider.as_ref().ok_or_else(|| anyhow::anyhow!("plugin has no running backend provider"))?;
+        provider.core.injection_source(module_id, method).map_err(anyhow::Error::msg)
+    }
+
     pub fn invoke(&self, id: &str, method: &str, params: Value) -> anyhow::Result<Value> {
         anyhow::ensure!(!method.trim().is_empty(), "plugin method cannot be empty");
         let plugins = self.plugins.lock().unwrap();

@@ -10,7 +10,6 @@ use std::{
 };
 
 pub const REPLAY_INJECTOR: &str = "replay_injector";
-pub const GAME_RECORD: &str = "game_record";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
@@ -148,7 +147,7 @@ impl PacketModuleInfo {
                 .any(|subscription| subscription.matches(packet))
     }
 
-    fn allows(&self, packet: &Packet, operation: PacketOperation) -> bool {
+    pub(crate) fn allows(&self, packet: &Packet, operation: PacketOperation) -> bool {
         self.online
             && self.subscriptions.iter().any(|subscription| {
                 subscription.selector_matches(packet)
@@ -391,7 +390,6 @@ impl Default for PipelineConfig {
             modules: vec![
                 module(REPLAY_INJECTOR),
                 module("method_filter"),
-                module(GAME_RECORD),
                 module("packet_logger"),
                 module("game_state"),
                 module("unlock_illustrated_book"),

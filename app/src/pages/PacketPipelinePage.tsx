@@ -23,7 +23,6 @@ const FALLBACK: PipelineConfig = {
     modules: [
         {id: "replay_injector", enabled: true, options: {}},
         {id: "method_filter", enabled: true, options: {bypass_methods: [".lq.Route.heartbeat"]}},
-        {id: "game_record", enabled: true, options: {}},
         {id: "packet_logger", enabled: true, options: {}},
         {id: "game_state", enabled: true, options: {}},
         {id: "unlock_illustrated_book", enabled: true, options: {}},

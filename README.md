@@ -31,22 +31,6 @@ Shanten Lens 是一款面向《雀魂》青云之志模式的桌面辅助工具�
 - [常见问题](#常见问题)
 - [许可](#许可)
 
-## 连接本地青云之志项目
-
-本版本支持直接连接 `D:/qyzz` 游戏：打开两边的新版程序，在游戏设置的“辅助设置”中开启“连接向听镜”，然后开始或继续游戏。底部出现“已连接本机青云之志”后，原有花火指导、万象指导、分数计算器与换牌序列会读取当前局。执行序列会实际换牌，并由游戏校验版本、保存和播放动画。
-
-该接入不需要代理或证书。连接仅限同一台电脑，自动读取连接文件中的临时端口和随机连接令牌：Windows 为 `%LOCALAPPDATA%/Qyzz/shanten-lens.json`，macOS 为 `~/Library/Application Support/Qyzz/shanten-lens.json`（需要游戏与向听镜两端均更新到支持 Mac 本机发现的版本，并使用同一个系统用户运行）；再次点击游戏连接按钮或退出游戏即可断开。若同时收到本机游戏和原版封包流水线的数据，会显示全屏“数据源冲突”动画，选择其中一个来源后继续。未选来源的状态单独缓存，封包继续转发，但暂停其流水线模块和操作；来源变化会停止自动操作并清除旧换牌方案。断开一个来源后自动使用另一个，再次同时连接时重新选择。
-
-支持读取完整牌山、换牌堆、手牌、杠、宝牌、魂牌、护身符成长和印章；操作支持换牌、结束换牌、出牌、暗杠。其他功能中的原版协议操作暂不转发到本地游戏。计算器仍使用向听镜自身规则，未声称与本地游戏所有自定义计分完全相同。
-
-花火指导的“一键执行方案”支持换牌后继续两杠或三杠及打牌。最后一次换牌使游戏自动进入出牌阶段时直接继续；仍在换牌阶段时才发送结束换牌请求。
-
-构建本版本：在 `app` 目录运行 `pnpm exec tauri build --no-bundle`，启动 `app/src-tauri/target/release/shanten-lens.exe`。普通旧版程序不包含此接口。
-
-接入回归测试：后端 `cargo test -p shanten-backend --lib`；计算器在 `app` 目录运行 `node scripts/qyzz-score.test.mjs D:/qyzz/test-output/lens-state.json`（先运行游戏的 `tests/lens_bridge_test.gd` 生成数据）。真实双进程换牌测试的启动方法见游戏 README 中的“连接向听镜”。
-
-完整方案的双进程测试：先编译后端测试，在游戏目录启动 `tests/lens_bridge_test.gd -- --serve-lens-test --hanabi-fixture`；追加 `--last-exchange` 可覆盖换牌次数耗尽，追加 `--three-quads` 切换三杠构筑。测试进程设置 `QYZZ_TEST_DISCOVERY=D:/qyzz/test-output/lens-discovery.json`、`QYZZ_TEST_ROOT` 为独立临时目录、`QYZZ_TEST_FULL_PLAN=2` 或 `3`，运行 `cargo test -p shanten-backend real_qyzz_connection_search_and_exchange -- --ignored --nocapture`。这会验证真实游戏中的换牌、结束换牌、杠牌及打牌；不设置 `QYZZ_TEST_FULL_PLAN` 则只验证换牌。
-
 ## 使用须知
 
 本项目仅用于教育和研究。第三方辅助、自动化和修改通信可能违反游戏服务条款，并可能导致账号限制。使用者应自行了解并承担相关风险。
@@ -235,7 +219,7 @@ app/src-tauri/target/release/bundle/nsis/
 
 GitHub Releases 同时提供 NSIS 安装包和 `shanten-lens_<版本>_windows_x64_portable.zip`。便携版解压后运行 `shanten-lens.exe`，使用默认配置单独构建，不嵌入自动更新公钥，后续版本需手动下载替换；不会在退出时自动安装 NSIS 更新。
 
-正式安装版启动后自动检查并下载更新，签名验证通过后，在用户关闭向听镜时静默安装，下次打开即为新版。下载期间关闭程序会直接退出，下次启动重新下载，不会安装未完成的包。设置中可以关闭下次启动时的自动更新；更新窗口可以忽略已下载的版本。配置、证书和插件仍保存在原有应用数据目录中。
+正式安装版启动后自动检查并下载更新，签名验证通过后立即静默安装，并由安装器自动重启新版向听镜。手动检查更新后点击“自动更新”也会执行下载、验证、安装和重启。下载期间关闭程序会直接退出，下次启动重新下载，不会安装未完成的包。设置中可以关闭下次启动时的自动更新；更新窗口可以在开始下载前忽略版本。配置、证书和插件仍保存在原有应用数据目录中。
 
 旧版需要手动安装一次新的 `*-setup.exe`。原 MSI 用户建议先通过 Windows 卸载旧程序，再安装新版本，避免两套安装记录；保留应用数据。之后无需手动下载或解压。开发构建不自动安装更新。
 
@@ -298,6 +282,8 @@ cargo check --manifest-path app\src-tauri\Cargo.toml
 相关项目：[插件市场](https://github.com/SpCoGov/shanten-lens-marketplace) · [插件 SDK](https://github.com/SpCoGov/shanten-lens-sdk)
 
 应用内的“插件”页面提供插件市场、已安装插件和插件源管理。
+
+牌谱功能由独立的[牌谱工具插件](https://github.com/SpCoGov/shanten-lens-game-record)提供，需要时下载对应系统的插件 ZIP，并在插件页面导入、启用。
 
 - 可以从插件市场安装插件，也可以导入根目录含 `plugin.json` 的 ZIP 包。
 - 插件默认需要经过启用和封包权限确认；只授予你理解且确实需要的权限。

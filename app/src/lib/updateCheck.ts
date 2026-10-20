@@ -174,6 +174,10 @@ export async function discardUpdate(): Promise<void> {
     await invoke("discard_app_update");
 }
 
+export async function installUpdate(version: string): Promise<void> {
+    await invoke("install_app_update", {version});
+}
+
 async function fetchLatestRelease(useSystemProxy: boolean): Promise<GitHubRelease> {
     try {
         const text = await invoke<string>("fetch_latest_release", {useSystemProxy});

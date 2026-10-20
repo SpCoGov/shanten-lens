@@ -116,7 +116,7 @@ impl ProxyControl {
         timeout: Duration,
         config: PipelineConfig,
     ) -> Result<(u16, Value), String> {
-        self.request_inner(method, data, timeout, true, config, Some(REPLAY_INJECTOR))
+        self.request_inner(method, data, timeout, true, config, Some(REPLAY_INJECTOR.into()))
             .await
     }
 
@@ -126,9 +126,9 @@ impl ProxyControl {
         data: &Value,
         timeout: Duration,
         config: PipelineConfig,
-        source: &'static str,
+        source: &str,
     ) -> Result<(u16, Value), String> {
-        self.request_inner(method, data, timeout, false, config, Some(source))
+        self.request_inner(method, data, timeout, false, config, Some(source.into()))
             .await
     }
 
@@ -139,7 +139,7 @@ impl ProxyControl {
         timeout: Duration,
         replay_id: bool,
         config: PipelineConfig,
-        source: Option<&'static str>,
+        source: Option<String>,
     ) -> Result<(u16, Value), String> {
         if !self.services.packet_processing_allowed() {
             return Err("qyzz-operation-not-supported-use-game-controls".into());
@@ -189,7 +189,7 @@ impl ProxyControl {
                     .map_err(|_| "flow processor poisoned")?;
                 processor.set_config(config)?;
                 match source {
-                    Some(source) => processor.process_injected(&pipeline_frame, source),
+                    Some(source) => processor.process_injected(&pipeline_frame, &source),
                     None => processor.process(&pipeline_frame, Direction::Outbound),
                 }
                 .map_err(|error| error.to_string())

@@ -215,7 +215,7 @@ scripts\build_all.bat
 app/src-tauri/target/release/bundle/nsis/
 ```
 
-正式な Windows インストール版は起動時に更新をダウンロード・検証し、終了時に自動インストールします。旧版からは一度だけ `*-setup.exe` の手動インストールが必要です。旧 MSI 版はアプリデータを残してアンインストールしてから移行してください。
+正式な Windows インストール版は起動時に更新をダウンロード・検証し、直ちに自動インストールして新版を再起動します。手動で更新を確認した場合も「自動更新」でダウンロードから再起動まで実行します。旧版からは一度だけ `*-setup.exe` の手動インストールが必要です。旧 MSI 版はアプリデータを残してアンインストールしてから移行してください。
 
 GitHub Releases では `shanten-lens_<バージョン>_windows_x64_portable.zip` も配布します。展開後に `shanten-lens.exe` を実行してください。ポータブル版は更新公開鍵を含まない既定の設定で別途ビルドし、終了時の自動インストールは行いません。更新時は新しい ZIP をダウンロードして置き換えてください。
 
@@ -272,6 +272,8 @@ cargo check --manifest-path app\src-tauri\Cargo.toml
 関連プロジェクト：[プラグインマーケット](https://github.com/SpCoGov/shanten-lens-marketplace) · [プラグイン SDK](https://github.com/SpCoGov/shanten-lens-sdk)
 
 アプリ内の「プラグイン」ページでは、プラグインマーケット、インストール済みプラグイン、プラグインソースを管理できます。
+
+牌譜機能は独立した[牌譜ツールプラグイン](https://github.com/SpCoGov/shanten-lens-game-record)で提供します。必要な場合は対応 OS のプラグイン ZIP をダウンロードし、プラグインページでインポートして有効にしてください。
 
 - プラグインマーケットからインストールするか、ルートに `plugin.json` を含む ZIP パッケージをインポートできます。
 - プラグインを有効にする際はパケット権限の確認が必要です。内容を理解し、実際に必要な権限だけを付与してください。

@@ -228,6 +228,19 @@ pub(super) struct ProviderCore {
 }
 
 impl ProviderCore {
+    pub(super) fn injection_source(&self, module_id: &str, method: &str) -> Result<String, String> {
+        if !self.online.load(Ordering::Acquire) || !self.permissions.contains(&PacketOperation::Inject) {
+            return Err("plugin has no approved injection permission".into());
+        }
+        let id = self.modules.lock().unwrap().get(module_id).cloned().ok_or("module is not registered")?;
+        let packet = Packet { direction: pipeline::Direction::Outbound, packet_type: "Req".into(),
+            method: method.into(), id: None, data: Value::Null };
+        if !self.registry.snapshot().iter().any(|module| module.id == id && module.allows(&packet, PacketOperation::Inject)) {
+            return Err("request is outside the module's approved subscriptions".into());
+        }
+        Ok(id)
+    }
+
     pub(super) fn call(&self, method: &str, params: Value, timeout: Duration) -> RpcResult {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let (sender, receiver) = mpsc::channel();
@@ -292,6 +305,18 @@ impl ProviderCore {
             "module.register" => self.register_module(params),
             "module.replaceSubscriptions" => self.replace_subscriptions(params),
             "config.set" => self.set_config(params),
+            "plugin.emit" => {
+                let name = params.get("name").and_then(Value::as_str).unwrap_or_default();
+                match validate_identifier(name, "event name") {
+                    Ok(()) if name.len() <= 128 => {
+                        let _ = self.events.send(event("plugin_event", json!({
+                            "pluginId":self.plugin_id,"name":name,"data":params.get("data").unwrap_or(&Value::Null)
+                        })));
+                        Ok(Value::Null)
+                    }
+                    _ => Err("invalid plugin event name".into()),
+                }
+            }
             "plugin.updateAvailable" => self.offer_update(params),
             _ => Err(format!("unknown plugin method: {method}")),
         };

@@ -3,7 +3,7 @@ use super::{deck, face, ids, norm, pool, search_limits, souzu, Entry, SearchPref
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     time::{Duration, Instant},
 };
 
@@ -33,7 +33,61 @@ struct Rule {
 struct Group {
     #[serde(default)]
     quad: bool,
+    #[serde(default)]
+    kind: Kind,
+    #[serde(default)]
+    suit_group: String,
+    #[serde(default)]
+    distinct_group: String,
     rule: Rule,
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum Kind {
+    #[default]
+    Single,
+    Pair,
+    Sequence,
+    Triplet,
+    Meld,
+    Quad,
+}
+
+impl Kind {
+    fn size(self) -> usize {
+        match self {
+            Self::Single => 1,
+            Self::Pair => 2,
+            Self::Quad => 4,
+            _ => 3,
+        }
+    }
+
+    fn accepts(self, faces: &[u8]) -> bool {
+        if faces.len() != self.size() { return false; }
+        let same = faces.iter().all(|face| *face == faces[0]);
+        let mut sorted = faces.to_vec();
+        sorted.sort_unstable();
+        let sequence = sorted.len() == 3 && sorted[0] < 27 && sorted[0] % 9 <= 6
+            && sorted[1] == sorted[0] + 1 && sorted[2] == sorted[0] + 2;
+        match self {
+            Self::Single => true,
+            Self::Pair | Self::Triplet | Self::Quad => same,
+            Self::Sequence => sequence,
+            Self::Meld => same || sequence,
+        }
+    }
+}
+
+impl Group {
+    fn kind(&self) -> Kind {
+        if self.quad { Kind::Quad } else { self.kind }
+    }
+
+    fn is_quad(&self) -> bool {
+        self.kind() == Kind::Quad
+    }
 }
 
 impl Rule {
@@ -125,6 +179,82 @@ impl Search<'_> {
         self.aborted.is_none()
     }
 
+    fn candidates(&mut self, group: usize, domain: &[usize]) -> Vec<Vec<usize>> {
+        let group = self.groups[group].clone();
+        let kind = group.kind();
+        if kind == Kind::Single { return domain.iter().map(|&i| vec![i]).collect(); }
+        let mut by_face: [Vec<usize>; 34] = std::array::from_fn(|_| Vec::new());
+        let mut joker = None;
+        for &i in domain {
+            if let Some(tile) = souzu::tile(&self.entries[i].face) {
+                by_face[tile as usize].push(i);
+            } else if !group.is_quad() {
+                joker = Some(i);
+            }
+        }
+        fn expand(search: &mut Search<'_>, pattern: &[u8], by_face: &[Vec<usize>; 34], joker: Option<usize>,
+            rule: &Rule, chosen: &mut Vec<usize>, values: &mut Vec<Vec<usize>>) {
+            if !search.pulse() { return; }
+            let slot = chosen.len();
+            if slot == pattern.len() {
+                let mut candidate = chosen.clone();
+                candidate.sort_unstable();
+                values.push(candidate);
+                return;
+            }
+            let tile = pattern[slot];
+            let face = format!("{}{}", tile % 9 + 1, ['m', 'p', 's', 'z'][(tile / 9) as usize]);
+            for &i in by_face[tile as usize].iter().chain(joker.iter()) {
+                if chosen.contains(&i) || (slot > 0 && pattern[slot - 1] == tile && i <= chosen[slot - 1])
+                    || (Some(i) == joker && !rule.ordinary(&face, &[false; 34], &[false; 34])) {
+                    continue;
+                }
+                chosen.push(i);
+                expand(search, pattern, by_face, joker, rule, chosen, values);
+                chosen.pop();
+                if search.aborted.is_some() { return; }
+            }
+        }
+        let mut values = Vec::new();
+        for tile in 0..34u8 {
+            if matches!(kind, Kind::Pair | Kind::Triplet | Kind::Meld | Kind::Quad) {
+                expand(self, &vec![tile; kind.size()], &by_face, joker, &group.rule, &mut Vec::new(), &mut values);
+            }
+            if matches!(kind, Kind::Sequence | Kind::Meld) && tile < 27 && tile % 9 <= 6 {
+                expand(self, &[tile, tile + 1, tile + 2], &by_face, joker, &group.rule, &mut Vec::new(), &mut values);
+            }
+            if self.aborted.is_some() { break; }
+        }
+        values.sort();
+        values.dedup();
+        values
+    }
+
+    fn groups_match(&self, selected: &[Vec<usize>], joker_as: Option<u8>) -> bool {
+        if joker_as.is_none() && self.groups.iter().all(|group| group.suit_group.trim().is_empty() && group.distinct_group.trim().is_empty()) {
+            return true;
+        }
+        let faces = selected.iter().map(|tiles| tiles.iter().filter_map(|&i|
+            souzu::tile(&self.entries[i].face).or(joker_as)
+        ).collect::<Vec<_>>()).collect::<Vec<_>>();
+        for (g, tiles) in selected.iter().enumerate().filter(|(_, tiles)| !tiles.is_empty()) {
+            let group = &self.groups[g];
+            if faces[g].len() == tiles.len() && !group.kind().accepts(&faces[g]) { return false; }
+            for other in 0..g {
+                let linked = &self.groups[other];
+                if !group.suit_group.trim().is_empty() && group.suit_group.trim() == linked.suit_group.trim()
+                    && faces[g].first().zip(faces[other].first()).is_some_and(|(a, b)| a / 9 != b / 9) {
+                    return false;
+                }
+                if !group.distinct_group.trim().is_empty() && group.distinct_group.trim() == linked.distinct_group.trim()
+                    && faces[g].iter().any(|face| faces[other].contains(face)) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     fn visit(
         &mut self,
         choices: &[Choices],
@@ -155,7 +285,7 @@ impl Search<'_> {
                 .groups
                 .iter()
                 .zip(selected.iter())
-                .filter(|(g, _)| g.quad)
+                .filter(|(g, _)| g.is_quad())
                 .map(|(_, selected)| {
                     selected
                         .iter()
@@ -164,10 +294,10 @@ impl Search<'_> {
                 })
                 .collect::<Vec<_>>();
             let joker_group = selected.iter().position(|tiles| tiles.iter().any(|&i| self.entries[i].face == "bd"));
-            let mut joker_as = joker_group.and_then(|g| self.groups[g].rule.joker_face());
-            if self.exclude_invalid_shapes {
+            let mut joker_as = None;
+            if self.exclude_invalid_shapes || joker_group.is_some() {
                 let mut counts = [0u8; 34];
-                for (_, tiles) in self.groups.iter().zip(selected.iter()).filter(|(group, _)| !group.quad) {
+                for (_, tiles) in self.groups.iter().zip(selected.iter()).filter(|(group, _)| !group.is_quad()) {
                     for &i in tiles {
                         if let Some(tile) = souzu::tile(&self.entries[i].face) {
                             counts[tile as usize] += 1;
@@ -179,7 +309,8 @@ impl Search<'_> {
                         let face = format!("{}{}", tile % 9 + 1, ['m', 'p', 's', 'z'][tile / 9]);
                         if !self.groups[g].rule.ordinary(&face, &[false; 34], &[false; 34]) { return None; }
                         counts[tile] += 1;
-                        let valid = legal_shape(&counts, quads.len());
+                        let valid = self.groups_match(selected, Some(tile as u8))
+                            && (!self.exclude_invalid_shapes || legal_shape(&counts, quads.len()));
                         counts[tile] -= 1;
                         valid.then_some(face)
                     });
@@ -191,7 +322,7 @@ impl Search<'_> {
             let (steps, discards, incoming, draws) =
                 simulate(self.state, self.entries, &target, &quads, self.prefix)?;
             let resolved = selected.iter().enumerate().map(|(g, selected)| json!({
-                "quad":self.groups[g].quad,
+                "quad":self.groups[g].is_quad(),"kind":self.groups[g].kind(),
                 "tiles":selected.iter().map(|&i| json!({"id":self.entries[i].id,
                     "face":face(&deck(self.state),self.entries[i].id),
                     "joker_as":if self.entries[i].face=="bd" {joker_as.clone()}else{None},
@@ -230,6 +361,10 @@ impl Search<'_> {
                 continue;
             }
             selected[group] = candidate.clone();
+            if !self.groups_match(selected, None) {
+                selected[group].clear();
+                continue;
+            }
             used.extend(candidate);
             if let Some(plan) = self.visit(choices, depth + 1, selected, used, next_nonwall) {
                 return Some(plan);
@@ -405,15 +540,17 @@ pub(super) fn search(
     };
     if groups.is_empty()
         || groups.len() > 14
-        || groups.iter().filter(|g| g.quad).count() > 4
+        || groups.iter().filter(|g| g.is_quad()).count() > 4
         || groups
             .iter()
-            .map(|g| if g.quad { 3 } else { 1 })
+            .map(|g| if g.is_quad() { 3 } else { g.kind().size() })
             .sum::<usize>()
             != 14
         || groups
             .iter()
-            .any(|g| !g.rule.valid() || (g.quad && g.rule.joker == Joker::Only))
+            .any(|g| !g.rule.valid() || (g.is_quad() && g.rule.joker == Joker::Only)
+                || (g.quad && !matches!(g.kind, Kind::Single | Kind::Quad))
+                || g.suit_group.chars().count() > 32 || g.distinct_group.chars().count() > 32)
     {
         return fail("custom-invalid-target");
     }
@@ -479,7 +616,7 @@ pub(super) fn search(
         prefix: 0,
         aborted: None,
     };
-    let minimum_draws = (14 + groups.iter().filter(|g| g.quad).count()).saturating_sub(hand.len());
+    let minimum_draws = (14 + groups.iter().filter(|g| g.is_quad()).count()).saturating_sub(hand.len());
     for prefix in minimum_draws..=entries.iter().filter(|e| e.source == "wall").count() {
         search.prefix = prefix;
         if !search.pulse() {
@@ -493,7 +630,7 @@ pub(super) fn search(
                     .enumerate()
                     .filter(|(_, e)| {
                         (e.source != "wall" || e.index < prefix)
-                            && (!g.quad || e.face != "bd")
+                            && (!g.is_quad() || e.face != "bd")
                             && g.rule.matches(face(&deck, e.id), &dora, &soul)
                     })
                     .map(|(i, _)| i)
@@ -503,37 +640,15 @@ pub(super) fn search(
         let slots = groups
             .iter()
             .zip(&domains)
-            .flat_map(|(g, d)| std::iter::repeat_n(d.clone(), if g.quad { 4 } else { 1 }))
+            .flat_map(|(g, d)| std::iter::repeat_n(d.clone(), g.kind().size()))
             .collect::<Vec<_>>();
         if !can_match(&slots, entries.len()) {
             continue;
         }
         let mut choices = Vec::new();
         for (group, domain) in domains.iter().enumerate() {
-            let mut values = Vec::new();
-            if groups[group].quad {
-                let mut by_face = HashMap::<&str, Vec<usize>>::new();
-                for &i in domain {
-                    by_face.entry(&entries[i].face).or_default().push(i);
-                }
-                for group in by_face.values() {
-                    for a in 0..group.len() {
-                        for b in a + 1..group.len() {
-                            for c in b + 1..group.len() {
-                                for d in c + 1..group.len() {
-                                    if !search.pulse() {
-                                        return fail(search.aborted.unwrap());
-                                    }
-                                    values.push(vec![group[a], group[b], group[c], group[d]]);
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                values = domain.iter().map(|&i| vec![i]).collect();
-            }
-            values.sort();
+            let values = search.candidates(group, domain);
+            if let Some(reason) = search.aborted { return fail(reason); }
             choices.push(Choices { group, values });
         }
         choices.sort_by_key(|c| c.values.len());
@@ -578,6 +693,81 @@ mod tests {
     }
     fn run(state: &Value, target: &Value) -> Value {
         search(state, target, 36, false, &mut |_| {}, &|| false)
+    }
+
+    #[test]
+    fn configurable_pairs_require_distinct_faces_only_when_linked() {
+        let hand = ["1m","1m","1m","1m","3m","3m","5p","0p","7p","7p","2s","2s","4s","4s"];
+        let pairs = json!(vec![json!({"kind":"pair","distinct_group":"A","rule":{}}); 7]);
+        let missing = state(&hand, &[], &[], 0);
+        assert_eq!(run(&missing, &pairs)["reason"], "custom-not-reachable");
+        let mut unlinked = pairs.clone();
+        for group in unlinked.as_array_mut().unwrap() { group["distinct_group"] = json!(""); }
+        replay(&missing, &run(&missing, &unlinked));
+        let reachable = state(&hand, &["7z", "7z"], &[], 1);
+        let plan = run(&reachable, &pairs);
+        replay(&reachable, &plan);
+        let faces = plan["resolved_groups"].as_array().unwrap().iter()
+            .map(|group| norm(group["tiles"][0]["face"].as_str().unwrap())).collect::<HashSet<_>>();
+        assert_eq!(faces.len(), 7);
+        assert_eq!(plan["draws_needed"], 0);
+    }
+
+    #[test]
+    fn configurable_sequences_share_suits_and_keep_per_group_ranges() {
+        let hand = ["1m","2m","3m","4p","5p","6p","7s","8s","9s","2z","2z","2z","7z","7z"];
+        let mut groups = [[1,2,3],[4,5,6],[7,8,9]].iter().map(|ranks|
+            json!({"kind":"sequence","suit_group":"A","rule":{"ranks":ranks}})).collect::<Vec<_>>();
+        groups.push(json!({"kind":"meld","rule":{"faces":["2z"]}}));
+        groups.push(json!({"kind":"pair","rule":{"faces":["7z"]}}));
+        let target = json!(groups);
+        let missing = state(&hand, &[], &[], 0);
+        assert_eq!(run(&missing, &target)["reason"], "custom-not-reachable");
+        let reachable = state(&hand, &["4m","0m","6m","7m","8m","9m"], &[], 1);
+        let plan = search(&reachable, &target, 36, true, &mut |_| {}, &|| false);
+        replay(&reachable, &plan);
+        for group in plan["resolved_groups"].as_array().unwrap().iter().take(3) {
+            assert_eq!(group["kind"], "sequence");
+            assert!(group["tiles"].as_array().unwrap().iter().all(|tile| tile["face"].as_str().unwrap().ends_with('m')));
+        }
+        assert!(!Kind::Sequence.accepts(&[7, 8, 9]));
+        assert!(!Kind::Sequence.accepts(&[27, 28, 29]));
+    }
+
+    #[test]
+    fn structured_groups_resolve_fixed_jokers_and_declared_quads() {
+        let hand = ["bd","9m","3m","3m","5p","0p","7p","7p","2s","2s","4s","4s","7z","7z"];
+        let pairs = json!(vec![json!({"kind":"pair","distinct_group":"A","rule":{}}); 7]);
+        let s = state(&hand, &[], &[], 0);
+        let plan = run(&s, &pairs);
+        replay(&s, &plan);
+        let joker = plan["resolved_groups"].as_array().unwrap().iter().flat_map(|g| g["tiles"].as_array().unwrap())
+            .find(|tile| tile["face"] == "bd").unwrap();
+        assert_eq!(joker["joker_as"], "9m");
+        let hand = ["1m","1m","1m","1m","2p","3p","4p","5s","6s","7s","2z","2z","2z"];
+        let s = state(&hand, &[], &["7z","7z"], 0);
+        let target = json!([
+            {"kind":"quad","rule":{"faces":["1m"]}},
+            {"kind":"meld","rule":{"faces":["2p","3p","4p"]}},
+            {"kind":"sequence","rule":{"ranks":[5,6,7]}},
+            {"kind":"triplet","rule":{"faces":["2z"]}},
+            {"kind":"pair","rule":{"faces":["7z"]}}
+        ]);
+        let plan = search(&s, &target, 36, true, &mut |_| {}, &|| false);
+        replay(&s, &plan);
+        assert_eq!(plan["resolved_groups"][0]["quad"], true);
+        assert!(plan["custom_steps"].as_array().unwrap().iter().any(|step| step["kind"] == "kan"));
+    }
+
+    #[test]
+    fn malformed_group_constraints_are_rejected() {
+        let s = state(&["1m"; 14], &[], &[], 0);
+        for invalid in [json!({"kind":"seven_pairs","rule":{}}), json!({"kind":"pair","quad":true,"rule":{}}),
+            json!({"suit_group":"A".repeat(33),"rule":{}}), json!({"distinct_group":42,"rule":{}})] {
+            let mut target = vec![json!({"rule":{}}); 14];
+            target[0] = invalid;
+            assert_eq!(run(&s, &json!(target))["reason"], "custom-invalid-target");
+        }
     }
 
     #[test]
