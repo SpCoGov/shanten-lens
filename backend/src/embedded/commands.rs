@@ -4,13 +4,12 @@ use crate::{
         AmuletAction, AmuletActionRequest, AutorunAction, CommandResult, ConfigTables,
         FlowDumpResult, JsonMap, PacketLogSnapshot, PacketRecordingStatus, TsumoLoopStatus,
     },
-    pipeline::{self, PacketModuleInfo, PipelineConfig, GAME_RECORD},
+    pipeline::{self, PacketModuleInfo, PipelineConfig},
     runtime::{normalize_config, register_builtin_modules},
     services::event,
 };
 use serde_json::{json, Value};
 use std::time::Duration;
-use tracing::error;
 
 impl BackendRuntime {
     pub fn data_sources(&self) -> crate::ipc::DataSourceStatus {
@@ -106,55 +105,6 @@ impl BackendRuntime {
                 ..Default::default()
             },
             Err(error) => failed(error),
-        }
-    }
-
-    pub async fn fetch_game_record(&self, game_uuid: String) -> CommandResult {
-        let game_uuid = game_uuid.trim();
-        if game_uuid.is_empty() || game_uuid.len() > 200 {
-            return failed("invalid-payload");
-        }
-        let config = self.state.pipeline.read().await.clone();
-        match self
-            .state
-            .proxy
-            .inject(
-                ".lq.Lobby.fetchGameRecord",
-                &json!({
-                    "clientVersionString": "StandaloneWindows_2022-0.16.273",
-                    "gameUuid": game_uuid,
-                }),
-                Duration::from_secs(12),
-                config,
-                GAME_RECORD,
-            )
-            .await
-        {
-            Ok((id, response)) => CommandResult {
-                ok: response.get("error").is_none(),
-                reason: response
-                    .get("error")
-                    .is_some()
-                    .then(|| "protocol-error".into()),
-                msg_id: Some(id),
-                response: Some(response),
-                ..Default::default()
-            },
-            Err(error) => failed(error),
-        }
-    }
-
-    pub fn override_game_record(&self, record: Value) -> CommandResult {
-        match self.state.services.arm_game_record_override(&record) {
-            Ok(()) => CommandResult {
-                ok: true,
-                ..Default::default()
-            },
-            Err(error) => {
-                let reason = format!("{error:#}");
-                error!(target: "shanten_backend::game_record", error = %reason, "failed to arm game record override");
-                failed(reason)
-            }
         }
     }
 

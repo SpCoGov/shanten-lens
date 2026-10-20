@@ -244,6 +244,18 @@ async fn backend_invoke_plugin(
 
 #[tauri::command]
 #[specta::specta]
+async fn backend_request_plugin_packet(
+    id: String,
+    module_id: String,
+    method: String,
+    payload: Value,
+    state: State<'_, IpcBackendState>,
+) -> Result<Value, String> {
+    state.0.request_plugin_packet(id, module_id, method, payload).await
+}
+
+#[tauri::command]
+#[specta::specta]
 async fn backend_rescan_plugins(
     state: State<'_, IpcBackendState>,
 ) -> Result<Vec<PluginInfo>, String> {
@@ -338,24 +350,6 @@ async fn backend_replay_packet(
     state: State<'_, IpcBackendState>,
 ) -> Result<CommandResult, String> {
     Ok(state.0.replay_packet(method, payload).await)
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn backend_fetch_game_record(
-    game_uuid: String,
-    state: State<'_, IpcBackendState>,
-) -> Result<CommandResult, String> {
-    Ok(state.0.fetch_game_record(game_uuid).await)
-}
-
-#[tauri::command]
-#[specta::specta]
-fn backend_override_game_record(
-    record: Value,
-    state: State<'_, IpcBackendState>,
-) -> Result<CommandResult, String> {
-    Ok(state.0.override_game_record(record))
 }
 
 #[tauri::command]
@@ -659,6 +653,7 @@ async fn backend_select_data_source(source: shanten_backend::ipc::DataSource, re
     state.0.select_data_source(source, revision).await
 }
 
+#[cfg(debug_assertions)]
 fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::new()
         .error_handling(tauri_specta::ErrorHandlingMode::Throw)
@@ -681,6 +676,7 @@ fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
             backend_get_plugin_config,
             backend_set_plugin_config,
             backend_invoke_plugin,
+            backend_request_plugin_packet,
             backend_rescan_plugins,
             backend_set_plugin_enabled,
             backend_restart_plugin,
@@ -692,8 +688,6 @@ fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
             backend_get_packet_recording,
             backend_set_packet_recording,
             backend_replay_packet,
-            backend_fetch_game_record,
-            backend_override_game_record,
             backend_update_config,
             backend_set_locale,
             backend_dump_flows,
@@ -713,6 +707,7 @@ fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
         ])
 }
 
+#[cfg(debug_assertions)]
 fn export_ipc_bindings(ipc: &tauri_specta::Builder<tauri::Wry>) {
     ipc.export(
         specta_typescript::Typescript::default()
@@ -723,9 +718,8 @@ fn export_ipc_bindings(ipc: &tauri_specta::Builder<tauri::Wry>) {
 }
 
 pub fn run() {
-    let ipc = ipc_builder();
     #[cfg(debug_assertions)]
-    export_ipc_bindings(&ipc);
+    export_ipc_bindings(&ipc_builder());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -742,6 +736,7 @@ pub fn run() {
             app_update::app_updater_enabled,
             app_update::download_app_update,
             app_update::discard_app_update,
+            app_update::install_app_update,
             shutdown_app,
             frontend_ready,
             update_startup_progress,
@@ -770,6 +765,7 @@ pub fn run() {
             backend_get_plugin_config,
             backend_set_plugin_config,
             backend_invoke_plugin,
+            backend_request_plugin_packet,
             backend_rescan_plugins,
             backend_set_plugin_enabled,
             backend_restart_plugin,
@@ -781,8 +777,6 @@ pub fn run() {
             backend_get_packet_recording,
             backend_set_packet_recording,
             backend_replay_packet,
-            backend_fetch_game_record,
-            backend_override_game_record,
             backend_update_config,
             backend_set_locale,
             backend_dump_flows,

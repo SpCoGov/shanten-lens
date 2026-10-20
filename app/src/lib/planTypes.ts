@@ -1,3 +1,5 @@
+import type {TargetKind} from "./customTarget";
+
 export type TileId = number;
 
 export type SearchPreferences = {
@@ -52,7 +54,7 @@ export type DebugPoolData = {
 
 export type PlanData = {
     state_revision?: number;
-    resolved_groups?: Array<{quad: boolean; tiles: Array<{id: number; face: string; joker_as?: string | null}>}>;
+    resolved_groups?: Array<{quad: boolean; kind?: TargetKind; tiles: Array<{id: number; face: string; joker_as?: string | null}>}>;
     custom_steps?: Array<{kind: "exchange" | "draw" | "discard" | "kan"; tiles: number[]; out?: number[]}>;
     plan_id?: string;
     status?: "win_now" | "plan" | "impossible" | "searching" | "catalog";

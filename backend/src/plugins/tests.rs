@@ -432,6 +432,19 @@ fn provider_process() {
             Some("host.ready") => {
                 json!({"jsonrpc":"2.0","method":"module.register","params":{"moduleId":"observer","subscriptionsRevision":1,"subscriptions":[]}})
             }
+            Some("frontend.invoke") if message["params"]["method"] == "test.register" => {
+                let mut out = std::io::stdout().lock();
+                writeln!(out, "{}", json!({"jsonrpc":"2.0","method":"module.register","params":{
+                    "moduleId":"injector","subscriptionsRevision":1,"subscriptions":[{
+                        "direction":"outbound","type":"Req","method":".lq.Lobby.fetchGameRecord","operations":["inject"]
+                    }]
+                }})).unwrap();
+                writeln!(out, "{}", json!({"jsonrpc":"2.0","method":"plugin.emit","params":{
+                    "pluginId":"another.plugin","name":"test.updated","data":{"value":42}
+                }})).unwrap();
+                out.flush().unwrap();
+                json!({"jsonrpc":"2.0","id":message["id"],"result":true})
+            }
             Some("host.shutdown") => return,
             _ => continue,
         };
@@ -439,6 +452,44 @@ fn provider_process() {
         writeln!(out, "{response}").unwrap();
         out.flush().unwrap();
     }
+}
+
+#[test]
+fn plugin_requests_require_approved_matching_subscriptions_and_events_keep_their_owner() {
+    let fixture = Fixture::new();
+    let manager = &fixture.manager;
+    let directory = manager.root.join("test.provider");
+    fs::create_dir(&directory).unwrap();
+    fs::copy(std::env::current_exe().unwrap(), directory.join("provider.exe")).unwrap();
+    fs::write(directory.join("plugin.json"), json!({
+        "id":"test.provider","name":"Test","version":"1.0.0","apiVersion":1,
+        "backend":{"type":"process","entry":"provider.exe","args":["--exact","plugins::tests::provider_process","--nocapture"]},
+        "permissions":{"packet":["inject"]}
+    }).to_string()).unwrap();
+    manager.rescan().unwrap();
+    manager.set_enabled("test.provider", true, vec![]).unwrap();
+    manager.invoke("test.provider", "test.register", Value::Null).unwrap();
+    assert!(manager.injection_source("test.provider", "injector", ".lq.Lobby.fetchGameRecord").is_err());
+    manager.set_enabled("test.provider", true, vec![PacketOperation::Inject]).unwrap();
+    let mut events = manager.events.subscribe();
+    manager.invoke("test.provider", "test.register", Value::Null).unwrap();
+    assert_eq!(manager.injection_source("test.provider", "injector", ".lq.Lobby.fetchGameRecord").unwrap(),
+        "plugin:test.provider:main:injector");
+    assert!(manager.injection_source("test.provider", "injector", ".lq.Lobby.login").is_err());
+    assert!(manager.injection_source("test.provider", "observer", ".lq.Lobby.fetchGameRecord").is_err());
+    assert!(manager.injection_source("another.plugin", "injector", ".lq.Lobby.fetchGameRecord").is_err());
+    let mut emitted = false;
+    while let Ok(event) = events.try_recv() {
+        if event["type"] == "plugin_event" {
+            assert_eq!(event["data"]["pluginId"], "test.provider");
+            assert_eq!(event["data"]["name"], "test.updated");
+            assert_eq!(event["data"]["data"]["value"], 42);
+            emitted = true;
+        }
+    }
+    assert!(emitted);
+    manager.set_enabled("test.provider", false, vec![]).unwrap();
+    assert!(manager.injection_source("test.provider", "injector", ".lq.Lobby.fetchGameRecord").is_err());
 }
 
 #[test]

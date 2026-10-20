@@ -17,7 +17,6 @@ import CustomSwitchPage from "./pages/CustomSwitchPage";
 import OverlayPage from "./pages/OverlayPage";
 import TodayWinPage from "./pages/TodayWinPage";
 import GameStatePage from "./pages/GameStatePage";
-import GameRecordPage from "./pages/GameRecordPage";
 import * as backendIpc from "./lib/ipc";
 import TileGrid from "./components/TileGrid";
 import Modal from "./components/Modal";
@@ -57,6 +56,7 @@ import {
     checkForUpdates,
     downloadUpdate,
     discardUpdate,
+    installUpdate,
     ignoreUpdateVersion,
     readUpdatePrefs,
     setUpdateAutoCheck,
@@ -273,7 +273,7 @@ async function openSettingsWindow() {
     }
 }
 
-type Route = "home" | "score" | "blackhole" | "wanxiang" | "custom-switch" | "fuse" | "pipeline" | "plugins" | "plugin" | "today-win" | "gamestate" | "record" | "autorun" | "overlay" | "diagnostics" | "about";
+type Route = "home" | "score" | "blackhole" | "wanxiang" | "custom-switch" | "fuse" | "pipeline" | "plugins" | "plugin" | "today-win" | "gamestate" | "autorun" | "overlay" | "diagnostics" | "about";
 type TutorialId = "home" | "blackhole";
 type TutorialStep = {
     title: string;
@@ -846,8 +846,9 @@ export default function App() {
     const [latestUpdate, setLatestUpdate] = React.useState<UpdateInfo | null>(null);
     const [updateChecking, setUpdateChecking] = React.useState(false);
     const [updateDownload, setUpdateDownload] = React.useState<{
-        version: string; status: "downloading" | "ready" | "failed"; percent?: number;
+        version: string; status: "downloading" | "installing" | "download_failed" | "install_failed"; percent?: number;
     } | null>(null);
+    const updateBusy = updateDownload?.status === "downloading" || updateDownload?.status === "installing";
     const updateDownloadingRef = React.useRef(false);
     const [tsumoLoopStatus, setTsumoLoopStatus] = React.useState<TsumoLoopStatus>({running: false, lastReason: "", winCount: 0});
     const [tsumoLoopIntervalMs, setTsumoLoopIntervalMs] = React.useState(() => readTsumoLoopIntervalMs());
@@ -879,6 +880,17 @@ export default function App() {
     const [wallTileIds, setWallTileIds] = React.useState<number[]>([]);
 
     React.useEffect(() => startPluginRuntime(), []);
+    React.useEffect(() => {
+        const open = (event: Event) => {
+            const id = (event as CustomEvent<unknown>).detail;
+            if (typeof id === "string" && usePluginStore.getState().pages.some(page => page.id === id)) {
+                setActivePluginPageId(id);
+                setRoute("plugin");
+            }
+        };
+        window.addEventListener("sl:plugin-page", open);
+        return () => window.removeEventListener("sl:plugin-page", open);
+    }, []);
     React.useEffect(() => {
         if (route === "plugin" && !activePluginPage) setRoute("plugins");
     }, [activePluginPage, route]);
@@ -997,7 +1009,6 @@ export default function App() {
     const [planCustomSwitch, setPlanCustomSwitch] = React.useState<PlanData | null>(null);
     const [latestGameState, setLatestGameState] = React.useState<GameStateData | null>(null);
     const sourceSession = React.useRef<number | undefined>();
-    const [latestGameRecord, setLatestGameRecord] = React.useState<Record<string, backendIpc.JsonValue> | null>(null);
     const [amuletHotkeys, setAmuletHotkeys] = React.useState<AmuletHotkeySettings>(() => readAmuletHotkeySettings());
     const [gameMapOpen, setGameMapOpen] = React.useState(false);
     const [hotkeyEditorOpen, setHotkeyEditorOpen] = React.useState(false);
@@ -1111,10 +1122,11 @@ export default function App() {
         }
     }, [t]);
 
-    const startUpdateDownload = React.useCallback(async (update: UpdateInfo) => {
+    const startUpdate = React.useCallback(async (update: UpdateInfo) => {
         if (updateDownloadingRef.current) return;
         updateDownloadingRef.current = true;
         setUpdateDownload({version: update.version, status: "downloading"});
+        let downloaded = false;
         try {
             await downloadUpdate(update, ({downloaded, total}) => {
                 setUpdateDownload({
@@ -1122,12 +1134,14 @@ export default function App() {
                     percent: total ? Math.min(100, Math.floor(downloaded * 100 / total)) : undefined,
                 });
             });
-            setUpdateDownload({version: update.version, status: "ready"});
-            pushToast(t("update.ready", {version: update.version}), "success", 5000);
+            downloaded = true;
+            setUpdateDownload({version: update.version, status: "installing"});
+            await installUpdate(update.version);
         } catch (error) {
-            console.error("[update-download]", error);
-            setUpdateDownload({version: update.version, status: "failed"});
-            pushToast(t("update.download_failed"), "error", 5000);
+            console.error("[update]", error);
+            const status = downloaded ? "install_failed" : "download_failed";
+            setUpdateDownload({version: update.version, status});
+            pushToast(t(`update.${status}`), "error", 5000);
         } finally {
             updateDownloadingRef.current = false;
         }
@@ -1135,7 +1149,7 @@ export default function App() {
 
     React.useEffect(() => {
         const listener = safeListen("app-update:install-failed", () => {
-            setUpdateDownload((current) => current ? {...current, status: "failed"} : current);
+            setUpdateDownload((current) => current ? {...current, status: "install_failed"} : current);
             pushToast(t("update.install_failed"), "error", 6000);
         });
         return () => { void listener.then((unlisten) => unlisten()); };
@@ -1150,7 +1164,7 @@ export default function App() {
                 const prefs = readUpdatePrefs();
                 setLatestUpdate(result.update);
                 if (!manual && result.update.canInstall) {
-                    void startUpdateDownload(result.update);
+                    void startUpdate(result.update);
                     return;
                 }
                 setUpdateDialog({
@@ -1170,7 +1184,7 @@ export default function App() {
         } finally {
             if (manual) setUpdateChecking(false);
         }
-    }, [t, startUpdateDownload]);
+    }, [t, startUpdate]);
 
     React.useEffect(() => {
         console.info("[update-check]", "auto", "scheduled");
@@ -1438,7 +1452,7 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
-        type EventName = "update_gamestate" | "update_game_record" | "discard_recommendation" | "souzu_switch_execution" | "autorun_status" | "tsumo_loop_status" | "msgbox";
+        type EventName = "update_gamestate" | "discard_recommendation" | "souzu_switch_execution" | "autorun_status" | "tsumo_loop_status" | "msgbox";
         type AppBackendEvent = {[K in EventName]: {type: K; data: backendIpc.BackendEventMap[K]}}[EventName];
         const handleBackendEvent = (pkt: AppBackendEvent) => {
             if (pkt.type === "update_gamestate") {
@@ -1491,9 +1505,6 @@ export default function App() {
                 setCandidates(d.candidate_effect_list ?? []);
                 setTileScoreMap(d.tile_score_map ?? {});
                 setFanValueMap(d.fan_value_map ?? {});
-            } else if (pkt.type === "update_game_record") {
-                setLatestGameRecord(pkt.data);
-                setRoute("record");
             } else if (pkt.type === "discard_recommendation" && pkt.data) {
                 const arr = (Array.isArray(pkt.data) ? pkt.data : []) as Array<{ yaku: string; data: PlanData }>;
                 for (const item of arr) {
@@ -1577,7 +1588,7 @@ export default function App() {
 
         let active = true;
         const backendUnlisteners = ([
-            "update_gamestate", "update_game_record", "discard_recommendation", "souzu_switch_execution",
+            "update_gamestate", "discard_recommendation", "souzu_switch_execution",
             "autorun_status", "tsumo_loop_status", "msgbox",
         ] as EventName[]).map((name) => backendIpc.subscribeBackendEvent(name, (data) => handleBackendEvent({type: name, data} as AppBackendEvent)));
         void backendIpc.initializeBackend().then((snapshot) => {
@@ -1873,7 +1884,6 @@ export default function App() {
         {id:"diagnostics", icon:"article", title:t("nav.diagnostics"), active:route === "diagnostics", tutorial:"nav-diagnostics", onClick:() => setRoute("diagnostics")},
         {id:"about", icon:"help", title:t("nav.about"), active:route === "about", tutorial:"nav-about", onClick:() => setRoute("about")},
         {id:"today-win", icon:"extension", title:t("nav.todayWin"), active:route === "today-win", tutorial:"nav-today-win", onClick:() => setRoute("today-win")},
-        {id:"record", icon:"receipt_long", title:t("nav.record"), active:route === "record", tutorial:"nav-record", onClick:() => setRoute("record")},
         {id:"gamestate", icon:"data_object", title:t("nav.gamestate"), active:route === "gamestate", tutorial:"nav-gamestate", onClick:() => setRoute("gamestate")},
         ...pluginPages.map(page => ({id: "plugin:" + page.id, icon:page.icon, title:pluginPageTitle(page), active:route === "plugin" && activePluginPageId === page.id, onClick:() => {setActivePluginPageId(page.id);setRoute("plugin");}})),
         {id:"hotkeys", icon:"keyboard", title:t("amulet_hotkeys.customize"), tutorial:"nav-hotkeys", onClick:() => setHotkeyEditorOpen(true)},
@@ -1883,7 +1893,7 @@ export default function App() {
     ];
     const navigationDefaults = {
         outside:["home", "score", "blackhole", "more", "spacer", "hotkeys", "refresh", "settings", "theme"],
-        more:["fuse", "pipeline", "plugins", ...pluginPages.map(page => "plugin:" + page.id), "wanxiang", "custom-switch", "overlay", "diagnostics", "about", "separator:tools", "today-win", "record", "gamestate"],
+        more:["fuse", "pipeline", "plugins", ...pluginPages.map(page => "plugin:" + page.id), "wanxiang", "custom-switch", "overlay", "diagnostics", "about", "separator:tools", "today-win", "gamestate"],
     };
 
     return (
@@ -2164,7 +2174,6 @@ export default function App() {
                         {route === "plugin" && <PluginPageOutlet page={activePluginPage}/>}
                         {route === "today-win" && <TodayWinPage/>}
                         {route === "gamestate" && <GameStatePage currentState={latestGameState}/>}
-                        {route === "record" && <GameRecordPage record={latestGameRecord} onChange={setLatestGameRecord}/>}
                         {route === "blackhole" && (
                             <BlackHolePage
                                 stage={stage}
@@ -2543,7 +2552,7 @@ export default function App() {
                             <p>{t(updateDialog.update.canInstall ? "update.install_body" : "update.dialog_body", {version: updateDialog.update.version})}</p>
                             {updateDownload?.version === updateDialog.update.version ? (
                                 <div role="status">
-                                    <p>{t(`update.${updateDownload.status === "ready" ? "ready" : updateDownload.status === "failed" ? "download_failed" : "downloading"}`, {version: updateDownload.version})}</p>
+                                    <p>{t(`update.${updateDownload.status}`, {version: updateDownload.version})}</p>
                                     {updateDownload.status === "downloading" ? (
                                         <progress max={100} value={updateDownload.percent} aria-label={t("update.downloading")}/>
                                     ) : null}
@@ -2585,7 +2594,7 @@ export default function App() {
                         <div className="update-dialog-actions">
                             <button
                                 className="nav-btn"
-                                disabled={updateDownload?.status === "downloading"}
+                                disabled={updateBusy}
                                 onClick={async () => {
                                     try {
                                         if (updateDialog.update.canInstall) await discardUpdate();
@@ -2606,20 +2615,16 @@ export default function App() {
                             </button>
                             <button
                                 className="nav-btn update-dialog-primary"
-                                disabled={updateDownload?.status === "downloading"}
+                                disabled={updateBusy}
                                 onClick={() => {
                                     if (!updateDialog.update.canInstall) {
                                         void openUpdateUrl(updateDialog.update.downloadUrl);
-                                    } else if (updateDownload?.version === updateDialog.update.version && updateDownload.status === "ready") {
-                                        void closeProgram();
                                     } else {
-                                        void startUpdateDownload(updateDialog.update);
+                                        void startUpdate(updateDialog.update);
                                     }
                                 }}
                             >
-                                {t(!updateDialog.update.canInstall ? "update.download_package"
-                                    : updateDownload?.version === updateDialog.update.version && updateDownload.status === "ready"
-                                        ? "update.exit_install" : "update.download_update")}
+                                {t(!updateDialog.update.canInstall ? "update.manual_download" : "update.download_update")}
                             </button>
                         </div>
                     </div>

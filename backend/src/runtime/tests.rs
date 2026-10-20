@@ -8,12 +8,15 @@ use std::{fs, path::PathBuf};
 use tokio::sync::broadcast;
 
 #[test]
-fn retired_activity_module_is_removed_without_changing_plugin_settings() {
+fn retired_builtin_modules_are_removed_without_changing_plugin_settings() {
     let mut config = PipelineConfig::default();
     config.modules.push(crate::pipeline::ModuleConfig {
         id: "limited_time_activity".into(),
         enabled: true,
         options: Value::Null,
+    });
+    config.modules.push(crate::pipeline::ModuleConfig {
+        id: "game_record".into(), enabled: true, options: json!({}),
     });
     let plugin = crate::pipeline::ModuleConfig {
         id: "plugin:shanten-lens.activity:main:activities".into(),
@@ -25,11 +28,11 @@ fn retired_activity_module_is_removed_without_changing_plugin_settings() {
     assert!(!config
         .modules
         .iter()
-        .any(|module| module.id == "limited_time_activity"));
+        .any(|module| ["limited_time_activity", "game_record"].contains(&module.id.as_str())));
     assert_eq!(config.modules.last(), Some(&plugin));
     assert!(!builtin_modules(None, 0)
         .iter()
-        .any(|module| module.id() == "limited_time_activity"));
+        .any(|module| ["limited_time_activity", "game_record"].contains(&module.id())));
 }
 
 #[derive(Clone, PartialEq, Message)]

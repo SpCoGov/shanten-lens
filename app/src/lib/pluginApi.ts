@@ -1,7 +1,7 @@
 import i18n from "./i18n";
 import * as backendIpc from "./ipc";
 import {pushToast, type ToastKind} from "./toast";
-import {registerPluginPage, type PluginPage} from "./pluginStore";
+import {registerPluginPage, usePluginStore, type PluginPage} from "./pluginStore";
 import {safelyCleanup} from "./pluginLifecycle";
 
 export type FrontendPluginPage = Omit<PluginPage, "id" | "pluginId"> & {id: string};
@@ -11,8 +11,12 @@ export type FrontendPluginApi = {
     theme: {current(): string; onChange(callback: () => void): () => void};
     i18n: {locale(): string; t(key: string, values?: Record<string, unknown>): string; onChange(callback: () => void): () => void};
     config: {get(): Promise<Record<string, unknown>>; set(value: Record<string, unknown>): Promise<void>};
-    backend: {invoke<T>(method: string, params?: unknown): Promise<T>};
-    ui: {registerPage(page: FrontendPluginPage): () => void; showToast(message: string, kind?: ToastKind): void};
+    backend: {
+        invoke<T>(method: string, params?: unknown): Promise<T>;
+        request<T>(moduleId: string, method: string, payload: unknown): Promise<T>;
+        onEvent(name: string, callback: (data: unknown) => void): () => void;
+    };
+    ui: {registerPage(page: FrontendPluginPage): () => void; openPage(id: string): void; showToast(message: string, kind?: ToastKind): void};
 };
 
 export function createPluginApi(pluginId: string, namespace: string, defaultLocale: string) {
@@ -62,8 +66,25 @@ export function createPluginApi(pluginId: string, namespace: string, defaultLoca
         },
         backend: {
             invoke: async <T,>(method: string, params: unknown = null) => { ensureActive(); return await backendIpc.invokePlugin(pluginId, method, params as backendIpc.JsonValue) as T; },
+            request: async <T,>(moduleId: string, method: string, payload: unknown) => {
+                ensureActive();
+                return await backendIpc.requestPluginPacket(pluginId, moduleId, method, payload as backendIpc.JsonValue) as T;
+            },
+            onEvent: (name, callback) => {
+                ensureActive();
+                return track(backendIpc.subscribeBackendEvent("plugin_event", event => {
+                    if (event.pluginId === pluginId && event.name === name) callback(event.data);
+                }));
+            },
         },
         ui: {
+            openPage: id => {
+                ensureActive();
+                const pageId = `${pluginId}:${id}`;
+                if (usePluginStore.getState().pages.some(page => page.id === pageId)) {
+                    window.dispatchEvent(new CustomEvent("sl:plugin-page", {detail: pageId}));
+                }
+            },
             registerPage: (page) => {
                 ensureActive();
                 if (!page.id || !page.title || typeof page.mount !== "function") throw new Error("invalid plugin page");

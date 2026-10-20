@@ -94,6 +94,28 @@ pub fn discard_app_update(state: State<'_, AppUpdater>) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn install_app_update(state: State<'_, AppUpdater>, version: String) -> Result<(), String> {
+    let _download = state.download.try_lock().map_err(|e| e.to_string())?;
+    let (update, bytes) = {
+        let mut pending = state.pending.lock().map_err(|e| e.to_string())?;
+        let (update, _) = pending
+            .as_ref()
+            .ok_or("No verified update ready to install")?;
+        if update.version != version {
+            return Err("The downloaded release changed; check for updates again".into());
+        }
+        pending
+            .take()
+            .ok_or("No verified update ready to install")?
+    };
+    // The Windows installer relaunches the new binary after replacing the running app.
+    update
+        .restart_after_install(true)
+        .install(bytes)
+        .map_err(|e| e.to_string())
+}
+
 pub fn install_on_exit(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<AppUpdater>();
     let pending = state.pending.lock().map_err(|e| e.to_string())?.take();

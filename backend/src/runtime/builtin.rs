@@ -2,7 +2,7 @@ use super::fuse::{enabled, ints, FuseRules};
 use crate::{
     pipeline::{
         Direction, ModuleAction, ModuleRegistry, Packet, PacketModule, PacketModuleInfo,
-        PacketOperation, PacketSubscription, PipelineConfig, GAME_RECORD, REPLAY_INJECTOR,
+        PacketOperation, PacketSubscription, PipelineConfig, REPLAY_INJECTOR,
     },
     services::Services,
 };
@@ -15,7 +15,6 @@ pub(super) fn builtin_modules(
 ) -> Vec<Box<dyn PacketModule>> {
     vec![
         Box::new(MethodFilter),
-        Box::new(GameRecord(services.clone())),
         Box::new(PacketLogger(services.clone())),
         Box::new(GameState(services.clone(), flow_id)),
         Box::new(UnlockIllustratedBook(services.clone())),
@@ -82,39 +81,6 @@ impl PacketModule for PacketLogger {
     fn process(&mut self, packet: &mut Packet, _options: &Value) -> ModuleAction {
         if let Some(services) = &self.0 {
             services.record_packet(packet);
-        }
-        ModuleAction::Forward
-    }
-}
-
-struct GameRecord(Option<Arc<Services>>);
-impl PacketModule for GameRecord {
-    fn id(&self) -> &'static str {
-        GAME_RECORD
-    }
-
-    fn subscriptions(&self, _options: &Value) -> Vec<PacketSubscription> {
-        vec![
-            subscription(
-                Some(Direction::Inbound),
-                Some("Res"),
-                Some(".lq.Lobby.fetchGameRecord"),
-                &[PacketOperation::Read, PacketOperation::Edit],
-            ),
-            subscription(
-                Some(Direction::Outbound),
-                Some("Req"),
-                Some(".lq.Lobby.fetchGameRecord"),
-                &[PacketOperation::Inject],
-            ),
-        ]
-    }
-
-    fn process(&mut self, packet: &mut Packet, _options: &Value) -> ModuleAction {
-        if let Some(services) = &self.0 {
-            if !services.packet_processing_allowed() { return ModuleAction::Forward; }
-            services.apply_game_record_override(packet);
-            services.publish_game_record(packet);
         }
         ModuleAction::Forward
     }
@@ -332,10 +298,10 @@ pub fn default_module_options(id: &str) -> Value {
 }
 
 pub fn normalize_config(mut config: PipelineConfig) -> PipelineConfig {
-    // The activity module is now provided by the standalone activity plugin.
+    // Retired built-in modules are now provided by standalone plugins.
     config
         .modules
-        .retain(|module| module.id != "limited_time_activity");
+        .retain(|module| !["limited_time_activity", "game_record"].contains(&module.id.as_str()));
     let defaults = PipelineConfig::default();
     for module in &mut config.modules {
         if module.options.is_null() {

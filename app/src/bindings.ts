@@ -59,6 +59,9 @@ async backendSetPluginConfig(id: string, value: JsonValue) : Promise<null> {
 async backendInvokePlugin(id: string, method: string, params: JsonValue) : Promise<JsonValue> {
     return await TAURI_INVOKE("backend_invoke_plugin", { id, method, params });
 },
+async backendRequestPluginPacket(id: string, moduleId: string, method: string, payload: JsonValue) : Promise<JsonValue> {
+    return await TAURI_INVOKE("backend_request_plugin_packet", { id, moduleId, method, payload });
+},
 async backendRescanPlugins() : Promise<PluginInfo[]> {
     return await TAURI_INVOKE("backend_rescan_plugins");
 },
@@ -91,12 +94,6 @@ async backendSetPacketRecording(active: boolean) : Promise<PacketRecordingStatus
 },
 async backendReplayPacket(method: string, payload: Partial<{ [key in string]: JsonValue }>) : Promise<CommandResult> {
     return await TAURI_INVOKE("backend_replay_packet", { method, payload });
-},
-async backendFetchGameRecord(gameUuid: string) : Promise<CommandResult> {
-    return await TAURI_INVOKE("backend_fetch_game_record", { gameUuid });
-},
-async backendOverrideGameRecord(record: JsonValue) : Promise<CommandResult> {
-    return await TAURI_INVOKE("backend_override_game_record", { record });
 },
 async backendUpdateConfig(config: Partial<{ [key in string]: Partial<{ [key in string]: JsonValue }> }>) : Promise<null> {
     return await TAURI_INVOKE("backend_update_config", { config });

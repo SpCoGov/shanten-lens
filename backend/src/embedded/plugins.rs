@@ -5,6 +5,16 @@ use crate::plugins::{
 use serde_json::Value;
 
 impl BackendRuntime {
+    pub async fn request_plugin_packet(&self, id: String, module_id: String, method: String, payload: Value) -> Result<Value, String> {
+        if method.is_empty() || method.len() > 200 || !payload.is_object() {
+            return Err("invalid-payload".into());
+        }
+        let source = self.state.plugins.injection_source(&id, &module_id, &method).map_err(|error| error.to_string())?;
+        let config = self.state.pipeline.read().await.clone();
+        let (_, response) = self.state.proxy.inject(&method, &payload, std::time::Duration::from_secs(12), config, &source).await?;
+        Ok(response)
+    }
+
     pub fn plugins(&self) -> Vec<PluginInfo> {
         self.state.plugins.list()
     }
