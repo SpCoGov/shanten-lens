@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "version": 3,
+  "version": 4,
   "items": [
     {
       "id": 600010,
@@ -688,7 +688,7 @@
           "chs_t": "關卡開始時，額外翻開1張寶牌指示牌（最多10張）",
           "jp": "ステージ開始時、追加でドラ表示牌を1枚めくる。",
           "en": "At the start of the level, reveal 1 extra Dora indicator (up to 10 total).",
-          "kr": "스테이시 시작 시, 도라표시패 1장을 추가로 공개한다(최대 10장)."
+          "kr": "스테이지 시작 시, 도라표시패 1장을 추가로 공개한다(최대 10장)."
         },
         "price": null,
         "sell_price": null,
@@ -904,8 +904,8 @@
   ],
   "source": {
     "client_url": "https://game.maj-soul.com/1/",
-    "product_version": "4.0.47",
-    "bundle_hash": "32a94aec59119f2bc06bb675989674a810cdeaa7",
+    "product_version": "4.0.51",
+    "bundle_hash": "aeed8ac264cef3020e36e86df584f1b71a7437ee",
     "issuer": "chs_t",
     "name_language": "jp"
   }

@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "version": 8,
+  "version": 9,
   "items": [
     {
       "id": 1,
       "icon_id": 1,
       "name": "嶺上の花",
-      "rarity": "BLUE",
-      "sell_price": 6,
+      "rarity": "GREEN",
+      "sell_price": 3,
       "metadata": {
         "data_id": 10,
         "names": {
@@ -18,21 +18,21 @@
           "kr": "산봉우리의 꽃"
         },
         "descriptions": {
-          "chs": "听牌后，开杠时必定可以岭上开花。岭上开花额外[tag]+4[/tag]番",
-          "chs_t": "聽牌後，開槓時必定可以嶺上開花。嶺上開花額外[tag]+4[/tag]番",
-          "jp": "テンパイ後、カンすると必ずツモ和了になる。さらに嶺上開花が[tag]+4[/tag]飜になる。",
-          "en": "After reaching Tenpai, calling a Kan guarantees a win with Yaku: After a Kan and grants an additional [tag]+4[/tag] Han.",
-          "kr": "텐파이 후 깡을 하면 반드시 영상개화가 된다. 영상개화 추가 [tag]+4[/tag]판."
+          "chs": "听牌后，开杠时必定可以岭上开花。岭上开花额外[tag]+16[/tag]番",
+          "chs_t": "聽牌後，開槓時必定可以嶺上開花。嶺上開花額外[tag]+16[/tag]番",
+          "jp": "テンパイ後、カンすると必ずツモ和了になる。さらに嶺上開花が[tag]+16[/tag]飜になる。",
+          "en": "After reaching Tenpai, calling a Kan guarantees a win with Yaku: After a Kan and grants an additional [tag]+16[/tag] Han.",
+          "kr": "텐파이 후 깡을 하면 반드시 영상개화가 된다. 영상개화 추가 [tag]+16[/tag]판."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_0001.png",
         "icon_id": 1,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       },
       "plus_name": "嶺上の花+",
-      "plus_sell_price": 6,
+      "plus_sell_price": 3,
       "plus_metadata": {
         "data_id": 11,
         "names": {
@@ -43,26 +43,26 @@
           "kr": "산봉우리의 꽃+"
         },
         "descriptions": {
-          "chs": "听牌后，开杠时必定可以岭上开花。岭上开花额外[tag]+8[/tag]番",
-          "chs_t": "聽牌後，開槓時必定可以嶺上開花。嶺上開花額外[tag]+8[/tag]番",
-          "jp": "テンパイ後、カンすると必ずツモ和了になる。さらに嶺上開花が[tag]+8[/tag]飜になる。",
-          "en": "After reaching Tenpai, calling a Kan guarantees a win with Yaku: After a Kan and grants an additional [tag]+8[/tag] Han.",
-          "kr": "텐파이 후 깡을 하면 반드시 영상개화가 된다. 영상개화 추가 [tag]+8[/tag]판."
+          "chs": "听牌后，开杠时必定可以岭上开花。岭上开花额外[tag]+32[/tag]番",
+          "chs_t": "聽牌後，開槓時必定可以嶺上開花。嶺上開花額外[tag]+32[/tag]番",
+          "jp": "テンパイ後、カンすると必ずツモ和了になる。さらに嶺上開花が[tag]+32[/tag]飜になる。",
+          "en": "After reaching Tenpai, calling a Kan guarantees a win with Yaku: After a Kan and grants an additional [tag]+32[/tag] Han.",
+          "kr": "텐파이 후 깡을 하면 반드시 영상개화가 된다. 영상개화 추가 [tag]+32[/tag]판."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_0001.png",
         "icon_id": 1,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       }
     },
     {
       "id": 2,
       "icon_id": 2,
       "name": "海底皓月",
-      "rarity": "BLUE",
-      "sell_price": 6,
+      "rarity": "GREEN",
+      "sell_price": 3,
       "metadata": {
         "data_id": 20,
         "names": {
@@ -79,15 +79,15 @@
           "en": "After reaching Tenpai, the last drawn tile guarantees a win with Yaku: Under the Sea.",
           "kr": "텐파이 후 마지막으로 가져온 패는 반드시 해저로월로 화료."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_0002.png",
         "icon_id": 2,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       },
       "plus_name": "海底皓月+",
-      "plus_sell_price": 6,
+      "plus_sell_price": 3,
       "plus_metadata": {
         "data_id": 21,
         "names": {
@@ -98,18 +98,18 @@
           "kr": "바다 아래 달빛+"
         },
         "descriptions": {
-          "chs": "听牌后，最后1张摸牌必定海底摸月和牌。海底摸月额外[tag]+8[/tag]番",
-          "chs_t": "聽牌後，最後1張摸牌必定海底摸月和牌。海底摸月額外[tag]+8[/tag]番",
-          "jp": "テンパイ後、最後のツモ順で必ずツモ和了になる。さらに海底摸月が[tag]+8[/tag]飜になる。",
-          "en": "After reaching Tenpai, the last drawn tile guarantees a win with Yaku: Under the Sea and grants an additional [tag]+8[/tag] Han.",
-          "kr": "텐파이 후 마지막으로 가져온 패는 반드시 해저로월로 화료. 해저로월 추가 [tag]+8[/tag]판."
+          "chs": "听牌后，最后1张摸牌必定海底摸月和牌。海底摸月额外[tag]+32[/tag]番",
+          "chs_t": "聽牌後，最後1張摸牌必定海底摸月和牌。海底摸月額外[tag]+32[/tag]番",
+          "jp": "テンパイ後、最後のツモ順で必ずツモ和了になる。さらに海底摸月が[tag]+32[/tag]飜になる。",
+          "en": "After reaching Tenpai, the last drawn tile guarantees a win with Yaku: Under the Sea and grants an additional [tag]+32[/tag] Han.",
+          "kr": "텐파이 후 마지막으로 가져온 패는 반드시 해저로월로 화료. 해저로월 추가 [tag]+32[/tag]판."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_0002.png",
         "icon_id": 2,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       }
     },
     {
@@ -134,7 +134,7 @@
           "en": "After calling a Kan, the Kan tiles become Soul tiles.",
           "kr": "깡을 한 뒤, 깡을 한 패는 혼패가 된다."
         },
-        "price": 9,
+        "price": 6,
         "sell_price": 3,
         "icon_name": "fu_0004.png",
         "icon_id": 4,
@@ -159,7 +159,7 @@
           "en": "After calling a Kan, the Kan tiles and 1 random tile type become Soul tiles.",
           "kr": "깡을 한 뒤, 깡을 한 패와 무작위 패 하나가 혼패가 된다."
         },
-        "price": 9,
+        "price": 6,
         "sell_price": 3,
         "icon_name": "fu_0004.png",
         "icon_id": 4,
@@ -248,7 +248,7 @@
         "sell_price": 9,
         "icon_name": "fu_0006.png",
         "icon_id": 6,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       },
       "plus_name": "羽化登仙+",
@@ -273,7 +273,7 @@
         "sell_price": 9,
         "icon_name": "fu_0006.png",
         "icon_id": 6,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       }
     },
@@ -513,11 +513,11 @@
           "kr": "역만 마스터"
         },
         "descriptions": {
-          "chs": "和牌时，如果完成了役满役种，则本护身符获得[tag]x0.8[/tag]番（当前为[tag]x{0}[/tag]番）",
-          "chs_t": "和牌時，如果完成了役滿役種，則本護身符獲得[tag]x0.8[/tag]番（當前為[tag]x{0}[/tag]番）",
-          "jp": "このお守りは、和了時、役満を達成した場合、1種類達成につきボーナス飜数を [tag]0.8[/tag] 飜獲得する。（現在は [tag]x{0}[/tag] ）",
-          "en": "When winning, if a Yakuman is completed, this talisman gets [tag]x0.8[/tag] Han (currently [tag]x{0}[/tag] Han).",
-          "kr": "역만으로 화료 시 부적 [tag]x0.8[/tag]판 획득. (현재 [tag]x{0}[/tag]판)"
+          "chs": "和牌时，如果完成了役满役种，则本护身符获得[tag]x1[/tag]番（当前为[tag]x{0}[/tag]番）",
+          "chs_t": "和牌時，如果完成了役滿役種，則本護身符獲得[tag]x1[/tag]番（當前為[tag]x{0}[/tag]番）",
+          "jp": "このお守りは、和了時、役満を達成した場合、[tag]x1[/tag]飜を獲得する。（現在は[tag]x{0}[/tag]飜）",
+          "en": "When winning, if a Yakuman is completed, this talisman gets [tag]x1[/tag] Han (currently [tag]x{0}[/tag] Han).",
+          "kr": "역만으로 화료 시 부적 [tag]x1[/tag]판 획득. (현재 [tag]x{0}[/tag]판)"
         },
         "price": 18,
         "sell_price": 9,
@@ -538,11 +538,11 @@
           "kr": "역만 마스터+"
         },
         "descriptions": {
-          "chs": "和牌时，如果完成了役满役种，则本护身符获得[tag]x1.2[/tag]番（当前为[tag]x{0}[/tag]番）",
-          "chs_t": "和牌時，如果完成了役滿役種，則本護身符獲得[tag]x1.2[/tag]番（當前為[tag]x{0}[/tag]番）",
-          "jp": "このお守りは、和了時、役満を達成した場合、1種類達成につきボーナス飜数を [tag]1.2[/tag] 飜獲得する。（現在は [tag]x{0}[/tag] ）",
-          "en": "When winning, if a Yakuman is completed, this talisman gets [tag]x1.2[/tag] Han (currently [tag]x{0}[/tag] Han).",
-          "kr": "역만으로 화료 시 부적 [tag]x1.2[/tag]판 획득. (현재 [tag]x{0}[/tag]판)"
+          "chs": "和牌时，如果完成了役满役种，则本护身符获得[tag]x1.5[/tag]番（当前为[tag]x{0}[/tag]番）",
+          "chs_t": "和牌時，如果完成了役滿役種，則本護身符獲得[tag]x1.5[/tag]番（當前為[tag]x{0}[/tag]番）",
+          "jp": "このお守りは、和了時、役満を達成した場合、[tag]x1.5[/tag]飜を獲得する。（現在は[tag]x{0}[/tag]飜）",
+          "en": "When winning, if a Yakuman is completed, this talisman gets [tag]x1.5[/tag] Han (currently [tag]x{0}[/tag] Han).",
+          "kr": "역만으로 화료 시 부적 [tag]x1.5[/tag]판 획득. (현재 [tag]x{0}[/tag]판)"
         },
         "price": 18,
         "sell_price": 9,
@@ -633,7 +633,7 @@
         "sell_price": 9,
         "icon_name": "fu_0014.png",
         "icon_id": 14,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       },
       "plus_name": "効率と賞与+",
@@ -658,7 +658,7 @@
         "sell_price": 9,
         "icon_name": "fu_0014.png",
         "icon_id": 14,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       }
     },
@@ -798,7 +798,7 @@
         "sell_price": 12,
         "icon_name": "fu_0017.png",
         "icon_id": 17,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "PURPLE"
       },
       "plus_name": "天の恵+",
@@ -823,7 +823,7 @@
         "sell_price": 12,
         "icon_name": "fu_0017.png",
         "icon_id": 17,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "PURPLE"
       }
     },
@@ -908,7 +908,7 @@
         "sell_price": 6,
         "icon_name": "fu_0019.png",
         "icon_id": 19,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       },
       "plus_name": "蓄電池+",
@@ -933,7 +933,7 @@
         "sell_price": 6,
         "icon_name": "fu_0019.png",
         "icon_id": 19,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       }
     },
@@ -1118,17 +1118,17 @@
           "kr": "승승장구"
         },
         "descriptions": {
-          "chs": "每关第1次和牌时，如果和牌的番数在[tag]13[/tag]番及以上，则获得[tag]13[/tag]星币",
-          "chs_t": "每關第1次和牌時，如果和牌的番數在[tag]13[/tag]番及以上，獲得[tag]13[/tag]星幣",
-          "jp": "ステージ1回目の和了時、[tag]13[/tag]飜以上を達成した場合、勝ち星の獲得数に[tag]+13[/tag]。",
-          "en": "For the first win in a level, if the winning hand has [tag]13[/tag] Han or more, get [tag]13[/tag] Star Coins.",
-          "kr": "매 스테이지 첫번째 화료 시, 판수가 13판 이상일 경우, [tag]13[/tag]스타코인 획득."
+          "chs": "每关第1次和牌时，如果和牌的番数在[tag]78[/tag]番及以上，则获得[tag]13[/tag]星币",
+          "chs_t": "每關第1次和牌時，如果和牌的番數在[tag]78[/tag]番及以上，獲得[tag]13[/tag]星幣",
+          "jp": "ステージ1回目の和了時、[tag]78[/tag]飜以上を達成した場合、勝ち星の獲得数に[tag]+13[/tag]。",
+          "en": "For the first win in a level, if the winning hand has [tag]78[/tag] Han or more, get [tag]13[/tag] Star Coins.",
+          "kr": "매 스테이지 첫번째 화료 시, 판수가 78판 이상일 경우, [tag]13[/tag]스타코인 획득."
         },
         "price": 12,
         "sell_price": 6,
         "icon_name": "fu_0024.png",
         "icon_id": 24,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "BLUE"
       },
       "plus_name": "益々繁盛+",
@@ -1143,17 +1143,17 @@
           "kr": "승승장구+"
         },
         "descriptions": {
-          "chs": "每关第1次和牌时，如果和牌的番数在[tag]10[/tag]番及以上，则获得[tag]13[/tag]星币",
-          "chs_t": "每關第1次和牌時，如果和牌的番數在[tag]10[/tag]番及以上，獲得[tag]13[/tag]星幣",
-          "jp": "ステージ1回目の和了時、[tag]10[/tag]飜以上を達成した場合、勝ち星の獲得数に[tag]+13[/tag]。",
-          "en": "For the first win in a level, if the winning hand has [tag]10[/tag] Han or more, get [tag]13[/tag] Star Coins.",
-          "kr": "매 스테이지 첫번째 화료 시, 판수가 10판 이상일 경우, [tag]13[/tag]스타코인 획득."
+          "chs": "每关第1次和牌时，如果和牌的番数在[tag]78[/tag]番及以上，则获得[tag]26[/tag]星币",
+          "chs_t": "每關第1次和牌時，如果和牌的番數在[tag]78[/tag]番及以上，獲得[tag]26[/tag]星幣",
+          "jp": "ステージ1回目の和了時、[tag]78[/tag]飜以上を達成した場合、勝ち星の獲得数に[tag]+26[/tag]。",
+          "en": "For the first win in a level, if the winning hand has [tag]78[/tag] Han or more, get [tag]26[/tag] Star Coins.",
+          "kr": "매 스테이지 첫번째 화료 시, 판수가 78판 이상일 경우, [tag]26[/tag]스타코인 획득."
         },
         "price": 12,
         "sell_price": 6,
         "icon_name": "fu_0024.png",
         "icon_id": 24,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "BLUE"
       }
     },
@@ -1183,7 +1183,7 @@
         "sell_price": 3,
         "icon_name": "fu_0025.png",
         "icon_id": 25,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "資本形成+",
@@ -1208,7 +1208,7 @@
         "sell_price": 3,
         "icon_name": "fu_0025.png",
         "icon_id": 25,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -1448,11 +1448,11 @@
           "kr": "현상금 사냥꾼"
         },
         "descriptions": {
-          "chs": "听牌时，如果手牌没有重复的牌，分数[tag]x4[/tag]",
-          "chs_t": "聽牌時，如果手牌沒有重複的牌，分數[tag]x4[/tag]",
-          "jp": "アガリ牌を除き、手牌に同じ牌が存在しない場合、スコアが[tag]x4[/tag]。",
-          "en": "When reaching Tenpai, if there are no duplicate tiles in hand, the PT is [tag]multiplied by 4[/tag].",
-          "kr": "텐파이 시, 손패에 중복된 패가 없으면 점수 [tag]x4[/tag]."
+          "chs": "听牌时，如果手牌没有重复的牌，分数[tag]x10[/tag]",
+          "chs_t": "聽牌時，如果手牌沒有重複的牌，分數[tag]x10[/tag]",
+          "jp": "アガリ牌を除き、手牌に同じ牌が存在しない場合、スコアが[tag]x10[/tag]。",
+          "en": "When reaching Tenpai, if there are no duplicate tiles in hand, the PT is [tag]multiplied by 10[/tag].",
+          "kr": "텐파이 시, 손패에 중복된 패가 없으면 점수 [tag]x10[/tag]."
         },
         "price": 6,
         "sell_price": 3,
@@ -1473,11 +1473,11 @@
           "kr": "현상금 사냥꾼+"
         },
         "descriptions": {
-          "chs": "听牌时，如果手牌没有重复的牌，分数[tag]x5[/tag]",
-          "chs_t": "聽牌時，如果手牌沒有重複的牌，分數[tag]x5[/tag]",
-          "jp": "アガリ牌を除き、手牌に同じ牌が存在しない場合、スコアが[tag]x5[/tag]。",
-          "en": "When reaching Tenpai, if there are no duplicate tiles in hand, the PT is [tag]multiplied by 5[/tag].",
-          "kr": "텐파이 시, 손패에 중복된 패가 없으면 점수 [tag]x5[/tag]."
+          "chs": "听牌时，如果手牌没有重复的牌，分数[tag]x15[/tag]",
+          "chs_t": "聽牌時，如果手牌沒有重複的牌，分數[tag]x15[/tag]",
+          "jp": "アガリ牌を除き、手牌に同じ牌が存在しない場合、スコアが[tag]x15[/tag]。",
+          "en": "When reaching Tenpai, if there are no duplicate tiles in hand, the PT is [tag]multiplied by 15[/tag].",
+          "kr": "텐파이 시, 손패에 중복된 패가 없으면 점수 [tag]x15[/tag]."
         },
         "price": 6,
         "sell_price": 3,
@@ -1953,7 +1953,7 @@
         "sell_price": 6,
         "icon_name": "fu_0040.png",
         "icon_id": 40,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       },
       "plus_name": "ノベルティ+",
@@ -1978,7 +1978,7 @@
         "sell_price": 6,
         "icon_name": "fu_0040.png",
         "icon_id": 40,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       }
     },
@@ -2338,7 +2338,7 @@
         "sell_price": 3,
         "icon_name": "fu_0047.png",
         "icon_id": 47,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "新鮮のドラ+",
@@ -2363,7 +2363,7 @@
         "sell_price": 3,
         "icon_name": "fu_0047.png",
         "icon_id": 47,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -2668,7 +2668,7 @@
         "sell_price": 3,
         "icon_name": "fu_0058.png",
         "icon_id": 58,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "チャンス！+",
@@ -2693,7 +2693,7 @@
         "sell_price": 3,
         "icon_name": "fu_0058.png",
         "icon_id": 58,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -2943,7 +2943,7 @@
         "sell_price": 3,
         "icon_name": "fu_0064.png",
         "icon_id": 64,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "幻覚キノコ+",
@@ -2968,7 +2968,7 @@
         "sell_price": 3,
         "icon_name": "fu_0064.png",
         "icon_id": 64,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -3218,7 +3218,7 @@
         "sell_price": 3,
         "icon_name": "fu_0069.png",
         "icon_id": 69,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "道具屋常連+",
@@ -3243,7 +3243,7 @@
         "sell_price": 3,
         "icon_name": "fu_0069.png",
         "icon_id": 69,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -3493,7 +3493,7 @@
         "sell_price": 3,
         "icon_name": "fu_0074.png",
         "icon_id": 74,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "四君子：梅+",
@@ -3518,7 +3518,7 @@
         "sell_price": 3,
         "icon_name": "fu_0074.png",
         "icon_id": 74,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -3548,7 +3548,7 @@
         "sell_price": 3,
         "icon_name": "fu_0075.png",
         "icon_id": 75,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "四君子：蘭+",
@@ -3573,7 +3573,7 @@
         "sell_price": 3,
         "icon_name": "fu_0075.png",
         "icon_id": 75,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -3603,7 +3603,7 @@
         "sell_price": 3,
         "icon_name": "fu_0076.png",
         "icon_id": 76,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "四君子：竹+",
@@ -3628,7 +3628,7 @@
         "sell_price": 3,
         "icon_name": "fu_0076.png",
         "icon_id": 76,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -3658,7 +3658,7 @@
         "sell_price": 3,
         "icon_name": "fu_0077.png",
         "icon_id": 77,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "四君子：菊+",
@@ -3683,7 +3683,7 @@
         "sell_price": 3,
         "icon_name": "fu_0077.png",
         "icon_id": 77,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -3713,7 +3713,7 @@
         "sell_price": 12,
         "icon_name": "fu_0078.png",
         "icon_id": 78,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "PURPLE"
       },
       "plus_name": "魂天神社+",
@@ -3738,7 +3738,7 @@
         "sell_price": 12,
         "icon_name": "fu_0078.png",
         "icon_id": 78,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "PURPLE"
       }
     },
@@ -3823,7 +3823,7 @@
         "sell_price": 6,
         "icon_name": "fu_0080.png",
         "icon_id": 80,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       },
       "plus_name": "一目惚れ+",
@@ -3848,7 +3848,7 @@
         "sell_price": 6,
         "icon_name": "fu_0080.png",
         "icon_id": 80,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       }
     },
@@ -3933,7 +3933,7 @@
         "sell_price": 3,
         "icon_name": "fu_0082.png",
         "icon_id": 82,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "ワンの財宝+",
@@ -3958,7 +3958,7 @@
         "sell_price": 3,
         "icon_name": "fu_0082.png",
         "icon_id": 82,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -4428,7 +4428,7 @@
         "sell_price": 6,
         "icon_name": "fu_0095.png",
         "icon_id": 95,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       },
       "plus_name": "ゴールドディガー+",
@@ -4453,7 +4453,7 @@
         "sell_price": 6,
         "icon_name": "fu_0095.png",
         "icon_id": 95,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       }
     },
@@ -4528,17 +4528,17 @@
           "kr": "병뚜껑 당첨"
         },
         "descriptions": {
-          "chs": "开杠后，公开后[tag]4[/tag]张待摸牌",
-          "chs_t": "開槓後，公開後[tag]4[/tag]張待摸牌",
-          "jp": "カンする時、次の[tag]4[/tag]枚の牌が表牌になる。",
-          "en": "After calling a Kan, reveal the next [tag]4[/tag] tiles in the Tile Wall.",
-          "kr": "깡을 한 뒤, 남은 패 [tag]+4[/tag]장 공개."
+          "chs": "开杠后，公开后[tag]12[/tag]张待摸牌",
+          "chs_t": "開槓後，公開後[tag]12[/tag]張待摸牌",
+          "jp": "カンする時、次の[tag]12[/tag]枚の牌が表牌になる。",
+          "en": "After calling a Kan, reveal the next [tag]12[/tag] tiles in the Tile Wall.",
+          "kr": "깡을 한 뒤, 남은 패 [tag]+12[/tag]장 공개."
         },
         "price": 6,
         "sell_price": 3,
         "icon_name": "fu_0097.png",
         "icon_id": 97,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "GREEN"
       },
       "plus_name": "ラッキーキャップ+",
@@ -4553,17 +4553,17 @@
           "kr": "병뚜껑 당첨+"
         },
         "descriptions": {
-          "chs": "开杠后，公开后[tag]6[/tag]张待摸牌",
-          "chs_t": "開槓後，公開後[tag]6[/tag]張待摸牌",
-          "jp": "カンする時、次の[tag]6[/tag]枚の牌が表牌になる。",
-          "en": "After calling a Kan, reveal the next [tag]6[/tag] tiles in the Tile Wall.",
-          "kr": "깡을 한 뒤, 남은 패 [tag]+6[/tag]장 공개."
+          "chs": "开杠后，公开后[tag]20[/tag]张待摸牌",
+          "chs_t": "開槓後，公開後[tag]20[/tag]張待摸牌",
+          "jp": "カンする時、次の[tag]20[/tag]枚の牌が表牌になる。",
+          "en": "After calling a Kan, reveal the next [tag]20[/tag] tiles in the Tile Wall.",
+          "kr": "깡을 한 뒤, 남은 패 [tag]+20[/tag]장 공개."
         },
         "price": 6,
         "sell_price": 3,
         "icon_name": "fu_0097.png",
         "icon_id": 97,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "GREEN"
       }
     },
@@ -4993,11 +4993,11 @@
           "kr": "문방사보+"
         },
         "descriptions": {
-          "chs": "在你打出[tag]9[/tag]张字牌后，使随机1种牌变为魂牌（还剩[tag]{0}[/tag]张字牌）",
-          "chs_t": "在你打出[tag]9[/tag]張字牌後，使隨機1種牌變為魂牌（還剩[tag]{0}[/tag]張字牌）",
-          "jp": "字牌を[tag]9[/tag]枚打牌するごとに、ランダムで1種の牌が魂牌になる。次回効果発動まであと[tag]{0}[/tag]枚。",
-          "en": "After [tag]9[/tag] Honor tiles are discarded, make 1 random tile type become Soul tiles ([tag]{0}[/tag] Honor tile(s) to go).",
-          "kr": "자패 [tag]9[/tag]장을 버린 후, 임의의 1종류 패가 혼패로 변한다. (현재 자패 [tag]{0}[/tag]장 남음)"
+          "chs": "在你打出[tag]12[/tag]张字牌后，使随机2种牌变为魂牌（还剩[tag]{0}[/tag]张字牌）",
+          "chs_t": "在你打出[tag]12[/tag]張字牌後，使隨機2種牌變為魂牌（還剩[tag]{0}[/tag]張字牌）",
+          "jp": "字牌を[tag]12[/tag]枚打牌するごとに、ランダムで2種の牌が魂牌になる。次回効果発動まであと[tag]{0}[/tag]枚。",
+          "en": "After [tag]12[/tag] Honor tiles are discarded, make 2 random tile type become Soul tiles ([tag]{0}[/tag] Honor tile(s) to go).",
+          "kr": "자패 [tag]12[/tag]장을 버린 후, 임의의 2종류 패가 혼패로 변한다. (현재 자패 [tag]{0}[/tag]장 남음)"
         },
         "price": 6,
         "sell_price": 3,
@@ -5408,11 +5408,11 @@
           "kr": "불법 폭죽"
         },
         "descriptions": {
-          "chs": "锁定[tag]3[/tag]张待摸牌。每锁定6张牌后本护身符获得[tag]x0.5[/tag]番（当前为[tag]x{0}[/tag]番，还需锁定[tag]{1}[/tag]张）",
-          "chs_t": "鎖定[tag]3[/tag]張待摸牌。每鎖定6張牌後本護身符獲得[tag]x0.5[/tag]番（當前為[tag]x{0}[/tag]番，還需鎖定[tag]{1}[/tag]張）",
-          "jp": "山最後の[tag]3[/tag]枚の牌をロックする。山の牌が6枚ロックされるごとに、[tag]x0.5[/tag]飜を獲得する（現在は[tag]{0}[/tag]飜）。次回効果発動まであと[tag]{1}[/tag]枚。",
-          "en": "Lock [tag]3[/tag] tiles in the Tile Wall. For every 6 tiles locked, this talisman gets [tag]x0.5[/tag] Han (currently [tag]x{0}[/tag] Han; still [tag]{1}[/tag] tile(s) to lock).",
-          "kr": "남은 패 [tag]3[/tag]장 고정. 6장 고정할 때마다, 부적 x0.5판. (현재 [tag]x{0}[/tag]판, 남은 고정 수 [tag]{1}[/tag]장)"
+          "chs": "锁定[tag]3[/tag]张待摸牌。每锁定6张牌后本护身符获得[tag]x1[/tag]番（当前为[tag]x{0}[/tag]番，还需锁定[tag]{1}[/tag]张）",
+          "chs_t": "鎖定[tag]3[/tag]張待摸牌。每鎖定6張牌後本護身符獲得[tag]x1[/tag]番（當前為[tag]x{0}[/tag]番，還需鎖定[tag]{1}[/tag]張）",
+          "jp": "山最後の[tag]3[/tag]枚の牌をロックする。山の牌が6枚ロックされるごとに、[tag]x1[/tag]飜を獲得する（現在は[tag]{0}[/tag]飜）。次回効果発動まであと[tag]{1}[/tag]枚。",
+          "en": "Lock [tag]3[/tag] tiles in the Tile Wall. For every 6 tiles locked, this talisman gets [tag]x1[/tag] Han (currently [tag]x{0}[/tag] Han; still [tag]{1}[/tag] tile(s) to lock).",
+          "kr": "남은 패 [tag]3[/tag]장 고정. 6장 고정할 때마다, 부적 x1판. (현재 [tag]x{0}[/tag]판, 남은 고정 수 [tag]{1}[/tag]장)"
         },
         "price": 12,
         "sell_price": 6,
@@ -5433,11 +5433,11 @@
           "kr": "불법 폭죽+"
         },
         "descriptions": {
-          "chs": "锁定[tag]3[/tag]张待摸牌。每锁定6张牌后本护身符获得[tag]x1[/tag]番（当前为[tag]x{0}[/tag]番，还需锁定[tag]{1}[/tag]张）",
-          "chs_t": "鎖定[tag]3[/tag]張待摸牌。每鎖定6張牌後本護身符獲得[tag]x1[/tag]番（當前為[tag]x{0}[/tag]番，還需鎖定[tag]{1}[/tag]張）",
-          "jp": "山最後の[tag]3[/tag]枚の牌をロックする。山の牌が6枚ロックされるごとに、[tag]x1[/tag]飜を獲得する（現在は[tag]{0}[/tag]飜）。次回効果発動まであと[tag]{1}[/tag]枚。",
-          "en": "Lock [tag]3[/tag] tiles in the Tile Wall. For every 6 tiles locked, this talisman gets [tag]x1[/tag] Han (currently [tag]x{0}[/tag] Han; still [tag]{1}[/tag] tile(s) to lock).",
-          "kr": "남은 패 [tag]3[/tag]장 고정. 6장 고정할 때마다, 부적 x1판. (현재 [tag]x{0}[/tag]판, 남은 고정 수 [tag]{1}[/tag]장)"
+          "chs": "锁定[tag]3[/tag]张待摸牌。每锁定6张牌后本护身符获得[tag]x1.5[/tag]番（当前为[tag]x{0}[/tag]番，还需锁定[tag]{1}[/tag]张）",
+          "chs_t": "鎖定[tag]3[/tag]張待摸牌。每鎖定6張牌後本護身符獲得[tag]x1.5[/tag]番（當前為[tag]x{0}[/tag]番，還需鎖定[tag]{1}[/tag]張）",
+          "jp": "山最後の[tag]3[/tag]枚の牌をロックする。山の牌が6枚ロックされるごとに、[tag]x1.5[/tag]飜を獲得する（現在は[tag]{0}[/tag]飜）。次回効果発動まであと[tag]{1}[/tag]枚。",
+          "en": "Lock [tag]3[/tag] tiles in the Tile Wall. For every 6 tiles locked, this talisman gets [tag]x1.5[/tag] Han (currently [tag]x{0}[/tag] Han; still [tag]{1}[/tag] tile(s) to lock).",
+          "kr": "남은 패 [tag]3[/tag]장 고정. 6장 고정할 때마다, 부적 x1.5판. (현재 [tag]x{0}[/tag]판, 남은 고정 수 [tag]{1}[/tag]장)"
         },
         "price": 12,
         "sell_price": 6,
@@ -5583,7 +5583,7 @@
         "sell_price": 6,
         "icon_name": "fu_0116.png",
         "icon_id": 116,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "BLUE"
       },
       "plus_name": "太陽盗みの大泥棒+",
@@ -5608,7 +5608,7 @@
         "sell_price": 6,
         "icon_name": "fu_0116.png",
         "icon_id": 116,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "BLUE"
       }
     },
@@ -6013,11 +6013,11 @@
           "kr": "쾌속 열차"
         },
         "descriptions": {
-          "chs": "和牌时，如果完成了七对子，本护身符获得[tag]x0.2[/tag]番（当前为[tag]x{0}[/tag]番）",
-          "chs_t": "和牌時，如果完成了七對子，本護身符獲得[tag]x0.2[/tag]番（當前為[tag]x{0}[/tag]番）",
-          "jp": "七対子を和了するごとに、[tag]x0.2[/tag]飜を獲得する。（現在は[tag]{0}[/tag]飜）",
-          "en": "When a win includes Seven Pairs, this talisman gets [tag]x0.2[/tag] Han (currently [tag]x{0}[/tag] Han).",
-          "kr": "화료 시, 치또이쯔를 포함하고 있다면, 부적[tag]x0.2[/tag]판 (현재 [tag]x{0}[/tag]판)"
+          "chs": "和牌时，如果完成了七对子，本护身符获得[tag]x0.6[/tag]番（当前为[tag]x{0}[/tag]番）",
+          "chs_t": "和牌時，如果完成了七對子，本護身符獲得[tag]x0.6[/tag]番（當前為[tag]x{0}[/tag]番）",
+          "jp": "七対子を和了するごとに、[tag]x0.6[/tag]飜を獲得する。（現在は[tag]{0}[/tag]飜）",
+          "en": "When a win includes Seven Pairs, this talisman gets [tag]x0.6[/tag] Han (currently [tag]x{0}[/tag] Han).",
+          "kr": "화료 시, 치또이쯔를 포함하고 있다면, 부적[tag]x0.6[/tag]판 (현재 [tag]x{0}[/tag]판)"
         },
         "price": 12,
         "sell_price": 6,
@@ -6038,11 +6038,11 @@
           "kr": "쾌속 열차+"
         },
         "descriptions": {
-          "chs": "和牌时，如果完成了七对子，本护身符获得[tag]x0.4[/tag]番（当前为[tag]x{0}[/tag]番）",
-          "chs_t": "和牌時，如果完成了七對子，本護身符獲得[tag]x0.4[/tag]番（當前為[tag]x{0}[/tag]番）",
-          "jp": "七対子を和了するごとに、[tag]x0.4[/tag]飜を獲得する。（現在は[tag]{0}[/tag]飜）",
-          "en": "When a win includes Seven Pairs, this talisman gets [tag]x0.4[/tag] Han (currently [tag]x{0}[/tag] Han).",
-          "kr": "화료 시, 치또이쯔를 포함하고 있다면, 부적[tag]x0.4[/tag]판 (현재 [tag]x{0}[/tag]판)"
+          "chs": "和牌时，如果完成了七对子，本护身符获得[tag]x1[/tag]番（当前为[tag]x{0}[/tag]番）",
+          "chs_t": "和牌時，如果完成了七對子，本護身符獲得[tag]x1[/tag]番（當前為[tag]x{0}[/tag]番）",
+          "jp": "七対子を和了するごとに、[tag]x1[/tag]飜を獲得する。（現在は[tag]{0}[/tag]飜）",
+          "en": "When a win includes Seven Pairs, this talisman gets [tag]x1[/tag] Han (currently [tag]x{0}[/tag] Han).",
+          "kr": "화료 시, 치또이쯔를 포함하고 있다면, 부적[tag]x1[/tag]판 (현재 [tag]x{0}[/tag]판)"
         },
         "price": 12,
         "sell_price": 6,
@@ -6111,8 +6111,8 @@
       "id": 138,
       "icon_id": 126,
       "name": "怠慢バイト",
-      "rarity": "BLUE",
-      "sell_price": 6,
+      "rarity": "ORANGE",
+      "sell_price": 9,
       "metadata": {
         "data_id": 1380,
         "names": {
@@ -6123,21 +6123,21 @@
           "kr": "농땡이 알바"
         },
         "descriptions": {
-          "chs": "[tag]x{0}[/tag]番。完成换牌后，如果你连续摸切9张及以上的牌，每张为本护身符获得[tag]x0.1[/tag]番（已累计[tag]{1}[/tag]张）",
-          "chs_t": "[tag]x{0}[/tag]番。完成換牌後，如果你連續摸切9張及以上的牌，每張為本護身符獲得[tag]x0.1[/tag]番（已累計[tag]{1}[/tag]張）",
-          "jp": "入替終了後、連続でツモ切りした牌が9枚以上の場合、9枚目以降の牌1枚ごとに、[tag]x0.1[/tag]飜を獲得する。（現在は[tag]{0}[/tag]飜）（現在の連続ツモ切り枚数は[tag]{1}[/tag]枚）",
-          "en": "[tag]x{0}[/tag] Han. After finishing with the tile exchange, if you consecutively draw and discard 9 or more tiles, each tile grants this talisman [tag]x0.1[/tag] Han (currently accumulated [tag]{1}[/tag] tiles).",
-          "kr": "[tag]x{0}[/tag]판. 패 교환 후, 연속으로 9장 이상 쯔모패를 버렸다면, 버린 패당 부적 [tag]x0.1[/tag]판. (현재 누계 [tag]{1}[/tag]장)"
+          "chs": "[tag]x{0}[/tag]番。完成换牌后，如果你连续摸切9张及以上的牌，每张为本护身符获得[tag]x0.3[/tag]番（已累计[tag]{1}[/tag]张）",
+          "chs_t": "[tag]x{0}[/tag]番。完成換牌後，如果你連續摸切9張及以上的牌，每張為本護身符獲得[tag]x0.3[/tag]番（已累計[tag]{1}[/tag]張）",
+          "jp": "入替終了後、連続でツモ切りした牌が9枚以上の場合、9枚目以降の牌1枚ごとに、[tag]x0.3[/tag]飜を獲得する。（現在は[tag]{0}[/tag]飜）（現在の連続ツモ切り枚数は[tag]{1}[/tag]枚）",
+          "en": "[tag]x{0}[/tag] Han. After finishing with the tile exchange, if you consecutively draw and discard 9 or more tiles, each tile grants this talisman [tag]x0.3[/tag] Han (currently accumulated [tag]{1}[/tag] tiles).",
+          "kr": "[tag]x{0}[/tag]판. 패 교환 후, 연속으로 9장 이상 쯔모패를 버렸다면, 버린 패당 부적 [tag]x0.3[/tag]판. (현재 누계 [tag]{1}[/tag]장)"
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 18,
+        "sell_price": 9,
         "icon_name": "fu_0126.png",
         "icon_id": 126,
-        "deprecated": true,
-        "rarity": "BLUE"
+        "deprecated": false,
+        "rarity": "ORANGE"
       },
       "plus_name": "怠慢バイト+",
-      "plus_sell_price": 6,
+      "plus_sell_price": 9,
       "plus_metadata": {
         "data_id": 1381,
         "names": {
@@ -6148,18 +6148,18 @@
           "kr": "농땡이 알바+"
         },
         "descriptions": {
-          "chs": "[tag]x{0}[/tag]番。完成换牌后，如果你连续摸切9张及以上的牌，每张为本护身符获得[tag]x0.2[/tag]番（已累计[tag]{1}[/tag]张）",
-          "chs_t": "[tag]x{0}[/tag]番。完成換牌後，如果你連續摸切9張及以上的牌，每張為本護身符獲得[tag]x0.2[/tag]番（已累計[tag]{1}[/tag]張）",
-          "jp": "入替終了後、連続でツモ切りした牌が9枚以上の場合、9枚目以降の牌1枚ごとに、[tag]x0.2[/tag]飜を獲得する。（現在は[tag]{0}[/tag]飜）（現在の連続ツモ切り枚数は[tag]{1}[/tag]枚）",
-          "en": "[tag]x{0}[/tag] Han. After finishing with the tile exchange, if you consecutively draw and discard 9 or more tiles, each tile grants this talisman [tag]x0.2[/tag] Han (currently accumulated [tag]{1}[/tag] tiles).",
-          "kr": "[tag]x{0}[/tag]판. 패 교환 후, 연속으로 9장 이상 쯔모패를 버렸다면, 버린 패당 부적 [tag]x0.2[/tag]판. (현재 누계 [tag]{1}[/tag]장)"
+          "chs": "[tag]x{0}[/tag]番。完成换牌后，如果你连续摸切9张及以上的牌，每张为本护身符获得[tag]x0.5[/tag]番（已累计[tag]{1}[/tag]张）",
+          "chs_t": "[tag]x{0}[/tag]番。完成換牌後，如果你連續摸切9張及以上的牌，每張為本護身符獲得[tag]x0.5[/tag]番（已累計[tag]{1}[/tag]張）",
+          "jp": "入替終了後、連続でツモ切りした牌が9枚以上の場合、9枚目以降の牌1枚ごとに、[tag]x0.5[/tag]飜を獲得する。（現在は[tag]{0}[/tag]飜）（現在の連続ツモ切り枚数は[tag]{1}[/tag]枚）",
+          "en": "[tag]x{0}[/tag] Han. After finishing with the tile exchange, if you consecutively draw and discard 9 or more tiles, each tile grants this talisman [tag]x0.5[/tag] Han (currently accumulated [tag]{1}[/tag] tiles).",
+          "kr": "[tag]x{0}[/tag]판. 패 교환 후, 연속으로 9장 이상 쯔모패를 버렸다면, 버린 패당 부적 [tag]x0.5[/tag]판. (현재 누계 [tag]{1}[/tag]장)"
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 18,
+        "sell_price": 9,
         "icon_name": "fu_0126.png",
         "icon_id": 126,
-        "deprecated": true,
-        "rarity": "BLUE"
+        "deprecated": false,
+        "rarity": "ORANGE"
       }
     },
     {
@@ -6298,7 +6298,7 @@
         "sell_price": 9,
         "icon_name": "fu_0129.png",
         "icon_id": 129,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       },
       "plus_name": "鍵開けの達人+",
@@ -6323,7 +6323,7 @@
         "sell_price": 9,
         "icon_name": "fu_0129.png",
         "icon_id": 129,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       }
     },
@@ -6453,11 +6453,11 @@
           "kr": "세뱃돈 수거"
         },
         "descriptions": {
-          "chs": "关卡结束时，获得[tag]15[/tag]个星币。关卡开始时，减少[tag]15[/tag]个星币。",
-          "chs_t": "關卡結束時，獲得[tag]15[/tag]個星幣。關卡開始時，減少[tag]15[/tag]個星幣。",
-          "jp": "ステージ終了時、勝ち星を[tag]15[/tag]獲得する。ステージ開始時、勝ち星を[tag]15[/tag]失う。",
-          "en": "At the end of the level, get [tag]15[/tag] Star Coins. At the start of the level, lose [tag]15[/tag] Star Coins.",
-          "kr": "스테이지 종료 후, [tag]15[/tag]스타코인 획득. 스테이지 시작 시, [tag]15[/tag]스타코인 감소."
+          "chs": "关卡结束时，获得[tag]20[/tag]个星币。关卡开始时，减少[tag]20[/tag]个星币。",
+          "chs_t": "關卡結束時，獲得[tag]20[/tag]個星幣。關卡開始時，減少[tag]20[/tag]個星幣。",
+          "jp": "ステージ終了時、勝ち星を[tag]20[/tag]獲得する。ステージ開始時、勝ち星を[tag]20[/tag]失う。",
+          "en": "At the end of the level, get [tag]20[/tag] Star Coins. At the start of the level, lose [tag]20[/tag] Star Coins.",
+          "kr": "스테이지 종료 후, [tag]20[/tag]스타코인 획득. 스테이지 시작 시, [tag]20[/tag]스타코인 감소."
         },
         "price": 12,
         "sell_price": 6,
@@ -6478,11 +6478,11 @@
           "kr": "세뱃돈 수거+"
         },
         "descriptions": {
-          "chs": "关卡结束时，获得[tag]25[/tag]个星币。关卡开始时，减少[tag]25[/tag]个星币。",
-          "chs_t": "關卡結束時，獲得[tag]25[/tag]個星幣。關卡開始時，減少[tag]25[/tag]個星幣。",
-          "jp": "ステージ終了時、勝ち星を[tag]25[/tag]獲得する。ステージ開始時、勝ち星を[tag]25[/tag]失う。",
-          "en": "At the end of the level, get [tag]25[/tag] Star Coins. At the start of the level, lose [tag]25[/tag] Star Coins.",
-          "kr": "스테이지 종료 후, [tag]25[/tag]스타코인 획득. 스테이지 시작 시, [tag]25[/tag]스타코인 감소."
+          "chs": "关卡结束时，获得[tag]30[/tag]个星币。关卡开始时，减少[tag]30[/tag]个星币。",
+          "chs_t": "關卡結束時，獲得[tag]30[/tag]個星幣。關卡開始時，減少[tag]30[/tag]個星幣。",
+          "jp": "ステージ終了時、勝ち星を[tag]30[/tag]獲得する。ステージ開始時、勝ち星を[tag]30[/tag]失う。",
+          "en": "At the end of the level, get [tag]30[/tag] Star Coins. At the start of the level, lose [tag]30[/tag] Star Coins.",
+          "kr": "스테이지 종료 후, [tag]30[/tag]스타코인 획득. 스테이지 시작 시, [tag]30[/tag]스타코인 감소."
         },
         "price": 12,
         "sell_price": 6,
@@ -6573,7 +6573,7 @@
         "sell_price": 6,
         "icon_name": "fu_0134.png",
         "icon_id": 134,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       },
       "plus_name": "駆けるタイヤ+",
@@ -6598,7 +6598,7 @@
         "sell_price": 6,
         "icon_name": "fu_0134.png",
         "icon_id": 134,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       }
     },
@@ -6683,7 +6683,7 @@
         "sell_price": 6,
         "icon_name": "fu_0136.png",
         "icon_id": 136,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       },
       "plus_name": "俺が払おう+",
@@ -6708,7 +6708,7 @@
         "sell_price": 6,
         "icon_name": "fu_0136.png",
         "icon_id": 136,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       }
     },
@@ -6838,11 +6838,11 @@
           "kr": "소울라이크"
         },
         "descriptions": {
-          "chs": "和牌时，如果完成了役满役种，本护身符获得每张魂牌额外[tag]+2番[/tag]的效果（当前每张魂牌[tag]{0}[/tag]番）",
-          "chs_t": "和牌時，如果完成了役滿役種，本護身符獲得每張魂牌額外[tag]+2番[/tag]的效果（當前每張魂牌[tag]{0}[/tag]番）",
-          "jp": "役満を達成するごとに、魂牌の飜数[tag]+2[/tag]飜（現在の魂牌飜数は[tag]{0}[/tag]飜）。",
-          "en": "When winning, if a Yakuman is completed, this talisman gets [tag]+2[/tag] Han for each Soul tile (currently [tag]{0}[/tag] Han per Soul tile).",
-          "kr": "역만 완성할 때 마다, 부적에 혼패 장당 [tag]+2판[/tag] 효과 획득. (현재 혼패 장당 [tag]{0}[/tag]판)"
+          "chs": "和牌时，如果完成了役满役种，本护身符获得每张魂牌额外[tag]+4番[/tag]的效果（当前每张魂牌[tag]{0}[/tag]番）",
+          "chs_t": "和牌時，如果完成了役滿役種，本護身符獲得每張魂牌額外[tag]+4番[/tag]的效果（當前每張魂牌[tag]{0}[/tag]番）",
+          "jp": "役満を達成するごとに、魂牌の飜数[tag]+4[/tag]飜（現在の魂牌飜数は[tag]{0}[/tag]飜）。",
+          "en": "When winning, if a Yakuman is completed, this talisman gets [tag]+4[/tag] Han for each Soul tile (currently [tag]{0}[/tag] Han per Soul tile).",
+          "kr": "역만 완성할 때 마다, 부적에 혼패 장당 [tag]+4판[/tag] 효과 획득. (현재 혼패 장당 [tag]{0}[/tag]판)"
         },
         "price": 12,
         "sell_price": 6,
@@ -6863,11 +6863,11 @@
           "kr": "소울라이크+"
         },
         "descriptions": {
-          "chs": "和牌时，如果完成了役满役种，本护身符获得每张魂牌额外[tag]+3番[/tag]的效果（当前每张魂牌[tag]{0}[/tag]番）",
-          "chs_t": "和牌時，如果完成了役滿役種，本護身符獲得每張魂牌額外[tag]+3番[/tag]的效果（當前每張魂牌[tag]{0}[/tag]番）",
-          "jp": "役満を達成するごとに、魂牌の飜数[tag]+3[/tag]飜（現在の魂牌飜数は[tag]{0}[/tag]飜）。",
-          "en": "When winning, if a Yakuman is completed, this talisman gets [tag]+3[/tag] Han for each Soul tile (currently [tag]{0}[/tag] Han per Soul tile).",
-          "kr": "역만 완성할 때 마다, 부적에 혼패 장당 [tag]+3판[/tag] 효과 획득. (현재 혼패 장당 [tag]{0}[/tag]판)"
+          "chs": "和牌时，如果完成了役满役种，本护身符获得每张魂牌额外[tag]+6番[/tag]的效果（当前每张魂牌[tag]{0}[/tag]番）",
+          "chs_t": "和牌時，如果完成了役滿役種，本護身符獲得每張魂牌額外[tag]+6番[/tag]的效果（當前每張魂牌[tag]{0}[/tag]番）",
+          "jp": "役満を達成するごとに、魂牌の飜数[tag]+6[/tag]飜（現在の魂牌飜数は[tag]{0}[/tag]飜）。",
+          "en": "When winning, if a Yakuman is completed, this talisman gets [tag]+6[/tag] Han for each Soul tile (currently [tag]{0}[/tag] Han per Soul tile).",
+          "kr": "역만 완성할 때 마다, 부적에 혼패 장당 [tag]+6판[/tag] 효과 획득. (현재 혼패 장당 [tag]{0}[/tag]판)"
         },
         "price": 12,
         "sell_price": 6,
@@ -6936,8 +6936,8 @@
       "id": 153,
       "icon_id": 141,
       "name": "万人に1人",
-      "rarity": "BLUE",
-      "sell_price": 6,
+      "rarity": "GREEN",
+      "sell_price": 3,
       "metadata": {
         "data_id": 1530,
         "names": {
@@ -6954,15 +6954,15 @@
           "en": "After reaching Tenpai, [tag]drawing a 1-Man guarantees a win[/tag].",
           "kr": "텐파이 후, [tag]쯔모패가 1만이라면 반드시 화료 가능[/tag]."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_0141.png",
         "icon_id": 141,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       },
       "plus_name": "万人に1人+",
-      "plus_sell_price": 6,
+      "plus_sell_price": 3,
       "plus_metadata": {
         "data_id": 1531,
         "names": {
@@ -6979,12 +6979,12 @@
           "en": "After reaching Tenpai, [tag]drawing any Man tile guarantees a win[/tag].",
           "kr": "텐파이 후, [tag]쯔모패가 만수패라면 반드시 화료 가능[/tag]."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_0141.png",
         "icon_id": 141,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       }
     },
     {
@@ -7013,7 +7013,7 @@
         "sell_price": 6,
         "icon_name": "fu_0142.png",
         "icon_id": 142,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       },
       "plus_name": "輝くステージ+",
@@ -7038,7 +7038,7 @@
         "sell_price": 6,
         "icon_name": "fu_0142.png",
         "icon_id": 142,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       }
     },
@@ -7058,11 +7058,11 @@
           "kr": "금 먹는 용 링랑"
         },
         "descriptions": {
-          "chs": "每当获得星币时，吃掉一半！吃掉的每个星币可使本护身符获得[tag]x0.2[/tag]番（当前为[tag]x{0}[/tag]番）",
-          "chs_t": "每當獲得星幣時，吃掉一半！吃掉的每個星幣可使本護身符獲得[tag]x0.2[/tag]番（當前為[tag]x{0}[/tag]番）",
-          "jp": "勝ち星を獲得するごとに、その獲得量の半分が琳琅に食べられる。琳琅が勝ち星を1つ食べるごとに、[tag]x0.2[/tag]飜を獲得する（現在は[tag]x{0}[/tag]飜）。",
-          "en": "Each time you gain Star Coins, Lin Lang eats half of them! For each eaten Star Coin, this talisman gets [tag]x0.2[/tag] Han (currently [tag]x{0}[/tag] Han).",
-          "kr": "매번 스타코인 획득 시, 절반을 먹어버린다! 먹은 코인당 부적 [tag]x0.2[/tag]판 획득. (현재 [tag]x{0}[/tag]판)"
+          "chs": "每当获得星币时，吃掉一半！吃掉的每个星币可使本护身符获得[tag]x0.3[/tag]番（当前为[tag]x{0}[/tag]番）",
+          "chs_t": "每當獲得星幣時，吃掉一半！吃掉的每個星幣可使本護身符獲得[tag]x0.3[/tag]番（當前為[tag]x{0}[/tag]番）",
+          "jp": "勝ち星を獲得するごとに、その獲得量の半分が琳琅に食べられる。琳琅が勝ち星を1つ食べるごとに、[tag]x0.3[/tag]飜を獲得する（現在は[tag]x{0}[/tag]飜）。",
+          "en": "Each time you gain Star Coins, Lin Lang eats half of them! For each eaten Star Coin, this talisman gets [tag]x0.3[/tag] Han (currently [tag]x{0}[/tag] Han).",
+          "kr": "매번 스타코인 획득 시, 절반을 먹어버린다! 먹은 코인당 부적 [tag]x0.3[/tag]판 획득. (현재 [tag]x{0}[/tag]판)"
         },
         "price": 18,
         "sell_price": 9,
@@ -7083,11 +7083,11 @@
           "kr": "금 먹는 용 링랑+"
         },
         "descriptions": {
-          "chs": "每当获得星币时，吃掉一半！吃掉的每个星币可使本护身符获得[tag]x0.3[/tag]番（当前为[tag]x{0}[/tag]番）",
-          "chs_t": "每當獲得星幣時，吃掉一半！吃掉的每個星幣可使本護身符獲得[tag]x0.3[/tag]番（當前為[tag]x{0}[/tag]番）",
-          "jp": "勝ち星を獲得するごとに、その獲得量の半分が琳琅に食べられる。琳琅が勝ち星を1つ食べるごとに、[tag]x0.3[/tag]飜を獲得する（現在は[tag]x{0}[/tag]飜）。",
-          "en": "Each time you gain Star Coins, Lin Lang eats half of them! For each eaten Star Coin, this talisman gets [tag]x0.3[/tag] Han (currently [tag]x{0}[/tag] Han).",
-          "kr": "매번 스타코인 획득 시, 절반을 먹어버린다! 먹은 코인당 부적 [tag]x0.3[/tag]판 획득. (현재 [tag]x{0}[/tag]판)"
+          "chs": "每当获得星币时，吃掉一半！吃掉的每个星币可使本护身符获得[tag]x0.5[/tag]番（当前为[tag]x{0}[/tag]番）",
+          "chs_t": "每當獲得星幣時，吃掉一半！吃掉的每個星幣可使本護身符獲得[tag]x0.5[/tag]番（當前為[tag]x{0}[/tag]番）",
+          "jp": "勝ち星を獲得するごとに、その獲得量の半分が琳琅に食べられる。琳琅が勝ち星を1つ食べるごとに、[tag]x0.5[/tag]飜を獲得する（現在は[tag]x{0}[/tag]飜）。",
+          "en": "Each time you gain Star Coins, Lin Lang eats half of them! For each eaten Star Coin, this talisman gets [tag]x0.5[/tag] Han (currently [tag]x{0}[/tag] Han).",
+          "kr": "매번 스타코인 획득 시, 절반을 먹어버린다! 먹은 코인당 부적 [tag]x0.5[/tag]판 획득. (현재 [tag]x{0}[/tag]판)"
         },
         "price": 18,
         "sell_price": 9,
@@ -7168,17 +7168,17 @@
           "kr": "무거운 짐"
         },
         "descriptions": {
-          "chs": "[tag]x{0}[/tag]番。每当你没有换牌时，本护身符的番数效果[tag]+30%[/tag]",
-          "chs_t": "[tag]x{0}[/tag]番。每當你沒有換牌時，本護身符的番數效果[tag]+30%[/tag]",
-          "jp": "飜数[tag]x{0}[/tag]。ステージ開始時、手牌の入替を行わない場合、このお守りの効果値が[tag]×130%[/tag]。",
-          "en": "[tag]x{0}[/tag] Han. Each time you do not exchange tiles, this talisman gets [tag]+30%[/tag] Han.",
-          "kr": "[tag]x{0}[/tag]판. 패를 교환하지 않을 때마다, 부적 효과 [tag]+30%[/tag]."
+          "chs": "[tag]x{0}[/tag]番。每当你没有换牌时，本护身符的番数效果[tag]+20%[/tag]",
+          "chs_t": "[tag]x{0}[/tag]番。每當你沒有換牌時，本護身符的番數效果[tag]+20%[/tag]",
+          "jp": "飜数[tag]x{0}[/tag]。ステージ開始時、手牌の入替を行わない場合、このお守りの効果値が[tag]×120%[/tag]。",
+          "en": "[tag]x{0}[/tag] Han. Each time you do not exchange tiles, this talisman gets [tag]+20%[/tag] Han.",
+          "kr": "[tag]x{0}[/tag]판. 패를 교환하지 않을 때마다, 부적 효과 [tag]+20%[/tag]."
         },
         "price": 18,
         "sell_price": 9,
         "icon_name": "fu_0145.png",
         "icon_id": 145,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       },
       "plus_name": "ウエイトトレーニング+",
@@ -7193,17 +7193,17 @@
           "kr": "무거운 짐+"
         },
         "descriptions": {
-          "chs": "[tag]x{0}[/tag]番。每当你没有换牌时，本护身符的番数效果[tag]+50%[/tag]",
-          "chs_t": "[tag]x{0}[/tag]番。每當你沒有換牌時，本護身符的番數效果[tag]+50%[/tag]",
-          "jp": "飜数[tag]x{0}[/tag]。ステージ開始時、手牌の入替を行わない場合、このお守りの効果値が[tag]×150%[/tag]。",
-          "en": "[tag]x{0}[/tag] Han. Each time you do not exchange tiles, this talisman gets [tag]+50%[/tag] Han.",
-          "kr": "[tag]x{0}[/tag]판. 패를 교환하지 않을 때마다, 부적 효과 [tag]+50%[/tag]."
+          "chs": "[tag]x{0}[/tag]番。每当你没有换牌时，本护身符的番数效果[tag]+30%[/tag]",
+          "chs_t": "[tag]x{0}[/tag]番。每當你沒有換牌時，本護身符的番數效果[tag]+30%[/tag]",
+          "jp": "飜数[tag]x{0}[/tag]。ステージ開始時、手牌の入替を行わない場合、このお守りの効果値が[tag]×130%[/tag]。",
+          "en": "[tag]x{0}[/tag] Han. Each time you do not exchange tiles, this talisman gets [tag]+30%[/tag] Han.",
+          "kr": "[tag]x{0}[/tag]판. 패를 교환하지 않을 때마다, 부적 효과 [tag]+30%[/tag]."
         },
         "price": 18,
         "sell_price": 9,
         "icon_name": "fu_0145.png",
         "icon_id": 145,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       }
     },
@@ -7288,7 +7288,7 @@
         "sell_price": 9,
         "icon_name": "fu_0147.png",
         "icon_id": 147,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       },
       "plus_name": "保存食+",
@@ -7313,7 +7313,7 @@
         "sell_price": 9,
         "icon_name": "fu_0147.png",
         "icon_id": 147,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       }
     },
@@ -7453,7 +7453,7 @@
         "sell_price": 9,
         "icon_name": "fu_0150.png",
         "icon_id": 150,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       },
       "plus_name": "神の領域+",
@@ -7478,7 +7478,7 @@
         "sell_price": 9,
         "icon_name": "fu_0150.png",
         "icon_id": 150,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       }
     },
@@ -7563,7 +7563,7 @@
         "sell_price": 9,
         "icon_name": "fu_0152.png",
         "icon_id": 152,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       },
       "plus_name": "サプライズ発明家未来+",
@@ -7588,7 +7588,7 @@
         "sell_price": 9,
         "icon_name": "fu_0152.png",
         "icon_id": 152,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       }
     },
@@ -7718,17 +7718,17 @@
           "kr": "가면 바텐더 백야"
         },
         "descriptions": {
-          "chs": "出售本护身符时可以获得50星币，并使随机[tag]其他1张[/tag]护身符升级",
-          "chs_t": "出售本護身符時可以獲得50星幣，並使隨機[tag]其他1張[/tag]護身符升級",
-          "jp": "このお守りを売却する時、勝ち星を50獲得し、他のお守りをランダムで[tag]1枚[/tag]強化する。",
-          "en": "Selling this talisman grants 50 Star Coins and randomly upgrades [tag]1 other[/tag] talisman.",
-          "kr": "부적 판매 시 50스타코인을 획득하고, 임의의 [tag]다른 1장[/tag] 부적을 레벨업한다."
+          "chs": "出售本护身符时可以获得[tag]50[/tag]星币。[tag]入手[/tag]：随机其他[tag]1[/tag]张护身符升级",
+          "chs_t": "出售本護身符時可以獲得[tag]50[/tag]星幣。[tag]入手[/tag]：隨機其他[tag]1[/tag]張護身符升級",
+          "jp": "このお守りを売却する時、勝ち星を50獲得する。[tag]入手[/tag]:ランダムのお守りを1枚強化する。",
+          "en": "Selling this talisman grants [tag]50[/tag] Star Coins. [tag]Acquire[/tag]: Randomly upgrades [tag]1[/tag] other talisman.",
+          "kr": "본 부적을 판매하면 50 스타코인을 획득한다. [tag]입수[/tag]: 무작위 부적 1개 레벨업."
         },
         "price": 24,
         "sell_price": 50,
         "icon_name": "fu_0155.png",
         "icon_id": 155,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "PURPLE"
       },
       "plus_name": "マスクドバーテンダー白夜+",
@@ -7743,17 +7743,17 @@
           "kr": "가면 바텐더 백야+"
         },
         "descriptions": {
-          "chs": "出售本护身符时可以获得50星币，并使随机[tag]其他2张[/tag]护身符升级",
-          "chs_t": "出售本護身符時可以獲得50星幣，並使隨機[tag]其他2張[/tag]護身符升級",
-          "jp": "このお守りを売却する時、勝ち星を50獲得し、他のお守りをランダムで[tag]2枚[/tag]強化する。",
-          "en": "Selling this talisman grants 50 Star Coins and randomly upgrades [tag]2 other[/tag] talismans.",
-          "kr": "부적 판매 시 50스타코인을 획득하고, 임의의 [tag]다른 2장[/tag] 부적을 레벨업한다."
+          "chs": "出售本护身符时可以获得[tag]50[/tag]星币。[tag]入手[/tag]：随机其他[tag]2[/tag]张护身符升级",
+          "chs_t": "出售本護身符時可以獲得[tag]50[/tag]星幣。[tag]入手[/tag]：隨機其他[tag]2[/tag]張護身符升級",
+          "jp": "このお守りを売却する時、勝ち星を50獲得する。[tag]入手[/tag]:ランダムのお守りを2枚強化する。",
+          "en": "Selling this talisman grants [tag]50[/tag] Star Coins. [tag]Acquire[/tag]: Randomly upgrades [tag]2[/tag] other talismans.",
+          "kr": "본 부적을 판매하면 50 스타코인을 획득한다. [tag]입수[/tag]: 무작위 부적 2개 레벨업."
         },
         "price": 24,
         "sell_price": 50,
         "icon_name": "fu_0155.png",
         "icon_id": 155,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "PURPLE"
       }
     },
@@ -7938,11 +7938,11 @@
           "kr": "콩나무"
         },
         "descriptions": {
-          "chs": "和牌时，索子的基础分值计为[tag]3倍[/tag]。关卡结束时使随机[tag]1种[/tag]索子牌的基础分值[tag]x1.3[/tag]",
-          "chs_t": "和牌時，索子的基礎分值計為[tag]3倍[/tag]。關卡結束時使隨機[tag]1種[/tag]索子牌的基礎分值[tag]x1.3[/tag]",
-          "jp": "和了時、索子のスコア[tag]x3[/tag]。ステージ終了時、ランダムで[tag]1[/tag]種類の索子のスコア[tag]x1.3[/tag]。",
-          "en": "When winning, the basic PT of Sou tiles [tag]x3[/tag]. At the end of the level, the basic PT of [tag]1[/tag] random Sou tile type [tag]x1.3[/tag].",
-          "kr": "삭수패의 기본 점수 [tag]3배[/tag] 증가. 스테이지 종료 시, 임의의 [tag]1개[/tag] 삭수패의 기본 점수 [tag]x1.3[/tag]."
+          "chs": "和牌时，索子的基础分值计为[tag]5倍[/tag]。关卡结束时使随机[tag]2种[/tag]索子牌的基础分值[tag]x1.2[/tag]",
+          "chs_t": "和牌時，索子的基礎分值計為[tag]5倍[/tag]。關卡結束時使隨機[tag]2種[/tag]索子牌的基礎分值[tag]x1.2[/tag]",
+          "jp": "和了時、索子のスコア[tag]x5[/tag]。ステージ終了時、ランダムで[tag]2[/tag]種類の索子のスコア[tag]x1.2[/tag]。",
+          "en": "When winning, the basic PT of Sou tiles [tag]x5[/tag]. At the end of the level, the basic PT of [tag]2[/tag] random Sou tile types [tag]x1.2[/tag].",
+          "kr": "삭수패의 기본 점수 [tag]5배[/tag] 증가. 스테이지 종료 시, 임의의 [tag]2개[/tag] 삭수패의 기본 점수 [tag]x1.2[/tag]."
         },
         "price": 12,
         "sell_price": 6,
@@ -7963,11 +7963,11 @@
           "kr": "콩나무+"
         },
         "descriptions": {
-          "chs": "和牌时，索子的基础分值计为[tag]5倍[/tag]。关卡结束时使随机[tag]2种[/tag]索子牌的基础分值[tag]x1.3[/tag]",
-          "chs_t": "和牌時，索子的基礎分值計為[tag]5倍[/tag]。關卡結束時使隨機[tag]2種[/tag]索子牌的基礎分值[tag]x1.3[/tag]",
-          "jp": "和了時、索子のスコアが[tag]x5[/tag]。ステージ終了時、ランダムで[tag]2[/tag]種類の索子のスコア[tag]x1.3[/tag]。",
-          "en": "When winning, the basic PT of Sou tiles [tag]x5[/tag]. At the end of the level, the basic PT of [tag]2[/tag] random Sou tile types [tag]x1.3[/tag].",
-          "kr": "삭수패의 기본 점수 [tag]5배[/tag] 증가. 스테이지 종료 시, 임의의 [tag]2개[/tag] 삭수패의 기본 점수 [tag]x1.3[/tag]."
+          "chs": "和牌时，索子的基础分值计为[tag]8倍[/tag]。关卡结束时使随机[tag]3种[/tag]索子牌的基础分值[tag]x1.2[/tag]",
+          "chs_t": "和牌時，索子的基礎分值計為[tag]8倍[/tag]。關卡結束時使隨機[tag]3種[/tag]索子牌的基礎分值[tag]x1.2[/tag]",
+          "jp": "和了時、索子のスコアが[tag]x8[/tag]。ステージ終了時、ランダムで[tag]3[/tag]種類の索子のスコア[tag]x1.2[/tag]。",
+          "en": "When winning, the basic PT of Sou tiles [tag]x8[/tag]. At the end of the level, the basic PT of [tag]3[/tag] random Sou tile types [tag]x1.2[/tag].",
+          "kr": "삭수패의 기본 점수 [tag]8배[/tag] 증가. 스테이지 종료 시, 임의의 [tag]3개[/tag] 삭수패의 기본 점수 [tag]x1.2[/tag]."
         },
         "price": 12,
         "sell_price": 6,
@@ -8003,7 +8003,7 @@
         "sell_price": 9,
         "icon_name": "fu_0162.png",
         "icon_id": 162,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       },
       "plus_name": "失敗した発明品+",
@@ -8028,7 +8028,7 @@
         "sell_price": 9,
         "icon_name": "fu_0162.png",
         "icon_id": 162,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       }
     },
@@ -8113,7 +8113,7 @@
         "sell_price": 6,
         "icon_name": "fu_0161.png",
         "icon_id": 161,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       },
       "plus_name": "四君子の約束+",
@@ -8138,7 +8138,7 @@
         "sell_price": 6,
         "icon_name": "fu_0161.png",
         "icon_id": 161,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       }
     },
@@ -8168,7 +8168,7 @@
         "sell_price": 3,
         "icon_name": "fu_0163.png",
         "icon_id": 163,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "雲上の森+",
@@ -8193,7 +8193,7 @@
         "sell_price": 3,
         "icon_name": "fu_0163.png",
         "icon_id": 163,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -8223,7 +8223,7 @@
         "sell_price": 3,
         "icon_name": "fu_0164.png",
         "icon_id": 164,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "鏡写し+",
@@ -8248,7 +8248,7 @@
         "sell_price": 3,
         "icon_name": "fu_0164.png",
         "icon_id": 164,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -8278,7 +8278,7 @@
         "sell_price": 3,
         "icon_name": "fu_0165.png",
         "icon_id": 165,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "ラストピース+",
@@ -8303,7 +8303,7 @@
         "sell_price": 3,
         "icon_name": "fu_0165.png",
         "icon_id": 165,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -8773,7 +8773,7 @@
         "sell_price": 6,
         "icon_name": "fu_0174.png",
         "icon_id": 174,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       },
       "plus_name": "軽自動車+",
@@ -8798,7 +8798,7 @@
         "sell_price": 6,
         "icon_name": "fu_0174.png",
         "icon_id": 174,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       }
     },
@@ -8916,8 +8916,8 @@
       "id": 215,
       "icon_id": 177,
       "name": "すてきな天使",
-      "rarity": "BLUE",
-      "sell_price": 6,
+      "rarity": "GREEN",
+      "sell_price": 3,
       "metadata": {
         "data_id": 2150,
         "names": {
@@ -8934,15 +8934,15 @@
           "en": "[tag]+{0}[/tag] PT. During the current game, this talisman grants [tag]+30[/tag] PT each time it is discovered in a pack; it also grants [tag]+30[/tag] PT whenever it is obtained by any method.",
           "kr": "[tag]+{0}[/tag]점. 효과량은 현재 게임 중 부적팩을 열어 본 부적을 발견하고 획득한 횟수의 [tag]30[/tag]배와 같다."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_0177.png",
         "icon_id": 177,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       },
       "plus_name": "すてきな天使+",
-      "plus_sell_price": 6,
+      "plus_sell_price": 3,
       "plus_metadata": {
         "data_id": 2151,
         "names": {
@@ -8959,20 +8959,20 @@
           "en": "[tag]+{0}[/tag] PT. During the current game, this talisman grants [tag]+60[/tag] PT each time it is discovered in a pack; it also grants [tag]+60[/tag] PT whenever it is obtained by any method.",
           "kr": "[tag]+{0}[/tag]점. 효과량은 현재 게임 중 부적팩을 열어 본 부적을 발견하고 획득한 횟수의 [tag]60[/tag]배와 같다."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_0177.png",
         "icon_id": 177,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       }
     },
     {
       "id": 216,
       "icon_id": 178,
       "name": "うごめく闇",
-      "rarity": "ORANGE",
-      "sell_price": 9,
+      "rarity": "BLUE",
+      "sell_price": 6,
       "metadata": {
         "data_id": 2160,
         "names": {
@@ -8989,15 +8989,15 @@
           "en": "When you draw a [tag]1 Man[/tag], you can perform a Closed Kan with any Triplet in your hand.",
           "kr": "[tag]1만[/tag]을 쯔모할 때마다, 손패 중 임의의 커쯔와 안깡을 할 수 있다."
         },
-        "price": 18,
-        "sell_price": 9,
+        "price": 12,
+        "sell_price": 6,
         "icon_name": "fu_0178.png",
         "icon_id": 178,
         "deprecated": false,
-        "rarity": "ORANGE"
+        "rarity": "BLUE"
       },
       "plus_name": "うごめく闇+",
-      "plus_sell_price": 9,
+      "plus_sell_price": 6,
       "plus_metadata": {
         "data_id": 2161,
         "names": {
@@ -9014,12 +9014,12 @@
           "en": "When you draw a [tag]Man tile[/tag], you can perform a Closed Kan with any Triplet in your hand.",
           "kr": "[tag]만수패[/tag]를 쯔모할 때마다, 손패 중 임의의 커쯔와 안깡을 할 수 있다."
         },
-        "price": 18,
-        "sell_price": 9,
+        "price": 12,
+        "sell_price": 6,
         "icon_name": "fu_0178.png",
         "icon_id": 178,
         "deprecated": false,
-        "rarity": "ORANGE"
+        "rarity": "BLUE"
       }
     },
     {
@@ -9136,8 +9136,8 @@
       "id": 219,
       "icon_id": 181,
       "name": "凪いだ空",
-      "rarity": "ORANGE",
-      "sell_price": 9,
+      "rarity": "BLUE",
+      "sell_price": 6,
       "metadata": {
         "data_id": 2190,
         "names": {
@@ -9154,15 +9154,15 @@
           "en": "At the start of the level, lock all [tag]Wind[/tag] tiles and move them to the end of the Tile Wall.",
           "kr": "스테이지 시작 시, 모든 [tag]풍패[/tag]를 고정하고 맨 뒤로 보낸다."
         },
-        "price": 18,
-        "sell_price": 9,
+        "price": 12,
+        "sell_price": 6,
         "icon_name": "fu_0181.png",
         "icon_id": 181,
         "deprecated": false,
-        "rarity": "ORANGE"
+        "rarity": "BLUE"
       },
       "plus_name": "凪いだ空+",
-      "plus_sell_price": 9,
+      "plus_sell_price": 6,
       "plus_metadata": {
         "data_id": 2191,
         "names": {
@@ -9179,12 +9179,12 @@
           "en": "At the start of the level, lock all [tag]Honor[/tag] tiles and move them to the end of the Tile Wall.",
           "kr": "스테이지 시작 시, 모든 [tag]자패[/tag]를 고정하고 맨 뒤로 보낸다."
         },
-        "price": 18,
-        "sell_price": 9,
+        "price": 12,
+        "sell_price": 6,
         "icon_name": "fu_0181.png",
         "icon_id": 181,
         "deprecated": false,
-        "rarity": "ORANGE"
+        "rarity": "BLUE"
       }
     },
     {
@@ -9246,8 +9246,8 @@
       "id": 221,
       "icon_id": 183,
       "name": "最終案内",
-      "rarity": "ORANGE",
-      "sell_price": 9,
+      "rarity": "BLUE",
+      "sell_price": 6,
       "metadata": {
         "data_id": 2210,
         "names": {
@@ -9264,15 +9264,15 @@
           "en": "At the start of the level, sort the tiles in the Tile Wall according to the [tag]Auto Arrange[/tag] order.",
           "kr": "스테이지 시작 시, 남은 패를 [tag]자동 정리[/tag] 순서대로 정렬한다."
         },
-        "price": 18,
-        "sell_price": 9,
+        "price": 12,
+        "sell_price": 6,
         "icon_name": "fu_0183.png",
         "icon_id": 183,
         "deprecated": false,
-        "rarity": "ORANGE"
+        "rarity": "BLUE"
       },
       "plus_name": "最終案内+",
-      "plus_sell_price": 9,
+      "plus_sell_price": 6,
       "plus_metadata": {
         "data_id": 2211,
         "names": {
@@ -9289,12 +9289,12 @@
           "en": "At the start of the level, sort the tiles in the Tile Wall according to the [tag]Auto Arrange[/tag] order, and then reveal [tag]{0}[/tag] tiles of one random category.",
           "kr": "스테이지 시작 시, 남은 패를 [tag]자동 정리[/tag] 순서대로 정렬하며, 남은 패 [tag]{0}[/tag]장을 공개한다. (스테이지마다 랜덤 종류)"
         },
-        "price": 18,
-        "sell_price": 9,
+        "price": 12,
+        "sell_price": 6,
         "icon_name": "fu_0183.png",
         "icon_id": 183,
         "deprecated": false,
-        "rarity": "ORANGE"
+        "rarity": "BLUE"
       }
     },
     {
@@ -9323,7 +9323,7 @@
         "sell_price": 9,
         "icon_name": "fu_0184.png",
         "icon_id": 184,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       },
       "plus_name": "三連花火+",
@@ -9348,7 +9348,7 @@
         "sell_price": 9,
         "icon_name": "fu_0184.png",
         "icon_id": 184,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       }
     },
@@ -9378,7 +9378,7 @@
         "sell_price": 9,
         "icon_name": "fu_0185.png",
         "icon_id": 185,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       },
       "plus_name": "あやしいビーム+",
@@ -9403,7 +9403,7 @@
         "sell_price": 9,
         "icon_name": "fu_0185.png",
         "icon_id": 185,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       }
     },
@@ -9466,8 +9466,8 @@
       "id": 225,
       "icon_id": 187,
       "name": "ニャセウスの船",
-      "rarity": "ORANGE",
-      "sell_price": 9,
+      "rarity": "BLUE",
+      "sell_price": 6,
       "metadata": {
         "data_id": 2250,
         "names": {
@@ -9478,21 +9478,21 @@
           "kr": "냥세우스의 배"
         },
         "descriptions": {
-          "chs": "关卡开始时，手牌获得随机[tag]6[/tag]张上一次和牌时所包含的牌",
-          "chs_t": "關卡開始時，手牌獲得隨機[tag]6[/tag]張上一次和牌時所包含的牌",
-          "jp": "ステージ開始時、前回和了時に手牌に入っていた牌から[tag]6[/tag]枚を配牌として手に入れる。",
-          "en": "At the start of the level, your initial hand will include [tag]6[/tag] random tiles from your previous winning hand.",
-          "kr": "스테이지 시작 시, 손패에 지난번 화료 시 포함했던 패 중 랜덤 [tag]6[/tag]장을 획득한다."
+          "chs": "关卡开始时，手牌获得随机[tag]4[/tag]张上一次和牌时所包含的牌",
+          "chs_t": "關卡開始時，手牌獲得隨機[tag]4[/tag]張上一次和牌時所包含的牌",
+          "jp": "ステージ開始時、前回和了時に手牌に入っていた牌から[tag]4[/tag]枚を配牌として手に入れる。",
+          "en": "At the start of the level, your initial hand will include [tag]4[/tag] random tiles from your previous winning hand.",
+          "kr": "스테이지 시작 시, 손패에 지난번 화료 시 포함했던 패 중 랜덤 [tag]4[/tag]장을 획득한다."
         },
-        "price": 18,
-        "sell_price": 9,
+        "price": 12,
+        "sell_price": 6,
         "icon_name": "fu_0187.png",
         "icon_id": 187,
         "deprecated": false,
-        "rarity": "ORANGE"
+        "rarity": "BLUE"
       },
       "plus_name": "ニャセウスの船+",
-      "plus_sell_price": 9,
+      "plus_sell_price": 6,
       "plus_metadata": {
         "data_id": 2251,
         "names": {
@@ -9503,18 +9503,18 @@
           "kr": "냥세우스의 배+"
         },
         "descriptions": {
-          "chs": "关卡开始时，手牌获得随机[tag]9[/tag]张上一次和牌时所包含的牌",
-          "chs_t": "關卡開始時，手牌獲得隨機[tag]9[/tag]張上一次和牌時所包含的牌",
-          "jp": "ステージ開始時、前回和了時に手牌に入っていた牌から[tag]9[/tag]枚を配牌として手に入れる。",
-          "en": "At the start of the level, your initial hand will include [tag]9[/tag] random tiles from your previous winning hand.",
-          "kr": "스테이지 시작 시, 손패에 지난번 화료 시 포함했던 패 중 랜덤 [tag]9[/tag]장을 획득한다."
+          "chs": "关卡开始时，手牌获得随机[tag]6[/tag]张上一次和牌时所包含的牌",
+          "chs_t": "關卡開始時，手牌獲得隨機[tag]6[/tag]張上一次和牌時所包含的牌",
+          "jp": "ステージ開始時、前回和了時に手牌に入っていた牌から[tag]6[/tag]枚を配牌として手に入れる。",
+          "en": "At the start of the level, your initial hand will include [tag]6[/tag] random tiles from your previous winning hand.",
+          "kr": "스테이지 시작 시, 손패에 지난번 화료 시 포함했던 패 중 랜덤 [tag]6[/tag]장을 획득한다."
         },
-        "price": 18,
-        "sell_price": 9,
+        "price": 12,
+        "sell_price": 6,
         "icon_name": "fu_0187.png",
         "icon_id": 187,
         "deprecated": false,
-        "rarity": "ORANGE"
+        "rarity": "BLUE"
       }
     },
     {
@@ -9598,7 +9598,7 @@
         "sell_price": 9,
         "icon_name": "fu_0189.png",
         "icon_id": 189,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       },
       "plus_name": "月光の加護+",
@@ -9623,7 +9623,7 @@
         "sell_price": 9,
         "icon_name": "fu_0189.png",
         "icon_id": 189,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "ORANGE"
       }
     },
@@ -9653,7 +9653,7 @@
         "sell_price": 9,
         "icon_name": "fu_0190.png",
         "icon_id": 190,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       },
       "plus_name": "不安定なお守り+",
@@ -9678,7 +9678,7 @@
         "sell_price": 9,
         "icon_name": "fu_0190.png",
         "icon_id": 190,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       }
     },
@@ -9818,7 +9818,7 @@
         "sell_price": 12,
         "icon_name": "fu_0193.png",
         "icon_id": 193,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "PURPLE"
       },
       "plus_name": "劇的！お守り大改造+",
@@ -9843,7 +9843,7 @@
         "sell_price": 12,
         "icon_name": "fu_0193.png",
         "icon_id": 193,
-        "deprecated": true,
+        "deprecated": false,
         "rarity": "PURPLE"
       }
     },
@@ -9983,7 +9983,7 @@
         "sell_price": 3,
         "icon_name": "fu_3010.png",
         "icon_id": 3010,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "安息の地+",
@@ -10008,7 +10008,7 @@
         "sell_price": 3,
         "icon_name": "fu_3010.png",
         "icon_id": 3010,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -10093,7 +10093,7 @@
         "sell_price": 3,
         "icon_name": "fu_3030.png",
         "icon_id": 3030,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "海賊シェフ+",
@@ -10118,7 +10118,7 @@
         "sell_price": 3,
         "icon_name": "fu_3030.png",
         "icon_id": 3030,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -10313,7 +10313,7 @@
         "sell_price": 3,
         "icon_name": "fu_3070.png",
         "icon_id": 3070,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "ランニングマシン+",
@@ -10338,7 +10338,7 @@
         "sell_price": 3,
         "icon_name": "fu_3070.png",
         "icon_id": 3070,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -10533,7 +10533,7 @@
         "sell_price": 3,
         "icon_name": "fu_3110.png",
         "icon_id": 3110,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "かかし+",
@@ -10558,7 +10558,7 @@
         "sell_price": 3,
         "icon_name": "fu_3110.png",
         "icon_id": 3110,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -10578,11 +10578,11 @@
           "kr": "자가재생"
         },
         "descriptions": {
-          "chs": "关卡结束时，恢复[tag]3[/tag]点生命值。[tag]苦战[/tag]:改为恢复[tag]9[/tag]点",
-          "chs_t": "關卡結束時，恢復[tag]3[/tag]點生命值。 [tag]苦戰[/tag]：改為恢復[tag]9[/tag]點",
-          "jp": "ステージ終了時、体力を[tag]3[/tag]回復する。[tag]苦戦時[/tag]:体力を[tag]9[/tag]回復する。",
-          "en": "At the end of the level, restore [tag]3[/tag] HP. [tag]Fierce Battle[/tag]: Restore [tag]9[/tag] HP instead.",
-          "kr": "스테이지 종료 시, 체력을 [tag]3[/tag] 회복한다. [tag]고전[/tag]: 체력 [tag]9[/tag] 회복."
+          "chs": "关卡结束时，恢复[tag]3[/tag]点生命值。[tag]苦战[/tag]:改为恢复[tag]12[/tag]点",
+          "chs_t": "關卡結束時，恢復[tag]3[/tag]點生命值。 [tag]苦戰[/tag]：改為恢復[tag]12[/tag]點",
+          "jp": "ステージ終了時、体力を[tag]3[/tag]回復する。[tag]苦戦時[/tag]:体力を[tag]12[/tag]回復する。",
+          "en": "At the end of the level, restore [tag]3[/tag] HP. [tag]Fierce Battle[/tag]: Restore [tag]12[/tag] HP instead.",
+          "kr": "스테이지 종료 시, 체력을 [tag]3[/tag] 회복한다. [tag]고전[/tag]: 체력 [tag]12[/tag] 회복."
         },
         "price": 6,
         "sell_price": 3,
@@ -10603,11 +10603,11 @@
           "kr": "자가재생+"
         },
         "descriptions": {
-          "chs": "关卡结束时，恢复[tag]6[/tag]点生命值。[tag]苦战[/tag]:改为恢复[tag]18[/tag]点",
-          "chs_t": "關卡結束時，恢復[tag]6[/tag]點生命值。 [tag]苦戰[/tag]：改為恢復[tag]18[/tag]點",
-          "jp": "ステージ終了時、体力を[tag]6[/tag]回復する。[tag]苦戦時[/tag]:体力を[tag]18[/tag]回復する。",
-          "en": "At the end of the level, restore [tag]6[/tag] HP. [tag]Fierce Battle[/tag]: Restore [tag]18[/tag] HP instead.",
-          "kr": "스테이지 종료 시, 체력을 [tag]6[/tag] 회복한다. [tag]고전[/tag]: 체력 [tag]18[/tag] 회복."
+          "chs": "关卡结束时，恢复[tag]6[/tag]点生命值。[tag]苦战[/tag]:改为恢复[tag]24[/tag]点",
+          "chs_t": "關卡結束時，恢復[tag]6[/tag]點生命值。 [tag]苦戰[/tag]：改為恢復[tag]24[/tag]點",
+          "jp": "ステージ終了時、体力を[tag]6[/tag]回復する。[tag]苦戦時[/tag]:体力を[tag]24[/tag]回復する。",
+          "en": "At the end of the level, restore [tag]6[/tag] HP. [tag]Fierce Battle[/tag]: Restore [tag]24[/tag] HP instead.",
+          "kr": "스테이지 종료 시, 체력을 [tag]6[/tag] 회복한다. [tag]고전[/tag]: 체력 [tag]24[/tag] 회복."
         },
         "price": 6,
         "sell_price": 3,
@@ -10643,7 +10643,7 @@
         "sell_price": 3,
         "icon_name": "fu_3130.png",
         "icon_id": 3130,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "第一狩人+",
@@ -10668,7 +10668,7 @@
         "sell_price": 3,
         "icon_name": "fu_3130.png",
         "icon_id": 3130,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -10863,7 +10863,7 @@
         "sell_price": 3,
         "icon_name": "fu_3170.png",
         "icon_id": 3170,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "もう1つ無料+",
@@ -10888,7 +10888,7 @@
         "sell_price": 3,
         "icon_name": "fu_3170.png",
         "icon_id": 3170,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -10973,7 +10973,7 @@
         "sell_price": 3,
         "icon_name": "fu_3190.png",
         "icon_id": 3190,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       },
       "plus_name": "AAA級木材商+",
@@ -10998,7 +10998,7 @@
         "sell_price": 3,
         "icon_name": "fu_3190.png",
         "icon_id": 3190,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "GREEN"
       }
     },
@@ -11018,11 +11018,11 @@
           "kr": "핏빛 해적"
         },
         "descriptions": {
-          "chs": "和牌时，使随机[tag]1[/tag]张手牌视为红宝牌。[tag]集结(1)[/tag]:重复触发1次该效果",
-          "chs_t": "和牌時，使隨機[tag]1[/tag]張手牌視為紅寶牌。 [tag]集結（1）[/tag]：重複觸發1次該效果",
-          "jp": "和了時、ランダムで[tag]1[/tag]枚の手牌を赤ドラとして扱う。[tag]集結(1)[/tag]:この効果を追加でもう一度発動する。",
-          "en": "Upon winning, [tag]1[/tag] random tile in your hand is treated as a Red Dora. [tag]Rally (1)[/tag]: Trigger this effect 1 extra time.",
-          "kr": "화료 시, 임의의 손패 [tag]1[/tag]장을 적도라로 간주한다. [tag]집합(1)[/tag]: 해당 효과 1회 중복 발동."
+          "chs": "和牌时，使随机[tag]3[/tag]张手牌视为红宝牌。[tag]集结(1)[/tag]:重复触发1次该效果",
+          "chs_t": "和牌時，使隨機[tag]3[/tag]張手牌視為紅寶牌。 [tag]集結（1）[/tag]：重複觸發1次該效果",
+          "jp": "和了時、ランダムで[tag]3[/tag]枚の手牌を赤ドラとして扱う。[tag]集結(1)[/tag]:この効果を追加でもう一度発動する。",
+          "en": "Upon winning, [tag]3[/tag] random tiles in your hand are treated as Red Doras. Rally (1): Trigger this effect 1 extra time.",
+          "kr": "화료 시, 임의의 손패 [tag]3[/tag]장을 적도라로 간주한다. [tag]집합(1)[/tag]: 해당 효과 1회 중복 발동."
         },
         "price": 6,
         "sell_price": 3,
@@ -11043,11 +11043,11 @@
           "kr": "핏빛 해적+"
         },
         "descriptions": {
-          "chs": "和牌时，使随机[tag]2[/tag]张手牌视为红宝牌。[tag]集结(1)[/tag]:重复触发1次该效果",
-          "chs_t": "和牌時，使隨機[tag]2[/tag]張手牌視為紅寶牌。 [tag]集結（1）[/tag]：重複觸發1次該效果",
-          "jp": "和了時、ランダムで[tag]2[/tag]枚の手牌を赤ドラとして扱う。[tag]集結(1)[/tag]:この効果を追加でもう一度発動する。",
-          "en": "Upon winning, [tag]2[/tag] random tiles in your hand are treated as Red Doras. [tag]Rally (1)[/tag]: Trigger this effect 1 extra time.",
-          "kr": "화료 시, 임의의 손패 [tag]2[/tag]장을 적도라로 간주한다. [tag]집합(1)[/tag]: 해당 효과 1회 중복 발동."
+          "chs": "和牌时，使随机[tag]6[/tag]张手牌视为红宝牌。[tag]集结(1)[/tag]:重复触发1次该效果",
+          "chs_t": "和牌時，使隨機[tag]6[/tag]張手牌視為紅寶牌。 [tag]集結（1）[/tag]：重複觸發1次該效果",
+          "jp": "和了時、ランダムで[tag]6[/tag]枚の手牌を赤ドラとして扱う。[tag]集結(1)[/tag]:この効果を追加でもう一度発動する。",
+          "en": "Upon winning, [tag]6[/tag] random tiles in your hand are treated as Red Doras. Rally (1): Trigger this effect 1 extra time.",
+          "kr": "화료 시, 임의의 손패 [tag]6[/tag]장을 적도라로 간주한다. [tag]집합(1)[/tag]: 해당 효과 1회 중복 발동."
         },
         "price": 6,
         "sell_price": 3,
@@ -11073,11 +11073,11 @@
           "kr": "가운데 정렬"
         },
         "descriptions": {
-          "chs": "和牌时，所有点数为[tag]4、5、6[/tag]的序数牌的基础分值[tag]+2[/tag]",
-          "chs_t": "和牌時，所有點數為[tag]4、5、6[/tag]的序數牌的基礎分值[tag]+2[/tag]",
-          "jp": "和了時、全ての[tag]4、5、6[/tag]の数牌が[tag]+2[/tag]PTを獲得する。",
-          "en": "Upon winning, all tiles numbered [tag]4, 5, or 6[/tag] gain [tag]+2[/tag] basic PT.",
-          "kr": "화료 시, 숫자 [tag]4, 5, 6[/tag]인 모든 수패의 기본 점수[tag]+2[/tag]."
+          "chs": "和牌时，所有点数为[tag]4、5、6[/tag]的序数牌的基础分值[tag]+3[/tag]",
+          "chs_t": "和牌時，所有點數為[tag]4、5、6[/tag]的序數牌的基礎分值[tag]+3[/tag]",
+          "jp": "和了時、全ての[tag]4、5、6[/tag]の数牌が[tag]+3[/tag]PTを獲得する。",
+          "en": "Upon winning, all tiles numbered [tag]4, 5, or 6[/tag] gain [tag]+3[/tag] basic PT.",
+          "kr": "화료 시, 숫자 [tag]4, 5, 6[/tag]인 모든 수패의 기본 점수[tag]+3[/tag]."
         },
         "price": 6,
         "sell_price": 3,
@@ -11098,11 +11098,11 @@
           "kr": "가운데 정렬+"
         },
         "descriptions": {
-          "chs": "和牌时，所有点数为[tag]4、5、6[/tag]的序数牌的基础分值[tag]+4[/tag]",
-          "chs_t": "和牌時，所有點數為[tag]4、5、6[/tag]的序數牌的基礎分值[tag]+4[/tag]",
-          "jp": "和了時、全ての[tag]4、5、6[/tag]の数牌が[tag]+4[/tag]PTを獲得する。",
-          "en": "Upon winning, all tiles numbered [tag]4, 5, or 6[/tag] gain [tag]+4[/tag] basic PT.",
-          "kr": "화료 시, 숫자 [tag]4, 5, 6[/tag]인 모든 수패의 기본 점수[tag]+4[/tag]."
+          "chs": "和牌时，所有点数为[tag]4、5、6[/tag]的序数牌的基础分值[tag]+5[/tag]",
+          "chs_t": "和牌時，所有點數為[tag]4、5、6[/tag]的序數牌的基礎分值[tag]+5[/tag]",
+          "jp": "和了時、全ての[tag]4、5、6[/tag]の数牌が[tag]+5[/tag]PTを獲得する。",
+          "en": "Upon winning, all tiles numbered [tag]4, 5, or 6[/tag] gain [tag]+5[/tag] basic PT.",
+          "kr": "화료 시, 숫자 [tag]4, 5, 6[/tag]인 모든 수패의 기본 점수[tag]+5[/tag]."
         },
         "price": 6,
         "sell_price": 3,
@@ -11138,7 +11138,7 @@
         "sell_price": 6,
         "icon_name": "fu_3220.png",
         "icon_id": 3220,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       },
       "plus_name": "召喚陣+",
@@ -11163,7 +11163,7 @@
         "sell_price": 6,
         "icon_name": "fu_3220.png",
         "icon_id": 3220,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       }
     },
@@ -11183,11 +11183,11 @@
           "kr": "임프 두목"
         },
         "descriptions": {
-          "chs": "每当[tag]1[/tag]张小鬼护身符消失时，获得[tag]20[/tag]星币和[tag]1[/tag]张其他的小鬼护身符",
-          "chs_t": "每當[tag]1[/tag]張小鬼護身符消失時，獲得[tag]20[/tag]星幣和[tag]1[/tag]張其他的小鬼護身符",
-          "jp": "お化け守りが[tag]1[/tag]枚消滅する度に、勝ち星[tag]20[/tag]とほかのお化け守りを[tag]1[/tag]枚獲得する。",
-          "en": "Whenever [tag]1[/tag] Imp talisman disappears, gain [tag]20[/tag] Star Coins and [tag]1[/tag] different Imp talisman.",
-          "kr": "임프 부적이 [tag]1[/tag]장 사라질 때마다, [tag]20[/tag] 스타코인과 다른 임프 부적 [tag]1[/tag]장을 획득한다."
+          "chs": "每当[tag]1[/tag]张小鬼护身符消失时，获得[tag]10[/tag]星币和[tag]1[/tag]张其他的小鬼护身符",
+          "chs_t": "每當[tag]1[/tag]張小鬼護身符消失時，獲得[tag]10[/tag]星幣和[tag]1[/tag]張其他的小鬼護身符",
+          "jp": "お化け守りが[tag]1[/tag]枚消滅する度に、勝ち星[tag]10[/tag]とほかのお化け守りを[tag]1[/tag]枚獲得する。",
+          "en": "Whenever [tag]1[/tag] Imp talisman disappears, gain [tag]10[/tag] Star Coins and [tag]1[/tag] different Imp talisman.",
+          "kr": "임프 부적이 [tag]1[/tag]장 사라질 때마다, [tag]10[/tag] 스타코인과 다른 임프 부적 [tag]1[/tag]장을 획득한다."
         },
         "price": 12,
         "sell_price": 6,
@@ -11208,11 +11208,11 @@
           "kr": "임프 두목+"
         },
         "descriptions": {
-          "chs": "每当[tag]1[/tag]张小鬼护身符消失时，获得[tag]30[/tag]星币和[tag]2[/tag]张其他的小鬼护身符",
-          "chs_t": "每當[tag]1[/tag]張小鬼護身符消失時，獲得[tag]30[/tag]星幣和[tag]2[/tag]張其他的小鬼護身符",
-          "jp": "お化け守りが[tag]1[/tag]枚消滅する度に、勝ち星[tag]30[/tag]とほかのお化け守りを[tag]2[/tag]枚獲得する。",
-          "en": "Whenever [tag]1[/tag] Imp talisman disappears, gain [tag]30[/tag] Star Coins and [tag]2[/tag] different Imp talismans.",
-          "kr": "임프 부적이 [tag]1[/tag]장 사라질 때마다, [tag]30[/tag] 스타코인과 다른 임프 부적 [tag]2[/tag]장을 획득한다."
+          "chs": "每当[tag]1[/tag]张小鬼护身符消失时，获得[tag]15[/tag]星币和[tag]2[/tag]张其他的小鬼护身符",
+          "chs_t": "每當[tag]1[/tag]張小鬼護身符消失時，獲得[tag]15[/tag]星幣和[tag]2[/tag]張其他的小鬼護身符",
+          "jp": "お化け守りが[tag]1[/tag]枚消滅する度に、勝ち星[tag]15[/tag]とほかのお化け守りを[tag]2[/tag]枚獲得する。",
+          "en": "Whenever [tag]1[/tag] Imp talisman disappears, gain [tag]15[/tag] Star Coins and [tag]2[/tag] different Imp talismans.",
+          "kr": "임프 부적이 [tag]1[/tag]장 사라질 때마다, [tag]15[/tag] 스타코인과 다른 임프 부적 [tag]2[/tag]장을 획득한다."
         },
         "price": 12,
         "sell_price": 6,
@@ -11281,8 +11281,8 @@
       "id": 325,
       "icon_id": 3250,
       "name": "エリート海賊",
-      "rarity": "BLUE",
-      "sell_price": 6,
+      "rarity": "GREEN",
+      "sell_price": 3,
       "metadata": {
         "data_id": 3250,
         "names": {
@@ -11293,21 +11293,21 @@
           "kr": "엘리트 해적"
         },
         "descriptions": {
-          "chs": "每当换出[tag]{0}/5[/tag]张筒子牌时，获得[tag]1[/tag]星币。[tag]集结:[/tag]改为[tag]2[/tag]星币",
-          "chs_t": "每當換出[tag]{0}/5[/tag]張筒子牌時，獲得[tag]1[/tag]星幣。 [tag]集結：[/tag]改為[tag]2[/tag]星幣",
-          "jp": "[tag]{0}/5[/tag]枚の筒子牌の入替を行う度に、勝ち星を[tag]1[/tag]獲得する。[tag]集結:[/tag]勝ち星を[tag]2[/tag]獲得する。",
-          "en": "After exchanging [tag]{0}/5[/tag] Pin tiles in total, gain [tag]1[/tag] Star Coin. [tag]Rally[/tag]: Gain [tag]2[/tag] Star Coins instead.",
-          "kr": "통수패를 [tag]{0}/5[/tag]장 교환할 때마다, [tag]1[/tag]스타코인을 획득한다. [tag]집합[/tag]: [tag]2[/tag]스타코인 획득으로 변경."
+          "chs": "每当换出[tag]{0}/5[/tag]张筒子牌时，获得[tag]1[/tag]星币。[tag]集结:[/tag]改为[tag]3[/tag]星币",
+          "chs_t": "每當換出[tag]{0}/5[/tag]張筒子牌時，獲得[tag]1[/tag]星幣。 [tag]集結：[/tag]改為[tag]3[/tag]星幣",
+          "jp": "[tag]{0}/5[/tag]枚の筒子牌の入替を行う度に、勝ち星を[tag]1[/tag]獲得する。[tag]集結:[/tag]勝ち星を[tag]3[/tag]獲得する。",
+          "en": "After exchanging [tag]{0}/5[/tag] Pin tiles in total, gain [tag]1[/tag] Star Coin. [tag]Rally[/tag]: Gain [tag]3[/tag] Star Coins instead.",
+          "kr": "통수패를 [tag]{0}/5[/tag]장 교환할 때마다, [tag]1[/tag]스타코인을 획득한다. [tag]집합[/tag]: [tag]3[/tag]스타코인 획득으로 변경."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_3250.png",
         "icon_id": 3250,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       },
       "plus_name": "エリート海賊+",
-      "plus_sell_price": 6,
+      "plus_sell_price": 3,
       "plus_metadata": {
         "data_id": 3251,
         "names": {
@@ -11318,18 +11318,18 @@
           "kr": "엘리트 해적+"
         },
         "descriptions": {
-          "chs": "每当换出[tag]{0}/5[/tag]张筒子牌时，获得[tag]2[/tag]星币。[tag]集结:[/tag]改为[tag]3[/tag]星币",
-          "chs_t": "每當換出[tag]{0}/5[/tag]張筒子牌時，獲得[tag]2[/tag]星幣。 [tag]集結：[/tag]改為[tag]3[/tag]星幣",
-          "jp": "[tag]{0}/5[/tag]枚の筒子牌の入替を行う度に、勝ち星を[tag]2[/tag]獲得する。[tag]集結:[/tag]勝ち星を[tag]3[/tag]獲得する。",
-          "en": "After exchanging [tag]{0}/5[/tag] Pin tiles in total, gain [tag]2[/tag] Star Coins. [tag]Rally[/tag]: Gain [tag]3[/tag] Star Coins instead.",
-          "kr": "통수패를 [tag]{0}/5[/tag]장 교환할 때마다, [tag]2[/tag]스타코인을 획득한다. [tag]집합[/tag]: [tag]3[/tag]스타코인 획득으로 변경."
+          "chs": "每当换出[tag]{0}/5[/tag]张筒子牌时，获得[tag]2[/tag]星币。[tag]集结:[/tag]改为[tag]6[/tag]星币",
+          "chs_t": "每當換出[tag]{0}/5[/tag]張筒子牌時，獲得[tag]2[/tag]星幣。 [tag]集結：[/tag]改為[tag]6[/tag]星幣",
+          "jp": "[tag]{0}/5[/tag]枚の筒子牌の入替を行う度に、勝ち星を[tag]2[/tag]獲得する。[tag]集結:[/tag]勝ち星を[tag]6[/tag]獲得する。",
+          "en": "After exchanging [tag]{0}/5[/tag] Pin tiles in total, gain [tag]2[/tag] Star Coins. [tag]Rally[/tag]: Gain [tag]6[/tag] Star Coins instead.",
+          "kr": "통수패를 [tag]{0}/5[/tag]장 교환할 때마다, [tag]2[/tag]스타코인을 획득한다. [tag]집합[/tag]: [tag]6[/tag]스타코인 획득으로 변경."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_3250.png",
         "icon_id": 3250,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       }
     },
     {
@@ -11721,8 +11721,8 @@
       "id": 333,
       "icon_id": 3330,
       "name": "双銃のガード",
-      "rarity": "BLUE",
-      "sell_price": 6,
+      "rarity": "GREEN",
+      "sell_price": 3,
       "metadata": {
         "data_id": 3330,
         "names": {
@@ -11739,15 +11739,15 @@
           "en": "Upon winning, if drawn from the [tag]last 6[/tag] tiles in the Tile Wall, gain [tag]1[/tag] Star Coin. [tag]Fierce Battle[/tag]: Gain [tag]2[/tag] Star Coins instead.",
           "kr": "화료 시, 남은 패가 [tag]6장 이하[/tag]면 [tag]1[/tag] 스타코인을 획득한다. [tag]고전[/tag]:[tag]2[/tag] 스타코인 획득."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_3330.png",
         "icon_id": 3330,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       },
       "plus_name": "双銃のガード+",
-      "plus_sell_price": 6,
+      "plus_sell_price": 3,
       "plus_metadata": {
         "data_id": 3331,
         "names": {
@@ -11764,20 +11764,20 @@
           "en": "Upon winning, if drawn from the [tag]last 6[/tag] tiles in the Tile Wall, gain [tag]2[/tag] Star Coins. [tag]Fierce Battle[/tag]: Gain [tag]4[/tag] Star Coins instead.",
           "kr": "화료 시, 남은 패가 [tag]6장 이하[/tag]면 [tag]2[/tag] 스타코인을 획득한다. [tag]고전[/tag]:[tag]4[/tag] 스타코인 획득."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_3330.png",
         "icon_id": 3330,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       }
     },
     {
       "id": 334,
       "icon_id": 3340,
       "name": "救急箱",
-      "rarity": "BLUE",
-      "sell_price": 6,
+      "rarity": "GREEN",
+      "sell_price": 3,
       "metadata": {
         "data_id": 3340,
         "names": {
@@ -11794,15 +11794,15 @@
           "en": "Each time the Tile Wall is replenished, restore [tag]3[/tag] HP.",
           "kr": "패를 받은 후, 체력을 [tag]3[/tag] 회복한다."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_3340.png",
         "icon_id": 3340,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       },
       "plus_name": "救急箱+",
-      "plus_sell_price": 6,
+      "plus_sell_price": 3,
       "plus_metadata": {
         "data_id": 3341,
         "names": {
@@ -11819,20 +11819,20 @@
           "en": "Each time the Tile Wall is replenished, restore [tag]5[/tag] HP.",
           "kr": "패를 받은 후, 체력을 [tag]5[/tag] 회복한다."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_3340.png",
         "icon_id": 3340,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       }
     },
     {
       "id": 335,
       "icon_id": 3350,
       "name": "龍の先導者",
-      "rarity": "BLUE",
-      "sell_price": 6,
+      "rarity": "GREEN",
+      "sell_price": 3,
       "metadata": {
         "data_id": 3350,
         "names": {
@@ -11849,15 +11849,15 @@
           "en": "If your Tenpai wait includes a [tag]Dragon tile[/tag], drawing [tag]any Dragon tile[/tag] guarantees a win.",
           "kr": "텐파이 상태에서 [tag]삼원패[/tag]를 포함하고 있을 경우, [tag]임의의 삼원패[/tag]를 쯔모하면 반드시 화료한다."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_3350.png",
         "icon_id": 3350,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       },
       "plus_name": "龍の先導者+",
-      "plus_sell_price": 6,
+      "plus_sell_price": 3,
       "plus_metadata": {
         "data_id": 3351,
         "names": {
@@ -11874,12 +11874,12 @@
           "en": "If your Tenpai wait includes a [tag]Dragon tile[/tag], drawing [tag]any Honor tile[/tag] guarantees a win.",
           "kr": "텐파이 상태에서 [tag]삼원패[/tag]를 포함하고 있을 경우, [tag]임의의 자패[/tag]를 쯔모하면 반드시 화료한다."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_3350.png",
         "icon_id": 3350,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       }
     },
     {
@@ -11898,11 +11898,11 @@
           "kr": "슬로우 스타트"
         },
         "descriptions": {
-          "chs": "每关[tag]第5次[/tag]和牌时，本护身符获得[tag]x5[/tag]番（当前为[tag]x{0}[/tag]番）",
-          "chs_t": "每關[tag]第5次[/tag]和牌時，本護身符獲得[tag]x5[/tag]番（當前為[tag]x{0}[/tag]番）",
-          "jp": "各ステージで[tag]5回目[/tag]の和了時に[tag]x5[/tag]飜を獲得する。（現在[tag]x{0}[/tag]飜）",
-          "en": "Upon your [tag]5th[/tag] win each level, this talisman gains [tag]x5[/tag] Han (currently [tag]x{0}[/tag] Han).",
-          "kr": "각 스테이지에서 [tag]5번째[/tag] 화료 시, [tag]x5[/tag]판 획득한다(현재 [tag]x{0}[/tag]판)."
+          "chs": "每关[tag]第5次[/tag]和牌时，本护身符获得[tag]x10[/tag]番（当前为[tag]x{0}[/tag]番）",
+          "chs_t": "每關[tag]第5次[/tag]和牌時，本護身符獲得[tag]x10[/tag]番（當前為[tag]x{0}[/tag]番）",
+          "jp": "各ステージで[tag]5回目[/tag]の和了時に[tag]x10[/tag]飜を獲得する。（現在[tag]x{0}[/tag]飜）",
+          "en": "Upon your [tag]5th[/tag] win each level, this talisman gains [tag]x10[/tag] Han (currently [tag]x{0}[/tag] Han).",
+          "kr": "각 스테이지에서 [tag]5번째[/tag] 화료 시, [tag]x10[/tag]판 획득한다(현재 [tag]x{0}[/tag]판)."
         },
         "price": 12,
         "sell_price": 6,
@@ -11923,11 +11923,11 @@
           "kr": "슬로우 스타트+"
         },
         "descriptions": {
-          "chs": "每关[tag]第5次[/tag]和牌时，本护身符获得[tag]x10[/tag]番（当前为[tag]x{0}[/tag]番）",
-          "chs_t": "每關[tag]第5次[/tag]和牌時，本護身符獲得[tag]x10[/tag]番（當前為[tag]x{0}[/tag]番）",
-          "jp": "各ステージで[tag]5回目[/tag]の和了時に[tag]x10[/tag]飜を獲得する。（現在[tag]x{0}[/tag]飜）",
-          "en": "Upon your [tag]5th[/tag] win each level, this talisman gains [tag]x10[/tag] Han (currently [tag]x{0}[/tag] Han).",
-          "kr": "각 스테이지에서 [tag]5번째[/tag] 화료 시, [tag]x10[/tag]판 획득한다(현재 [tag]x{0}[/tag]판)."
+          "chs": "每关[tag]第5次[/tag]和牌时，本护身符获得[tag]x20[/tag]番（当前为[tag]x{0}[/tag]番）",
+          "chs_t": "每關[tag]第5次[/tag]和牌時，本護身符獲得[tag]x20[/tag]番（當前為[tag]x{0}[/tag]番）",
+          "jp": "各ステージで[tag]5回目[/tag]の和了時に[tag]x20[/tag]飜を獲得する。（現在[tag]x{0}[/tag]飜）",
+          "en": "Upon your [tag]5th[/tag] win each level, this talisman gains [tag]x20[/tag] Han (currently [tag]x{0}[/tag] Han).",
+          "kr": "각 스테이지에서 [tag]5번째[/tag] 화료 시, [tag]x20[/tag]판 획득한다(현재 [tag]x{0}[/tag]판)."
         },
         "price": 12,
         "sell_price": 6,
@@ -11953,11 +11953,11 @@
           "kr": "불꽃 무장"
         },
         "descriptions": {
-          "chs": "[tag]x30[/tag]番。剩余[tag]{0}/5[/tag]次生效后本护身符消失。",
-          "chs_t": "[tag]x30[/tag]番。 剩餘[tag]{0}/5[/tag]次生效后本護身符消失。",
-          "jp": "飜数[tag]x30[/tag]。このお守りは[tag]{0}/5[/tag]回発動すると消滅する。",
-          "en": "[tag]x30[/tag] Han. This talisman disappears after triggering [tag]{0}/5[/tag] more times.",
-          "kr": "[tag]x30[/tag]판. 5회 효과 발동 후, 본 부적은 소멸된다(현재 [tag]{0}/5[/tag]회)."
+          "chs": "[tag]x30[/tag]番。剩余[tag]{0}/8[/tag]次生效后本护身符消失。",
+          "chs_t": "[tag]x30[/tag]番。 剩餘[tag]{0}/8[/tag]次生效后本護身符消失。",
+          "jp": "飜数[tag]x30[/tag]。このお守りは[tag]{0}/8[/tag]回発動すると消滅する。",
+          "en": "[tag]x30[/tag] Han. This talisman disappears after triggering [tag]{0}/8[/tag] more times.",
+          "kr": "[tag]x30[/tag]판. 8회 효과 발동 후, 본 부적은 소멸된다(현재 [tag]{0}/8[/tag]회)."
         },
         "price": 12,
         "sell_price": 6,
@@ -11978,11 +11978,11 @@
           "kr": "불꽃 무장+"
         },
         "descriptions": {
-          "chs": "[tag]x50[/tag]番。剩余[tag]{0}/5[/tag]次生效后本护身符消失。",
-          "chs_t": "[tag]x50[/tag]番。 剩餘[tag]{0}/5[/tag]次生效后本護身符消失。",
-          "jp": "飜数[tag]x50[/tag]。このお守りは[tag]{0}/5[/tag]回発動すると消滅する。",
-          "en": "[tag]x50[/tag] Han. This talisman disappears after triggering [tag]{0}/5[/tag] more times.",
-          "kr": "[tag]x50[/tag]판. 5회 효과 발동 후, 본 부적은 소멸된다(현재 [tag]{0}/5[/tag]회)."
+          "chs": "[tag]x50[/tag]番。剩余[tag]{0}/8[/tag]次生效后本护身符消失。",
+          "chs_t": "[tag]x50[/tag]番。 剩餘[tag]{0}/8[/tag]次生效后本護身符消失。",
+          "jp": "飜数[tag]x50[/tag]。このお守りは[tag]{0}/8[/tag]回発動すると消滅する。",
+          "en": "[tag]x50[/tag] Han. This talisman disappears after triggering [tag]{0}/8[/tag] more times.",
+          "kr": "[tag]x50[/tag]판. 8회 효과 발동 후, 본 부적은 소멸된다(현재 [tag]{0}/8[/tag]회)."
         },
         "price": 12,
         "sell_price": 6,
@@ -12106,8 +12106,8 @@
       "id": 340,
       "icon_id": 3400,
       "name": "期限切れの薬",
-      "rarity": "BLUE",
-      "sell_price": 6,
+      "rarity": "GREEN",
+      "sell_price": 3,
       "metadata": {
         "data_id": 3400,
         "names": {
@@ -12124,15 +12124,15 @@
           "en": "At the end of the level, [tag]{0}[/tag] (then it swaps to [tag]{1}[/tag]!).",
           "kr": "스테이지 종료 시, [tag]{0}[/tag] 효과를 획득한다(그리고 [tag]{1}[/tag] 효과로 변한다!)."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_3400.png",
         "icon_id": 3400,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       },
       "plus_name": "期限切れの薬+",
-      "plus_sell_price": 6,
+      "plus_sell_price": 3,
       "plus_metadata": {
         "data_id": 3401,
         "names": {
@@ -12149,12 +12149,12 @@
           "en": "At the end of the level, [tag]{0}[/tag] (then it swaps to [tag]{1}[/tag]!).",
           "kr": "스테이지 종료 시, [tag]{0}[/tag] 효과를 획득한다(그리고 [tag]{1}[/tag] 효과로 변한다!)."
         },
-        "price": 12,
-        "sell_price": 6,
+        "price": 6,
+        "sell_price": 3,
         "icon_name": "fu_3400.png",
         "icon_id": 3400,
         "deprecated": false,
-        "rarity": "BLUE"
+        "rarity": "GREEN"
       }
     },
     {
@@ -12173,11 +12173,11 @@
           "kr": "자장가 연주자"
         },
         "descriptions": {
-          "chs": "锁定[tag]6[/tag]张待摸牌。听牌后，所有狂暴牌在摸到时均可和牌",
-          "chs_t": "鎖定[tag]6[/tag]張待摸牌。 聽牌后，所有狂暴牌在摸到時均可和牌",
-          "jp": "牌山の牌を[tag]6[/tag]枚ロックする。聴牌時、すべての狂暴牌をツモするとツモ和了になる。",
-          "en": "Lock [tag]6[/tag] tiles in the Tile Wall. After reaching Tenpai, drawing any Frenzy tile guarantees a win.",
-          "kr": "패산에 패 [tag]6[/tag]장을 고정한다. 텐파이 상태일 시, 임의의 광폭패를 쯔모하면 화료한다."
+          "chs": "锁定[tag]12[/tag]张待摸牌。听牌后，所有狂暴牌在摸到时均可和牌",
+          "chs_t": "鎖定[tag]12[/tag]張待摸牌。 聽牌后，所有狂暴牌在摸到時均可和牌",
+          "jp": "牌山の牌を[tag]12[/tag]枚ロックする。聴牌時、すべての狂暴牌をツモするとツモ和了になる。",
+          "en": "Lock [tag]12[/tag] tiles in the Tile Wall. After reaching Tenpai, drawing any Frenzy tile guarantees a win.",
+          "kr": "패산에 패 [tag]12[/tag]장을 고정한다. 텐파이 상태일 시, 임의의 광폭패를 쯔모하면 화료한다."
         },
         "price": 18,
         "sell_price": 9,
@@ -12562,13 +12562,13 @@
           "chs_t": "[tag]x{0}[/tag]番。 效果量等同於本局遊戲中護身符的[tag]升級次數[/tag]",
           "jp": "飜数[tag]x{0}[/tag]。倍数はこのお守りの[tag]強化回数[/tag]。",
           "en": "[tag]x{0}[/tag] Han. Effect equals the [tag]number of talisman upgrades[/tag] this run.",
-          "kr": "[tag]+{0}[/tag]판. 효과량은 현재 게임 중 부적의 [tag]강화 수량[/tag]과 같다."
+          "kr": "[tag]x{0}[/tag]판. 효과량은 현재 게임 중 부적의 [tag]강화 수량[/tag]과 같다."
         },
         "price": 12,
         "sell_price": 6,
         "icon_name": "fu_3480.png",
         "icon_id": 3480,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       },
       "plus_name": "磁力兵士+",
@@ -12587,13 +12587,13 @@
           "chs_t": "[tag]x{0}[/tag]番。 效果量等同於本局遊戲中護身符的[tag]升級次數的2倍[/tag]",
           "jp": "飜数[tag]x{0}[/tag]。倍数はこのお守りの[tag]強化回数x2[/tag]。",
           "en": "[tag]x{0}[/tag] Han. Effect equals [tag]double the number of talisman upgrades[/tag] this run.",
-          "kr": "[tag]+{0}[/tag]판. 효과량은 현재 게임 중 부적의 [tag]강화 수량의 2배[/tag]와 같다."
+          "kr": "[tag]x{0}[/tag]판. 효과량은 현재 게임 중 부적의 [tag]강화 수량의 2배[/tag]와 같다."
         },
         "price": 12,
         "sell_price": 6,
         "icon_name": "fu_3480.png",
         "icon_id": 3480,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "BLUE"
       }
     },
@@ -12617,7 +12617,7 @@
           "chs_t": "每當獲取[tag]1[/tag]張小鬼護身符時，使隨機1張萬子牌的基礎分值[tag]+66[/tag]。 [tag]入手：[/tag]獲得[tag]1[/tag]張小鬼護身符",
           "jp": "お化けお守りを[tag]1[/tag]枚獲得する度に、いずれか1枚の萬子の基礎スコア[tag]+66[/tag]。[tag]入手:[/tag]お化けお守りを[tag]1[/tag]枚獲得する。",
           "en": "Whenever you obtain [tag]1[/tag] Imp talisman, 1 random Man tile gains [tag]+66[/tag] basic PT. [tag]Acquire[/tag]: Gain [tag]1[/tag] Imp talisman.",
-          "kr": "임프 부적을 [tag]1[/tag]장 획득할 때마다, 임의의 만수패 1장의 기본점수[tag]+66[/tag]. [tag]입수[/tag]: [tag]1[/tag]장의 임프 부적을 획득."
+          "kr": "임프 부적을 [tag]1[/tag]장 획득할 때마다, 임의의 만수패 1장의 기본 점수[tag]+66[/tag]. [tag]입수[/tag]: [tag]1[/tag]장의 임프 부적을 획득."
         },
         "price": 18,
         "sell_price": 9,
@@ -12642,7 +12642,7 @@
           "chs_t": "每當獲取[tag]1[/tag]張小鬼護身符時，使隨機1張萬子牌的基礎分值[tag]+99[/tag]。 [tag]入手：[/tag]獲得[tag]1[/tag]張小鬼護身符",
           "jp": "お化けお守りを[tag]1[/tag]枚獲得する度に、いずれか1枚の萬子の基礎スコアが[tag]+99[/tag]。[tag]入手:[/tag]お化けお守りを[tag]1[/tag]枚獲得する。",
           "en": "Whenever you obtain [tag]1[/tag] Imp talisman, 1 random Man tile gains [tag]+99[/tag] basic PT. [tag]Acquire[/tag]: Gain [tag]1[/tag] Imp talisman.",
-          "kr": "임프 부적을 [tag]1[/tag]장 획득할 때마다, 임의의 만수패 1장의 기본 판수[tag]+99[/tag]. [tag]입수[/tag]: [tag]1[/tag]장의 임프 부적을 획득."
+          "kr": "임프 부적을 [tag]1[/tag]장 획득할 때마다, 임의의 만수패 1장의 기본 점수[tag]+99[/tag]. [tag]입수[/tag]: [tag]1[/tag]장의 임프 부적을 획득."
         },
         "price": 18,
         "sell_price": 9,
@@ -12678,7 +12678,7 @@
         "sell_price": 9,
         "icon_name": "fu_3500.png",
         "icon_id": 3500,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       },
       "plus_name": "除霊家政夫A-37+",
@@ -12703,7 +12703,7 @@
         "sell_price": 9,
         "icon_name": "fu_3500.png",
         "icon_id": 3500,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       }
     },
@@ -12821,8 +12821,8 @@
       "id": 353,
       "icon_id": 3530,
       "name": "萬ピース",
-      "rarity": "ORANGE",
-      "sell_price": 9,
+      "rarity": "BLUE",
+      "sell_price": 6,
       "metadata": {
         "data_id": 3530,
         "names": {
@@ -12833,21 +12833,21 @@
           "kr": "진귀한 보물"
         },
         "descriptions": {
-          "chs": "和牌时，如果手牌中有[tag]6[/tag]张及以上的万子，所有役满役种在本轮游戏中基础番数[tag]+4[/tag]番",
-          "chs_t": "和牌時，如果手牌中有[tag]6[/tag]張及以上的萬子，所有役滿役種在本輪遊戲中基礎番數[tag]+4[/tag]番",
-          "jp": "萬子を[tag]6[/tag]枚以上所持して和了すると、すべての役満役の基礎飜数[tag]+4[/tag]飜。",
-          "en": "Upon winning, if your hand contains [tag]6[/tag] or more Man tiles, all Yakuman yaku gain [tag]+4[/tag] base Han for the rest of this run.",
-          "kr": "화료 시, 손패에 [tag]6[/tag]장 이상의 만수패가 있다면, 모든 역만은 이번 게임에서 기본 판수 [tag]+4[/tag]판."
+          "chs": "和牌时，如果手牌中有[tag]6[/tag]张及以上的万子，所有役满役种在本轮游戏中基础番数[tag]+6[/tag]番",
+          "chs_t": "和牌時，如果手牌中有[tag]6[/tag]張及以上的萬子，所有役滿役種在本輪遊戲中基礎番數[tag]+6[/tag]番",
+          "jp": "萬子を[tag]6[/tag]枚以上所持して和了すると、すべての役満役の基礎飜数[tag]+6[/tag]飜。",
+          "en": "Upon winning, if your hand contains [tag]6[/tag] or more Man tiles, all Yakuman yaku gain [tag]+6[/tag] base Han for the rest of this run.",
+          "kr": "화료 시, 손패에 [tag]6[/tag]장 이상의 만수패가 있다면, 모든 역만은 이번 게임에서 기본 판수 [tag]+6[/tag]판."
         },
-        "price": 18,
-        "sell_price": 9,
+        "price": 12,
+        "sell_price": 6,
         "icon_name": "fu_3530.png",
         "icon_id": 3530,
         "deprecated": false,
-        "rarity": "ORANGE"
+        "rarity": "BLUE"
       },
       "plus_name": "萬ピース+",
-      "plus_sell_price": 9,
+      "plus_sell_price": 6,
       "plus_metadata": {
         "data_id": 3531,
         "names": {
@@ -12858,18 +12858,18 @@
           "kr": "진귀한 보물+"
         },
         "descriptions": {
-          "chs": "和牌时，如果手牌中有[tag]6[/tag]张及以上的万子，所有役满役种在本轮游戏中基础番数[tag]+8[/tag]番",
-          "chs_t": "和牌時，如果手牌中有[tag]6[/tag]張及以上的萬子，所有役滿役種在本輪遊戲中基礎番數[tag]+8[/tag]番",
-          "jp": "萬子を[tag]6[/tag]枚以上所持して和了すると、すべての役満役の基礎飜数[tag]+8[/tag]飜。",
-          "en": "Upon winning, if your hand contains [tag]6[/tag] or more Man tiles, all Yakuman yaku gain [tag]+8[/tag] base Han for the rest of this run.",
-          "kr": "화료 시, 손패에 [tag]6[/tag]장 이상의 만수패가 있다면, 모든 역만은 이번 게임에서 기본 판수 [tag]+8[/tag]판."
+          "chs": "和牌时，如果手牌中有[tag]6[/tag]张及以上的万子，所有役满役种在本轮游戏中基础番数[tag]+12[/tag]番",
+          "chs_t": "和牌時，如果手牌中有[tag]6[/tag]張及以上的萬子，所有役滿役種在本輪遊戲中基礎番數[tag]+12[/tag]番",
+          "jp": "萬子を[tag]6[/tag]枚以上所持して和了すると、すべての役満役の基礎飜数[tag]+12[/tag]飜。",
+          "en": "Upon winning, if your hand contains [tag]6[/tag] or more Man tiles, all Yakuman yaku gain [tag]+12[/tag] base Han for the rest of this run.",
+          "kr": "화료 시, 손패에 [tag]6[/tag]장 이상의 만수패가 있다면, 모든 역만은 이번 게임에서 기본 판수 [tag]+12[/tag]판."
         },
-        "price": 18,
-        "sell_price": 9,
+        "price": 12,
+        "sell_price": 6,
         "icon_name": "fu_3530.png",
         "icon_id": 3530,
         "deprecated": false,
-        "rarity": "ORANGE"
+        "rarity": "BLUE"
       }
     },
     {
@@ -12892,7 +12892,7 @@
           "chs_t": "每換出1張序數牌時，根據萬、筒、索的順序對應獲得[tag]x0.05[/tag]番、[tag]+1[/tag]番或[tag]+5[/tag]分的效果。 （當前為[tag]x{0}[/tag]番，[tag]+{1}[/tag]番，[tag]+{2}[/tag]分）",
           "jp": "数牌を1枚入れ替える度に、萬子、筒子、索子の順に[tag]x0.05[/tag]飜、[tag]+1[/tag]飜、もしくは[tag]+5[/tag]スコアを獲得する（現在は[tag]x{0}[/tag]飜、[tag]+{1}[/tag]飜，[tag]+{2}[/tag]スコア）。",
           "en": "Whenever you exchange 1 number tile, gain [tag]x0.05[/tag] Han for Man, [tag]+1[/tag] Han for Pin, or [tag]+5[/tag] PT for Sou. (currently [tag]x{0}[/tag] Han, [tag]+{1}[/tag] Han, [tag]+{2}[/tag] PT)",
-          "kr": "수패를 1장 교환할 때마다, 만수패, 통수패, 삭수패 순으로 각각 [tag]x0.1[/tag], [tag]+2[/tag]판, [tag]+10[/tag]점의 효과를 획득한다(현재 [tag]x{0}[/tag]판, [tag]+{1}[/tag]판, [tag]+{2}[/tag]점)."
+          "kr": "수패를 1장 교환할 때마다, 만수패, 통수패, 삭수패 순으로 각각 [tag]x0.05[/tag], [tag]+1[/tag]판, [tag]+5[/tag]점의 효과를 획득한다(현재 [tag]x{0}[/tag]판, [tag]+{1}[/tag]판, [tag]+{2}[/tag]점)."
         },
         "price": 18,
         "sell_price": 9,
@@ -13063,7 +13063,7 @@
         "sell_price": 9,
         "icon_name": "fu_3570.png",
         "icon_id": 3570,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       },
       "plus_name": "満点ミキサー+",
@@ -13088,7 +13088,7 @@
         "sell_price": 9,
         "icon_name": "fu_3570.png",
         "icon_id": 3570,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       }
     },
@@ -13151,8 +13151,8 @@
       "id": 359,
       "icon_id": 3590,
       "name": "ミニドラゴンのお守り",
-      "rarity": "ORANGE",
-      "sell_price": 9,
+      "rarity": "BLUE",
+      "sell_price": 6,
       "metadata": {
         "data_id": 3590,
         "names": {
@@ -13163,21 +13163,21 @@
           "kr": "미니 용 부적"
         },
         "descriptions": {
-          "chs": "关卡开始时，将[tag]3[/tag]张手牌尽可能替换成[tag]随机的三元牌[/tag]",
-          "chs_t": "關卡開始時，將[tag]3[/tag]張手牌儘可能替換成[tag]隨機的三元牌[/tag]",
-          "jp": "ステージ開始時、手牌[tag]3[/tag]枚を可能な限り[tag]ランダムな三元牌[/tag]に入替する。",
-          "en": "At the start of the level, replace [tag]3[/tag] tiles in your hand with [tag]random Dragon tiles[/tag] if possible.",
-          "kr": "스테이지 시작 시, 손패 [tag]3[/tag]장을 [tag]임의의 삼원패[/tag]로 바꾼다."
+          "chs": "关卡开始时，将[tag]2[/tag]张手牌尽可能替换成[tag]随机的三元牌[/tag]",
+          "chs_t": "關卡開始時，將[tag]2[/tag]張手牌儘可能替換成[tag]隨機的三元牌[/tag]",
+          "jp": "ステージ開始時、手牌[tag]2[/tag]枚を可能な限り[tag]ランダムな三元牌[/tag]に入替する。",
+          "en": "At the start of the level, replace [tag]2[/tag] tiles in your hand with [tag]random Dragon tiles[/tag] if possible.",
+          "kr": "스테이지 시작 시, 손패 [tag]2[/tag]장을 [tag]임의의 삼원패[/tag]로 바꾼다."
         },
-        "price": 18,
-        "sell_price": 9,
+        "price": 12,
+        "sell_price": 6,
         "icon_name": "fu_3590.png",
         "icon_id": 3590,
         "deprecated": false,
-        "rarity": "ORANGE"
+        "rarity": "BLUE"
       },
       "plus_name": "ミニドラゴンのお守り+",
-      "plus_sell_price": 9,
+      "plus_sell_price": 6,
       "plus_metadata": {
         "data_id": 3591,
         "names": {
@@ -13188,18 +13188,18 @@
           "kr": "미니 용 부적+"
         },
         "descriptions": {
-          "chs": "关卡开始时，将[tag]6[/tag]张手牌尽可能替换成[tag]随机的三元牌[/tag]",
-          "chs_t": "關卡開始時，將[tag]6[/tag]張手牌儘可能替換成[tag]隨機的三元牌[/tag]",
-          "jp": "ステージ開始時、手牌[tag]6[/tag]枚を可能な限り[tag]ランダムな三元牌[/tag]に入替する。",
-          "en": "At the start of the level, replace [tag]6[/tag] tiles in your hand with [tag]random Dragon tiles[/tag] if possible.",
-          "kr": "스테이지 시작 시, 손패 [tag]6[/tag]장을 [tag]임의의 삼원패[/tag]로 바꾼다."
+          "chs": "关卡开始时，将[tag]3[/tag]张手牌尽可能替换成[tag]随机的三元牌[/tag]",
+          "chs_t": "關卡開始時，將[tag]3[/tag]張手牌儘可能替換成[tag]隨機的三元牌[/tag]",
+          "jp": "ステージ開始時、手牌[tag]3[/tag]枚を可能な限り[tag]ランダムな三元牌[/tag]に入替する。",
+          "en": "At the start of the level, replace [tag]3[/tag] tiles in your hand with [tag]random Dragon tiles[/tag] if possible.",
+          "kr": "스테이지 시작 시, 손패 [tag]3[/tag]장을 [tag]임의의 삼원패[/tag]로 바꾼다."
         },
-        "price": 18,
-        "sell_price": 9,
+        "price": 12,
+        "sell_price": 6,
         "icon_name": "fu_3590.png",
         "icon_id": 3590,
         "deprecated": false,
-        "rarity": "ORANGE"
+        "rarity": "BLUE"
       }
     },
     {
@@ -13273,11 +13273,11 @@
           "kr": "미니 용 석상"
         },
         "descriptions": {
-          "chs": "和牌时，受到等同于本次和牌中役种数量的伤害，并使这些役种本轮游戏中基础番数[tag]+3番[/tag]（生命不足时不生效）",
-          "chs_t": "和牌時，受到等同於本次和牌中役種數量的傷害，並使這些役種本輪遊戲中基礎番數[tag]+3番[/tag]（生命不足時不生效）",
-          "jp": "和了時、今回和了する役の種類数のダメージを受け、和了する役の基礎飜数[tag]+3[/tag]飜（体力値が不足している場合は発動しない）。",
-          "en": "Upon winning, take DMG equal to the number of scored yaku in the winning hand, and those yaku gain [tag]+3[/tag] base Han for the rest of this run (does not trigger if HP is insufficient).",
-          "kr": "화료 시, 이번에 화료한 역의 수만큼 피해를 입으며, 해당 역은 이번 게임에서 기본 판수 [tag]+3판[/tag] (체력 부족 시 미발동)."
+          "chs": "和牌时，受到等同于本次和牌中役种数量的伤害，并使这些役种本轮游戏中基础番数[tag]+6番[/tag]（生命不足时不生效）",
+          "chs_t": "和牌時，受到等同於本次和牌中役種數量的傷害，並使這些役種本輪遊戲中基礎番數[tag]+6番[/tag]（生命不足時不生效）",
+          "jp": "和了時、今回和了する役の種類数のダメージを受け、和了する役の基礎飜数[tag]+6[/tag]飜（体力値が不足している場合は発動しない）。",
+          "en": "Upon winning, take DMG equal to the number of scored yaku in the winning hand, and those yaku gain [tag]+6[/tag] base Han for the rest of this run (does not trigger if HP is insufficient).",
+          "kr": "화료 시, 이번에 화료한 역의 수만큼 피해를 입으며, 해당 역은 이번 게임에서 기본 판수 [tag]+6판[/tag] (체력 부족 시 미발동)."
         },
         "price": 18,
         "sell_price": 9,
@@ -13298,11 +13298,11 @@
           "kr": "미니 용 석상+"
         },
         "descriptions": {
-          "chs": "和牌时，受到等同于本次和牌中役种数量的伤害，并使这些役种本轮游戏中基础番数[tag]+5番[/tag]（生命不足时不生效）",
-          "chs_t": "和牌時，受到等同於本次和牌中役種數量的傷害，並使這些役種本輪遊戲中基礎番數[tag]+5番[/tag]（生命不足時不生效）",
-          "jp": "和了時、今回和了する役の種類数のダメージを受け、和了する役の基礎飜数[tag]+5[/tag]飜（体力値が不足している場合は発動しない）。",
-          "en": "Upon winning, take DMG equal to the number of scored yaku in the winning hand, and those yaku gain [tag]+5[/tag] base Han for the rest of this run (does not trigger if HP is insufficient).",
-          "kr": "화료 시, 이번에 화료한 역의 수만큼 피해를 입으며, 해당 역은 이번 게임에서 기본 판수 [tag]+5판[/tag] (체력 부족 시 미발동)."
+          "chs": "和牌时，受到等同于本次和牌中役种数量的伤害，并使这些役种本轮游戏中基础番数[tag]+10番[/tag]（生命不足时不生效）",
+          "chs_t": "和牌時，受到等同於本次和牌中役種數量的傷害，並使這些役種本輪遊戲中基礎番數[tag]+10番[/tag]（生命不足時不生效）",
+          "jp": "和了時、今回和了する役の種類数のダメージを受け、和了する役の基礎飜数[tag]+10[/tag]飜（体力値が不足している場合は発動しない）。",
+          "en": "Upon winning, take DMG equal to the number of scored yaku in the winning hand, and those yaku gain [tag]+10[/tag] base Han for the rest of this run (does not trigger if HP is insufficient).",
+          "kr": "화료 시, 이번에 화료한 역의 수만큼 피해를 입으며, 해당 역은 이번 게임에서 기본 판수 [tag]+10판[/tag] (체력 부족 시 미발동)."
         },
         "price": 18,
         "sell_price": 9,
@@ -13448,7 +13448,7 @@
         "sell_price": 9,
         "icon_name": "fu_3640.png",
         "icon_id": 3640,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       },
       "plus_name": "ガチガチ鎧+",
@@ -13473,7 +13473,7 @@
         "sell_price": 9,
         "icon_name": "fu_3640.png",
         "icon_id": 3640,
-        "deprecated": false,
+        "deprecated": true,
         "rarity": "ORANGE"
       }
     },
@@ -13603,11 +13603,11 @@
           "kr": "부상입은 검사 이브"
         },
         "descriptions": {
-          "chs": "关卡开始时，如果锁定牌数量大于等于[tag]18[/tag]，则使本轮游戏中非役种类番数增加等同于锁定牌[tag]1.5倍[/tag]数量的番数（当前数量为[tag]{0}[/tag]张）",
-          "chs_t": "關卡開始時，如果鎖定牌數量大於等於[tag]18[/tag]，則使本輪遊戲中非役種類番數增加等同於鎖定牌[tag]1.5倍[/tag]數量的番數（當前數量為[tag]{0}[/tag]張）",
-          "jp": "ステージ開始時、ロックされた牌数は[tag]18[/tag]枚以上の場合、役以外の飜数はロックされた牌数[tag]x1.5[/tag]飜（現在は[tag]{0}[/tag]枚）。",
-          "en": "At the start of the level, if you have [tag]18[/tag] or more locked tiles, non-yaku Han sources gain Han value equal to [tag]1.5x[/tag] the number of locked tiles for the rest of this run (currently [tag]{0}[/tag] locked tiles).",
-          "kr": "스테이지 시작 시, 고정된 패가 [tag]18[/tag]장 이상이면, 이번 게임에서 역 외의 판수가 고정된 패의 수의 [tag]1.5배[/tag]만큼 판수가 증가한다(현재 [tag]{0}[/tag]장)."
+          "chs": "关卡开始时，如果锁定牌数量大于等于[tag]18[/tag]，则使本轮游戏中非役种类番数增加等同于锁定牌[tag]3倍[/tag]数量的番数（当前数量为[tag]{0}[/tag]张）",
+          "chs_t": "關卡開始時，如果鎖定牌數量大於等於[tag]18[/tag]，則使本輪遊戲中非役種類番數增加等同於鎖定牌[tag]3倍[/tag]數量的番數（當前數量為[tag]{0}[/tag]張）",
+          "jp": "ステージ開始時、ロックされた牌数は[tag]18[/tag]枚以上の場合、役以外の飜数はロックされた牌数[tag]x3[/tag]飜（現在は[tag]{0}[/tag]枚）。",
+          "en": "At the start of the level, if you have [tag]18[/tag] or more locked tiles, non-yaku Han sources gain Han value equal to [tag]3x[/tag] the number of locked tiles for the rest of this run (currently [tag]{0}[/tag] locked tiles).",
+          "kr": "스테이지 시작 시, 고정된 패가 [tag]18[/tag]장 이상이면, 이번 게임에서 역 외의 판수가 고정된 패의 수의 [tag]3배[/tag]만큼 판수가 증가한다(현재 [tag]{0}[/tag]장)."
         },
         "price": 18,
         "sell_price": 9,
@@ -13628,11 +13628,11 @@
           "kr": "부상입은 검사 이브+"
         },
         "descriptions": {
-          "chs": "关卡开始时，如果锁定牌数量大于等于[tag]18[/tag]，则使本轮游戏中非役种类番数增加等同于锁定牌[tag]2倍[/tag]数量的番数（当前数量为[tag]{0}[/tag]张）",
-          "chs_t": "關卡開始時，如果鎖定牌數量大於等於[tag]18[/tag]，則使本輪遊戲中非役種類番數增加等同於鎖定牌[tag]2倍[/tag]數量的番數（當前數量為[tag]{0}[/tag]張）",
-          "jp": "ステージ開始時、ロックされた牌数は[tag]18[/tag]枚以上の場合、役以外の飜数はロックされた牌数[tag]x2[/tag]飜（現在は[tag]{0}[/tag]枚）。",
-          "en": "At the start of the level, if you have [tag]18[/tag] or more locked tiles, non-yaku Han sources gain Han value equal to [tag]2x[/tag] the number of locked tiles for the rest of this run (currently [tag]{0}[/tag] locked tiles).",
-          "kr": "스테이지 시작 시, 고정된 패가 [tag]18[/tag]장 이상이면, 이번 게임에서 역 외의 판수가 고정된 패의 수의 [tag]2배[/tag]만큼 판수가 증가한다(현재 [tag]{0}[/tag]장)."
+          "chs": "关卡开始时，如果锁定牌数量大于等于[tag]18[/tag]，则使本轮游戏中非役种类番数增加等同于锁定牌[tag]6倍[/tag]数量的番数（当前数量为[tag]{0}[/tag]张）",
+          "chs_t": "關卡開始時，如果鎖定牌數量大於等於[tag]18[/tag]，則使本輪遊戲中非役種類番數增加等同於鎖定牌[tag]6倍[/tag]數量的番數（當前數量為[tag]{0}[/tag]張）",
+          "jp": "ステージ開始時、ロックされた牌数は[tag]18[/tag]枚以上の場合、役以外の飜数はロックされた牌数[tag]x6[/tag]飜（現在は[tag]{0}[/tag]枚）。",
+          "en": "At the start of the level, if you have [tag]18[/tag] or more locked tiles, non-yaku Han sources gain Han value equal to [tag]6x[/tag] the number of locked tiles for the rest of this run (currently [tag]{0}[/tag] locked tiles).",
+          "kr": "스테이지 시작 시, 고정된 패가 [tag]18[/tag]장 이상이면, 이번 게임에서 역 외의 판수가 고정된 패의 수의 [tag]6배[/tag]만큼 판수가 증가한다(현재 [tag]{0}[/tag]장)."
         },
         "price": 18,
         "sell_price": 9,
@@ -13713,11 +13713,11 @@
           "kr": "백마 탄 황후"
         },
         "descriptions": {
-          "chs": "役满役种的番数[tag]x{0}[/tag]。关卡结束时，使效果量[tag]+1[/tag]",
-          "chs_t": "役滿役種的番數[tag]x{0}[/tag]。 關卡結束時，使效果量[tag]+1[/tag]",
-          "jp": "役満の飜数[tag]x{0}[/tag]飜。ステージ終了時、効果量[tag]+1[/tag]。",
-          "en": "The Han value of Yakuman yaku [tag]x{0}[/tag]. At the end of the level, this multiplier [tag]+1[/tag].",
-          "kr": "역만 판수 [tag]x{0}[/tag]. 스테이지 종료 시, 효과량 [tag]+1[/tag]."
+          "chs": "役满役种的番数[tag]x{0}[/tag]。关卡结束时，使效果量[tag]+2[/tag]",
+          "chs_t": "役滿役種的番數[tag]x{0}[/tag]。 關卡結束時，使效果量[tag]+2[/tag]",
+          "jp": "役満の飜数[tag]x{0}[/tag]飜。ステージ終了時、効果量[tag]+2[/tag]。",
+          "en": "The Han value of Yakuman yaku [tag]x{0}[/tag]. At the end of the level, this multiplier [tag]+2[/tag].",
+          "kr": "역만 판수 [tag]x{0}[/tag]. 스테이지 종료 시, 효과량 [tag]+2[/tag]."
         },
         "price": 18,
         "sell_price": 9,
@@ -13738,11 +13738,11 @@
           "kr": "백마 탄 황후+"
         },
         "descriptions": {
-          "chs": "役满役种的番数[tag]x{0}[/tag]。关卡结束时，使效果量[tag]+2[/tag]",
-          "chs_t": "役滿役種的番數[tag]x{0}[/tag]。 關卡結束時，使效果量[tag]+2[/tag]",
-          "jp": "役満の飜数[tag]x{0}[/tag]飜。ステージ終了時、効果量[tag]+2[/tag]。",
-          "en": "The Han value of Yakuman yaku [tag]x{0}[/tag]. At the end of the level, this multiplier [tag]+2[/tag].",
-          "kr": "역만 판수 [tag]x{0}[/tag]. 스테이지 종료 시, 효과량 [tag]+2[/tag]."
+          "chs": "役满役种的番数[tag]x{0}[/tag]。关卡结束时，使效果量[tag]+4[/tag]",
+          "chs_t": "役滿役種的番數[tag]x{0}[/tag]。 關卡結束時，使效果量[tag]+4[/tag]",
+          "jp": "役満の飜数[tag]x{0}[/tag]飜。ステージ終了時、効果量[tag]+4[/tag]。",
+          "en": "The Han value of Yakuman yaku [tag]x{0}[/tag]. At the end of the level, this multiplier [tag]+4[/tag].",
+          "kr": "역만 판수 [tag]x{0}[/tag]. 스테이지 종료 시, 효과량 [tag]+4[/tag]."
         },
         "price": 18,
         "sell_price": 9,
@@ -13827,7 +13827,7 @@
           "chs_t": "每當[tag]地和、嶺上開花或海底摸月[/tag]時，使對應役種本輪遊戲中的基礎番數[tag]x1.1[/tag]",
           "jp": "[tag]地和、嶺上開花もしくは海底摸月[/tag]が成立する度に、役に応じて基礎飜数[tag]x1.1[/tag]飜。",
           "en": "Whenever you achieve [tag]Blessing of Earth, After a Kan, or Under the Sea[/tag], the corresponding yaku's base Han is multiplied by [tag]1.1[/tag] for the rest of this run.",
-          "kr": "[tag]지화, 영상개화, 해저로월[/tag]을 할 때마다, 이번 게임에서 해당 역의 기본 점수 [tag]x1.1[/tag]."
+          "kr": "[tag]지화, 영상개화, 해저로월[/tag]을 할 때마다, 이번 게임에서 해당 역의 기본 판수 [tag]x1.1[/tag]."
         },
         "price": 18,
         "sell_price": 9,
@@ -13852,7 +13852,7 @@
           "chs_t": "每當[tag]地和、嶺上開花或海底摸月[/tag]時，使對應役種本輪遊戲中的基礎番數[tag]x1.2[/tag]",
           "jp": "[tag]地和、嶺上開花もしくは海底摸月[/tag]が成立する度に、役に応じて基礎飜数[tag]x1.2[/tag]飜。",
           "en": "Whenever you achieve [tag]Blessing of Earth, After a Kan, or Under the Sea[/tag], the corresponding yaku's base Han is multiplied by [tag]1.2[/tag] for the rest of this run.",
-          "kr": "[tag]지화, 영상개화, 해저로월[/tag]을 할 때마다, 이번 게임에서 해당 역의 기본 점수 [tag]x1.2[/tag]."
+          "kr": "[tag]지화, 영상개화, 해저로월[/tag]을 할 때마다, 이번 게임에서 해당 역의 기본 판수 [tag]x1.2[/tag]."
         },
         "price": 18,
         "sell_price": 9,
@@ -13878,11 +13878,11 @@
           "kr": "황금 신상"
         },
         "descriptions": {
-          "chs": "每次发牌后，所有公开牌的基础分值[tag]+5[/tag]。[tag]入手:[/tag]商店中的公开牌数提升[tag]1[/tag]级",
-          "chs_t": "每次發牌后，所有公開牌的基礎分值[tag]+5[/tag]。 [tag]入手：[/tag]商店中的公開牌數提升[tag]1[/tag]級",
-          "jp": "牌を配る度に、全ての公開する牌の基礎スコア[tag]+5[/tag]。[tag]入手時:[/tag]道具屋の公開する牌数が[tag]1[/tag]ランク上がる。",
-          "en": "Each time the Tile Wall is replenished, all revealed tiles gain [tag]+5[/tag] basic PT. [tag]Acquire[/tag]: Open Tile Count in the Shop +[tag]1[/tag] level.",
-          "kr": "패를 받을 때마다, 모든 공개패의 기본 점수 [tag]+5[/tag]. [tag]입수[/tag]: 상점에서 공개패 [tag]1[/tag]레벨 상승."
+          "chs": "每次发牌后，所有公开牌的基础分值[tag]+15[/tag]。[tag]入手:[/tag]商店中的公开牌数提升[tag]1[/tag]级",
+          "chs_t": "每次發牌后，所有公開牌的基礎分值[tag]+15[/tag]。 [tag]入手：[/tag]商店中的公開牌數提升[tag]1[/tag]級",
+          "jp": "牌を配る度に、全ての公開する牌の基礎スコア[tag]+15[/tag]。[tag]入手時:[/tag]道具屋の公開する牌数が[tag]1[/tag]ランク上がる。",
+          "en": "Each time the Tile Wall is replenished, all revealed tiles gain [tag]+15[/tag] basic PT. [tag]Acquire[/tag]: Open Tile Count in the Shop +[tag]1[/tag] level.",
+          "kr": "패를 받을 때마다, 모든 공개패의 기본 점수 [tag]+15[/tag]. [tag]입수[/tag]: 상점에서 공개패 [tag]1[/tag]레벨 상승."
         },
         "price": 24,
         "sell_price": 12,
@@ -13903,11 +13903,11 @@
           "kr": "황금 신상+"
         },
         "descriptions": {
-          "chs": "每次发牌后，所有公开牌的基础分值[tag]+8[/tag]。[tag]入手:[/tag]商店中的公开牌数提升[tag]1[/tag]级",
-          "chs_t": "每次發牌后，所有公開牌的基礎分值[tag]+8[/tag]。 [tag]入手：[/tag]商店中的公開牌數提升[tag]1[/tag]級",
-          "jp": "牌を配る度に、全ての公開する牌の基礎スコア[tag]+8[/tag]。[tag]入手時:[/tag]道具屋の公開する牌数が[tag]1[/tag]ランク上がる。",
-          "en": "Each time the Tile Wall is replenished, all revealed tiles gain [tag]+8[/tag] basic PT. [tag]Acquire[/tag]: Open Tile Count in the Shop +[tag]1[/tag] level.",
-          "kr": "패를 받을 때마다, 모든 공개패의 기본 점수 [tag]+8[/tag]. [tag]입수[/tag]: 상점에서 공개패 [tag]1[/tag]레벨 상승."
+          "chs": "每次发牌后，所有公开牌的基础分值[tag]+30[/tag]。[tag]入手:[/tag]商店中的公开牌数提升[tag]1[/tag]级",
+          "chs_t": "每次發牌后，所有公開牌的基礎分值[tag]+30[/tag]。 [tag]入手：[/tag]商店中的公開牌數提升[tag]1[/tag]級",
+          "jp": "牌を配る度に、全ての公開する牌の基礎スコア[tag]+30[/tag]。[tag]入手時:[/tag]道具屋の公開する牌数が[tag]1[/tag]ランク上がる。",
+          "en": "Each time the Tile Wall is replenished, all revealed tiles gain [tag]+30[/tag] basic PT. [tag]Acquire[/tag]: Open Tile Count in the Shop +[tag]1[/tag] level.",
+          "kr": "패를 받을 때마다, 모든 공개패의 기본 점수 [tag]+30[/tag]. [tag]입수[/tag]: 상점에서 공개패 [tag]1[/tag]레벨 상승."
         },
         "price": 24,
         "sell_price": 12,
@@ -13933,11 +13933,11 @@
           "kr": "아기 곰 선장"
         },
         "descriptions": {
-          "chs": "关卡开始时，手牌获得[tag]3张发[/tag]并使其基础分值[tag]+30[/tag]。[tag]集结(1)[/tag]:重复增加1次基础分值",
-          "chs_t": "關卡開始時，手牌獲得[tag]3張發[/tag]並使其基礎分值[tag]+30[/tag]。 [tag]集結（1）[/tag]：重複增加1次基礎分值",
-          "jp": "ステージ開始時、[tag]發3枚[/tag]を手牌に加え、發の基礎スコア[tag]+30[/tag]。[tag]集結(1)[/tag]:追加で基礎スコア[tag]+30[/tag]。",
-          "en": "At the start of the level, add [tag]3 Green Dragon tiles[/tag] to your hand and grant them [tag]+30[/tag] basic PT. [tag]Rally (1)[/tag]: Trigger this basic PT increase 1 extra time.",
-          "kr": "스테이지 시작 시, 손패에 [tag]발 3장[/tag]을 획득하고, 기본점수 [tag]+30[/tag]. [tag]집합(1)[/tag]: 기본점수 1회 중복 증가."
+          "chs": "关卡开始时，手牌获得[tag]3张发[/tag]并使其基础分值[tag]+50[/tag]。[tag]集结(1)[/tag]:重复增加1次基础分值",
+          "chs_t": "關卡開始時，手牌獲得[tag]3張發[/tag]並使其基礎分值[tag]+50[/tag]。 [tag]集結（1）[/tag]：重複增加1次基礎分值",
+          "jp": "ステージ開始時、[tag]發3枚[/tag]を手牌に加え、發の基礎スコア[tag]+50[/tag]。[tag]集結(1)[/tag]:追加で基礎スコア[tag]+50[/tag]。",
+          "en": "At the start of the level, add [tag]3 Green Dragon tiles[/tag] to your hand and grant them [tag]+50[/tag] basic PT. [tag]Rally (1)[/tag]: Trigger this basic PT increase 1 extra time.",
+          "kr": "스테이지 시작 시, 손패에 [tag]발 3장[/tag]을 획득하고, 기본점수 [tag]+50[/tag]. [tag]집합(1)[/tag]: 기본점수 1회 중복 증가."
         },
         "price": 24,
         "sell_price": 12,
@@ -13958,11 +13958,11 @@
           "kr": "아기 곰 선장+"
         },
         "descriptions": {
-          "chs": "关卡开始时，手牌获得[tag]3张发[/tag]并使其基础分值[tag]+60[/tag]。[tag]集结(1)[/tag]:重复增加1次基础分值",
-          "chs_t": "關卡開始時，手牌獲得[tag]3張發[/tag]並使其基礎分值[tag]+60[/tag]。 [tag]集結（1）[/tag]：重複增加1次基礎分值",
-          "jp": "ステージ開始時、[tag]發3枚[/tag]を手牌に加え、發の基礎スコア[tag]+60[/tag]。[tag]集結(1)[/tag]:追加で基礎スコア[tag]+60[/tag]。",
-          "en": "At the start of the level, add [tag]3 Green Dragon tiles[/tag] to your hand and grant them [tag]+60[/tag] basic PT. [tag]Rally (1)[/tag]: Trigger this basic PT increase 1 extra time.",
-          "kr": "스테이지 시작 시, 손패에 [tag]발 3장[/tag]을 획득하고, 기본점수 [tag]+60[/tag]. [tag]집합(1)[/tag]: 기본점수 1회 중복 증가."
+          "chs": "关卡开始时，手牌获得[tag]3张发[/tag]并使其基础分值[tag]+100[/tag]。[tag]集结(1)[/tag]:重复增加1次基础分值",
+          "chs_t": "關卡開始時，手牌獲得[tag]3張發[/tag]並使其基礎分值[tag]+100[/tag]。 [tag]集結（1）[/tag]：重複增加1次基礎分值",
+          "jp": "ステージ開始時、[tag]發3枚[/tag]を手牌に加え、發の基礎スコア[tag]+100[/tag]。[tag]集結(1)[/tag]:追加で基礎スコア[tag]+100[/tag]。",
+          "en": "At the start of the level, add [tag]3 Green Dragon tiles[/tag] to your hand and grant them [tag]+100[/tag] basic PT. [tag]Rally (1)[/tag]: Trigger this basic PT increase 1 extra time.",
+          "kr": "스테이지 시작 시, 손패에 [tag]발 3장[/tag]을 획득하고, 기본점수 [tag]+100[/tag]. [tag]집합(1)[/tag]: 기본점수 1회 중복 증가."
         },
         "price": 24,
         "sell_price": 12,
@@ -14597,7 +14597,7 @@
           "chs_t": "生命值最高可達到上限的[tag]1/2[/tag]。 無法出售，[tag]{0}/2[/tag]個關卡后本護身符消失！",
           "jp": "体力の最大値が上限の[tag]1/2[/tag]になる。このお守りは売却できない。[tag]{0}/2[/tag]ステージクリアすると消滅する。",
           "en": "Your HP cannot exceed [tag]1/2[/tag] of your max HP. Cannot be sold. This talisman disappears after [tag]{0}/2[/tag] levels!",
-          "kr": "최대 체력이 [tag]1/2[/tag] 감소하며, 판매할 수 없다. [tag]{0}[/tag] 스테이지 후, 본 부적 소멸!"
+          "kr": "최대 체력이 [tag]1/2[/tag]로 감소하며, 판매할 수 없다. [tag]{0}[/tag] 스테이지 후, 본 부적 소멸!"
         },
         "price": 0,
         "sell_price": 0,
@@ -14622,7 +14622,7 @@
           "chs_t": "生命值最高可達到上限的[tag]1/3[/tag]。 無法出售，[tag]{0}/2[/tag]個關卡后本護身符消失！",
           "jp": "体力の最大値が上限の[tag]1/3[/tag]になる。このお守りは売却できない。[tag]{0}/2[/tag]ステージクリアすると消滅する。",
           "en": "Your HP cannot exceed [tag]1/3[/tag] of your max HP. Cannot be sold. This talisman disappears after [tag]{0}/2[/tag] levels!",
-          "kr": "최대 체력이 [tag]1/3[/tag] 감소하며, 판매할 수 없다. [tag]{0}[/tag] 스테이지 후, 본 부적 소멸!"
+          "kr": "최대 체력이 [tag]1/3[/tag]로 감소하며, 판매할 수 없다. [tag]{0}[/tag] 스테이지 후, 본 부적 소멸!"
         },
         "price": 0,
         "sell_price": 0,
@@ -14703,11 +14703,11 @@
           "kr": "박물관장 조셉"
         },
         "descriptions": {
-          "chs": "役满役种的番数[tag]x{0}[/tag]，效果量等同于本轮游戏中获得过[tag]招募令[/tag]数量的[tag]5倍[/tag]。累计换[tag]{1}/64[/tag]张牌后，获得1张[tag]招募令[/tag]",
-          "chs_t": "役滿役種的番數[tag]x{0}[/tag]，效果量等同於本輪遊戲中獲得過[tag]招募令[/tag]數量的[tag]5倍[/tag]。 累計換[tag]{1}/64[/tag]張牌后，獲得1張[tag]招募令[/tag]",
-          "jp": "役満役の飜数[tag]x{0}[/tag]。効果量は[tag]招集令[/tag]の獲得数[tag]x5[/tag]飜。合計で手牌を[tag]{1}/64[/tag]枚入替すると、[tag]招集令[/tag]1枚を獲得する。",
-          "en": "The Han value of Yakuman yaku [tag]x{0}[/tag]. This effect equals [tag]5x[/tag] the number of [tag]Recruitment Posters[/tag] you hold. After exchanging [tag]{1}/64[/tag] tiles in total, gain 1 [tag]Recruitment Poster[/tag].",
-          "kr": "역만 판수[tag]x{0}[/tag], 효과량은 이번 게임에서 획득한 [tag]모집령[/tag] 수의 [tag]5배[/tag]이다. 패를 [tag]{1}/64[/tag]장 누적 교환하면, [tag]모집령[/tag] 1장을 획득한다."
+          "chs": "役满役种的番数[tag]x{0}[/tag]，效果量等同于本轮游戏中获得过[tag]招募令[/tag]数量的[tag]10倍[/tag]。累计换[tag]{1}/64[/tag]张牌后，获得1张[tag]招募令[/tag]",
+          "chs_t": "役滿役種的番數[tag]x{0}[/tag]，效果量等同於本輪遊戲中獲得過[tag]招募令[/tag]數量的[tag]10倍[/tag]。 累計換[tag]{1}/64[/tag]張牌后，獲得1張[tag]招募令[/tag]",
+          "jp": "役満役の飜数[tag]x{0}[/tag]。効果量は[tag]招集令[/tag]の獲得数[tag]x10[/tag]飜。合計で手牌を[tag]{1}/64[/tag]枚入替すると、[tag]招集令[/tag]1枚を獲得する。",
+          "en": "The Han value of Yakuman yaku [tag]x{0}[/tag]. This effect equals [tag]10x[/tag] the number of [tag]Recruitment Posters[/tag] you hold. After exchanging [tag]{1}/64[/tag] tiles in total, gain 1 [tag]Recruitment Poster[/tag].",
+          "kr": "역만 판수[tag]x{0}[/tag], 효과량은 이번 게임에서 획득한 [tag]모집령[/tag] 수의 [tag]10배[/tag]이다. 패를 [tag]{1}/64[/tag]장 누적 교환하면, [tag]모집령[/tag] 1장을 획득한다."
         },
         "price": 18,
         "sell_price": 9,
@@ -14728,11 +14728,11 @@
           "kr": "박물관장 조셉+"
         },
         "descriptions": {
-          "chs": "役满役种的番数[tag]x{0}[/tag]，效果量等同于本轮游戏中获得过[tag]招募令[/tag]数量的[tag]10倍[/tag]。累计换[tag]{1}/64[/tag]张牌后，获得1张[tag]招募令[/tag]",
-          "chs_t": "役滿役種的番數[tag]x{0}[/tag]，效果量等同於本輪遊戲中獲得過[tag]招募令[/tag]數量的[tag]10倍[/tag]。 累計換[tag]{1}/64[/tag]張牌后，獲得1張[tag]招募令[/tag]",
-          "jp": "役満役の飜数[tag]x{0}[/tag]。効果量は[tag]招集令[/tag]の獲得数[tag]x10[/tag]飜。合計で手牌を[tag]{1}/64[/tag]枚入替すると、[tag]招集令[/tag]1枚を獲得する。",
-          "en": "The Han value of Yakuman yaku [tag]x{0}[/tag]. This effect equals [tag]10x[/tag] the number of [tag]Recruitment Posters[/tag] you hold. After exchanging [tag]{1}/64[/tag] tiles in total, gain 1 [tag]Recruitment Poster[/tag].",
-          "kr": "역만 판수[tag]x{0}[/tag], 효과량은 이번 게임에서 획득한 [tag]모집령[/tag] 수의 [tag]10배[/tag]이다. 패를 [tag]{1}/64[/tag]장 누적 교환하면, [tag]모집령[/tag] 1장을 획득한다."
+          "chs": "役满役种的番数[tag]x{0}[/tag]，效果量等同于本轮游戏中获得过[tag]招募令[/tag]数量的[tag]20倍[/tag]。累计换[tag]{1}/64[/tag]张牌后，获得1张[tag]招募令[/tag]",
+          "chs_t": "役滿役種的番數[tag]x{0}[/tag]，效果量等同於本輪遊戲中獲得過[tag]招募令[/tag]數量的[tag]20倍[/tag]。 累計換[tag]{1}/64[/tag]張牌后，獲得1張[tag]招募令[/tag]",
+          "jp": "役満役の飜数[tag]x{0}[/tag]。効果量は[tag]招集令[/tag]の獲得数[tag]x20[/tag]飜。合計で手牌を[tag]{1}/64[/tag]枚入替すると、[tag]招集令[/tag]1枚を獲得する。",
+          "en": "The Han value of Yakuman yaku [tag]x{0}[/tag]. This effect equals [tag]20x[/tag] the number of [tag]Recruitment Posters[/tag] you hold. After exchanging [tag]{1}/64[/tag] tiles in total, gain 1 [tag]Recruitment Poster[/tag].",
+          "kr": "역만 판수[tag]x{0}[/tag], 효과량은 이번 게임에서 획득한 [tag]모집령[/tag] 수의 [tag]20배[/tag]이다. 패를 [tag]{1}/64[/tag]장 누적 교환하면, [tag]모집령[/tag] 1장을 획득한다."
         },
         "price": 18,
         "sell_price": 9,
@@ -14796,12 +14796,452 @@
         "deprecated": false,
         "rarity": "PURPLE"
       }
+    },
+    {
+      "id": 401,
+      "icon_id": 4010,
+      "name": "魂の指輪",
+      "rarity": "GREEN",
+      "sell_price": 3,
+      "metadata": {
+        "data_id": 4010,
+        "names": {
+          "chs": "万魂戒指",
+          "chs_t": "萬魂戒指",
+          "jp": "魂の指輪",
+          "en": "Ring of Myriad Souls",
+          "kr": "혼의 반지"
+        },
+        "descriptions": {
+          "chs": "累计自摸[tag]{0}/3[/tag]张万子牌时，使随机[tag]1[/tag]张牌变为魂牌",
+          "chs_t": "累計自摸[tag]{0}/3[/tag]張萬子牌時，使隨機[tag]1[/tag]張牌變為魂牌",
+          "jp": "萬子牌を[tag]{0}/3[/tag]枚ツモする度に、ランダムで[tag]1[/tag]枚の牌を魂牌にする。",
+          "en": "For every [tag]{0}/3[/tag] Man tiles drawn, turn [tag]1[/tag] random tile into a Soul tile.",
+          "kr": "만수패를 3장 뽑을 때마다, 임의의 패 [tag]1[/tag]장이 혼패로 변한다(현재 [tag]{0}/3[/tag]장)."
+        },
+        "price": 6,
+        "sell_price": 3,
+        "icon_name": "fu_4010.png",
+        "icon_id": 4010,
+        "deprecated": false,
+        "rarity": "GREEN"
+      },
+      "plus_name": "魂の指輪+",
+      "plus_sell_price": 3,
+      "plus_metadata": {
+        "data_id": 4011,
+        "names": {
+          "chs": "万魂戒指+",
+          "chs_t": "萬魂戒指+",
+          "jp": "魂の指輪+",
+          "en": "Ring of Myriad Souls+",
+          "kr": "혼의 반지+"
+        },
+        "descriptions": {
+          "chs": "累计自摸[tag]{0}/3[/tag]张万子牌时，使随机[tag]2[/tag]张牌变为魂牌",
+          "chs_t": "累計自摸[tag]{0}/3[/tag]張萬子牌時，使隨機[tag]2[/tag]張牌變為魂牌",
+          "jp": "萬子牌を[tag]{0}/3[/tag]枚ツモする度に、ランダムで[tag]2[/tag]枚の牌を魂牌にする。",
+          "en": "For every [tag]{0}/3[/tag] Man tiles drawn, turn [tag]2[/tag] random tiles into Soul tiles.",
+          "kr": "만수패를 3장 뽑을 때마다, 임의의 패 [tag]2[/tag]장이 혼패로 변한다(현재 [tag]{0}/3[/tag]장)."
+        },
+        "price": 6,
+        "sell_price": 3,
+        "icon_name": "fu_4010.png",
+        "icon_id": 4010,
+        "deprecated": false,
+        "rarity": "GREEN"
+      }
+    },
+    {
+      "id": 402,
+      "icon_id": 4020,
+      "name": "パルスドクター",
+      "rarity": "BLUE",
+      "sell_price": 6,
+      "metadata": {
+        "data_id": 4020,
+        "names": {
+          "chs": "线圈医师",
+          "chs_t": "線圈醫師",
+          "jp": "パルスドクター",
+          "en": "Coil Medic",
+          "kr": "펄스 닥터"
+        },
+        "descriptions": {
+          "chs": "和牌时，如果自摸的是筒子，则恢复[tag]1[/tag]点生命值",
+          "chs_t": "和牌時，如果自摸的是筒子，則恢復[tag]1[/tag]點生命值",
+          "jp": "筒子牌をツモして和了した際、体力を[tag]1[/tag]回復する。",
+          "en": "Upon Tsumo with a Pin tile, restore [tag]1[/tag] HP.",
+          "kr": "통수패를 뽑아 화료하면, 체력을 [tag]1[/tag] 회복한다."
+        },
+        "price": 12,
+        "sell_price": 6,
+        "icon_name": "fu_4020.png",
+        "icon_id": 4020,
+        "deprecated": false,
+        "rarity": "BLUE"
+      },
+      "plus_name": "パルスドクター+",
+      "plus_sell_price": 6,
+      "plus_metadata": {
+        "data_id": 4021,
+        "names": {
+          "chs": "线圈医师+",
+          "chs_t": "線圈醫師+",
+          "jp": "パルスドクター+",
+          "en": "Coil Medic+",
+          "kr": "펄스 닥터+"
+        },
+        "descriptions": {
+          "chs": "和牌时，如果自摸的是筒子，则恢复[tag]2[/tag]点生命值",
+          "chs_t": "和牌時，如果自摸的是筒子，則恢復[tag]2[/tag]點生命值",
+          "jp": "筒子牌をツモして和了した際、体力を[tag]2[/tag]回復する。",
+          "en": "Upon Tsumo with a Pin tile, restore [tag]2[/tag] HP.",
+          "kr": "통수패를 뽑아 화료하면, 체력을 [tag]2[/tag] 회복한다."
+        },
+        "price": 12,
+        "sell_price": 6,
+        "icon_name": "fu_4020.png",
+        "icon_id": 4020,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 403,
+      "icon_id": 4030,
+      "name": "探検家の助手",
+      "rarity": "BLUE",
+      "sell_price": 6,
+      "metadata": {
+        "data_id": 4030,
+        "names": {
+          "chs": "探险助手",
+          "chs_t": "探險助手",
+          "jp": "探検家の助手",
+          "en": "Expedition Aide",
+          "kr": "탐험 조수"
+        },
+        "descriptions": {
+          "chs": "换牌次数[tag]+1[/tag]。累计换[tag]{0}/108[/tag]张牌后，获得[tag]1[/tag]张“招募令”",
+          "chs_t": "換牌次數[tag]+1[/tag]。累計換[tag]{0}/108[/tag]張牌後，獲得[tag]1[/tag]張「招募令」",
+          "jp": "入替回数[tag]+1[/tag]。[tag]{0}/108[/tag]枚の牌を入替する度に、お守り「召集令」を[tag]1[/tag]枚獲得する。",
+          "en": "Tile exchanges [tag]+1[/tag]. Upon exchanging a total of [tag]{0}/108[/tag] tiles, gain [tag]1[/tag] Recruitment Poster.",
+          "kr": "패 교환 횟수 [tag]+1[/tag]. 패를 108장 교환할 때마다, '모집령' [tag]1[/tag]장을 획득한다(현재 누적 [tag]{0}/108[/tag]장)."
+        },
+        "price": 12,
+        "sell_price": 6,
+        "icon_name": "fu_4030.png",
+        "icon_id": 4030,
+        "deprecated": false,
+        "rarity": "BLUE"
+      },
+      "plus_name": "探検家の助手+",
+      "plus_sell_price": 6,
+      "plus_metadata": {
+        "data_id": 4031,
+        "names": {
+          "chs": "探险助手+",
+          "chs_t": "探險助手+",
+          "jp": "探検家の助手+",
+          "en": "Expedition Aide+",
+          "kr": "탐험 조수+"
+        },
+        "descriptions": {
+          "chs": "换牌次数[tag]+2[/tag]。累计换[tag]{0}/108[/tag]张牌后，获得[tag]1[/tag]张“招募令”",
+          "chs_t": "換牌次數[tag]+2[/tag]。累計換[tag]{0}/108[/tag]張牌後，獲得[tag]1[/tag]張「招募令」",
+          "jp": "入替回数[tag]+2[/tag]。[tag]{0}/108[/tag]枚の牌を入替する度に、お守り「召集令」を[tag]1[/tag]枚獲得する。",
+          "en": "Tile exchanges [tag]+2[/tag]. Upon exchanging a total of [tag]{0}/108[/tag] tiles, gain [tag]1[/tag] Recruitment Poster.",
+          "kr": "패 교환 횟수 [tag]+2[/tag]. 패를 108장 교환할 때마다, '모집령' [tag]1[/tag]장을 획득한다(현재 누적 [tag]{0}/108[/tag]장)."
+        },
+        "price": 12,
+        "sell_price": 6,
+        "icon_name": "fu_4030.png",
+        "icon_id": 4030,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 404,
+      "icon_id": 4040,
+      "name": "お化けゲート",
+      "rarity": "BLUE",
+      "sell_price": 6,
+      "metadata": {
+        "data_id": 4040,
+        "names": {
+          "chs": "小鬼传送门",
+          "chs_t": "小鬼傳送門",
+          "jp": "お化けゲート",
+          "en": "Imp Portal",
+          "kr": "임프 전송문"
+        },
+        "descriptions": {
+          "chs": "关卡结束时，使所有的小鬼护身符消失，并恢复[tag]等同于消失数量[/tag]的生命值。入手：获得[tag]1[/tag]张小鬼护身符",
+          "chs_t": "關卡結束時，使所有的小鬼護身符消失，並恢復[tag]等同於消失數量[/tag]的生命值。[tag]入手[/tag]：獲得[tag]1[/tag]張小鬼護身符",
+          "jp": "ステージ終了時、お化けお守りを全て消費して、[tag]消費した枚数分[/tag]の体力を回復する。お化けお守りを[tag]1[/tag]枚獲得する。",
+          "en": "At the end of the level, remove all Imp talismans and restore HP [tag]equal to the number removed[/tag]. [tag]Acquire[/tag]: Gain [tag]1[/tag] Imp talisman.",
+          "kr": "스테이지 종료 시, 모든 임프 부적을 소모하고, [tag]소모한 수량[/tag]만큼의 체력을 회복한다. 입수: [tag]1[/tag]장의 임프 부적 획득."
+        },
+        "price": 12,
+        "sell_price": 6,
+        "icon_name": "fu_4040.png",
+        "icon_id": 4040,
+        "deprecated": false,
+        "rarity": "BLUE"
+      },
+      "plus_name": "お化けゲート+",
+      "plus_sell_price": 6,
+      "plus_metadata": {
+        "data_id": 4041,
+        "names": {
+          "chs": "小鬼传送门+",
+          "chs_t": "小鬼傳送門+",
+          "jp": "お化けゲート+",
+          "en": "Imp Portal+",
+          "kr": "임프 전송문+"
+        },
+        "descriptions": {
+          "chs": "关卡结束时，使所有的小鬼护身符消失，并恢复[tag]等同于消失数量2倍[/tag]的生命值。入手：获得[tag]1[/tag]张小鬼护身符",
+          "chs_t": "關卡結束時，使所有的小鬼護身符消失，並恢復[tag]等同於消失數量2倍[/tag]的生命值。[tag]入手[/tag]：獲得[tag]1[/tag]張小鬼護身符",
+          "jp": "ステージ終了時、お化けお守りを全て消費して、[tag]消費した枚数分の2倍[/tag]の体力を回復する。お化けお守りを[tag]1[/tag]枚獲得する。",
+          "en": "At the end of the level, remove all Imp talismans and restore HP [tag]equal to twice the number removed[/tag]. [tag]Acquire[/tag]: Gain [tag]1[/tag] Imp talisman.",
+          "kr": "스테이지 종료 시, 모든 임프 부적을 소모하고, [tag]소모한 수량의 2배[/tag]만큼의 체력을 회복한다. 입수: [tag]1[/tag]장의 임프 부적 획득."
+        },
+        "price": 12,
+        "sell_price": 6,
+        "icon_name": "fu_4040.png",
+        "icon_id": 4040,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 405,
+      "icon_id": 4050,
+      "name": "豆腐の舵取り",
+      "rarity": "BLUE",
+      "sell_price": 6,
+      "metadata": {
+        "data_id": 4050,
+        "names": {
+          "chs": "豆腐舵手",
+          "chs_t": "豆腐舵手",
+          "jp": "豆腐の舵取り",
+          "en": "Tofu Skipper",
+          "kr": "두부 키잡이"
+        },
+        "descriptions": {
+          "chs": "关卡开始时，额外公开[tag]2[/tag]张宝牌指示牌。[tag]集结[/tag]：将该指示牌固定为白（牌库不足时不生效）",
+          "chs_t": "關卡開始時，額外公開[tag]2[/tag]張寶牌指示牌。[tag]集結[/tag]：將該指示牌固定為白（牌庫不足時不生效）",
+          "jp": "ステージ開始時、[tag]2[/tag]枚のドラ表示牌を追加で公開する。[tag]集結[/tag]:この効果で追加で公開されたドラ表示牌は、確定で「白」になる。（牌山が足りない場合は発動しない。）",
+          "en": "At the start of the level, reveal [tag]2[/tag] extra Dora indicators. [tag]Rally[/tag]: Fix these indicators as White Dragons (does not take effect if there are insufficient tiles in the tile pool).",
+          "kr": "스테이지 시작 시, 도라표시패 [tag]2[/tag]장을 추가로 공개한다. [tag]집합[/tag]: 이 효과로 추가 공개된 도라표시패는 확정적으로 '백'이 된다(패 창고가 부족하면 발동하지 않음)."
+        },
+        "price": 12,
+        "sell_price": 6,
+        "icon_name": "fu_4050.png",
+        "icon_id": 4050,
+        "deprecated": false,
+        "rarity": "BLUE"
+      },
+      "plus_name": "豆腐の舵取り+",
+      "plus_sell_price": 6,
+      "plus_metadata": {
+        "data_id": 4051,
+        "names": {
+          "chs": "豆腐舵手+",
+          "chs_t": "豆腐舵手+",
+          "jp": "豆腐の舵取り+",
+          "en": "Tofu Skipper+",
+          "kr": "두부 키잡이+"
+        },
+        "descriptions": {
+          "chs": "关卡开始时，额外公开[tag]4[/tag]张宝牌指示牌。[tag]集结[/tag]：将该指示牌固定为白（牌库不足时不生效）",
+          "chs_t": "關卡開始時，額外公開[tag]4[/tag]張寶牌指示牌。[tag]集結[/tag]：將該指示牌固定為白（牌庫不足時不生效）",
+          "jp": "ステージ開始時、[tag]4[/tag]枚のドラ表示牌を追加で公開する。[tag]集結[/tag]:この効果で追加で公開されたドラ表示牌は、確定で「白」になる。（牌山が足りない場合は発動しない。）",
+          "en": "At the start of the level, reveal [tag]4[/tag] extra Dora indicators. [tag]Rally[/tag]: Fix these indicators as White Dragons (does not take effect if there are insufficient tiles in the tile pool).",
+          "kr": "스테이지 시작 시, 도라표시패 [tag]4[/tag]장을 추가로 공개한다. [tag]집합[/tag]: 이 효과로 추가 공개된 도라표시패는 확정적으로 '백'이 된다(패 창고가 부족하면 발동하지 않음)."
+        },
+        "price": 12,
+        "sell_price": 6,
+        "icon_name": "fu_4050.png",
+        "icon_id": 4050,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 406,
+      "icon_id": 4060,
+      "name": "デジタルパイロン",
+      "rarity": "BLUE",
+      "sell_price": 6,
+      "metadata": {
+        "data_id": 4060,
+        "names": {
+          "chs": "电子路障",
+          "chs_t": "電子路障",
+          "jp": "デジタルパイロン",
+          "en": "Conebot",
+          "kr": "전파 차단기"
+        },
+        "descriptions": {
+          "chs": "换牌次数[tag]+4[/tag]，但是每次换牌最多选择[tag]3[/tag]张",
+          "chs_t": "換牌次數[tag]+4[/tag]，但是每次換牌最多選擇[tag]3[/tag]張",
+          "jp": "入替回数[tag]+4[/tag]。入替を行う際に、最大[tag]3[/tag]枚の牌までしか選べない。",
+          "en": "Tile exchanges [tag]+4[/tag], but you may only select up to [tag]3[/tag] tiles per exchange.",
+          "kr": "패 교환 횟수 [tag]+4[/tag]. 단, 패를 교환할 때마다 최대 [tag]3[/tag]장만 선택할 수 있다."
+        },
+        "price": 12,
+        "sell_price": 6,
+        "icon_name": "fu_4060.png",
+        "icon_id": 4060,
+        "deprecated": false,
+        "rarity": "BLUE"
+      },
+      "plus_name": "デジタルパイロン+",
+      "plus_sell_price": 6,
+      "plus_metadata": {
+        "data_id": 4061,
+        "names": {
+          "chs": "电子路障+",
+          "chs_t": "電子路障+",
+          "jp": "デジタルパイロン+",
+          "en": "Conebot+",
+          "kr": "전파 차단기+"
+        },
+        "descriptions": {
+          "chs": "换牌次数[tag]+6[/tag]，但是每次换牌最多选择[tag]3[/tag]张",
+          "chs_t": "換牌次數[tag]+6[/tag]，但是每次換牌最多選擇[tag]3[/tag]張",
+          "jp": "入替回数[tag]+6[/tag]。入替を行う際に、最大[tag]3[/tag]枚の牌までしか選べない。",
+          "en": "Tile exchanges [tag]+6[/tag], but you may only select up to [tag]3[/tag] tiles per exchange.",
+          "kr": "패 교환 횟수 [tag]+6[/tag]. 단, 패를 교환할 때마다 최대 [tag]3[/tag]장만 선택할 수 있다."
+        },
+        "price": 12,
+        "sell_price": 6,
+        "icon_name": "fu_4060.png",
+        "icon_id": 4060,
+        "deprecated": false,
+        "rarity": "BLUE"
+      }
+    },
+    {
+      "id": 407,
+      "icon_id": 4070,
+      "name": "雪原からの援軍",
+      "rarity": "ORANGE",
+      "sell_price": 9,
+      "metadata": {
+        "data_id": 4070,
+        "names": {
+          "chs": "冰原援兵",
+          "chs_t": "冰原援兵",
+          "jp": "雪原からの援軍",
+          "en": "Frost Sentry",
+          "kr": "설원의 구원군"
+        },
+        "descriptions": {
+          "chs": "每当护身符获得魂牌额外增加番数的效果时，额外获得[tag]1[/tag]次",
+          "chs_t": "每當護身符獲得魂牌額外增加番數的效果時，額外獲得[tag]1[/tag]次",
+          "jp": "「魂牌の飜数が増える」効果を獲得する際に、追加でもう[tag]1[/tag]回発動する。",
+          "en": "Whenever a talisman gains an effect that increases Han for Soul tiles, it triggers [tag]1[/tag] additional time.",
+          "kr": "혼패로 인해 판수가 추가되는 효과를 획득할 때, 추가로 [tag]1[/tag]회 더 발동한다."
+        },
+        "price": 18,
+        "sell_price": 9,
+        "icon_name": "fu_4070.png",
+        "icon_id": 4070,
+        "deprecated": false,
+        "rarity": "ORANGE"
+      },
+      "plus_name": "雪原からの援軍+",
+      "plus_sell_price": 9,
+      "plus_metadata": {
+        "data_id": 4071,
+        "names": {
+          "chs": "冰原援兵+",
+          "chs_t": "冰原援兵+",
+          "jp": "雪原からの援軍+",
+          "en": "Frost Sentry+",
+          "kr": "설원의 구원군+"
+        },
+        "descriptions": {
+          "chs": "每当护身符获得魂牌额外增加番数的效果时，额外获得[tag]2[/tag]次",
+          "chs_t": "每當護身符獲得魂牌額外增加番數的效果時，額外獲得[tag]2[/tag]次",
+          "jp": "「魂牌の飜数が増える」効果を獲得する際に、追加でもう[tag]2[/tag]回発動する。",
+          "en": "Whenever a talisman gains an effect that increases Han for Soul tiles, it triggers [tag]2[/tag] additional times.",
+          "kr": "혼패로 인해 판수가 추가되는 효과를 획득할 때, 추가로 [tag]2[/tag]회 더 발동한다."
+        },
+        "price": 18,
+        "sell_price": 9,
+        "icon_name": "fu_4070.png",
+        "icon_id": 4070,
+        "deprecated": false,
+        "rarity": "ORANGE"
+      }
+    },
+    {
+      "id": 408,
+      "icon_id": 4080,
+      "name": "完璧な役満モジュール",
+      "rarity": "PURPLE",
+      "sell_price": 12,
+      "metadata": {
+        "data_id": 4080,
+        "names": {
+          "chs": "完美役满模块",
+          "chs_t": "完美役滿模組",
+          "jp": "完璧な役満モジュール",
+          "en": "Flawless Yakuman Module",
+          "kr": "완벽한 역만 모듈"
+        },
+        "descriptions": {
+          "chs": "和牌时，所有役种都会被视为[tag]役满役种[/tag]，每有1个役种则使本护身符获得[tag]x0.5[/tag]番。（当前为[tag]x{0}[/tag]番）",
+          "chs_t": "和牌時，所有役種都會被視為[tag]役滿役種[/tag]，每有1個役種則使本護身符獲得[tag]x0.5[/tag]番。（當前為[tag]x{0}[/tag]番）",
+          "jp": "すべての役が[tag]役満[/tag]になる。和了時、役1種類につき[tag]x0.5[/tag]飜を獲得する。（現在[tag]x{0}[/tag]飜）",
+          "en": "Upon winning, all yaku are treated as [tag]Yakuman[/tag]. This talisman gains [tag]x0.5[/tag] Han for each yaku present. (currently [tag]x{0}[/tag] Han)",
+          "kr": "화료 시, 모든 역을 [tag]역만[/tag]으로 간주한다. 역 1종류마다 [tag]x0.5[/tag]판 획득(현재[tag]x{0}[/tag]판)."
+        },
+        "price": 24,
+        "sell_price": 12,
+        "icon_name": "fu_4080.png",
+        "icon_id": 4080,
+        "deprecated": false,
+        "rarity": "PURPLE"
+      },
+      "plus_name": "完璧な役満モジュール+",
+      "plus_sell_price": 12,
+      "plus_metadata": {
+        "data_id": 4081,
+        "names": {
+          "chs": "完美役满模块+",
+          "chs_t": "完美役滿模組+",
+          "jp": "完璧な役満モジュール+",
+          "en": "Flawless Yakuman Module+",
+          "kr": "완벽한 역만 모듈+"
+        },
+        "descriptions": {
+          "chs": "和牌时，所有役种都会被视为[tag]役满役种[/tag]，每有1个役种则使本护身符获得[tag]x1[/tag]番。（当前为[tag]x{0}[/tag]番）",
+          "chs_t": "和牌時，所有役種都會被視為[tag]役滿役種[/tag]，每有1個役種則使本護身符獲得[tag]x1[/tag]番。（當前為[tag]x{0}[/tag]番）",
+          "jp": "すべての役が[tag]役満[/tag]になる。和了時、役1種類につき[tag]x1[/tag]飜を獲得する。（現在[tag]x{0}[/tag]飜）",
+          "en": "Upon winning, all yaku are treated as [tag]Yakuman[/tag]. This talisman gains [tag]x1[/tag] Han for each yaku present. (currently [tag]x{0}[/tag] Han)",
+          "kr": "화료 시, 모든 역을 [tag]역만[/tag]으로 간주한다. 역 1종류마다 [tag]x1[/tag]판 획득(현재[tag]x{0}[/tag]판)."
+        },
+        "price": 24,
+        "sell_price": 12,
+        "icon_name": "fu_4080.png",
+        "icon_id": 4080,
+        "deprecated": false,
+        "rarity": "PURPLE"
+      }
     }
   ],
   "source": {
     "client_url": "https://game.maj-soul.com/1/",
-    "product_version": "4.0.47",
-    "bundle_hash": "32a94aec59119f2bc06bb675989674a810cdeaa7",
+    "product_version": "4.0.51",
+    "bundle_hash": "aeed8ac264cef3020e36e86df584f1b71a7437ee",
     "issuer": "chs_t",
     "name_language": "jp"
   }
