@@ -65,6 +65,7 @@ import {
 import {openUrl} from "@tauri-apps/plugin-opener";
 import {safeListen} from "./lib/tauriRuntime";
 import {formatLevelIdToLabel} from "./lib/levelFormat";
+import {getGameStage} from "./lib/gameStages";
 import {useContainerWidth} from "react-grid-layout";
 import HomeDashboard from "./components/HomeDashboard";
 import PacketPipelinePage from "./pages/PacketPipelinePage";
@@ -667,6 +668,10 @@ function formatMapNodeValue(value: unknown) {
 }
 
 function getGameMapNodeLabel(level: unknown, index: number, count: number, source?: GameStateData["source"]) {
+    if (source !== "qyzz") {
+        const stage = getGameStage(Number(level), index + 1);
+        if (stage) return stage.label;
+    }
     const prefix = formatLevelIdToLabel(level, source);
     if (index === 0) return `${prefix}-START`;
     if (index === count - 1 && count > 1) return `${prefix}-BOSS`;
@@ -771,7 +776,7 @@ function GameMapModal({
                     </svg>
                     <div className="game-map-level-pill">
                         <span>{t("game_map.level")}</span>
-                        <strong>{formatLevelIdToLabel(currentState?.level, currentState?.source)}</strong>
+                        <strong>{formatLevelIdToLabel(currentState?.level, currentState?.source, currentState?.node)}</strong>
                     </div>
                     <div className="game-map-node-pill">
                         <span>{t("game_map.node")}</span>
@@ -1947,11 +1952,11 @@ export default function App() {
                                                             resolveFace={(id) => deckMap.get(id) ?? null}
                                                         />
                                                     ) : (
-                                                        <LevelRecordPanel level={level} source={latestGameState?.source} items={levelRecordItems}/>
+                                                        <LevelRecordPanel level={level} source={latestGameState?.source} node={latestGameState?.node} items={levelRecordItems}/>
                                                     )}
                                                 </>
                                             ) : (
-                                                <LevelRecordPanel level={level} source={latestGameState?.source} items={levelRecordItems}/>
+                                                <LevelRecordPanel level={level} source={latestGameState?.source} node={latestGameState?.node} items={levelRecordItems}/>
                                             )}
                                         </div>
                                     ),
@@ -2166,6 +2171,8 @@ export default function App() {
                                 currentPoint={point}
                                 currentTargetPoint={targetPoint}
                                 source={latestGameState?.source}
+                                node={latestGameState?.node}
+                                mapNodes={latestGameState?.map_nodes}
                             />
                         )}
                         {route === "fuse" && <FusePage/>}

@@ -264,10 +264,12 @@ export function useLevelRecordItems({
 export default function LevelRecordPanel({
     level,
     source,
+    node,
     items,
 }: {
     level: number;
     source?: GameStateData["source"];
+    node?: number;
     items: LevelRecordItem[];
 }) {
     const {t} = useTranslation();
@@ -276,7 +278,7 @@ export default function LevelRecordPanel({
 
     return (
         <aside className="home-record-panel">
-            <div className="home-record-kicker">{t("level_records.level_label", {level: formatLevelIdToLabel(level, source)})}</div>
+            <div className="home-record-kicker">{t("level_records.level_label", {level: formatLevelIdToLabel(level, source, node)})}</div>
             <div className="home-record-list">
                 {items.map((item) => {
                     const amulet = item.amuletRegId != null ? registry.amuletById.get(item.amuletRegId) : null;

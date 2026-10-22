@@ -1,6 +1,24 @@
 use super::Services;
 use crate::pipeline::Packet;
 use serde_json::{json, Map, Value};
+use std::sync::LazyLock;
+
+static STAGE_BATTLES: LazyLock<std::collections::HashMap<(u64, u64), bool>> = LazyLock::new(|| {
+    let catalog: Value = serde_json::from_str(include_str!("../../assets/levels.json")).expect("invalid bundled level catalog");
+    catalog["levels"].as_array().unwrap().iter().flat_map(|level| {
+        level["nodes"].as_array().unwrap().iter().map(move |node| {
+            ((level["level"].as_u64().unwrap(), node["node"].as_u64().unwrap()), matches!(node["type"].as_u64(), Some(2 | 4)))
+        })
+    }).collect()
+});
+
+fn clear_noncombat_target(target: &mut Map<String, Value>) {
+    let key = (target.get("level").and_then(Value::as_u64).unwrap_or(0), target.get("node").and_then(Value::as_u64).unwrap_or(0));
+    if STAGE_BATTLES.get(&key) == Some(&false) {
+        target.insert("point".into(), json!("0"));
+        target.insert("target_point".into(), json!("0"));
+    }
+}
 
 pub(super) fn empty_game_state() -> Value {
     json!({
@@ -173,6 +191,7 @@ pub(super) fn apply_fetch_state(target: &mut Map<String, Value>, response: &Valu
     set_known(target, game, "record", "record");
     set_known(target, game, "ended", "ended");
     normalize_maps(target);
+    clear_noncombat_target(target);
     update_boss_buff(target);
     rebuild_pool_sections(target, round, false);
 }
@@ -274,6 +293,7 @@ fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
     }
     set_known(target, changes, "ended", "ended");
     normalize_maps(target);
+    clear_noncombat_target(target);
     update_boss_buff(target);
     if let Some(round) = changes.get("round") {
         let event_type = item.get("type").and_then(Value::as_i64).unwrap_or(-1);
@@ -642,4 +662,37 @@ fn update_boss_buff(target: &mut Map<String, Value>) {
         .cloned()
         .unwrap_or_else(|| json!([]));
     target.insert("boss_buff".into(), buffs);
+}
+
+#[cfg(test)]
+mod level_tests {
+    use super::*;
+
+    #[test]
+    fn map_and_node_identify_stages_and_noncombat_clears_previous_enemy() {
+        let mut state = empty_game_state().as_object().unwrap().clone();
+        apply_fetch_state(&mut state, &json!({"game": {"map": {"level":13001,"node":2}, "round":{"enemy":{"hp":"120","maxHp":"200"}}}}));
+        assert_eq!(state["level"], 13001);
+        assert_eq!(state["node"], 2);
+        assert_eq!(state["target_point"], "200");
+        apply_event_state(&mut state, &json!({"valueChanges":{"map":{"node":{"value":3}}}}));
+        assert_eq!(state["point"], "0");
+        assert_eq!(state["target_point"], "0");
+        apply_fetch_state(&mut state, &json!({"game":{"map":{"level":13001,"node":6},"round":{"enemy":{"hp":"750","maxHp":"750"}}}}));
+        assert_eq!(state["target_point"], "750");
+    }
+
+    #[test]
+    fn catalog_has_unique_nodes_and_combat_matches_score_presence() {
+        let catalog: Value = serde_json::from_str(include_str!("../../assets/levels.json")).unwrap();
+        let mut count = 0;
+        for level in catalog["levels"].as_array().unwrap() {
+            for node in level["nodes"].as_array().unwrap() {
+                let battle = STAGE_BATTLES[&(level["level"].as_u64().unwrap(), node["node"].as_u64().unwrap())];
+                assert_eq!(battle, node["hp_rate"].is_string());
+                count += 1;
+            }
+        }
+        assert_eq!(STAGE_BATTLES.len(), count);
+    }
 }

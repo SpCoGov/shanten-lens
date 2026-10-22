@@ -89,11 +89,12 @@ export type CurrentPointResult = {
 
 export type FutureProjection = {
     level: number;
+    node?: number;
     point: bigint;
     totalPoint: bigint;
     score: bigint;
     fan: bigint;
-    target?: bigint | null;
+    target: {min: bigint; max: bigint} | null;
     reached: boolean | null;
     amulets: Array<{
         uid: number;
@@ -1146,13 +1147,14 @@ function growAmuletData(
 
 export function projectFuturePoints(
     currentLevel: number,
-    futureLevels: Array<{ level: number; target?: string }>,
+    futureLevels: Array<{ level: number; node?: number; target?: string | string[] }>,
     currentResult: CurrentPointResult,
     currentRules: ResolvedAmuletRule[],
     baseScore: bigint,
     baseFan: bigint,
     winCount: number,
     runtime: AmuletRuntimeContext = {},
+    currentIsBattle = true,
 ): FutureProjection[] {
     const out: FutureProjection[] = [];
     let level = currentLevel;
@@ -1161,20 +1163,25 @@ export function projectFuturePoints(
 
     for (const future of futureLevels) {
         level = future.level;
-        rules = growAmuletData(rules, result, level, false);
+        if (currentIsBattle || out.length > 0) rules = growAmuletData(rules, result, level, false);
         const simulated = simulateLevelWins(baseScore, baseFan, level, rules, winCount, runtime);
         const projectedSingleWinResult = simulated.firstResult;
         result = simulated.lastResult;
-        const target = parseTargetPointValue(future.target ?? "") ?? null;
+        const targets = (Array.isArray(future.target) ? future.target : [future.target ?? ""])
+            .map(parseTargetPointValue)
+            .filter((target): target is bigint => target != null)
+            .sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+        const target = targets.length > 0 ? {min: targets[0], max: targets[targets.length - 1]} : null;
         const totalPoint = simulated.totalPoint;
         out.push({
             level,
+            node: future.node,
             point: projectedSingleWinResult.finalPoint,
             totalPoint,
             score: projectedSingleWinResult.finalScore,
             fan: projectedSingleWinResult.finalFan,
             target,
-            reached: target == null ? null : totalPoint >= target,
+            reached: target == null ? null : totalPoint >= target.max ? true : totalPoint < target.min ? false : null,
             amulets: rules.map((rule) => ({
                 uid: rule.item.uid,
                 regId: rule.regId,
