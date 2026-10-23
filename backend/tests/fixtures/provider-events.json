@@ -1,0 +1,2186 @@
+{
+  "character": {
+    "events": [
+      {
+        "effectedHooks": [],
+        "eventHooks": [],
+        "result": {},
+        "state": {
+          "current": 1,
+          "interrupt": 0
+        },
+        "type": 2,
+        "valueChanges": {
+          "character": {
+            "characterId": {
+              "dirty": true,
+              "value": 201
+            },
+            "hp": {
+              "dirty": true,
+              "value": 120
+            },
+            "maxHp": {
+              "dirty": true,
+              "value": 120
+            }
+          },
+          "effect": {},
+          "game": {
+            "tileScoreMap": {
+              "dirty": true,
+              "value": [
+                {
+                  "score": "5",
+                  "tile": "1m"
+                },
+                {
+                  "score": "5",
+                  "tile": "1p"
+                },
+                {
+                  "score": "5",
+                  "tile": "1s"
+                },
+                {
+                  "score": "10",
+                  "tile": "2p"
+                },
+                {
+                  "score": "10",
+                  "tile": "2s"
+                },
+                {
+                  "score": "10",
+                  "tile": "3p"
+                },
+                {
+                  "score": "10",
+                  "tile": "3s"
+                },
+                {
+                  "score": "10",
+                  "tile": "4p"
+                },
+                {
+                  "score": "10",
+                  "tile": "4s"
+                },
+                {
+                  "score": "10",
+                  "tile": "5p"
+                },
+                {
+                  "score": "10",
+                  "tile": "5s"
+                },
+                {
+                  "score": "10",
+                  "tile": "6p"
+                },
+                {
+                  "score": "10",
+                  "tile": "6s"
+                },
+                {
+                  "score": "10",
+                  "tile": "7p"
+                },
+                {
+                  "score": "10",
+                  "tile": "7s"
+                },
+                {
+                  "score": "10",
+                  "tile": "8p"
+                },
+                {
+                  "score": "10",
+                  "tile": "8s"
+                },
+                {
+                  "score": "5",
+                  "tile": "9m"
+                },
+                {
+                  "score": "5",
+                  "tile": "9p"
+                },
+                {
+                  "score": "5",
+                  "tile": "9s"
+                },
+                {
+                  "score": "5",
+                  "tile": "1z"
+                },
+                {
+                  "score": "5",
+                  "tile": "2z"
+                },
+                {
+                  "score": "5",
+                  "tile": "3z"
+                },
+                {
+                  "score": "5",
+                  "tile": "4z"
+                },
+                {
+                  "score": "5",
+                  "tile": "5z"
+                },
+                {
+                  "score": "5",
+                  "tile": "6z"
+                },
+                {
+                  "score": "5",
+                  "tile": "7z"
+                }
+              ]
+            }
+          },
+          "map": {},
+          "nodeEvent": {},
+          "record": {},
+          "round": {
+            "tianDora": {
+              "dirty": true,
+              "value": []
+            }
+          },
+          "shop": {}
+        }
+      },
+      {
+        "effectedHooks": [],
+        "eventHooks": [],
+        "result": {},
+        "state": {
+          "current": 2,
+          "interrupt": 1000
+        },
+        "type": 52,
+        "valueChanges": {
+          "character": {},
+          "effect": {},
+          "game": {},
+          "map": {},
+          "nodeEvent": {},
+          "record": {},
+          "round": {},
+          "shop": {}
+        }
+      },
+      {
+        "effectedHooks": [],
+        "eventHooks": [],
+        "result": {},
+        "state": {
+          "current": 2,
+          "interrupt": 1000
+        },
+        "type": 51,
+        "valueChanges": {
+          "character": {},
+          "effect": {
+            "packCandidates": {
+              "dirty": true,
+              "value": [
+                {
+                  "badgeId": 0,
+                  "id": 3020
+                },
+                {
+                  "badgeId": 0,
+                  "id": 3430
+                },
+                {
+                  "badgeId": 0,
+                  "id": 3530
+                }
+              ]
+            },
+            "packGoodsId": {
+              "dirty": true,
+              "value": 991
+            },
+            "packQueue": {
+              "dirty": true,
+              "value": []
+            }
+          },
+          "game": {},
+          "map": {},
+          "nodeEvent": {},
+          "record": {
+            "effectCounter": {
+              "dirty": true,
+              "value": [
+                {
+                  "effectId": 2150,
+                  "gainCount": 0,
+                  "packCandidateCount": 0
+                },
+                {
+                  "effectId": 2151,
+                  "gainCount": 0,
+                  "packCandidateCount": 0
+                },
+                {
+                  "effectId": 3280,
+                  "gainCount": 0,
+                  "packCandidateCount": 0
+                },
+                {
+                  "effectId": 3281,
+                  "gainCount": 0,
+                  "packCandidateCount": 0
+                }
+              ]
+            }
+          },
+          "round": {},
+          "shop": {}
+        }
+      }
+    ]
+  },
+  "initial": {
+    "events": [
+      {
+        "effectedHooks": [],
+        "eventHooks": [],
+        "result": {
+          "selectPackResult": {
+            "id": 3020,
+            "mergeType": 0,
+            "mergedList": [],
+            "mergedResult": 0,
+            "uid": 1
+          }
+        },
+        "state": {
+          "current": 3,
+          "interrupt": 0
+        },
+        "type": 53,
+        "valueChanges": {
+          "character": {},
+          "effect": {},
+          "game": {},
+          "map": {},
+          "nodeEvent": {},
+          "record": {},
+          "round": {},
+          "shop": {}
+        }
+      },
+      {
+        "effectedHooks": [],
+        "eventHooks": [],
+        "result": {},
+        "state": {
+          "current": 3,
+          "interrupt": 0
+        },
+        "type": 3,
+        "valueChanges": {
+          "character": {},
+          "effect": {
+            "effectList": {
+              "dirty": true,
+              "value": [
+                {
+                  "id": 3020,
+                  "store": [
+                    "0",
+                    "0"
+                  ],
+                  "tags": [],
+                  "uid": 1,
+                  "volume": 1
+                }
+              ]
+            },
+            "packCandidates": {
+              "dirty": true,
+              "value": []
+            },
+            "packGoodsId": {
+              "dirty": true,
+              "value": 0
+            }
+          },
+          "game": {},
+          "map": {
+            "level": {
+              "dirty": true,
+              "value": 13001
+            },
+            "mapNodes": {
+              "dirty": true,
+              "value": [
+                {
+                  "args": [],
+                  "subType": 0,
+                  "type": 1
+                },
+                {
+                  "args": [],
+                  "subType": 3002,
+                  "type": 2
+                },
+                {
+                  "args": [],
+                  "subType": 1,
+                  "type": 3
+                },
+                {
+                  "args": [],
+                  "subType": 3001,
+                  "type": 2
+                },
+                {
+                  "args": [],
+                  "subType": 5,
+                  "type": 3
+                },
+                {
+                  "args": [
+                    906
+                  ],
+                  "subType": 3011,
+                  "type": 4
+                }
+              ]
+            },
+            "node": {
+              "dirty": true,
+              "value": 1
+            }
+          },
+          "nodeEvent": {},
+          "record": {
+            "effectCounter": {
+              "dirty": true,
+              "value": [
+                {
+                  "effectId": 2150,
+                  "gainCount": 0,
+                  "packCandidateCount": 0
+                },
+                {
+                  "effectId": 2151,
+                  "gainCount": 0,
+                  "packCandidateCount": 0
+                },
+                {
+                  "effectId": 3280,
+                  "gainCount": 0,
+                  "packCandidateCount": 0
+                },
+                {
+                  "effectId": 3281,
+                  "gainCount": 0,
+                  "packCandidateCount": 0
+                }
+              ]
+            },
+            "effectGain": {
+              "dirty": true,
+              "value": 1
+            }
+          },
+          "round": {},
+          "shop": {}
+        }
+      }
+    ]
+  },
+  "next": {
+    "events": [
+      {
+        "effectedHooks": [],
+        "eventHooks": [],
+        "result": {},
+        "state": {
+          "current": 3,
+          "interrupt": 0
+        },
+        "type": 21,
+        "valueChanges": {
+          "character": {},
+          "effect": {},
+          "game": {},
+          "map": {
+            "node": {
+              "dirty": true,
+              "value": 2
+            }
+          },
+          "nodeEvent": {},
+          "record": {},
+          "round": {},
+          "shop": {}
+        }
+      },
+      {
+        "effectedHooks": [
+          {
+            "id": 9062,
+            "result": {
+              "addBadge": [],
+              "addBuff": [],
+              "addEffect": [],
+              "addFanValue": [],
+              "addShowTile": [],
+              "addTianDora": [],
+              "calcDesktopCount": 0,
+              "canGang": false,
+              "copyEffect": [],
+              "effectGrowth": false,
+              "forceMoqie": false,
+              "modifyBerserkTileCount": 0,
+              "modifyChangeCoin": "",
+              "modifyChangeHandsCount": 5,
+              "modifyChangeHandsList": [],
+              "modifyChangeHandsTileCount": 0,
+              "modifyDesktopCount": 0,
+              "modifyDora": [],
+              "modifyDoraMaxCount": 0,
+              "modifyEffectMaxCount": 0,
+              "modifyEffectPrice": "",
+              "modifyFanInfo": [],
+              "modifyGoods": [],
+              "modifyHuleCount": 0,
+              "modifyLockTileCount": 0,
+              "modifyShopGoodsCount": 0,
+              "modifyShopGoodsPrice": false,
+              "modifyShopPackEffect": [],
+              "modifyShopRareWeight": false,
+              "modifyShopUpgradeGoodsPrice": false,
+              "modifyShowDesktopCount": 0,
+              "modifyTargetPoint": "",
+              "modifyTileBaseScore": [],
+              "modifyTileScore": [],
+              "modifyTileScoreAura": "",
+              "removeBadge": [],
+              "removeBuff": [],
+              "removeEffect": [],
+              "removeGoods": [],
+              "replaceHu": false,
+              "selfEffectId": 0,
+              "setChangeTileCount": 0,
+              "setTileScore": [],
+              "tileReplace": [],
+              "transformEffect": [],
+              "upgradeEffect": [],
+              "upgradeLevel": false
+            },
+            "type": 3,
+            "uid": 0
+          }
+        ],
+        "eventHooks": [],
+        "result": {},
+        "state": {
+          "current": 4,
+          "interrupt": 0
+        },
+        "type": 4,
+        "valueChanges": {
+          "character": {},
+          "effect": {},
+          "game": {},
+          "map": {},
+          "nodeEvent": {},
+          "record": {
+            "highestLevelScore": {
+              "dirty": true,
+              "value": "0"
+            },
+            "levelHuCount": {
+              "dirty": true,
+              "value": 0
+            }
+          },
+          "round": {
+            "berserkTilePos": {
+              "dirty": true,
+              "value": [
+                1,
+                4,
+                9,
+                25
+              ]
+            },
+            "changeTileCount": {
+              "dirty": true,
+              "value": 0
+            },
+            "delayRound": {
+              "dirty": true,
+              "value": 0
+            },
+            "desktopRemain": {
+              "dirty": true,
+              "value": 36
+            },
+            "dora": {
+              "dirty": true,
+              "value": [
+                76
+              ]
+            },
+            "enemy": {
+              "dirty": true,
+              "value": {
+                "atk": 1,
+                "hp": "200",
+                "id": 3002,
+                "maxHp": "200"
+              }
+            },
+            "hands": {
+              "dirty": true,
+              "value": [
+                84,
+                103,
+                19,
+                82,
+                47,
+                70,
+                24,
+                78,
+                107,
+                99,
+                4,
+                62,
+                13
+              ]
+            },
+            "lockedTile": {
+              "dirty": true,
+              "value": []
+            },
+            "lockedTileCount": {
+              "dirty": true,
+              "value": 0
+            },
+            "ming": {
+              "dirty": true,
+              "value": []
+            },
+            "nextOperation": {
+              "dirty": true,
+              "value": [
+                {
+                  "gang": [],
+                  "type": 101,
+                  "value": 0
+                }
+              ]
+            },
+            "pool": {
+              "dirty": true,
+              "value": [
+                {
+                  "id": 84,
+                  "tile": "1s"
+                },
+                {
+                  "id": 103,
+                  "tile": "2z"
+                },
+                {
+                  "id": 19,
+                  "tile": "9p"
+                },
+                {
+                  "id": 82,
+                  "tile": "1m"
+                },
+                {
+                  "id": 47,
+                  "tile": "9s"
+                },
+                {
+                  "id": 70,
+                  "tile": "8p"
+                },
+                {
+                  "id": 24,
+                  "tile": "4z"
+                },
+                {
+                  "id": 78,
+                  "tile": "4z"
+                },
+                {
+                  "id": 107,
+                  "tile": "6z"
+                },
+                {
+                  "id": 99,
+                  "tile": "9m"
+                },
+                {
+                  "id": 4,
+                  "tile": "2p"
+                },
+                {
+                  "id": 62,
+                  "tile": "4p"
+                },
+                {
+                  "id": 13,
+                  "tile": "6s"
+                },
+                {
+                  "id": 76,
+                  "tile": "2z"
+                },
+                {
+                  "id": 37,
+                  "tile": "5p"
+                },
+                {
+                  "id": 96,
+                  "tile": "7s"
+                },
+                {
+                  "id": 83,
+                  "tile": "1p"
+                },
+                {
+                  "id": 64,
+                  "tile": "5p"
+                },
+                {
+                  "id": 10,
+                  "tile": "0p"
+                },
+                {
+                  "id": 11,
+                  "tile": "0s"
+                },
+                {
+                  "id": 55,
+                  "tile": "1m"
+                },
+                {
+                  "id": 75,
+                  "tile": "1z"
+                },
+                {
+                  "id": 27,
+                  "tile": "7z"
+                },
+                {
+                  "id": 108,
+                  "tile": "7z"
+                },
+                {
+                  "id": 6,
+                  "tile": "3p"
+                },
+                {
+                  "id": 22,
+                  "tile": "2z"
+                },
+                {
+                  "id": 71,
+                  "tile": "8s"
+                },
+                {
+                  "id": 26,
+                  "tile": "6z"
+                },
+                {
+                  "id": 33,
+                  "tile": "3p"
+                },
+                {
+                  "id": 31,
+                  "tile": "2p"
+                },
+                {
+                  "id": 49,
+                  "tile": "2z"
+                },
+                {
+                  "id": 36,
+                  "tile": "4s"
+                },
+                {
+                  "id": 7,
+                  "tile": "3s"
+                },
+                {
+                  "id": 74,
+                  "tile": "9s"
+                },
+                {
+                  "id": 43,
+                  "tile": "8p"
+                },
+                {
+                  "id": 17,
+                  "tile": "8s"
+                },
+                {
+                  "id": 105,
+                  "tile": "4z"
+                },
+                {
+                  "id": 91,
+                  "tile": "5p"
+                },
+                {
+                  "id": 72,
+                  "tile": "9m"
+                },
+                {
+                  "id": 69,
+                  "tile": "7s"
+                },
+                {
+                  "id": 45,
+                  "tile": "9m"
+                },
+                {
+                  "id": 63,
+                  "tile": "4s"
+                },
+                {
+                  "id": 68,
+                  "tile": "7p"
+                },
+                {
+                  "id": 102,
+                  "tile": "1z"
+                },
+                {
+                  "id": 56,
+                  "tile": "1p"
+                },
+                {
+                  "id": 54,
+                  "tile": "7z"
+                },
+                {
+                  "id": 94,
+                  "tile": "6s"
+                },
+                {
+                  "id": 21,
+                  "tile": "1z"
+                },
+                {
+                  "id": 29,
+                  "tile": "1p"
+                },
+                {
+                  "id": 86,
+                  "tile": "2s"
+                },
+                {
+                  "id": 35,
+                  "tile": "4p"
+                },
+                {
+                  "id": 1,
+                  "tile": "1m"
+                },
+                {
+                  "id": 67,
+                  "tile": "6s"
+                },
+                {
+                  "id": 3,
+                  "tile": "1s"
+                },
+                {
+                  "id": 38,
+                  "tile": "5s"
+                },
+                {
+                  "id": 52,
+                  "tile": "5z"
+                },
+                {
+                  "id": 46,
+                  "tile": "9p"
+                },
+                {
+                  "id": 95,
+                  "tile": "7p"
+                },
+                {
+                  "id": 14,
+                  "tile": "7p"
+                },
+                {
+                  "id": 28,
+                  "tile": "1m"
+                },
+                {
+                  "id": 93,
+                  "tile": "6p"
+                },
+                {
+                  "id": 53,
+                  "tile": "6z"
+                },
+                {
+                  "id": 90,
+                  "tile": "4s"
+                },
+                {
+                  "id": 104,
+                  "tile": "3z"
+                },
+                {
+                  "id": 9,
+                  "tile": "4s"
+                },
+                {
+                  "id": 58,
+                  "tile": "2p"
+                },
+                {
+                  "id": 79,
+                  "tile": "5z"
+                },
+                {
+                  "id": 65,
+                  "tile": "5s"
+                },
+                {
+                  "id": 8,
+                  "tile": "4p"
+                },
+                {
+                  "id": 39,
+                  "tile": "6p"
+                },
+                {
+                  "id": 89,
+                  "tile": "4p"
+                },
+                {
+                  "id": 85,
+                  "tile": "2p"
+                },
+                {
+                  "id": 41,
+                  "tile": "7p"
+                },
+                {
+                  "id": 57,
+                  "tile": "1s"
+                },
+                {
+                  "id": 66,
+                  "tile": "6p"
+                },
+                {
+                  "id": 61,
+                  "tile": "3s"
+                },
+                {
+                  "id": 77,
+                  "tile": "3z"
+                },
+                {
+                  "id": 2,
+                  "tile": "1p"
+                },
+                {
+                  "id": 87,
+                  "tile": "3p"
+                },
+                {
+                  "id": 101,
+                  "tile": "9s"
+                },
+                {
+                  "id": 30,
+                  "tile": "1s"
+                },
+                {
+                  "id": 12,
+                  "tile": "6p"
+                },
+                {
+                  "id": 59,
+                  "tile": "2s"
+                },
+                {
+                  "id": 100,
+                  "tile": "9p"
+                },
+                {
+                  "id": 42,
+                  "tile": "7s"
+                },
+                {
+                  "id": 32,
+                  "tile": "2s"
+                },
+                {
+                  "id": 15,
+                  "tile": "7s"
+                },
+                {
+                  "id": 92,
+                  "tile": "5s"
+                },
+                {
+                  "id": 81,
+                  "tile": "7z"
+                },
+                {
+                  "id": 97,
+                  "tile": "8p"
+                },
+                {
+                  "id": 18,
+                  "tile": "9m"
+                },
+                {
+                  "id": 40,
+                  "tile": "6s"
+                },
+                {
+                  "id": 48,
+                  "tile": "1z"
+                },
+                {
+                  "id": 16,
+                  "tile": "8p"
+                },
+                {
+                  "id": 25,
+                  "tile": "5z"
+                },
+                {
+                  "id": 23,
+                  "tile": "3z"
+                },
+                {
+                  "id": 50,
+                  "tile": "3z"
+                },
+                {
+                  "id": 106,
+                  "tile": "5z"
+                },
+                {
+                  "id": 60,
+                  "tile": "3p"
+                },
+                {
+                  "id": 44,
+                  "tile": "8s"
+                },
+                {
+                  "id": 73,
+                  "tile": "9p"
+                },
+                {
+                  "id": 80,
+                  "tile": "6z"
+                },
+                {
+                  "id": 5,
+                  "tile": "2s"
+                },
+                {
+                  "id": 98,
+                  "tile": "8s"
+                },
+                {
+                  "id": 20,
+                  "tile": "9s"
+                },
+                {
+                  "id": 88,
+                  "tile": "3s"
+                },
+                {
+                  "id": 34,
+                  "tile": "3s"
+                },
+                {
+                  "id": 51,
+                  "tile": "4z"
+                }
+              ]
+            },
+            "showDesktopTiles": {
+              "dirty": true,
+              "value": [
+                {
+                  "id": 1,
+                  "pos": 7
+                },
+                {
+                  "id": 22,
+                  "pos": 33
+                },
+                {
+                  "id": 21,
+                  "pos": 11
+                },
+                {
+                  "id": 54,
+                  "pos": 13
+                },
+                {
+                  "id": 72,
+                  "pos": 20
+                },
+                {
+                  "id": 31,
+                  "pos": 29
+                }
+              ]
+            },
+            "tianDora": {
+              "dirty": true,
+              "value": []
+            },
+            "tileReplace": {
+              "dirty": true,
+              "value": []
+            },
+            "tingList": {
+              "dirty": true,
+              "value": []
+            },
+            "totalChangeTileCount": {
+              "dirty": true,
+              "value": 5
+            },
+            "used": {
+              "dirty": true,
+              "value": []
+            },
+            "usedDesktop": {
+              "dirty": true,
+              "value": []
+            }
+          },
+          "shop": {}
+        }
+      },
+      {
+        "effectedHooks": [],
+        "eventHooks": [],
+        "result": {},
+        "state": {
+          "current": 4,
+          "interrupt": 0
+        },
+        "type": 5,
+        "valueChanges": {
+          "character": {},
+          "effect": {},
+          "game": {},
+          "map": {},
+          "nodeEvent": {},
+          "record": {},
+          "round": {
+            "tingList": {
+              "dirty": true,
+              "value": []
+            }
+          },
+          "shop": {}
+        }
+      },
+      {
+        "effectedHooks": [],
+        "eventHooks": [],
+        "result": {},
+        "state": {
+          "current": 5,
+          "interrupt": 0
+        },
+        "type": 6,
+        "valueChanges": {
+          "character": {},
+          "effect": {},
+          "game": {},
+          "map": {},
+          "nodeEvent": {},
+          "record": {},
+          "round": {},
+          "shop": {}
+        }
+      }
+    ]
+  },
+  "start": {
+    "events": [
+      {
+        "effectedHooks": [
+          {
+            "id": 9013,
+            "result": {
+              "addBadge": [],
+              "addBuff": [],
+              "addEffect": [],
+              "addFanValue": [],
+              "addShowTile": [],
+              "addTianDora": [],
+              "calcDesktopCount": 0,
+              "canGang": false,
+              "coinModify": {
+                "final": "25",
+                "modify": "15",
+                "origin": "10"
+              },
+              "copyEffect": [],
+              "effectGrowth": false,
+              "forceMoqie": false,
+              "modifyBerserkTileCount": 0,
+              "modifyChangeCoin": "",
+              "modifyChangeHandsCount": 0,
+              "modifyChangeHandsList": [],
+              "modifyChangeHandsTileCount": 0,
+              "modifyDesktopCount": 0,
+              "modifyDora": [],
+              "modifyDoraMaxCount": 0,
+              "modifyEffectMaxCount": 0,
+              "modifyEffectPrice": "",
+              "modifyFanInfo": [],
+              "modifyGoods": [],
+              "modifyHuleCount": 0,
+              "modifyLockTileCount": 0,
+              "modifyShopGoodsCount": 0,
+              "modifyShopGoodsPrice": false,
+              "modifyShopPackEffect": [],
+              "modifyShopRareWeight": false,
+              "modifyShopUpgradeGoodsPrice": false,
+              "modifyShowDesktopCount": 0,
+              "modifyTargetPoint": "",
+              "modifyTileBaseScore": [],
+              "modifyTileScore": [],
+              "modifyTileScoreAura": "",
+              "removeBadge": [],
+              "removeBuff": [],
+              "removeEffect": [],
+              "removeGoods": [],
+              "replaceHu": false,
+              "selfEffectId": 0,
+              "setChangeTileCount": 0,
+              "setTileScore": [],
+              "tileReplace": [],
+              "transformEffect": [],
+              "upgradeEffect": [],
+              "upgradeLevel": false
+            },
+            "type": 3,
+            "uid": 0
+          }
+        ],
+        "eventHooks": [],
+        "result": {
+          "newGameResult": {
+            "character": {
+              "characterId": 0,
+              "hp": 0,
+              "maxHp": 0
+            },
+            "effect": {
+              "buffList": [],
+              "effectList": [],
+              "maxEffectVolume": 8,
+              "packCandidates": [],
+              "packDisableSkip": 0,
+              "packGoodsId": 0,
+              "packQueue": [],
+              "runeStoneList": [],
+              "shopBuffList": [
+                {
+                  "id": 8002,
+                  "store": [
+                    "0"
+                  ]
+                },
+                {
+                  "id": 8003,
+                  "store": [
+                    "0"
+                  ]
+                },
+                {
+                  "id": 8004,
+                  "store": [
+                    "0"
+                  ]
+                }
+              ],
+              "skillBuffList": [
+                {
+                  "id": 9013,
+                  "store": []
+                },
+                {
+                  "id": 9033,
+                  "store": []
+                },
+                {
+                  "id": 9053,
+                  "store": []
+                },
+                {
+                  "id": 9023,
+                  "store": []
+                },
+                {
+                  "id": 9043,
+                  "store": []
+                },
+                {
+                  "id": 9062,
+                  "store": []
+                }
+              ]
+            },
+            "game": {
+              "bookEffectId": 0,
+              "coin": "25",
+              "fanValueMap": [
+                {
+                  "id": 1,
+                  "value": "1"
+                },
+                {
+                  "id": 2,
+                  "value": "1"
+                },
+                {
+                  "id": 3,
+                  "value": "1"
+                },
+                {
+                  "id": 4,
+                  "value": "1"
+                },
+                {
+                  "id": 5,
+                  "value": "1"
+                },
+                {
+                  "id": 6,
+                  "value": "1"
+                },
+                {
+                  "id": 7,
+                  "value": "1"
+                },
+                {
+                  "id": 8,
+                  "value": "1"
+                },
+                {
+                  "id": 9,
+                  "value": "1"
+                },
+                {
+                  "id": 10,
+                  "value": "1"
+                },
+                {
+                  "id": 11,
+                  "value": "1"
+                },
+                {
+                  "id": 12,
+                  "value": "1"
+                },
+                {
+                  "id": 13,
+                  "value": "1"
+                },
+                {
+                  "id": 14,
+                  "value": "1"
+                },
+                {
+                  "id": 15,
+                  "value": "2"
+                },
+                {
+                  "id": 16,
+                  "value": "2"
+                },
+                {
+                  "id": 17,
+                  "value": "2"
+                },
+                {
+                  "id": 18,
+                  "value": "2"
+                },
+                {
+                  "id": 19,
+                  "value": "2"
+                },
+                {
+                  "id": 20,
+                  "value": "2"
+                },
+                {
+                  "id": 21,
+                  "value": "2"
+                },
+                {
+                  "id": 22,
+                  "value": "2"
+                },
+                {
+                  "id": 23,
+                  "value": "2"
+                },
+                {
+                  "id": 24,
+                  "value": "2"
+                },
+                {
+                  "id": 25,
+                  "value": "2"
+                },
+                {
+                  "id": 26,
+                  "value": "3"
+                },
+                {
+                  "id": 27,
+                  "value": "3"
+                },
+                {
+                  "id": 28,
+                  "value": "3"
+                },
+                {
+                  "id": 29,
+                  "value": "6"
+                },
+                {
+                  "id": 30,
+                  "value": "1"
+                },
+                {
+                  "id": 31,
+                  "value": "1"
+                },
+                {
+                  "id": 32,
+                  "value": "1"
+                },
+                {
+                  "id": 33,
+                  "value": "1"
+                },
+                {
+                  "id": 36,
+                  "value": "13"
+                },
+                {
+                  "id": 37,
+                  "value": "13"
+                },
+                {
+                  "id": 38,
+                  "value": "13"
+                },
+                {
+                  "id": 39,
+                  "value": "13"
+                },
+                {
+                  "id": 40,
+                  "value": "13"
+                },
+                {
+                  "id": 41,
+                  "value": "13"
+                },
+                {
+                  "id": 42,
+                  "value": "13"
+                },
+                {
+                  "id": 43,
+                  "value": "13"
+                },
+                {
+                  "id": 44,
+                  "value": "13"
+                },
+                {
+                  "id": 45,
+                  "value": "13"
+                },
+                {
+                  "id": 47,
+                  "value": "26"
+                },
+                {
+                  "id": 48,
+                  "value": "26"
+                },
+                {
+                  "id": 49,
+                  "value": "26"
+                },
+                {
+                  "id": 50,
+                  "value": "26"
+                },
+                {
+                  "id": 100,
+                  "value": "1"
+                },
+                {
+                  "id": 101,
+                  "value": "1"
+                },
+                {
+                  "id": 201,
+                  "value": "1"
+                },
+                {
+                  "id": 202,
+                  "value": "1"
+                },
+                {
+                  "id": 203,
+                  "value": "1"
+                },
+                {
+                  "id": 204,
+                  "value": "2"
+                },
+                {
+                  "id": 205,
+                  "value": "2"
+                },
+                {
+                  "id": 206,
+                  "value": "2"
+                },
+                {
+                  "id": 207,
+                  "value": "4"
+                },
+                {
+                  "id": 208,
+                  "value": "5"
+                },
+                {
+                  "id": 209,
+                  "value": "5"
+                },
+                {
+                  "id": 210,
+                  "value": "5"
+                },
+                {
+                  "id": 211,
+                  "value": "5"
+                },
+                {
+                  "id": 212,
+                  "value": "8"
+                },
+                {
+                  "id": 213,
+                  "value": "13"
+                },
+                {
+                  "id": 214,
+                  "value": "13"
+                },
+                {
+                  "id": 215,
+                  "value": "13"
+                },
+                {
+                  "id": 216,
+                  "value": "26"
+                },
+                {
+                  "id": 217,
+                  "value": "5"
+                },
+                {
+                  "id": 218,
+                  "value": "13"
+                },
+                {
+                  "id": 219,
+                  "value": "13"
+                },
+                {
+                  "id": 220,
+                  "value": "13"
+                },
+                {
+                  "id": 221,
+                  "value": "13"
+                },
+                {
+                  "id": 222,
+                  "value": "13"
+                },
+                {
+                  "id": 223,
+                  "value": "26"
+                },
+                {
+                  "id": 224,
+                  "value": "26"
+                }
+              ],
+              "initChangeHandCount": 3,
+              "level": 0,
+              "maxEffectVolume": 0,
+              "tileScoreMap": []
+            },
+            "map": {
+              "level": 0,
+              "mapNodes": [],
+              "node": 0,
+              "transportCount": 0
+            },
+            "nodeEvent": {
+              "advancedShopGoods": [],
+              "advancedShopRefreshCount": 0,
+              "advancedShopRefreshPrice": 1,
+              "advancedShopUpgrade": [],
+              "bonfireSelection": [],
+              "gambleCount": 0,
+              "gambleId": 0,
+              "gamblePrice": 0,
+              "gambleSelections": [],
+              "tradeCount": 0,
+              "tradeItems": []
+            },
+            "record": {
+              "coinConsume": "0",
+              "coinGain": "0",
+              "effectCounter": [
+                {
+                  "effectId": 2150,
+                  "gainCount": 0,
+                  "packCandidateCount": 0
+                },
+                {
+                  "effectId": 2151,
+                  "gainCount": 0,
+                  "packCandidateCount": 0
+                },
+                {
+                  "effectId": 3280,
+                  "gainCount": 0,
+                  "packCandidateCount": 0
+                },
+                {
+                  "effectId": 3281,
+                  "gainCount": 0,
+                  "packCandidateCount": 0
+                }
+              ],
+              "effectGain": 0,
+              "effectUpgradeCount": 0,
+              "gameHuCount": 0,
+              "highestFan": "0",
+              "highestLevelScore": "0",
+              "huTilesId": [],
+              "levelHuCount": 0,
+              "packCount": 0,
+              "roundCount": 0,
+              "yimanCount": 0
+            },
+            "round": {
+              "afterGang": 0,
+              "berserkTile": [],
+              "berserkTilePos": [],
+              "changeTileCount": 0,
+              "delayRound": 0,
+              "desktop": [],
+              "desktopRemain": 0,
+              "dora": [],
+              "hands": [],
+              "lockedTile": [],
+              "lockedTileCount": 0,
+              "ming": [],
+              "mountain": [],
+              "nextOperation": [],
+              "pool": [
+                {
+                  "id": 57,
+                  "tile": "1s"
+                },
+                {
+                  "id": 70,
+                  "tile": "8p"
+                },
+                {
+                  "id": 84,
+                  "tile": "1s"
+                },
+                {
+                  "id": 77,
+                  "tile": "3z"
+                },
+                {
+                  "id": 49,
+                  "tile": "2z"
+                },
+                {
+                  "id": 86,
+                  "tile": "2s"
+                },
+                {
+                  "id": 55,
+                  "tile": "1m"
+                },
+                {
+                  "id": 30,
+                  "tile": "1s"
+                },
+                {
+                  "id": 12,
+                  "tile": "6p"
+                },
+                {
+                  "id": 17,
+                  "tile": "8s"
+                },
+                {
+                  "id": 58,
+                  "tile": "2p"
+                },
+                {
+                  "id": 35,
+                  "tile": "4p"
+                },
+                {
+                  "id": 24,
+                  "tile": "4z"
+                },
+                {
+                  "id": 27,
+                  "tile": "7z"
+                },
+                {
+                  "id": 31,
+                  "tile": "2p"
+                },
+                {
+                  "id": 81,
+                  "tile": "7z"
+                },
+                {
+                  "id": 41,
+                  "tile": "7p"
+                },
+                {
+                  "id": 80,
+                  "tile": "6z"
+                },
+                {
+                  "id": 85,
+                  "tile": "2p"
+                },
+                {
+                  "id": 39,
+                  "tile": "6p"
+                },
+                {
+                  "id": 96,
+                  "tile": "7s"
+                },
+                {
+                  "id": 10,
+                  "tile": "0p"
+                },
+                {
+                  "id": 5,
+                  "tile": "2s"
+                },
+                {
+                  "id": 75,
+                  "tile": "1z"
+                },
+                {
+                  "id": 90,
+                  "tile": "4s"
+                },
+                {
+                  "id": 100,
+                  "tile": "9p"
+                },
+                {
+                  "id": 45,
+                  "tile": "9m"
+                },
+                {
+                  "id": 92,
+                  "tile": "5s"
+                },
+                {
+                  "id": 97,
+                  "tile": "8p"
+                },
+                {
+                  "id": 1,
+                  "tile": "1m"
+                },
+                {
+                  "id": 74,
+                  "tile": "9s"
+                },
+                {
+                  "id": 3,
+                  "tile": "1s"
+                },
+                {
+                  "id": 91,
+                  "tile": "5p"
+                },
+                {
+                  "id": 44,
+                  "tile": "8s"
+                },
+                {
+                  "id": 14,
+                  "tile": "7p"
+                },
+                {
+                  "id": 104,
+                  "tile": "3z"
+                },
+                {
+                  "id": 99,
+                  "tile": "9m"
+                },
+                {
+                  "id": 22,
+                  "tile": "2z"
+                },
+                {
+                  "id": 67,
+                  "tile": "6s"
+                },
+                {
+                  "id": 54,
+                  "tile": "7z"
+                },
+                {
+                  "id": 46,
+                  "tile": "9p"
+                },
+                {
+                  "id": 48,
+                  "tile": "1z"
+                },
+                {
+                  "id": 79,
+                  "tile": "5z"
+                },
+                {
+                  "id": 36,
+                  "tile": "4s"
+                },
+                {
+                  "id": 11,
+                  "tile": "0s"
+                },
+                {
+                  "id": 6,
+                  "tile": "3p"
+                },
+                {
+                  "id": 7,
+                  "tile": "3s"
+                },
+                {
+                  "id": 13,
+                  "tile": "6s"
+                },
+                {
+                  "id": 23,
+                  "tile": "3z"
+                },
+                {
+                  "id": 53,
+                  "tile": "6z"
+                },
+                {
+                  "id": 38,
+                  "tile": "5s"
+                },
+                {
+                  "id": 15,
+                  "tile": "7s"
+                },
+                {
+                  "id": 68,
+                  "tile": "7p"
+                },
+                {
+                  "id": 82,
+                  "tile": "1m"
+                },
+                {
+                  "id": 94,
+                  "tile": "6s"
+                },
+                {
+                  "id": 64,
+                  "tile": "5p"
+                },
+                {
+                  "id": 93,
+                  "tile": "6p"
+                },
+                {
+                  "id": 56,
+                  "tile": "1p"
+                },
+                {
+                  "id": 43,
+                  "tile": "8p"
+                },
+                {
+                  "id": 76,
+                  "tile": "2z"
+                },
+                {
+                  "id": 8,
+                  "tile": "4p"
+                },
+                {
+                  "id": 9,
+                  "tile": "4s"
+                },
+                {
+                  "id": 51,
+                  "tile": "4z"
+                },
+                {
+                  "id": 103,
+                  "tile": "2z"
+                },
+                {
+                  "id": 52,
+                  "tile": "5z"
+                },
+                {
+                  "id": 33,
+                  "tile": "3p"
+                },
+                {
+                  "id": 105,
+                  "tile": "4z"
+                },
+                {
+                  "id": 87,
+                  "tile": "3p"
+                },
+                {
+                  "id": 88,
+                  "tile": "3s"
+                },
+                {
+                  "id": 108,
+                  "tile": "7z"
+                },
+                {
+                  "id": 95,
+                  "tile": "7p"
+                },
+                {
+                  "id": 102,
+                  "tile": "1z"
+                },
+                {
+                  "id": 26,
+                  "tile": "6z"
+                },
+                {
+                  "id": 60,
+                  "tile": "3p"
+                },
+                {
+                  "id": 34,
+                  "tile": "3s"
+                },
+                {
+                  "id": 73,
+                  "tile": "9p"
+                },
+                {
+                  "id": 61,
+                  "tile": "3s"
+                },
+                {
+                  "id": 66,
+                  "tile": "6p"
+                },
+                {
+                  "id": 42,
+                  "tile": "7s"
+                },
+                {
+                  "id": 20,
+                  "tile": "9s"
+                },
+                {
+                  "id": 65,
+                  "tile": "5s"
+                },
+                {
+                  "id": 2,
+                  "tile": "1p"
+                },
+                {
+                  "id": 78,
+                  "tile": "4z"
+                },
+                {
+                  "id": 71,
+                  "tile": "8s"
+                },
+                {
+                  "id": 47,
+                  "tile": "9s"
+                },
+                {
+                  "id": 29,
+                  "tile": "1p"
+                },
+                {
+                  "id": 4,
+                  "tile": "2p"
+                },
+                {
+                  "id": 63,
+                  "tile": "4s"
+                },
+                {
+                  "id": 89,
+                  "tile": "4p"
+                },
+                {
+                  "id": 40,
+                  "tile": "6s"
+                },
+                {
+                  "id": 28,
+                  "tile": "1m"
+                },
+                {
+                  "id": 59,
+                  "tile": "2s"
+                },
+                {
+                  "id": 72,
+                  "tile": "9m"
+                },
+                {
+                  "id": 101,
+                  "tile": "9s"
+                },
+                {
+                  "id": 69,
+                  "tile": "7s"
+                },
+                {
+                  "id": 37,
+                  "tile": "5p"
+                },
+                {
+                  "id": 21,
+                  "tile": "1z"
+                },
+                {
+                  "id": 16,
+                  "tile": "8p"
+                },
+                {
+                  "id": 19,
+                  "tile": "9p"
+                },
+                {
+                  "id": 32,
+                  "tile": "2s"
+                },
+                {
+                  "id": 50,
+                  "tile": "3z"
+                },
+                {
+                  "id": 83,
+                  "tile": "1p"
+                },
+                {
+                  "id": 18,
+                  "tile": "9m"
+                },
+                {
+                  "id": 25,
+                  "tile": "5z"
+                },
+                {
+                  "id": 98,
+                  "tile": "8s"
+                },
+                {
+                  "id": 107,
+                  "tile": "6z"
+                },
+                {
+                  "id": 62,
+                  "tile": "4p"
+                },
+                {
+                  "id": 106,
+                  "tile": "5z"
+                }
+              ],
+              "showDesktop": [],
+              "showDesktopTiles": [],
+              "tianDora": [],
+              "tileReplace": [],
+              "tingList": [],
+              "totalChangeTileCount": 0,
+              "used": [],
+              "usedDesktop": []
+            },
+            "shop": {
+              "goods": [],
+              "refreshPrice": 1,
+              "shopRefreshCount": 0,
+              "upgradeGoods": []
+            },
+            "state": {
+              "current": 1,
+              "interrupt": 0
+            }
+          }
+        },
+        "state": {
+          "current": 1,
+          "interrupt": 0
+        },
+        "type": 1,
+        "valueChanges": {
+          "character": {},
+          "effect": {},
+          "game": {
+            "coin": {
+              "dirty": true,
+              "value": "25"
+            }
+          },
+          "map": {},
+          "nodeEvent": {},
+          "record": {},
+          "round": {},
+          "shop": {}
+        }
+      }
+    ]
+  },
+  "trade": {
+    "events": [
+      {
+        "effectedHooks": [],
+        "eventHooks": [],
+        "result": {},
+        "state": {
+          "current": 3,
+          "interrupt": 0
+        },
+        "type": 21,
+        "valueChanges": {
+          "character": {},
+          "effect": {},
+          "game": {},
+          "map": {
+            "node": {
+              "dirty": true,
+              "value": 6
+            }
+          },
+          "nodeEvent": {},
+          "record": {},
+          "round": {},
+          "shop": {}
+        }
+      },
+      {
+        "effectedHooks": [],
+        "eventHooks": [],
+        "result": {},
+        "state": {
+          "current": 12,
+          "interrupt": 0
+        },
+        "type": 37,
+        "valueChanges": {
+          "character": {},
+          "effect": {},
+          "game": {},
+          "map": {},
+          "nodeEvent": {
+            "tradeCount": {
+              "dirty": true,
+              "value": 0
+            },
+            "tradeItems": {
+              "dirty": true,
+              "value": [
+                {
+                  "id": 2,
+                  "store": [
+                    20
+                  ]
+                },
+                {
+                  "id": 6,
+                  "store": [
+                    1
+                  ]
+                }
+              ]
+            },
+            "tradeReward": {
+              "dirty": true,
+              "value": {
+                "badgeId": 0,
+                "effectId": 2081,
+                "id": 6,
+                "runeStoneId": 0,
+                "type": 1
+              }
+            }
+          },
+          "record": {},
+          "round": {},
+          "shop": {}
+        }
+      }
+    ]
+  }
+}
