@@ -11,6 +11,10 @@
     --color-ring: #3b82f6;
     --accent-blue: #2563eb;
     --accent-green: #059669;
+    --autoplay-selected-bg: color-mix(in srgb, var(--color-ring) 10%, var(--panel-bg));
+    --autoplay-error: var(--badge-down-fg);
+    --autoplay-action-bg: color-mix(in srgb, var(--color-ring) 70%, #000);
+    --autoplay-action-fg: #fff;
 
     --custom-target-accent: var(--accent-blue);
     --custom-target-tint: color-mix(in srgb, var(--color-ring) 8%, var(--panel-bg));

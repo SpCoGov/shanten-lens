@@ -60,7 +60,7 @@ function valueSortNumber(v: number): number {
     return v === 0 ? 5.1 : v;
 }
 
-function sortKey(a: string, b: string): number {
+export function compareTileFaces(a: string, b: string): number {
     const order: Record<string, number> = { m: 0, p: 1, s: 2, z: 3 };
     const na = normalize(a);
     const nb = normalize(b);
@@ -103,7 +103,7 @@ export default function WallStats({ wallTiles, className, headerSlot }: WallStat
             else map.set(k, { count: 1, sample: t });
         }
         return Array.from(map.entries())
-            .sort((a, b) => sortKey(a[0], b[0]))
+            .sort((a, b) => compareTileFaces(a[0], b[0]))
             .map(([key, v]) => ({
                 key,
                 sample: v.sample,

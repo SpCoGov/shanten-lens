@@ -33,7 +33,10 @@ jobs:
       - name: Install extractor dependencies
         run: python -m pip install -r scripts/requirements-game-data.txt
 
-      - name: Generate protocol and registries
+      - name: Test game data extractor
+        run: python -m unittest discover -s scripts -p 'test_game_data.py'
+
+      - name: Generate protocol, registries and stages
         id: generate
         run: python scripts/update_game_data.py
 
@@ -52,21 +55,25 @@ jobs:
           base: "3.0"
           branch: feat/update-game-data
           delete-branch: true
-          commit-message: "chore(data): 更新雀魂协议、护身符与印章"
-          title: "chore(data): 更新雀魂协议、护身符与印章"
+          commit-message: "chore(data): 更新雀魂协议、护身符、印章与关卡"
+          title: "chore(data): 更新雀魂协议、护身符、印章与关卡"
           body: |
-            从雀魂 Unity 客户端自动生成协议及原版雀魂的护身符、印章注册表。
+            从雀魂 Unity 客户端自动生成协议及原版雀魂的护身符、印章、关卡数据。
 
             - 客户端版本：`${{ steps.generate.outputs.product_version }}`
             - 资源哈希：`${{ steps.generate.outputs.bundle_hash }}`
             - 上游护身符：${{ steps.generate.outputs.amulet_count }} 项（含弃用条目及 Plus 版）
             - 上游印章：${{ steps.generate.outputs.badge_count }} 项（含弃用条目）
+            - 上游地图：${{ steps.generate.outputs.level_count }} 张，共 ${{ steps.generate.outputs.stage_count }} 个节点（包含非战斗节点）
+            - 保留实际节点名称、节点类型、地图推进顺序，以及战斗节点的生命倍率和敌人基础生命值。
             - 保留简体中文、繁体中文、日文、英文、韩文的名称与描述，以及价格、图片名与 ID、弃用状态和稀有度。
             - 上游未提供的价格保留为 `null`，未翻译的文本保留为空字符串。
 
             生成后的 Rust 后端测试已通过。请检查协议字段及数据差异后合并。
-            本机青云之志护身符快照、图片和计分规则不在本次自动更新范围内。
+            本机青云之志护身符与关卡快照、图片和计分规则不在本次自动更新范围内。
           add-paths: |
             proto/liqi.proto
             backend/assets/amulets.json
             backend/assets/badges.json
+            backend/assets/levels.json
+            backend/assets/action_rules.json

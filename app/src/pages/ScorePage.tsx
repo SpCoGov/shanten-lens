@@ -4,7 +4,7 @@ import styles from "./ScorePage.module.css";
 import Modal from "../components/Modal";
 import AmuletCard from "../components/AmuletCard";
 import {getAllRegisteredAmuletRules} from "../lib/amuletRuleRegistry";
-import type {EffectItem, GameStateData} from "../lib/gamestate";
+import type {EffectItem, GameStateData, MapNodeItem} from "../lib/gamestate";
 import {useRegistry} from "../lib/registryStore";
 import {
     calculateCurrentPoint,
@@ -19,17 +19,18 @@ import {
     parseStoredDataFromItem,
     parseStoredDataListFromItem,
     parseFixed2,
-    parseTargetPointValue,
     projectFuturePoints,
     resolveAmuletRule,
     getRegisteredAmuletRuleExact,
     type AmuletRuleConfig,
     type EffectTarget,
+    type FutureProjection,
 } from "../lib/scoreEngine";
 import {buildDoraCountByTile} from "../lib/tileHighlights";
 import {formatLevelIdToLabel} from "../lib/levelFormat";
 
-import {getOrderedLevelTargets} from "../lib/levelTargets";
+import {getFutureLevelTargets, getOrderedLevelTargets} from "../lib/levelTargets";
+import {getGameStage, getLevelKey} from "../lib/gameStages";
 
 type CustomRuleMap = Record<string, Partial<AmuletRuleConfig>>;
 type TileScoreEntry = { tile: string; score: bigint };
@@ -73,10 +74,8 @@ function getRuleKey(item: EffectItem) {
     return `${item.uid}:${item.id}`;
 }
 
-function formatTargetText(target: string | undefined): string {
-    if (!target) return target ?? "";
-    const parsed = parseTargetPointValue(target);
-    return parsed == null ? target : formatFixed2(parsed);
+function formatTargetText(target: NonNullable<FutureProjection["target"]>): string {
+    return target.min === target.max ? formatFixed2(target.min) : `${formatFixed2(target.min)} – ${formatFixed2(target.max)}`;
 }
 
 function getTileScoreGroup(tile: string): "m" | "p" | "s" | "z" | "other" {
@@ -146,6 +145,8 @@ export default function ScorePage({
                                       currentPoint,
                                       currentTargetPoint,
                                       source,
+                                      node,
+                                      mapNodes,
                                   }: {
     amulets: EffectItem[];
     handTileIds: number[];
@@ -157,11 +158,15 @@ export default function ScorePage({
     currentPoint?: string;
     currentTargetPoint?: string;
     source?: GameStateData["source"];
+    node?: number;
+    mapNodes?: MapNodeItem[];
 }) {
     const {t} = useTranslation();
-    const levelTargets = getOrderedLevelTargets(source);
+    const levelTargets = React.useMemo(() => getOrderedLevelTargets(source, level, mapNodes), [source, level, mapNodes]);
+    const currentStage = source === "qyzz" ? undefined : getGameStage(level, node);
+    const currentIsBattle = currentStage == null || currentStage.hp_rate != null;
     const projectionMetaByLevel = React.useMemo(
-        () => new Map(levelTargets.map((item) => [item.level, item] as const)),
+        () => new Map(levelTargets.map((item) => [getLevelKey(item), item] as const)),
         [levelTargets],
     );
     const [fanText, setFanText] = usePersistentState<string>(FAN_STORAGE_KEY, "1");
@@ -170,7 +175,7 @@ export default function ScorePage({
     const [editingKey, setEditingKey] = React.useState<string | null>(null);
     const [showTileScores, setShowTileScores] = React.useState(false);
     const [showRuleOverview, setShowRuleOverview] = React.useState(false);
-    const [selectedFutureLevel, setSelectedFutureLevel] = React.useState<number | null>(null);
+    const [selectedFutureLevel, setSelectedFutureLevel] = React.useState<string | null>(null);
     const [selectedExecExplainIndex, setSelectedExecExplainIndex] = React.useState<number | null>(null);
     const [expandedFutureGroups, setExpandedFutureGroups] = React.useState<string[]>([]);
     const [ruleOverviewRarityFilter, setRuleOverviewRarityFilter] = React.useState<string>("all");
@@ -251,33 +256,36 @@ export default function ScorePage({
     }, [baseScore, baseFan, level, rules, hasPinzuInHand, soulTileCount]);
 
     const currentLevelLabel = React.useMemo(
-        () => projectionMetaByLevel.get(level)?.label ?? formatLevelIdToLabel(level || 0, source),
-        [level, source, projectionMetaByLevel],
+        () => formatLevelIdToLabel(level || 0, source, node),
+        [level, source, node],
     );
 
     const futureProjections = React.useMemo(() => {
-        const startIndex = levelTargets.findIndex((item) => item.level === level);
-        if (startIndex < 0) return [];
+        const futureLevels = getFutureLevelTargets(source, level, node, mapNodes);
         const runtime = {hasPinzuInHand, soulTileCount: 14};
         const seededRules = cloneResolvedRules(rules);
-        let seededResult = calculateCurrentPoint(baseScore, baseFan, level, seededRules, runtime);
-        for (let winIndex = 1; winIndex < winCount; winIndex += 1) {
+        let seededResult = currentResult;
+        if (currentIsBattle) {
             seededResult = calculateCurrentPoint(baseScore, baseFan, level, seededRules, runtime);
+            for (let winIndex = 1; winIndex < winCount; winIndex += 1) {
+                seededResult = calculateCurrentPoint(baseScore, baseFan, level, seededRules, runtime);
+            }
         }
         return projectFuturePoints(
             level,
-            levelTargets.slice(startIndex + 1),
+            futureLevels,
             seededResult,
             seededRules,
             baseScore,
             baseFan,
             winCount,
             runtime,
+            currentIsBattle,
         );
-    }, [level, levelTargets, rules, baseScore, baseFan, winCount, hasPinzuInHand]);
+    }, [level, node, mapNodes, source, currentIsBattle, currentResult, rules, baseScore, baseFan, winCount, hasPinzuInHand]);
 
     const selectedFutureProjection = React.useMemo(
-        () => futureProjections.find((projection) => projection.level === selectedFutureLevel) ?? null,
+        () => futureProjections.find((projection) => getLevelKey(projection) === selectedFutureLevel) ?? null,
         [futureProjections, selectedFutureLevel],
     );
     const selectedExecExplain = React.useMemo(
@@ -317,12 +325,12 @@ export default function ScorePage({
             } else {
                 items.push({type: "projection", projection: run[0]!});
                 const hiddenProjections = run.slice(1, -1);
-                const groupKey = `${run[0]!.level}:${run[run.length - 1]!.level}`;
+                const groupKey = `${getLevelKey(run[0]!)}:${getLevelKey(run[run.length - 1]!)}`;
                 items.push({
                     type: "collapsed", groupKey,
                     hiddenCount: hiddenProjections.length,
-                    startLevel: projectionMetaByLevel.get(hiddenProjections[0]!.level)?.label ?? formatLevelIdToLabel(hiddenProjections[0]!.level, source),
-                    endLevel: projectionMetaByLevel.get(hiddenProjections[hiddenProjections.length - 1]!.level)?.label ?? formatLevelIdToLabel(hiddenProjections[hiddenProjections.length - 1]!.level, source),
+                    startLevel: projectionMetaByLevel.get(getLevelKey(hiddenProjections[0]!))?.label ?? formatLevelIdToLabel(hiddenProjections[0]!.level, source, hiddenProjections[0]!.node),
+                    endLevel: projectionMetaByLevel.get(getLevelKey(hiddenProjections[hiddenProjections.length - 1]!))?.label ?? formatLevelIdToLabel(hiddenProjections[hiddenProjections.length - 1]!.level, source, hiddenProjections[hiddenProjections.length - 1]!.node),
                     expanded: expandedFutureGroups.includes(groupKey),
                     hiddenProjections,
                 });
@@ -366,11 +374,11 @@ export default function ScorePage({
 
     const actualTarget = React.useMemo(() => {
         try {
-            return parseFixed2(currentTargetPoint ?? "0");
+            return currentIsBattle ? parseFixed2(currentTargetPoint ?? "0") : 0n;
         } catch {
             return 0n;
         }
-    }, [currentTargetPoint]);
+    }, [currentTargetPoint, currentIsBattle]);
     const totalCurrentPoint = React.useMemo(
         () => currentResult.finalPoint * BigInt(winCount),
         [currentResult.finalPoint, winCount],
@@ -552,16 +560,16 @@ export default function ScorePage({
                         <div className={styles.stageMetrics}>
                             <div>
                                 <span className={styles.metricLabel}>{t("score.actual_point")}</span>
-                                <strong>{formatFixed2(actualPoint)}</strong>
+                                <strong>{currentIsBattle ? formatFixed2(actualPoint) : "-"}</strong>
                             </div>
                             <div>
                                 <span className={styles.metricLabel}>{t("score.current_target")}</span>
-                                <strong>{formatFixed2(actualTarget)}</strong>
+                                <strong>{currentIsBattle ? formatFixed2(actualTarget) : t("score.non_combat")}</strong>
                             </div>
                             <div>
                                 <span className={styles.metricLabel}>{t("score.current_target_result")}</span>
                                 <strong className={currentReached == null ? styles.neutral : currentReached ? styles.success : styles.danger}>
-                                    {currentReached == null ? t("score.not_set") : currentReached ? t("score.reached") : t("score.not_reached")}
+                                    {!currentIsBattle ? t("score.non_combat") : currentReached == null ? t("score.not_set") : currentReached ? t("score.reached") : t("score.not_reached")}
                                 </strong>
                             </div>
                         </div>
@@ -767,14 +775,13 @@ export default function ScorePage({
                                         {item.expanded ? (
                                             <div className="future-collapsed-list">
                                                 {item.hiddenProjections.map((projection) => {
-                                                    const meta = projectionMetaByLevel.get(projection.level);
-                                                    const levelLabel = meta?.label ?? formatLevelIdToLabel(projection.level, source);
-                                                    const targetText = meta?.target;
+                                                    const meta = projectionMetaByLevel.get(getLevelKey(projection));
+                                                    const levelLabel = meta?.label ?? formatLevelIdToLabel(projection.level, source, projection.node);
                                                     return (
                                                         <button
-                                                            key={`expanded:${projection.level}`}
+                                                            key={`expanded:${getLevelKey(projection)}`}
                                                             className="target-card target-card-button future-collapsed-item"
-                                                            onClick={() => setSelectedFutureLevel(projection.level)}
+                                                            onClick={() => setSelectedFutureLevel(getLevelKey(projection))}
                                                         >
                                                             <div className="target-card-main" style={{gridTemplateColumns: "minmax(0, 1fr)"}}>
                                                                 <div className="target-card-copy">
@@ -799,10 +806,10 @@ export default function ScorePage({
                                                             </div>
                                                             <div className="target-card-actions">
                                                                 <span className="badge">
-                                                                    {t("score.future_target_label")}: {targetText == null ? t("score.future_target_placeholder") : formatTargetText(targetText)}
+                                                                    {t("score.future_target_label")}: {projection.target == null ? t("score.future_target_placeholder") : formatTargetText(projection.target)}
                                                                 </span>
                                                                 <span className={`badge ${projection.reached == null ? "" : projection.reached ? "ok" : "down"}`}>
-                                                                    {projection.reached == null ? t("score.not_set") : projection.reached ? t("score.reached") : t("score.not_reached")}
+                                                                    {projection.reached == null ? t(projection.target == null ? "score.not_set" : "score.target_uncertain") : projection.reached ? t("score.reached") : t("score.not_reached")}
                                                                 </span>
                                                             </div>
                                                         </button>
@@ -815,14 +822,13 @@ export default function ScorePage({
                             }
 
                             const projection = item.projection;
-                            const meta = projectionMetaByLevel.get(projection.level);
-                            const levelLabel = meta?.label ?? formatLevelIdToLabel(projection.level, source);
-                            const targetText = meta?.target;
+                            const meta = projectionMetaByLevel.get(getLevelKey(projection));
+                            const levelLabel = meta?.label ?? formatLevelIdToLabel(projection.level, source, projection.node);
                             return (
                                 <button
-                                    key={projection.level}
+                                    key={getLevelKey(projection)}
                                     className="target-card"
-                                    onClick={() => setSelectedFutureLevel(projection.level)}
+                                    onClick={() => setSelectedFutureLevel(getLevelKey(projection))}
                                     style={{
                                         padding: 12,
                                         border: "1px solid var(--border)", borderRadius: 12,
@@ -852,10 +858,10 @@ export default function ScorePage({
                                     </div>
                                     <div className="target-card-actions">
                                         <span className="badge">
-                                            {t("score.future_target_label")}: {targetText == null ? t("score.future_target_placeholder") : formatTargetText(targetText)}
+                                            {t("score.future_target_label")}: {projection.target == null ? t("score.future_target_placeholder") : formatTargetText(projection.target)}
                                         </span>
                                         <span className={`badge ${projection.reached == null ? "" : projection.reached ? "ok" : "down"}`}>
-                                            {projection.reached == null ? t("score.not_set") : projection.reached ? t("score.reached") : t("score.not_reached")}
+                                            {projection.reached == null ? t(projection.target == null ? "score.not_set" : "score.target_uncertain") : projection.reached ? t("score.reached") : t("score.not_reached")}
                                         </span>
                                     </div>
                                 </button>
@@ -1157,7 +1163,7 @@ export default function ScorePage({
                 open={!!selectedFutureProjection}
                 onClose={() => setSelectedFutureLevel(null)}
                 title={selectedFutureProjection ? t("score.future_growth_detail_title", {
-                    level: projectionMetaByLevel.get(selectedFutureProjection.level)?.label ?? formatLevelIdToLabel(selectedFutureProjection.level, source),
+                    level: projectionMetaByLevel.get(getLevelKey(selectedFutureProjection))?.label ?? formatLevelIdToLabel(selectedFutureProjection.level, source, selectedFutureProjection.node),
                 }) : t("score.future_growth_detail_title", {level: "-"})}
                 width={980}
             >

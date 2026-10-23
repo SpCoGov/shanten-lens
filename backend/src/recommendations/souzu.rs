@@ -286,6 +286,25 @@ impl Search<'_> {
 }
 
 // Match the game's indicator mapping used by app/src/lib/tileHighlights.ts.
+pub(super) fn dora_counts(state: &Value) -> [usize; 34] {
+    let mut counts = [0; 34];
+    for id in ids(state.get("dora_tiles")) {
+        let Some(t) = state["deck_map"][id.to_string()].as_str().and_then(tile) else {
+            continue;
+        };
+        let next = match t {
+            0 => 8, // The game's 1m indicator points to 9m.
+            8 => 0,
+            17 => 9,
+            26 => 18,
+            33 => 27,
+            _ => t + 1,
+        };
+        counts[next as usize] += 1;
+    }
+    counts
+}
+
 pub(super) fn preferred_tiles(
     state: &Value,
     preferences: &SearchPreferences,
@@ -298,19 +317,8 @@ pub(super) fn preferred_tiles(
                 preferred[tile(raw).unwrap() as usize] = true;
             }
         }
-        for id in ids(state.get("dora_tiles")) {
-            let Some(t) = state["deck_map"][id.to_string()].as_str().and_then(tile) else {
-                continue;
-            };
-            let next = match t {
-                0 => 8, // The game's 1m indicator points to 9m.
-                8 => 0,
-                17 => 9,
-                26 => 18,
-                33 => 27,
-                _ => t + 1,
-            };
-            preferred[next as usize] = true;
+        for (tile, count) in dora_counts(state).into_iter().enumerate() {
+            preferred[tile] |= count != 0;
         }
     }
     if preferences.prefer_soul {

@@ -2,6 +2,8 @@
 #[cfg(test)]
 mod audit_tests;
 mod commands;
+mod direct;
+pub use direct::DirectStatus;
 mod plugins;
 mod qyzz;
 mod switch;
@@ -36,12 +38,14 @@ struct State {
     logs: Arc<LogBuffer>,
     services: Arc<Services>,
     proxy: ProxyControl,
+    direct: Arc<direct::DirectLink>,
     qyzz: Arc<qyzz::QyzzLink>,
     automation: Arc<Automation>,
     switch_plan: Arc<RwLock<Option<Value>>>,
     switch_generation: tokio::sync::watch::Sender<u64>,
     debug_generation: Arc<AtomicU64>,
     switch_execution: Arc<tokio::sync::Mutex<()>>,
+    action_executor: Arc<crate::action_executor::ActionExecutor>,
 }
 
 /// Backend runtime embedded by the Tauri application and exposed through
@@ -93,12 +97,14 @@ impl BackendRuntime {
                 logs,
                 services,
                 proxy,
+                direct: Arc::new(direct::DirectLink::default()),
                 qyzz: Arc::new(qyzz::QyzzLink::default()),
                 automation,
                 switch_plan: Arc::new(RwLock::new(None)),
                 switch_generation: tokio::sync::watch::channel(0).0,
                 debug_generation: Arc::new(AtomicU64::new(0)),
                 switch_execution: Arc::new(tokio::sync::Mutex::new(())),
+                action_executor: Arc::new(crate::action_executor::ActionExecutor::default()),
             },
             runtime_root,
             mitm_port,
@@ -158,6 +164,7 @@ impl BackendRuntime {
         let source_changes = async {
             loop {
                 match source_events.recv().await {
+                    Ok(event) if event["type"] == "direct_accounts_changed" => self.state.emit_direct_status(),
                     Ok(event) if event["type"] == "data_source_status" => {
                         self.state.automation.stop_autorun();
                         self.state.automation.stop_tsumo();

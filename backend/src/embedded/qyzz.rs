@@ -193,6 +193,8 @@ mod tests {
                 assert_eq!(command.packet["version"], game["qyzz_version"]);
                 let kind = command.packet["operation"].as_u64().unwrap();
                 let timing = game["execution_test_timing"].as_str().unwrap_or("").to_owned();
+                let exchange_stage = if timing.starts_with("packet-") { 5 } else { 4 };
+                let play_stage = exchange_stage + 1;
                 let previous_melds = game["ming"].clone();
                 let draw = match kind {
                     101 => {
@@ -203,12 +205,12 @@ mod tests {
                         hand = tiles;
                         hand.extend(incoming);
                         game["total_change_tile_count"] = json!(game["total_change_tile_count"].as_u64().unwrap() - 1);
-                        if timing == "auto-finish" && game["total_change_tile_count"] == 0 {
-                            game["stage"] = json!(5);
+                        if timing.ends_with("auto-finish") && game["total_change_tile_count"] == 0 {
+                            game["stage"] = json!(play_stage);
                             true
                         } else { false }
                     }
-                    100 => { game["stage"] = json!(5); hand.len() == 13 }
+                    100 => { game["stage"] = json!(play_stage); hand.len() == 13 }
                     1 | 4 => {
                         assert!(tiles.iter().all(|id| hand.contains(id) && game["deck_map"][id.to_string()] != "bd"));
                         hand.retain(|id| !tiles.contains(id));
@@ -224,7 +226,7 @@ mod tests {
                     hand.push(tile);
                 }
                 game["hand_tiles"] = json!(hand);
-                game["next_operation"] = if game["stage"] == 4 {json!([{"type":101},{"type":100}])} else {json!([{"type":1},{"type":4}])};
+                game["next_operation"] = if game["stage"] == exchange_stage {json!([{"type":101},{"type":100}])} else {json!([{"type":1},{"type":4}])};
                 let committed = game.clone();
                 if kind == 4 && !timing.is_empty() { game["ming"] = previous_melds; }
                 if kind == 100 && !timing.is_empty() { game["next_operation"] = json!([{"type":1}]); }
@@ -275,7 +277,17 @@ mod tests {
                 "options":{"search_algorithm":"custom_target","target_groups":target,"wall_limit":36}})).await;
             let plan = &replies[0]["data"][0]["data"];
             assert_eq!(plan["status"], "plan", "{plan}");
+            let mut execution_events = state.events.subscribe();
             let result = super::super::switch::switch_command(state, &json!({"action":"execute_full_plan","options":{"plan_id":plan["plan_id"]}})).await;
+            let mut execution_count = 0;
+            while let Ok(event) = execution_events.try_recv() {
+                if event["type"] == "souzu_switch_execution" {
+                    assert_eq!(event["data"]["search_algorithm"], plan["search_algorithm"]);
+                    assert_eq!(event["data"]["plan_id"], plan["plan_id"]);
+                    execution_count += 1;
+                }
+            }
+            assert!(execution_count > 0);
             assert_eq!(result[0]["data"]["ok"], true, "{result:?}");
             let game = state.services.game_state();
             assert_eq!(game["ming"].as_array().unwrap().len(), quads);
@@ -293,7 +305,44 @@ mod tests {
                 assert_eq!(state.services.game_state(), game);
             }
         }
-        for (custom, quads, timing) in [(true, 2, "delayed"), (false, 2, "delayed"), (false, 3, "delayed"),
+        for (objective, timing) in [("heavenly_blessing", ""), ("shining_pearl", "packet-auto-finish")] {
+            let faces = ["1m", "2m", "3m", "1s", "2s", "3s", "7p", "8p", "9p", "4p", "5p", "7z", "6p", "7z", "0p", "7z"];
+            let mut deck = faces.iter().enumerate().map(|(i, face)| ((i + 1).to_string(), json!(face)))
+                .collect::<serde_json::Map<_, _>>();
+            deck.insert("1000".into(), json!("bd"));
+            deck.insert("500".into(), json!("4p"));
+            let game = json!({"source":"qyzz","qyzz_run_id":format!("wanxiang-{objective}-{timing}"),"qyzz_version":1,"qyzz_deal_id":1,
+                "stage":if timing.starts_with("packet-") {5} else {4},"deck_map":deck,"hand_tiles":(1..=12).chain([1000]).collect::<Vec<_>>(),
+                "replacement_tiles":[13],"wall_tiles":[14,15,16],"locked_tiles":[],"dora_tiles":[500],"tian_dora_tiles":["5p"],
+                "effect_list":[],"ming":[],"total_change_tile_count":1,"next_operation":[{"type":101},{"type":100}],"execution_test_timing":timing});
+            state.services.publish_qyzz_state(&game).unwrap();
+            let replies = super::super::switch::switch_command(state, &json!({"action":"start",
+                "options":{"search_algorithm":"wanxiang_four_meld_switch","wall_limit":36}})).await;
+            let ordinary = &replies[0]["data"][0]["data"];
+            assert_eq!(ordinary["status"], "plan", "{ordinary}");
+            let before = state.services.game_state();
+            let rejected = super::super::switch::switch_command(state, &json!({"action":"execute_full_plan","options":{"plan_id":ordinary["plan_id"]}})).await;
+            assert_eq!(rejected[0]["data"]["reason"], "wanxiang-plan-has-no-full-kan-execution");
+            assert_eq!(state.services.game_state(), before);
+            let replies = super::super::switch::switch_command(state, &json!({"action":"start",
+                "options":{"search_algorithm":"wanxiang_four_meld_switch","wall_limit":36,"preferences":{"coin_objective":objective}}})).await;
+            let plan = &replies[0]["data"][0]["data"];
+            assert_eq!(plan["status"], "plan", "{plan}");
+            assert!(plan["custom_steps"].as_array().unwrap().iter().any(|step| step["kind"] == "discard" && step["tiles"] == json!([14])));
+            let result = super::super::switch::switch_command(state, &json!({"action":"execute_full_plan","options":{"plan_id":plan["plan_id"]}})).await;
+            assert_eq!(result[0]["data"]["ok"], true, "{result:?}");
+            let game = state.services.game_state();
+            let mut actual = game["hand_tiles"].as_array().unwrap().iter().map(|id| id.as_u64().unwrap()).collect::<Vec<_>>();
+            actual.sort_unstable();
+            let mut target = plan["target_physical_ids"].as_array().unwrap().iter().map(|id| id.as_u64().unwrap()).collect::<Vec<_>>();
+            target.sort_unstable();
+            assert_eq!(actual, target);
+            assert!(actual.contains(&11) && actual.contains(&15) && actual.contains(&1000));
+            assert_eq!(game["wall_tiles"], json!([16]));
+            assert_eq!(game["ming"], json!([]));
+        }
+        for (custom, quads, timing) in [(true, 2, "packet-auto-finish"), (true, 2, "packet-delayed"), (false, 2, "packet-auto-finish"),
+            (true, 2, "delayed"), (false, 2, "delayed"), (false, 3, "delayed"),
             (true, 2, "auto-finish"), (false, 2, "auto-finish"),
             (false, 2, "empty-wall"),
             (true, 2, "missing-kan"), (false, 2, "missing-kan")] {
@@ -307,14 +356,14 @@ mod tests {
             let mut deck = hand.iter().enumerate().map(|(i, face)| ((i+1).to_string(), json!(face)))
                 .chain(wall.iter().enumerate().map(|(i, face)| ((14+i).to_string(), json!(face))))
                 .collect::<serde_json::Map<_, _>>();
-            if timing == "auto-finish" {
+            if timing.ends_with("auto-finish") {
                 deck.insert("1".into(), json!("9m"));
                 deck.insert("19".into(), json!("1m"));
             }
             let game = json!({"source":"qyzz","qyzz_run_id":format!("timing-{custom}-{quads}-{timing}"),"qyzz_version":1,"qyzz_deal_id":1,
-                "stage":4,"deck_map":deck,"hand_tiles":(1..=13).collect::<Vec<_>>(),"wall_tiles":(14..14+wall.len()).collect::<Vec<_>>(),
-                "replacement_tiles":if timing=="auto-finish" {json!([19])} else {json!([])},
-                "locked_tiles":[],"dora_tiles":[],"effect_list":[],"ming":[],"total_change_tile_count":u8::from(timing=="auto-finish"),
+                "stage":if timing.starts_with("packet-") {5} else {4},"deck_map":deck,"hand_tiles":(1..=13).collect::<Vec<_>>(),"wall_tiles":(14..14+wall.len()).collect::<Vec<_>>(),
+                "replacement_tiles":if timing.ends_with("auto-finish") {json!([19])} else {json!([])},
+                "locked_tiles":[],"dora_tiles":[],"effect_list":[],"ming":[],"total_change_tile_count":u8::from(timing.ends_with("auto-finish")),
                 "next_operation":[{"type":101},{"type":100}],"execution_test_timing":timing});
             state.services.publish_qyzz_state(&game).unwrap();
             let mut groups = vec![json!({"quad":true,"rule":{"faces":["1m"]}}),json!({"quad":true,"rule":{"faces":["5p"]}})];

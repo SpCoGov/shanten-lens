@@ -4,6 +4,10 @@ mod souzu;
 mod wanxiang;
 mod custom;
 
+pub(crate) fn valid_custom_target(target: &Value) -> bool {
+    custom::valid_target(target)
+}
+
 pub fn custom_switch_plan(state: &Value, target: &Value, wall_limit: usize, exclude_invalid_shapes: bool,
     progress: &mut dyn FnMut(Value), stopped: &dyn Fn() -> bool) -> Value {
     custom::search(state, target, wall_limit, exclude_invalid_shapes, progress, stopped)
@@ -39,6 +43,13 @@ pub enum MeldType {
     Sequence,
 }
 
+#[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoinObjective {
+    HeavenlyBlessing,
+    ShiningPearl,
+}
+
 #[derive(Clone, Default, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct SearchPreferences {
@@ -47,6 +58,7 @@ pub struct SearchPreferences {
     pub any_waits: bool,
     pub preferred_suit: Option<TileSuit>,
     pub preferred_meld_type: Option<MeldType>,
+    pub coin_objective: Option<CoinObjective>,
 }
 
 fn ids(value: Option<&Value>) -> Vec<u64> {
@@ -296,10 +308,10 @@ pub fn switch_plan_with_preferences(
     }
     let has_wanxiang = hand.contains(&1000);
     match algorithm {
-        Some("wanxiang_four_meld_switch") => wanxiang::search(state, skip_signatures, preferences, progress, stopped),
+        Some("wanxiang_four_meld_switch") => wanxiang::search(state, wall_limit, skip_signatures, preferences, progress, stopped),
         Some("target_enumeration_three_quads") => souzu::search_with_preferences(state, wall_limit, 3, skip_signatures, preferences, progress, stopped),
         Some("target_enumeration_search") => souzu::search_with_preferences(state, wall_limit, 2, skip_signatures, preferences, progress, stopped),
-        None if has_wanxiang => wanxiang::search(state, skip_signatures, preferences, progress, stopped),
+        None if has_wanxiang => wanxiang::search(state, wall_limit, skip_signatures, preferences, progress, stopped),
         None => souzu::search_with_preferences(state, wall_limit, 2, skip_signatures, preferences, progress, stopped),
         Some(_) => json!({"status":"impossible","reason":"unknown-algorithm"}),
     }

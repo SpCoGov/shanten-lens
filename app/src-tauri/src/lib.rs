@@ -420,6 +420,15 @@ async fn backend_amulet_action(
 
 #[tauri::command]
 #[specta::specta]
+async fn backend_execute_action(
+    request: shanten_backend::action_executor::ActionExecutionRequest,
+    state: State<'_, IpcBackendState>,
+) -> Result<CommandResult, String> {
+    Ok(state.0.execute_action(request).await)
+}
+
+#[tauri::command]
+#[specta::specta]
 async fn backend_start_tsumo_loop(
     interval_ms: u64,
     reset_count: bool,
@@ -439,10 +448,9 @@ fn backend_stop_tsumo_loop(state: State<'_, IpcBackendState>) -> TsumoLoopStatus
 async fn backend_autorun(
     action: AutorunAction,
     force: bool,
-    mode: Option<String>,
     state: State<'_, IpcBackendState>,
 ) -> Result<CommandResult, String> {
-    Ok(state.0.autorun(action, force, mode).await)
+    Ok(state.0.autorun(action, force).await)
 }
 
 #[tauri::command]
@@ -653,6 +661,60 @@ async fn backend_select_data_source(source: shanten_backend::ipc::DataSource, re
     state.0.select_data_source(source, revision).await
 }
 
+#[tauri::command]
+#[specta::specta]
+async fn backend_send_direct_email_code(region: shanten_backend::direct_connection::Region, email: String, state: State<'_, IpcBackendState>) -> Result<(), String> {
+    state.0.send_direct_email_code(region, email).await
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_direct_accounts(state: State<'_, IpcBackendState>) -> Vec<shanten_backend::services::DirectAccountSummary> {
+    state.0.direct_accounts()
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_save_direct_account(account: shanten_backend::services::DirectAccountInput, state: State<'_, IpcBackendState>) -> Result<Vec<shanten_backend::services::DirectAccountSummary>, String> {
+    state.0.save_direct_account(account).await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_delete_direct_account(id: String, state: State<'_, IpcBackendState>) -> Result<Vec<shanten_backend::services::DirectAccountSummary>, String> {
+    state.0.delete_direct_account(id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_direct_routes(region: shanten_backend::direct_connection::Region, state: State<'_, IpcBackendState>) -> Result<Vec<shanten_backend::direct_connection::Route>, String> {
+    state.0.direct_routes(region).await
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_direct_status(state: State<'_, IpcBackendState>) -> shanten_backend::embedded::DirectStatus {
+    state.0.direct_status()
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_connect_direct(account_id: String, state: State<'_, IpcBackendState>) -> Result<shanten_backend::embedded::DirectStatus, String> {
+    state.0.connect_direct(account_id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_disconnect_direct(state: State<'_, IpcBackendState>) -> Result<shanten_backend::embedded::DirectStatus, String> {
+    Ok(state.0.disconnect_direct().await)
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn backend_capture_direct_account(account_id: Option<String>, state: State<'_, IpcBackendState>) -> Result<shanten_backend::embedded::DirectStatus, String> {
+    state.0.capture_direct_account(account_id).await
+}
+
 #[cfg(debug_assertions)]
 fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::new()
@@ -661,6 +723,15 @@ fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
             backend_snapshot,
             backend_data_sources,
             backend_select_data_source,
+            backend_direct_accounts,
+            backend_send_direct_email_code,
+            backend_save_direct_account,
+            backend_delete_direct_account,
+            backend_direct_routes,
+            backend_direct_status,
+            backend_connect_direct,
+            backend_disconnect_direct,
+            backend_capture_direct_account,
             backend_get_packet_pipeline,
             backend_get_packet_modules,
             backend_get_plugins,
@@ -695,6 +766,7 @@ fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
             backend_discard_tile,
             backend_upgrade_shop_buff,
             backend_amulet_action,
+            backend_execute_action,
             backend_start_tsumo_loop,
             backend_stop_tsumo_loop,
             backend_autorun,
@@ -715,6 +787,12 @@ fn export_ipc_bindings(ipc: &tauri_specta::Builder<tauri::Wry>) {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/bindings.ts"),
     )
     .expect("failed to export Tauri IPC bindings");
+}
+
+#[cfg(all(test, debug_assertions))]
+#[test]
+fn export_current_ipc_bindings() {
+    export_ipc_bindings(&ipc_builder());
 }
 
 pub fn run() {
@@ -750,6 +828,15 @@ pub fn run() {
             backend_snapshot,
             backend_data_sources,
             backend_select_data_source,
+            backend_direct_accounts,
+            backend_send_direct_email_code,
+            backend_save_direct_account,
+            backend_delete_direct_account,
+            backend_direct_routes,
+            backend_direct_status,
+            backend_connect_direct,
+            backend_disconnect_direct,
+            backend_capture_direct_account,
             backend_get_packet_pipeline,
             backend_get_packet_modules,
             backend_get_plugins,
@@ -784,6 +871,7 @@ pub fn run() {
             backend_discard_tile,
             backend_upgrade_shop_buff,
             backend_amulet_action,
+            backend_execute_action,
             backend_start_tsumo_loop,
             backend_stop_tsumo_loop,
             backend_autorun,

@@ -1,6 +1,7 @@
 export const HUD_ENABLED_KEY = "sl-hud:enabled";
 export const HUD_SHOW_BLACKHOLE_KEY = "sl-hud:show-blackhole";
 export const HUD_SHOW_WANXIANG_KEY = "sl-hud:show-wanxiang";
+export const HUD_SHOW_CUSTOM_SWITCH_KEY = "sl-hud:show-custom-switch";
 export const HUD_SHOW_SCORE_PROJECTION_KEY = "sl-hud:show-score-projection";
 
 export function readHudEnabled() {
@@ -44,6 +45,21 @@ export function readHudShowWanxiang() {
 export function writeHudShowWanxiang(value: boolean) {
     try {
         localStorage.setItem(HUD_SHOW_WANXIANG_KEY, value ? "1" : "0");
+    } catch {
+    }
+}
+
+export function readHudShowCustomSwitch() {
+    try {
+        return localStorage.getItem(HUD_SHOW_CUSTOM_SWITCH_KEY) === "1";
+    } catch {
+        return false;
+    }
+}
+
+export function writeHudShowCustomSwitch(value: boolean) {
+    try {
+        localStorage.setItem(HUD_SHOW_CUSTOM_SWITCH_KEY, value ? "1" : "0");
     } catch {
     }
 }

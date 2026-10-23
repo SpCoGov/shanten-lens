@@ -1,0 +1,5489 @@
+{
+  "source": {
+    "client_url": "https://game.maj-soul.com/1/",
+    "product_version": "4.0.51",
+    "bundle_hash": "3c0ce0802ed3ca8946842693db3e58f4d8945f37",
+    "issuer": "chs_t"
+  },
+  "rules": {
+    "effects": {
+      "10": {
+        "upgrade": 11,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "11": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "20": {
+        "upgrade": 21,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "21": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "30": {
+        "upgrade": 31,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "31": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "40": {
+        "upgrade": 41,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "41": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "50": {
+        "upgrade": 51,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "51": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "60": {
+        "upgrade": 61,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "61": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "70": {
+        "upgrade": 71,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "71": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "80": {
+        "upgrade": 81,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "81": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "90": {
+        "upgrade": 91,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "91": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "100": {
+        "upgrade": 101,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "101": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "110": {
+        "upgrade": 111,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "111": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "120": {
+        "upgrade": 121,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "121": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "130": {
+        "upgrade": 131,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "131": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "140": {
+        "upgrade": 141,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "141": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "150": {
+        "upgrade": 151,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "151": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "160": {
+        "upgrade": 161,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "161": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "170": {
+        "upgrade": 171,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "171": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "180": {
+        "upgrade": 181,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "181": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "190": {
+        "upgrade": 191,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "191": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "200": {
+        "upgrade": 201,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "201": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "210": {
+        "upgrade": 211,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "211": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "220": {
+        "upgrade": 221,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "221": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "230": {
+        "upgrade": 231,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "231": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "240": {
+        "upgrade": 241,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "241": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "250": {
+        "upgrade": 251,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "251": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "260": {
+        "upgrade": 261,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "261": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "270": {
+        "upgrade": 271,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "271": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "280": {
+        "upgrade": 281,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "281": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "290": {
+        "upgrade": 291,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "291": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "300": {
+        "upgrade": 301,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "301": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "310": {
+        "upgrade": 311,
+        "duplicate_enabled": null,
+        "effect_group": 1,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "311": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 1,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "320": {
+        "upgrade": 321,
+        "duplicate_enabled": null,
+        "effect_group": 1,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "321": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 1,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "330": {
+        "upgrade": 331,
+        "duplicate_enabled": null,
+        "effect_group": 1,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "331": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 1,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "340": {
+        "upgrade": 341,
+        "duplicate_enabled": null,
+        "effect_group": 1,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "341": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 1,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "350": {
+        "upgrade": 351,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "351": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "360": {
+        "upgrade": 361,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "361": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "370": {
+        "upgrade": 371,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "371": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "380": {
+        "upgrade": 381,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "381": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "390": {
+        "upgrade": 391,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "391": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "400": {
+        "upgrade": 401,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "401": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "410": {
+        "upgrade": 411,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "411": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "420": {
+        "upgrade": 421,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "421": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "430": {
+        "upgrade": 431,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "431": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "440": {
+        "upgrade": 441,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "441": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "450": {
+        "upgrade": 451,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "451": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "460": {
+        "upgrade": 461,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "461": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "470": {
+        "upgrade": 471,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "471": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "480": {
+        "upgrade": 481,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "481": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "490": {
+        "upgrade": 491,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "491": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "500": {
+        "upgrade": 501,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "501": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "510": {
+        "upgrade": 511,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "511": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "520": {
+        "upgrade": 521,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "521": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "530": {
+        "upgrade": 531,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "531": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "550": {
+        "upgrade": 551,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "551": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "560": {
+        "upgrade": 561,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "561": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "570": {
+        "upgrade": 571,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "571": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "580": {
+        "upgrade": 581,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "581": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "590": {
+        "upgrade": 591,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "591": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "600": {
+        "upgrade": 601,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "601": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "610": {
+        "upgrade": 611,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "611": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "620": {
+        "upgrade": 621,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "621": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "630": {
+        "upgrade": 631,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "631": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "640": {
+        "upgrade": 641,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "641": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "650": {
+        "upgrade": 651,
+        "duplicate_enabled": null,
+        "effect_group": 2,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "651": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 2,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "660": {
+        "upgrade": 661,
+        "duplicate_enabled": null,
+        "effect_group": 2,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "661": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 2,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "670": {
+        "upgrade": 671,
+        "duplicate_enabled": null,
+        "effect_group": 2,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "671": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 2,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "680": {
+        "upgrade": 681,
+        "duplicate_enabled": null,
+        "effect_group": 2,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "681": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 2,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "690": {
+        "upgrade": 691,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "691": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "700": {
+        "upgrade": 701,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "701": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "710": {
+        "upgrade": 711,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "711": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "720": {
+        "upgrade": 721,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "721": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "730": {
+        "upgrade": 731,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "731": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "740": {
+        "upgrade": 741,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "741": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "750": {
+        "upgrade": 751,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "751": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1010": {
+        "upgrade": 1011,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1011": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1020": {
+        "upgrade": 1021,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1021": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1030": {
+        "upgrade": 1031,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1031": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1040": {
+        "upgrade": 1041,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1041": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1050": {
+        "upgrade": 1051,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1051": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1060": {
+        "upgrade": 1061,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1061": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1070": {
+        "upgrade": 1071,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1071": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1080": {
+        "upgrade": 1081,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1081": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1090": {
+        "upgrade": 1091,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1091": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1100": {
+        "upgrade": 1101,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1101": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1110": {
+        "upgrade": 1111,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1111": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1120": {
+        "upgrade": 1121,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1121": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1130": {
+        "upgrade": 1131,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1131": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1140": {
+        "upgrade": 1141,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1141": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1150": {
+        "upgrade": 1151,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1151": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1160": {
+        "upgrade": 1161,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1161": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1170": {
+        "upgrade": 1171,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1171": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1180": {
+        "upgrade": 1181,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1181": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1190": {
+        "upgrade": 1191,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1191": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1200": {
+        "upgrade": 1201,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1201": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1210": {
+        "upgrade": 1211,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1211": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1220": {
+        "upgrade": 1221,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1221": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1230": {
+        "upgrade": 1231,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1231": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1240": {
+        "upgrade": 1241,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1241": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1250": {
+        "upgrade": 1251,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1251": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1260": {
+        "upgrade": 1261,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1261": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1270": {
+        "upgrade": 1271,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1271": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1280": {
+        "upgrade": 1281,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1281": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1290": {
+        "upgrade": 1291,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1291": {
+        "upgrade": 1291,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1300": {
+        "upgrade": 1301,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1301": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1310": {
+        "upgrade": 1311,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1311": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1320": {
+        "upgrade": 1321,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1321": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1330": {
+        "upgrade": 1331,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1331": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1340": {
+        "upgrade": 1341,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1341": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1350": {
+        "upgrade": 1351,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1351": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1360": {
+        "upgrade": 1361,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1361": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1370": {
+        "upgrade": 1371,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1371": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1380": {
+        "upgrade": 1381,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1381": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1390": {
+        "upgrade": 1391,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1391": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1400": {
+        "upgrade": 1401,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1401": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1410": {
+        "upgrade": 1411,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1411": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1420": {
+        "upgrade": 1421,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1421": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1430": {
+        "upgrade": 1431,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1431": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1440": {
+        "upgrade": 1441,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1441": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1450": {
+        "upgrade": 1451,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1451": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1460": {
+        "upgrade": 1461,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1461": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1470": {
+        "upgrade": 1471,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1471": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1480": {
+        "upgrade": 1481,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1481": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1490": {
+        "upgrade": 1491,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1491": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1500": {
+        "upgrade": 1501,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1501": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1510": {
+        "upgrade": 1511,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1511": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1520": {
+        "upgrade": 1521,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1521": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1530": {
+        "upgrade": 1531,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1531": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1540": {
+        "upgrade": 1541,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1541": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1550": {
+        "upgrade": 1551,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1551": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1560": {
+        "upgrade": 1561,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1561": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1570": {
+        "upgrade": 1571,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1571": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1580": {
+        "upgrade": 1581,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1581": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1590": {
+        "upgrade": 1591,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1591": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1600": {
+        "upgrade": 1601,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1601": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1610": {
+        "upgrade": 1611,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1611": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1620": {
+        "upgrade": 1621,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1621": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1630": {
+        "upgrade": 1631,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1631": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1640": {
+        "upgrade": 1641,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1641": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1650": {
+        "upgrade": 1651,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1651": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1660": {
+        "upgrade": 1661,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1661": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1670": {
+        "upgrade": 1671,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "1671": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "1680": {
+        "upgrade": 1681,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "1681": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "1690": {
+        "upgrade": 1691,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "1691": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "1700": {
+        "upgrade": 1701,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1701": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1710": {
+        "upgrade": 1711,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1711": {
+        "upgrade": null,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1720": {
+        "upgrade": 1721,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1721": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "1730": {
+        "upgrade": 1731,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1731": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "1740": {
+        "upgrade": 1741,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "1741": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2010": {
+        "upgrade": 2011,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "2011": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "2020": {
+        "upgrade": 2021,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "2021": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "2030": {
+        "upgrade": 2031,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "2031": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "2040": {
+        "upgrade": 2041,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2041": {
+        "upgrade": 2041,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2050": {
+        "upgrade": 2051,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2051": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2060": {
+        "upgrade": 2061,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "2061": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "2070": {
+        "upgrade": 2071,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2071": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2080": {
+        "upgrade": 2081,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2081": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2090": {
+        "upgrade": 2091,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2091": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2100": {
+        "upgrade": 2101,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2101": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2110": {
+        "upgrade": 2111,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2111": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2120": {
+        "upgrade": 2121,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2121": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2130": {
+        "upgrade": 2131,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2131": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2140": {
+        "upgrade": 2141,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2141": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2150": {
+        "upgrade": 2151,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "2151": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "2160": {
+        "upgrade": 2161,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2161": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2170": {
+        "upgrade": 2171,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2171": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2180": {
+        "upgrade": 2181,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2181": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2190": {
+        "upgrade": 2191,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2191": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2200": {
+        "upgrade": 2201,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2201": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2210": {
+        "upgrade": 2211,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2211": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2220": {
+        "upgrade": 2221,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2221": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2230": {
+        "upgrade": 2231,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2231": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2240": {
+        "upgrade": 2241,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2241": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2250": {
+        "upgrade": 2251,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2251": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "2260": {
+        "upgrade": 2261,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2261": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2270": {
+        "upgrade": 2271,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2271": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2280": {
+        "upgrade": 2281,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2281": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2290": {
+        "upgrade": 2291,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2291": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2300": {
+        "upgrade": 2301,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "2301": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "2310": {
+        "upgrade": 2311,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "2311": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "2320": {
+        "upgrade": 2321,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "2321": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "2330": {
+        "upgrade": 2331,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "2331": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3010": {
+        "upgrade": 3011,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3011": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3020": {
+        "upgrade": 3021,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3021": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3030": {
+        "upgrade": 3031,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3031": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3040": {
+        "upgrade": 3041,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3041": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3050": {
+        "upgrade": 3051,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3051": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3060": {
+        "upgrade": 3061,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3061": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3070": {
+        "upgrade": 3071,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3071": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3080": {
+        "upgrade": 3081,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3081": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3090": {
+        "upgrade": 3091,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3091": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3100": {
+        "upgrade": 3101,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3101": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3110": {
+        "upgrade": 3111,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3111": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3120": {
+        "upgrade": 3121,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3121": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3130": {
+        "upgrade": 3131,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3131": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3140": {
+        "upgrade": 3141,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3141": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3150": {
+        "upgrade": 3151,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3151": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3160": {
+        "upgrade": 3161,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3161": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3170": {
+        "upgrade": 3171,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3171": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3180": {
+        "upgrade": 3181,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3181": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3190": {
+        "upgrade": 3191,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3191": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3200": {
+        "upgrade": 3201,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3201": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3210": {
+        "upgrade": 3211,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3211": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3220": {
+        "upgrade": 3221,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3221": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3230": {
+        "upgrade": 3231,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3231": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3240": {
+        "upgrade": 3241,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3241": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3250": {
+        "upgrade": 3251,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3251": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3260": {
+        "upgrade": 3261,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3261": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3270": {
+        "upgrade": 3271,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3271": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3280": {
+        "upgrade": 3281,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3281": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3290": {
+        "upgrade": 3291,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3291": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3300": {
+        "upgrade": 3301,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3301": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3310": {
+        "upgrade": 3311,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3311": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3320": {
+        "upgrade": 3321,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3321": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3330": {
+        "upgrade": 3331,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3331": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3340": {
+        "upgrade": 3341,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3341": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3350": {
+        "upgrade": 3351,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3351": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3360": {
+        "upgrade": 3361,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3361": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3370": {
+        "upgrade": 3371,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3371": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3380": {
+        "upgrade": 3381,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3381": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3390": {
+        "upgrade": 3391,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3391": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3400": {
+        "upgrade": 3401,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3401": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "3410": {
+        "upgrade": 3411,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3411": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3420": {
+        "upgrade": 3421,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3421": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3430": {
+        "upgrade": 3431,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3431": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3440": {
+        "upgrade": 3441,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3441": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3450": {
+        "upgrade": 3451,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3451": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3460": {
+        "upgrade": 3461,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3461": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3470": {
+        "upgrade": 3471,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3471": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3480": {
+        "upgrade": 3481,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3481": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3490": {
+        "upgrade": 3491,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3491": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3500": {
+        "upgrade": 3501,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3501": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3510": {
+        "upgrade": 3511,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3511": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3520": {
+        "upgrade": 3521,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3521": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3530": {
+        "upgrade": 3531,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3531": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3540": {
+        "upgrade": 3541,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3541": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3550": {
+        "upgrade": 3551,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3551": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3560": {
+        "upgrade": 3561,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3561": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3570": {
+        "upgrade": 3571,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3571": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3580": {
+        "upgrade": 3581,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3581": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3590": {
+        "upgrade": 3591,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3591": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3600": {
+        "upgrade": 3601,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3601": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3610": {
+        "upgrade": 3611,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3611": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3620": {
+        "upgrade": 3621,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3621": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3630": {
+        "upgrade": 3631,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3631": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3640": {
+        "upgrade": 3641,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3641": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3650": {
+        "upgrade": 3651,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3651": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3660": {
+        "upgrade": 3661,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3661": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3670": {
+        "upgrade": 3671,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3671": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3680": {
+        "upgrade": 3681,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3681": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3690": {
+        "upgrade": 3691,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3691": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3700": {
+        "upgrade": 3701,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3701": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3710": {
+        "upgrade": 3711,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3711": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3720": {
+        "upgrade": 3721,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3721": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3730": {
+        "upgrade": 3731,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3731": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3740": {
+        "upgrade": 3741,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3741": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3750": {
+        "upgrade": 3751,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3751": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3760": {
+        "upgrade": 3761,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3761": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3770": {
+        "upgrade": 3771,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3771": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3780": {
+        "upgrade": 3781,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3781": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3790": {
+        "upgrade": 3791,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3791": {
+        "upgrade": null,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3800": {
+        "upgrade": 3801,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3801": {
+        "upgrade": null,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3810": {
+        "upgrade": 3811,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3811": {
+        "upgrade": null,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3820": {
+        "upgrade": 3821,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3821": {
+        "upgrade": null,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3830": {
+        "upgrade": 3831,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3831": {
+        "upgrade": null,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3840": {
+        "upgrade": 3841,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3841": {
+        "upgrade": null,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3850": {
+        "upgrade": 3851,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3851": {
+        "upgrade": null,
+        "duplicate_enabled": 1,
+        "effect_group": 4,
+        "can_sell": 0,
+        "rarity": 5
+      },
+      "3860": {
+        "upgrade": 3861,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3861": {
+        "upgrade": null,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "3870": {
+        "upgrade": 3871,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3871": {
+        "upgrade": null,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "3880": {
+        "upgrade": 3881,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "3881": {
+        "upgrade": null,
+        "duplicate_enabled": 1,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "4010": {
+        "upgrade": 4011,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "4011": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 4
+      },
+      "4020": {
+        "upgrade": 4021,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "4021": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "4030": {
+        "upgrade": 4031,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "4031": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "4040": {
+        "upgrade": 4041,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "4041": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "4050": {
+        "upgrade": 4051,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "4051": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": 3,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "4060": {
+        "upgrade": 4061,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "4061": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 3
+      },
+      "4070": {
+        "upgrade": 4071,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "4071": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 2
+      },
+      "4080": {
+        "upgrade": 4081,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      },
+      "4081": {
+        "upgrade": null,
+        "duplicate_enabled": null,
+        "effect_group": null,
+        "can_sell": 1,
+        "rarity": 1
+      }
+    },
+    "shop_hp_rates": {
+      "3630": 200,
+      "3631": 100
+    },
+    "acquire_damage": {
+      "3550": 6,
+      "3551": 12
+    },
+    "badges": {
+      "600010": {
+        "volume": null,
+        "rarity": 1
+      },
+      "600020": {
+        "volume": null,
+        "rarity": 1
+      },
+      "600030": {
+        "volume": null,
+        "rarity": 1
+      },
+      "600040": {
+        "volume": null,
+        "rarity": 1
+      },
+      "600050": {
+        "volume": null,
+        "rarity": 1
+      },
+      "600060": {
+        "volume": null,
+        "rarity": 1
+      },
+      "600070": {
+        "volume": null,
+        "rarity": 1
+      },
+      "600080": {
+        "volume": null,
+        "rarity": 2
+      },
+      "600090": {
+        "volume": null,
+        "rarity": 2
+      },
+      "600100": {
+        "volume": null,
+        "rarity": 2
+      },
+      "600110": {
+        "volume": null,
+        "rarity": 2
+      },
+      "600120": {
+        "volume": null,
+        "rarity": 2
+      },
+      "600130": {
+        "volume": null,
+        "rarity": 2
+      },
+      "600140": {
+        "volume": null,
+        "rarity": 2
+      },
+      "600150": {
+        "volume": null,
+        "rarity": 2
+      },
+      "600160": {
+        "volume": 1,
+        "rarity": 3
+      },
+      "600170": {
+        "volume": null,
+        "rarity": 3
+      },
+      "600180": {
+        "volume": null,
+        "rarity": 3
+      },
+      "600190": {
+        "volume": null,
+        "rarity": 3
+      },
+      "600200": {
+        "volume": null,
+        "rarity": 3
+      },
+      "600210": {
+        "volume": null,
+        "rarity": 3
+      },
+      "600220": {
+        "volume": null,
+        "rarity": 1
+      },
+      "600230": {
+        "volume": null,
+        "rarity": 1
+      },
+      "600240": {
+        "volume": null,
+        "rarity": 1
+      },
+      "600250": {
+        "volume": null,
+        "rarity": 2
+      },
+      "600260": {
+        "volume": null,
+        "rarity": 2
+      },
+      "600270": {
+        "volume": null,
+        "rarity": 2
+      },
+      "600280": {
+        "volume": null,
+        "rarity": 2
+      },
+      "600290": {
+        "volume": null,
+        "rarity": 3
+      },
+      "600300": {
+        "volume": null,
+        "rarity": 3
+      },
+      "600310": {
+        "volume": null,
+        "rarity": 3
+      }
+    },
+    "shop_upgrades": [
+      {
+        "id": 8001,
+        "level": 1,
+        "price": 5,
+        "add_value": 1
+      },
+      {
+        "id": 8001,
+        "level": 2,
+        "price": 10,
+        "add_value": 2
+      },
+      {
+        "id": 8001,
+        "level": 3,
+        "price": 15,
+        "add_value": 3
+      },
+      {
+        "id": 8001,
+        "level": 4,
+        "price": 20,
+        "add_value": 4
+      },
+      {
+        "id": 8001,
+        "level": 5,
+        "price": 50,
+        "add_value": 5
+      },
+      {
+        "id": 8001,
+        "level": 6,
+        "price": 100,
+        "add_value": 6
+      },
+      {
+        "id": 8001,
+        "level": 7,
+        "price": 150,
+        "add_value": 7
+      },
+      {
+        "id": 8001,
+        "level": 8,
+        "price": 200,
+        "add_value": 8
+      },
+      {
+        "id": 8002,
+        "level": 1,
+        "price": 5,
+        "add_value": 1
+      },
+      {
+        "id": 8002,
+        "level": 2,
+        "price": 10,
+        "add_value": 2
+      },
+      {
+        "id": 8002,
+        "level": 3,
+        "price": 15,
+        "add_value": 3
+      },
+      {
+        "id": 8002,
+        "level": 4,
+        "price": 20,
+        "add_value": 4
+      },
+      {
+        "id": 8002,
+        "level": 5,
+        "price": 30,
+        "add_value": 5
+      },
+      {
+        "id": 8002,
+        "level": 6,
+        "price": 50,
+        "add_value": 6
+      },
+      {
+        "id": 8002,
+        "level": 7,
+        "price": 80,
+        "add_value": 7
+      },
+      {
+        "id": 8002,
+        "level": 8,
+        "price": 120,
+        "add_value": 8
+      },
+      {
+        "id": 8002,
+        "level": 9,
+        "price": 160,
+        "add_value": 9
+      },
+      {
+        "id": 8003,
+        "level": 1,
+        "price": 2,
+        "add_value": 1
+      },
+      {
+        "id": 8003,
+        "level": 2,
+        "price": 4,
+        "add_value": 2
+      },
+      {
+        "id": 8003,
+        "level": 3,
+        "price": 6,
+        "add_value": 3
+      },
+      {
+        "id": 8003,
+        "level": 4,
+        "price": 8,
+        "add_value": 4
+      },
+      {
+        "id": 8003,
+        "level": 5,
+        "price": 10,
+        "add_value": 5
+      },
+      {
+        "id": 8003,
+        "level": 6,
+        "price": 20,
+        "add_value": 6
+      },
+      {
+        "id": 8003,
+        "level": 7,
+        "price": 30,
+        "add_value": 7
+      },
+      {
+        "id": 8003,
+        "level": 8,
+        "price": 40,
+        "add_value": 8
+      },
+      {
+        "id": 8003,
+        "level": 9,
+        "price": 50,
+        "add_value": 9
+      },
+      {
+        "id": 8003,
+        "level": 10,
+        "price": 80,
+        "add_value": 10
+      },
+      {
+        "id": 8003,
+        "level": 11,
+        "price": 120,
+        "add_value": 11
+      },
+      {
+        "id": 8003,
+        "level": 12,
+        "price": 160,
+        "add_value": 12
+      },
+      {
+        "id": 8004,
+        "level": 1,
+        "price": 10,
+        "add_value": 1
+      },
+      {
+        "id": 8004,
+        "level": 2,
+        "price": 20,
+        "add_value": 2
+      },
+      {
+        "id": 8004,
+        "level": 3,
+        "price": 30,
+        "add_value": 3
+      },
+      {
+        "id": 8004,
+        "level": 4,
+        "price": 40,
+        "add_value": 4
+      },
+      {
+        "id": 8004,
+        "level": 5,
+        "price": 50,
+        "add_value": 5
+      },
+      {
+        "id": 8004,
+        "level": 6,
+        "price": 80,
+        "add_value": 6
+      },
+      {
+        "id": 8004,
+        "level": 7,
+        "price": 100,
+        "add_value": 7
+      },
+      {
+        "id": 8004,
+        "level": 8,
+        "price": 150,
+        "add_value": 8
+      },
+      {
+        "id": 8004,
+        "level": 9,
+        "price": 200,
+        "add_value": 9
+      }
+    ],
+    "characters": [
+      {
+        "activity_id": 260511,
+        "character_id": 201,
+        "init_desktop_count": 36,
+        "init_open_desktop_count": 6,
+        "init_tian_count": null
+      },
+      {
+        "activity_id": 260511,
+        "character_id": 202,
+        "init_desktop_count": 36,
+        "init_open_desktop_count": 6,
+        "init_tian_count": 3
+      },
+      {
+        "activity_id": 260511,
+        "character_id": 203,
+        "init_desktop_count": 36,
+        "init_open_desktop_count": 9,
+        "init_tian_count": null
+      },
+      {
+        "activity_id": 260511,
+        "character_id": 204,
+        "init_desktop_count": 36,
+        "init_open_desktop_count": 6,
+        "init_tian_count": null
+      },
+      {
+        "activity_id": 261081,
+        "character_id": 201,
+        "init_desktop_count": 36,
+        "init_open_desktop_count": 6,
+        "init_tian_count": null
+      },
+      {
+        "activity_id": 261081,
+        "character_id": 202,
+        "init_desktop_count": 36,
+        "init_open_desktop_count": 6,
+        "init_tian_count": 3
+      },
+      {
+        "activity_id": 261081,
+        "character_id": 203,
+        "init_desktop_count": 36,
+        "init_open_desktop_count": 9,
+        "init_tian_count": null
+      },
+      {
+        "activity_id": 261081,
+        "character_id": 204,
+        "init_desktop_count": 36,
+        "init_open_desktop_count": 6,
+        "init_tian_count": null
+      }
+    ],
+    "forge": [
+      {
+        "activity_id": 260511,
+        "type": 1,
+        "rarity": 1,
+        "price": 35
+      },
+      {
+        "activity_id": 260511,
+        "type": 1,
+        "rarity": 2,
+        "price": 25
+      },
+      {
+        "activity_id": 260511,
+        "type": 1,
+        "rarity": 3,
+        "price": 15
+      },
+      {
+        "activity_id": 260511,
+        "type": 1,
+        "rarity": 4,
+        "price": 5
+      },
+      {
+        "activity_id": 260511,
+        "type": 1,
+        "rarity": 5,
+        "price": 0
+      },
+      {
+        "activity_id": 260511,
+        "type": 2,
+        "rarity": 0,
+        "price": 1
+      },
+      {
+        "activity_id": 260511,
+        "type": 2,
+        "rarity": 1,
+        "price": 6
+      },
+      {
+        "activity_id": 260511,
+        "type": 2,
+        "rarity": 2,
+        "price": 12
+      },
+      {
+        "activity_id": 260511,
+        "type": 2,
+        "rarity": 3,
+        "price": 12
+      },
+      {
+        "activity_id": 261081,
+        "type": 1,
+        "rarity": 1,
+        "price": 35
+      },
+      {
+        "activity_id": 261081,
+        "type": 1,
+        "rarity": 2,
+        "price": 25
+      },
+      {
+        "activity_id": 261081,
+        "type": 1,
+        "rarity": 3,
+        "price": 15
+      },
+      {
+        "activity_id": 261081,
+        "type": 1,
+        "rarity": 4,
+        "price": 5
+      },
+      {
+        "activity_id": 261081,
+        "type": 1,
+        "rarity": 5,
+        "price": 0
+      },
+      {
+        "activity_id": 261081,
+        "type": 2,
+        "rarity": 0,
+        "price": 1
+      },
+      {
+        "activity_id": 261081,
+        "type": 2,
+        "rarity": 1,
+        "price": 6
+      },
+      {
+        "activity_id": 261081,
+        "type": 2,
+        "rarity": 2,
+        "price": 12
+      },
+      {
+        "activity_id": 261081,
+        "type": 2,
+        "rarity": 3,
+        "price": 12
+      }
+    ],
+    "transport": [
+      {
+        "activity_id": 260511,
+        "price": 30
+      },
+      {
+        "activity_id": 261081,
+        "price": 30
+      }
+    ],
+    "trade_types": {
+      "1": 1,
+      "2": 1,
+      "3": 2,
+      "4": 3,
+      "5": 3,
+      "6": 4,
+      "7": 5,
+      "8": 5,
+      "9": 2
+    },
+    "gamble_selections": {
+      "1": {
+        "type": 1,
+        "args": [
+          974
+        ]
+      },
+      "2": {
+        "type": 1,
+        "args": [
+          975
+        ]
+      },
+      "3": {
+        "type": 1,
+        "args": [
+          976
+        ]
+      },
+      "4": {
+        "type": 1,
+        "args": [
+          977
+        ]
+      },
+      "5": {
+        "type": 2,
+        "args": [
+          5
+        ]
+      },
+      "6": {
+        "type": 2,
+        "args": [
+          10
+        ]
+      },
+      "7": {
+        "type": 2,
+        "args": [
+          15
+        ]
+      },
+      "8": {
+        "type": 2,
+        "args": [
+          20
+        ]
+      },
+      "9": {
+        "type": 3,
+        "args": [
+          25
+        ]
+      },
+      "10": {
+        "type": 3,
+        "args": [
+          50
+        ]
+      },
+      "11": {
+        "type": 3,
+        "args": [
+          75
+        ]
+      },
+      "12": {
+        "type": 3,
+        "args": [
+          100
+        ]
+      },
+      "13": {
+        "type": 4,
+        "args": [
+          927
+        ]
+      },
+      "14": {
+        "type": 5,
+        "args": [
+          973
+        ]
+      },
+      "15": {
+        "type": 6,
+        "args": []
+      },
+      "16": {
+        "type": 7,
+        "args": [
+          1
+        ]
+      },
+      "17": {
+        "type": 7,
+        "args": [
+          2
+        ]
+      },
+      "18": {
+        "type": 7,
+        "args": [
+          3
+        ]
+      },
+      "19": {
+        "type": 8,
+        "args": [
+          1
+        ]
+      },
+      "20": {
+        "type": 8,
+        "args": [
+          2
+        ]
+      },
+      "21": {
+        "type": 8,
+        "args": [
+          3
+        ]
+      },
+      "22": {
+        "type": 9,
+        "args": [
+          6
+        ]
+      },
+      "23": {
+        "type": 9,
+        "args": [
+          9
+        ]
+      },
+      "24": {
+        "type": 9,
+        "args": [
+          12
+        ]
+      },
+      "25": {
+        "type": 9,
+        "args": [
+          15
+        ]
+      },
+      "26": {
+        "type": 10,
+        "args": [
+          10,
+          3
+        ]
+      },
+      "27": {
+        "type": 10,
+        "args": [
+          20,
+          3
+        ]
+      },
+      "28": {
+        "type": 10,
+        "args": [
+          30,
+          3
+        ]
+      },
+      "29": {
+        "type": 10,
+        "args": [
+          40,
+          3
+        ]
+      },
+      "30": {
+        "type": 10,
+        "args": [
+          50,
+          3
+        ]
+      },
+      "31": {
+        "type": 11,
+        "args": [
+          1,
+          200
+        ]
+      },
+      "32": {
+        "type": 11,
+        "args": [
+          2,
+          200
+        ]
+      },
+      "33": {
+        "type": 11,
+        "args": [
+          3,
+          200
+        ]
+      },
+      "34": {
+        "type": 2,
+        "args": [
+          100
+        ]
+      },
+      "35": {
+        "type": 13,
+        "args": [
+          19
+        ]
+      },
+      "36": {
+        "type": 14,
+        "args": [
+          973
+        ]
+      },
+      "37": {
+        "type": 15,
+        "args": []
+      },
+      "38": {
+        "type": 16,
+        "args": [
+          5
+        ]
+      },
+      "39": {
+        "type": 16,
+        "args": [
+          10
+        ]
+      },
+      "40": {
+        "type": 16,
+        "args": [
+          15
+        ]
+      },
+      "41": {
+        "type": 16,
+        "args": [
+          20
+        ]
+      },
+      "42": {
+        "type": 17,
+        "args": [
+          25
+        ]
+      },
+      "43": {
+        "type": 17,
+        "args": [
+          33
+        ]
+      },
+      "44": {
+        "type": 17,
+        "args": [
+          50
+        ]
+      },
+      "45": {
+        "type": 17,
+        "args": [
+          60
+        ]
+      },
+      "46": {
+        "type": 18,
+        "args": []
+      },
+      "47": {
+        "type": 19,
+        "args": [
+          3
+        ]
+      },
+      "48": {
+        "type": 19,
+        "args": [
+          6
+        ]
+      },
+      "49": {
+        "type": 19,
+        "args": [
+          9
+        ]
+      },
+      "50": {
+        "type": 20,
+        "args": [
+          1
+        ]
+      },
+      "51": {
+        "type": 20,
+        "args": [
+          2
+        ]
+      },
+      "52": {
+        "type": 20,
+        "args": [
+          3
+        ]
+      },
+      "53": {
+        "type": 21,
+        "args": [
+          928
+        ]
+      },
+      "54": {
+        "type": 22,
+        "args": [
+          978
+        ]
+      },
+      "55": {
+        "type": 23,
+        "args": []
+      },
+      "56": {
+        "type": 24,
+        "args": []
+      },
+      "57": {
+        "type": 25,
+        "args": []
+      },
+      "58": {
+        "type": 26,
+        "args": [
+          1
+        ]
+      },
+      "59": {
+        "type": 27,
+        "args": []
+      },
+      "60": {
+        "type": 1,
+        "args": [
+          974
+        ]
+      },
+      "61": {
+        "type": 1,
+        "args": [
+          975
+        ]
+      },
+      "62": {
+        "type": 1,
+        "args": [
+          976
+        ]
+      },
+      "63": {
+        "type": 1,
+        "args": [
+          977
+        ]
+      },
+      "64": {
+        "type": 2,
+        "args": [
+          5
+        ]
+      },
+      "65": {
+        "type": 2,
+        "args": [
+          10
+        ]
+      },
+      "66": {
+        "type": 2,
+        "args": [
+          15
+        ]
+      },
+      "67": {
+        "type": 2,
+        "args": [
+          20
+        ]
+      },
+      "68": {
+        "type": 3,
+        "args": [
+          25
+        ]
+      },
+      "69": {
+        "type": 3,
+        "args": [
+          50
+        ]
+      },
+      "70": {
+        "type": 3,
+        "args": [
+          75
+        ]
+      },
+      "71": {
+        "type": 3,
+        "args": [
+          100
+        ]
+      },
+      "72": {
+        "type": 4,
+        "args": [
+          927
+        ]
+      },
+      "73": {
+        "type": 5,
+        "args": [
+          973
+        ]
+      },
+      "74": {
+        "type": 6,
+        "args": []
+      },
+      "75": {
+        "type": 7,
+        "args": [
+          1
+        ]
+      },
+      "76": {
+        "type": 7,
+        "args": [
+          2
+        ]
+      },
+      "77": {
+        "type": 7,
+        "args": [
+          3
+        ]
+      },
+      "78": {
+        "type": 8,
+        "args": [
+          1
+        ]
+      },
+      "79": {
+        "type": 8,
+        "args": [
+          2
+        ]
+      },
+      "80": {
+        "type": 8,
+        "args": [
+          3
+        ]
+      },
+      "81": {
+        "type": 9,
+        "args": [
+          6
+        ]
+      },
+      "82": {
+        "type": 9,
+        "args": [
+          9
+        ]
+      },
+      "83": {
+        "type": 9,
+        "args": [
+          12
+        ]
+      },
+      "84": {
+        "type": 9,
+        "args": [
+          15
+        ]
+      },
+      "85": {
+        "type": 10,
+        "args": [
+          10,
+          3
+        ]
+      },
+      "86": {
+        "type": 10,
+        "args": [
+          20,
+          3
+        ]
+      },
+      "87": {
+        "type": 10,
+        "args": [
+          30,
+          3
+        ]
+      },
+      "88": {
+        "type": 10,
+        "args": [
+          40,
+          3
+        ]
+      },
+      "89": {
+        "type": 10,
+        "args": [
+          50,
+          3
+        ]
+      },
+      "90": {
+        "type": 11,
+        "args": [
+          1,
+          200
+        ]
+      },
+      "91": {
+        "type": 11,
+        "args": [
+          2,
+          200
+        ]
+      },
+      "92": {
+        "type": 11,
+        "args": [
+          3,
+          200
+        ]
+      },
+      "93": {
+        "type": 2,
+        "args": [
+          100
+        ]
+      },
+      "94": {
+        "type": 13,
+        "args": [
+          19
+        ]
+      },
+      "95": {
+        "type": 14,
+        "args": [
+          973
+        ]
+      },
+      "96": {
+        "type": 15,
+        "args": []
+      },
+      "97": {
+        "type": 16,
+        "args": [
+          5
+        ]
+      },
+      "98": {
+        "type": 16,
+        "args": [
+          10
+        ]
+      },
+      "99": {
+        "type": 16,
+        "args": [
+          15
+        ]
+      },
+      "100": {
+        "type": 16,
+        "args": [
+          20
+        ]
+      },
+      "101": {
+        "type": 17,
+        "args": [
+          25
+        ]
+      },
+      "102": {
+        "type": 17,
+        "args": [
+          33
+        ]
+      },
+      "103": {
+        "type": 17,
+        "args": [
+          50
+        ]
+      },
+      "104": {
+        "type": 17,
+        "args": [
+          60
+        ]
+      },
+      "105": {
+        "type": 18,
+        "args": []
+      },
+      "106": {
+        "type": 19,
+        "args": [
+          3
+        ]
+      },
+      "107": {
+        "type": 19,
+        "args": [
+          6
+        ]
+      },
+      "108": {
+        "type": 19,
+        "args": [
+          9
+        ]
+      },
+      "109": {
+        "type": 20,
+        "args": [
+          1
+        ]
+      },
+      "110": {
+        "type": 20,
+        "args": [
+          2
+        ]
+      },
+      "111": {
+        "type": 20,
+        "args": [
+          3
+        ]
+      },
+      "112": {
+        "type": 21,
+        "args": [
+          928
+        ]
+      },
+      "113": {
+        "type": 22,
+        "args": [
+          978
+        ]
+      },
+      "114": {
+        "type": 23,
+        "args": []
+      },
+      "115": {
+        "type": 24,
+        "args": []
+      },
+      "116": {
+        "type": 25,
+        "args": []
+      },
+      "117": {
+        "type": 26,
+        "args": [
+          1
+        ]
+      },
+      "118": {
+        "type": 27,
+        "args": []
+      },
+      "119": {
+        "type": 1,
+        "args": [
+          974
+        ]
+      },
+      "120": {
+        "type": 1,
+        "args": [
+          975
+        ]
+      },
+      "121": {
+        "type": 1,
+        "args": [
+          976
+        ]
+      },
+      "122": {
+        "type": 1,
+        "args": [
+          977
+        ]
+      },
+      "123": {
+        "type": 2,
+        "args": [
+          5
+        ]
+      },
+      "124": {
+        "type": 2,
+        "args": [
+          10
+        ]
+      },
+      "125": {
+        "type": 2,
+        "args": [
+          15
+        ]
+      },
+      "126": {
+        "type": 2,
+        "args": [
+          20
+        ]
+      },
+      "127": {
+        "type": 3,
+        "args": [
+          25
+        ]
+      },
+      "128": {
+        "type": 3,
+        "args": [
+          50
+        ]
+      },
+      "129": {
+        "type": 3,
+        "args": [
+          75
+        ]
+      },
+      "130": {
+        "type": 3,
+        "args": [
+          100
+        ]
+      },
+      "131": {
+        "type": 4,
+        "args": [
+          927
+        ]
+      },
+      "132": {
+        "type": 5,
+        "args": [
+          973
+        ]
+      },
+      "133": {
+        "type": 6,
+        "args": []
+      },
+      "134": {
+        "type": 7,
+        "args": [
+          1
+        ]
+      },
+      "135": {
+        "type": 7,
+        "args": [
+          2
+        ]
+      },
+      "136": {
+        "type": 7,
+        "args": [
+          3
+        ]
+      },
+      "137": {
+        "type": 8,
+        "args": [
+          1
+        ]
+      },
+      "138": {
+        "type": 8,
+        "args": [
+          2
+        ]
+      },
+      "139": {
+        "type": 8,
+        "args": [
+          3
+        ]
+      },
+      "140": {
+        "type": 9,
+        "args": [
+          6
+        ]
+      },
+      "141": {
+        "type": 9,
+        "args": [
+          9
+        ]
+      },
+      "142": {
+        "type": 9,
+        "args": [
+          12
+        ]
+      },
+      "143": {
+        "type": 9,
+        "args": [
+          15
+        ]
+      },
+      "144": {
+        "type": 10,
+        "args": [
+          10,
+          3
+        ]
+      },
+      "145": {
+        "type": 10,
+        "args": [
+          20,
+          3
+        ]
+      },
+      "146": {
+        "type": 10,
+        "args": [
+          30,
+          3
+        ]
+      },
+      "147": {
+        "type": 10,
+        "args": [
+          40,
+          3
+        ]
+      },
+      "148": {
+        "type": 10,
+        "args": [
+          50,
+          3
+        ]
+      },
+      "149": {
+        "type": 11,
+        "args": [
+          1,
+          200
+        ]
+      },
+      "150": {
+        "type": 11,
+        "args": [
+          2,
+          200
+        ]
+      },
+      "151": {
+        "type": 11,
+        "args": [
+          3,
+          200
+        ]
+      },
+      "152": {
+        "type": 2,
+        "args": [
+          100
+        ]
+      },
+      "153": {
+        "type": 13,
+        "args": [
+          19
+        ]
+      },
+      "154": {
+        "type": 14,
+        "args": [
+          973
+        ]
+      },
+      "155": {
+        "type": 15,
+        "args": []
+      },
+      "156": {
+        "type": 16,
+        "args": [
+          5
+        ]
+      },
+      "157": {
+        "type": 16,
+        "args": [
+          10
+        ]
+      },
+      "158": {
+        "type": 16,
+        "args": [
+          15
+        ]
+      },
+      "159": {
+        "type": 16,
+        "args": [
+          20
+        ]
+      },
+      "160": {
+        "type": 17,
+        "args": [
+          25
+        ]
+      },
+      "161": {
+        "type": 17,
+        "args": [
+          33
+        ]
+      },
+      "162": {
+        "type": 17,
+        "args": [
+          50
+        ]
+      },
+      "163": {
+        "type": 17,
+        "args": [
+          60
+        ]
+      },
+      "164": {
+        "type": 18,
+        "args": []
+      },
+      "165": {
+        "type": 19,
+        "args": [
+          3
+        ]
+      },
+      "166": {
+        "type": 19,
+        "args": [
+          6
+        ]
+      },
+      "167": {
+        "type": 19,
+        "args": [
+          9
+        ]
+      },
+      "168": {
+        "type": 20,
+        "args": [
+          1
+        ]
+      },
+      "169": {
+        "type": 20,
+        "args": [
+          2
+        ]
+      },
+      "170": {
+        "type": 20,
+        "args": [
+          3
+        ]
+      },
+      "171": {
+        "type": 21,
+        "args": [
+          928
+        ]
+      },
+      "172": {
+        "type": 22,
+        "args": [
+          978
+        ]
+      },
+      "173": {
+        "type": 23,
+        "args": []
+      },
+      "174": {
+        "type": 24,
+        "args": []
+      },
+      "175": {
+        "type": 25,
+        "args": []
+      },
+      "176": {
+        "type": 26,
+        "args": [
+          1
+        ]
+      },
+      "177": {
+        "type": 27,
+        "args": []
+      }
+    }
+  }
+}

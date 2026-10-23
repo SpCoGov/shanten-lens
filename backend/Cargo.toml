@@ -19,9 +19,12 @@ http-body-util = "0.1"
 tower-service = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-reqwest = { version = "0.13", features = ["blocking", "json"] }
+reqwest = { version = "0.13", features = ["blocking", "json", "query"] }
 semver = "1"
 sha2 = "0.10"
+hmac = "0.12"
+md-5 = "0.10"
+lz4_flex = { version = "0.11", default-features = false, features = ["std", "safe-decode"] }
 zip = { version = "4", default-features = false, features = ["deflate"] }
 
 [build-dependencies]

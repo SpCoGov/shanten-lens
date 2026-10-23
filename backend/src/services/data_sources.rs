@@ -4,6 +4,8 @@ use serde_json::{json, Value};
 
 #[derive(Default)]
 pub(super) struct DataSources {
+    pub direct_flow: Option<u64>,
+    pub transport_revision: u64,
     pub packet: Option<Value>,
     pub qyzz: Option<Value>,
     pub choice: Option<DataSource>,
@@ -11,6 +13,54 @@ pub(super) struct DataSources {
 }
 
 impl Services {
+    pub(super) fn refresh_decisions(&self) {
+        let mut sources = self.data_sources.lock().unwrap();
+        let active = sources.status.active;
+        self.publish_selected_source(&mut sources, active);
+    }
+
+    pub(crate) fn send_current_action(
+        &self, request: &crate::action_executor::ActionExecutionRequest, flow_id: u64,
+        send: impl FnOnce() -> Result<(), String>,
+    ) -> Result<(), String> {
+        let current = self.game_state.lock().unwrap();
+        crate::action_executor::candidate(&current, request)?;
+        if current["flow_id"].as_u64() != Some(flow_id) { return Err("stale".into()); }
+        send()
+    }
+
+    pub(crate) fn direct_flow_id(&self) -> Option<u64> {
+        self.data_sources.lock().unwrap().direct_flow
+    }
+
+    pub(crate) fn packet_transport(&self) -> (Option<u64>, u64) {
+        let sources = self.data_sources.lock().unwrap();
+        (sources.direct_flow, sources.transport_revision)
+    }
+
+    pub(crate) fn send_on_packet_transport(
+        &self, expected: (Option<u64>, u64), maintenance: bool,
+        send: impl FnOnce() -> Result<(), String>,
+    ) -> Result<(), String> {
+        let sources = self.data_sources.lock().unwrap();
+        if expected != (sources.direct_flow, sources.transport_revision) {
+            return Err("data-source-changed".into());
+        }
+        if !maintenance && (sources.status.pending || sources.status.active == Some(DataSource::Qyzz)) {
+            return Err("data-source-not-selected".into());
+        }
+        // Queueing and transport selection must be atomic across runtime workers.
+        send()
+    }
+
+    pub(crate) fn select_packet_transport(&self, direct_flow: Option<u64>) {
+        let mut sources = self.data_sources.lock().unwrap();
+        sources.direct_flow = direct_flow;
+        sources.transport_revision += 1;
+        sources.packet = None;
+        self.publish_selected_source(&mut sources, None);
+    }
+
     pub fn data_source_status(&self) -> DataSourceStatus {
         self.data_sources.lock().unwrap().status.clone()
     }
@@ -84,6 +134,11 @@ impl Services {
                 || current["qyzz_deal_id"] != next["qyzz_deal_id"];
             next["session_id"] = json!(current["session_id"].as_u64().unwrap_or(0) + u64::from(new_session));
             next["revision"] = json!(current["revision"].as_u64().unwrap_or(0) + 1);
+            let actions = crate::action_provider::evaluate(&next);
+            next["decision_report"] = json!(crate::decision::evaluate(&next, &actions,
+                &self.registry_for_source(active), &self.table("autorun")["playbook"]));
+            next["action_report"] = json!(actions);
+            next.as_object_mut().unwrap().remove("provider_state");
             *current = next.clone();
             drop(current);
             let _ = self.events.send(event("update_gamestate", next.clone()));

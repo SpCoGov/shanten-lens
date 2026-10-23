@@ -41,6 +41,8 @@ pub struct InjectedFrame {
 
 pub struct FlowProcessor {
     pub(crate) flow_id: u64,
+    pub(crate) capture_region: Option<String>,
+    pub(crate) direct: bool,
     codec: LiqiCodec,
     pipeline: Pipeline,
     services: Option<Arc<Services>>,
@@ -81,6 +83,8 @@ impl FlowProcessor {
         let modules = builtin_modules(services.clone(), flow_id);
         Self {
             flow_id,
+            capture_region: None,
+            direct: false,
             codec: LiqiCodec::new(),
             pipeline: Pipeline::with_registry(config, modules, registry),
             services,
@@ -191,6 +195,9 @@ impl FlowProcessor {
     ) -> anyhow::Result<FrameOutcome> {
         self.last_business_signal = false;
         let mut parsed = self.codec.parse(bytes)?;
+        if self.direct && matches!(parsed.method.as_ref(), ".lq.NotifyAnotherLogin" | ".lq.NotifyAccountLogout" | ".lq.NotifyConnectionShutdown") {
+            anyhow::bail!("direct-session-ended");
+        }
         if direction == Direction::Inbound {
             if let Some(id) = parsed.id {
                 self.latest_inbound_id = Some(id);
@@ -214,6 +221,13 @@ impl FlowProcessor {
             data: parsed.data.clone(),
         };
         if let Some(services) = &self.services {
+            if !self.direct {
+                if services.capture_oauth_packet(&packet, self.capture_region.as_deref()).is_err() {
+                    let _ = services.events.send(crate::services::event("ui_toast", serde_json::json!({
+                        "msg_key": "direct.capture_failed", "kind": "error", "duration": 10000
+                    })));
+                }
+            }
             services.record_received_packet(&packet);
         }
         let response =
@@ -221,11 +235,16 @@ impl FlowProcessor {
         self.last_business_signal = is_business_packet(&packet);
         // Keep transport, recordings and the inactive source's state cache alive, but
         // bypass packet edits, plugins, guards and UI events for an unselected source.
-        let bypass = self.services.as_ref().is_some_and(|services| !services.packet_processing_allowed());
+        let transport_selected = self.services.as_ref().is_none_or(|services| {
+            match services.direct_flow_id() {
+                Some(id) => self.direct && id == self.flow_id,
+                None => !self.direct,
+            }
+        });
+        let bypass = !transport_selected || self.services.as_ref().is_some_and(|services| !services.packet_processing_allowed());
         let pipeline_outcome = if bypass {
             let services = self.services.as_ref().unwrap();
-            services.update_game_state_from_flow(&packet, self.flow_id);
-            services.record_packet(&packet);
+            if transport_selected { services.update_game_state_from_flow(&packet, self.flow_id); }
             Outcome::Forward(packet)
         } else { match source {
             Some(source) => self

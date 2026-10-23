@@ -12,6 +12,10 @@ use serde_json::{json, Value};
 use std::time::Duration;
 
 impl BackendRuntime {
+    pub async fn execute_action(&self, request: crate::action_executor::ActionExecutionRequest) -> CommandResult {
+        self.state.action_executor.execute(&self.state.services, &self.state.proxy, request).await
+    }
+
     pub fn data_sources(&self) -> crate::ipc::DataSourceStatus {
         self.state.services.data_source_status()
     }
@@ -153,7 +157,7 @@ impl BackendRuntime {
         request_reply(
             &self.state,
             ".lq.Lobby.amuletActivityGameOperate",
-            json!({"activityId":260511,"type":1,"tileList":[tile_id]}),
+            json!({"activityId":261081,"type":1,"tileList":[tile_id]}),
         )
         .await
     }
@@ -185,7 +189,6 @@ impl BackendRuntime {
         &self,
         action: AutorunAction,
         force: bool,
-        mode: Option<String>,
     ) -> CommandResult {
         let result = match action {
             AutorunAction::Start => {
@@ -202,10 +205,9 @@ impl BackendRuntime {
                         ..Default::default()
                     }
                 } else {
-                    self.state.automation.start_autorun(has_live && force);
-                    CommandResult {
-                        ok: true,
-                        ..Default::default()
+                    match self.state.automation.start_autorun() {
+                        Ok(()) => CommandResult { ok: true, ..Default::default() },
+                        Err(key) => CommandResult { reason_key: Some(key.into()), ..Default::default() },
                     }
                 }
             }
@@ -216,28 +218,12 @@ impl BackendRuntime {
                     ..Default::default()
                 }
             }
-            AutorunAction::SetMode => {
-                self.state
-                    .automation
-                    .set_mode(mode.as_deref().unwrap_or("continuous"));
-                CommandResult {
-                    ok: true,
-                    ..Default::default()
-                }
-            }
-            AutorunAction::Step => {
-                self.state.automation.tick().await;
-                CommandResult {
-                    ok: true,
-                    ..Default::default()
-                }
-            }
             AutorunAction::Probe => match self
                 .state
                 .proxy
                 .request_with_retry(
                     ".lq.Lobby.fetchAmuletActivityData",
-                    &json!({"activityId":260511}),
+                    &json!({"activityId":261081}),
                     Duration::from_secs(12),
                 )
                 .await
@@ -311,27 +297,27 @@ async fn hotkey_reply(state: &State, request: AmuletActionRequest) -> CommandRes
     let (method, payload) = match request.action {
         AmuletAction::BuyPack => (
             ".lq.Lobby.amuletActivityOperate",
-            json!({"activityId":260511,"type":4,"args":[request.good_id.unwrap_or(0)]}),
+            json!({"activityId":261081,"type":4,"args":[request.good_id.unwrap_or(0)]}),
         ),
         AmuletAction::RefreshShop => (
             ".lq.Lobby.amuletActivityOperate",
-            json!({"activityId":260511,"type":9,"args":[]}),
+            json!({"activityId":261081,"type":9,"args":[]}),
         ),
         AmuletAction::Skip => (
             ".lq.Lobby.amuletActivityOperate",
-            json!({"activityId":260511,"type":3,"args":[]}),
+            json!({"activityId":261081,"type":3,"args":[]}),
         ),
         AmuletAction::SelectCandidate => (
             ".lq.Lobby.amuletActivityOperate",
-            json!({"activityId":260511,"type":16,"args":[request.selected_index.unwrap_or(0)]}),
+            json!({"activityId":261081,"type":16,"args":[request.selected_index.unwrap_or(0)]}),
         ),
         AmuletAction::SellEffect => (
             ".lq.Lobby.amuletActivityOperate",
-            json!({"activityId":260511,"type":5,"args":[request.uid.unwrap_or(0)]}),
+            json!({"activityId":261081,"type":5,"args":[request.uid.unwrap_or(0)]}),
         ),
         AmuletAction::SortEffect => (
             ".lq.Lobby.amuletActivityOperate",
-            json!({"activityId":260511,"type":8,"args":request.sorted_uid.unwrap_or_default()}),
+            json!({"activityId":261081,"type":8,"args":request.sorted_uid.unwrap_or_default()}),
         ),
         AmuletAction::SellRecent => {
             let state_value = state.services.game_state();
@@ -349,7 +335,7 @@ async fn hotkey_reply(state: &State, request: AmuletActionRequest) -> CommandRes
                 .unwrap_or(0);
             (
                 ".lq.Lobby.amuletActivityOperate",
-                json!({"activityId":260511,"type":5,"args":[uid]}),
+                json!({"activityId":261081,"type":5,"args":[uid]}),
             )
         }
     };

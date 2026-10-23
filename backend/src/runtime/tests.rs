@@ -253,7 +253,7 @@ fn real_protobuf_event_response_updates_game_state_end_to_end() {
         .build_request(
             23,
             ".lq.Lobby.amuletActivityOperate",
-            &json!({"activityId":260511,"type":3,"args":[]}),
+            &json!({"activityId":261081,"type":3,"args":[]}),
         )
         .unwrap();
     processor.process(&request, Direction::Outbound).unwrap();
@@ -284,7 +284,7 @@ fn real_protobuf_event_response_updates_game_state_end_to_end() {
         processor
             .build_replay_request(
                 ".lq.Lobby.amuletActivityOperate",
-                &json!({"activityId":260511,"type":3,"args":[]}),
+                &json!({"activityId":261081,"type":3,"args":[]}),
             )
             .unwrap()
             .0,
@@ -319,21 +319,24 @@ fn unselected_packet_source_forwards_without_running_modules() {
     let (events, _) = broadcast::channel(32);
     let services = Arc::new(Services::load(root.join("configs"), events).unwrap());
     services.publish_qyzz_state(&json!({})).unwrap();
+    services.set_packet_recording(true).unwrap();
     let config = PipelineConfig { schema: 1, modules: vec![crate::pipeline::ModuleConfig {
         id: "unselected-module".into(), enabled: true, options: Value::Null,
     }] };
     let mut processor = FlowProcessor::with_services(config.clone(), services.clone());
     processor.pipeline = Pipeline::new(config, vec![Box::new(UnexpectedModule) as Box<dyn PacketModule>]);
     assert_eq!(processor.process(&request_frame(), Direction::Outbound).unwrap(), FrameOutcome::Forward(request_frame()));
-    let request = processor.build_request(8, ".lq.Lobby.fetchAmuletActivityData", &json!({"activityId":260511})).unwrap();
+    let request = processor.build_request(8, ".lq.Lobby.fetchAmuletActivityData", &json!({"activityId":261081})).unwrap();
     let mut remote = LiqiCodec::new();
-    remote.parse(&request).unwrap();
+    assert_eq!(remote.parse(&request).unwrap().data["activityId"], 261081);
     let reply = remote.build(MessageType::Response, Some(8), ".lq.Lobby.fetchAmuletActivityData",
         &json!({"data":{"game":{"state":{"current":5}}}})).unwrap();
     assert_eq!(processor.process(&reply, Direction::Inbound).unwrap(), FrameOutcome::Forward(reply));
     assert!(services.data_source_status().pending);
     assert_eq!(services.game_state()["stage"], -1);
     assert_eq!(processor.process(&request_frame(), Direction::Outbound).unwrap(), FrameOutcome::Forward(request_frame()));
+    assert!(services.packet_log_snapshot().packets.is_empty());
+    assert_eq!(services.set_packet_recording(false).unwrap().count, 3);
     drop(processor);
     drop(services);
     fs::remove_dir_all(root).unwrap();

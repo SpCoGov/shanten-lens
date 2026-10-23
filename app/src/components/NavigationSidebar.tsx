@@ -4,7 +4,7 @@ import {useTranslation} from "react-i18next";
 import {normalizeSidebarLayout, separator, SIDEBAR_LAYOUT_KEY, type SidebarLayout} from "../lib/sidebarLayout";
 import styles from "./NavigationSidebar.module.css";
 
-export type SidebarItem = {id: string; title: string; icon: string; active?: boolean; onClick: () => void; tutorial?: string; buttonRef?: React.Ref<HTMLButtonElement>};
+export type SidebarItem = {id: string; title: string; icon: string; active?: boolean; hidden?: boolean; onClick: () => void; tutorial?: string; buttonRef?: React.Ref<HTMLButtonElement>};
 export default function NavigationSidebar({items, defaults}: {items: SidebarItem[]; defaults: SidebarLayout}) {
     const {t} = useTranslation();
     const [saved, setSaved] = React.useState<unknown>(() => {try {return JSON.parse(localStorage.getItem(SIDEBAR_LAYOUT_KEY) || "null");} catch {return null;}});
@@ -19,8 +19,8 @@ export default function NavigationSidebar({items, defaults}: {items: SidebarItem
     const editor = React.useRef<HTMLDivElement>(null);
     const dragId = React.useRef<string | null>(null);
     const itemMap = new Map(items.map(item => [item.id, item]));
-    const moreActive = layout.more.some(id => itemMap.get(id)?.active);
-    const activeId = items.find(item => item.active)?.id;
+    const moreActive = layout.more.some(id => itemMap.get(id)?.active && !itemMap.get(id)?.hidden);
+    const activeId = items.find(item => item.active && !item.hidden)?.id;
     const outsideOrder = layout.outside.join("|");
     React.useLayoutEffect(() => {
         const root = sidebar.current;
@@ -76,7 +76,7 @@ export default function NavigationSidebar({items, defaults}: {items: SidebarItem
         if (separator(id)) return <div key={id} className={id === "spacer" && outside ? styles.spacer : styles.divider} role="separator"/>;
         if (id === "more") return <button key={id} ref={moreButton} className={`nav-icon ${moreActive ? "active" : ""}`} title={t("nav.more")} aria-label={t("nav.more")} aria-expanded={menuOpen} aria-haspopup="menu" data-tutorial="nav-more" onClick={() => setMenuOpen(!menuOpen)}><span className="ms" aria-hidden="true">more_horiz</span></button>;
         const item = itemMap.get(id);
-        if (!item) return null;
+        if (!item || item.hidden) return null;
         return <button key={id} ref={item.buttonRef} className={`${outside ? "nav-icon" : "more-menu-item"} ${item.active ? "active" : ""}`} role={outside ? undefined : "menuitem"} title={item.title} aria-label={item.title} aria-current={item.active ? "page" : undefined} data-tutorial={item.tutorial} onClick={() => {setMenuOpen(false);item.onClick();}}><span className="ms" aria-hidden="true">{item.icon}</span>{!outside && <span>{item.title}</span>}</button>;
     };
     return <>
@@ -97,7 +97,7 @@ export default function NavigationSidebar({items, defaults}: {items: SidebarItem
                     if (list) {const rect = list.getBoundingClientRect();if (event.clientY < rect.top + 24) list.scrollTop -= 12;else if (event.clientY > rect.bottom - 24) list.scrollTop += 12;}
                 }} onPointerUp={() => {dragId.current = null;}} onPointerCancel={() => {dragId.current = null;}} onLostPointerCapture={() => {dragId.current = null;}}>
             <header><span>{t("nav_editor.customize")}</span><button onClick={finish}>{t("nav_editor.done")}</button></header>
-            <div className={styles.editorList}>{draft.map(row => <div key={row.id} className={styles.row} data-row-id={row.id}>
+            <div className={styles.editorList}>{draft.filter(row => !itemMap.get(row.id)?.hidden).map(row => <div key={row.id} className={styles.row} data-row-id={row.id}>
                 <input type="checkbox" checked={row.outside} disabled={row.id === "more" || row.id === "spacer"} title={t("nav_editor.checked_hint")} aria-label={t("nav_editor.checked_hint")} onChange={event => {
                     const outside = event.target.checked;
                     setDraft(current => current?.map(item => item.id === row.id ? {...item, outside} : item) ?? null);

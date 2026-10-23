@@ -14,6 +14,33 @@ async backendDataSources() : Promise<DataSourceStatus> {
 async backendSelectDataSource(source: DataSource, revision: number) : Promise<DataSourceStatus> {
     return await TAURI_INVOKE("backend_select_data_source", { source, revision });
 },
+async backendDirectAccounts() : Promise<DirectAccountSummary[]> {
+    return await TAURI_INVOKE("backend_direct_accounts");
+},
+async backendSendDirectEmailCode(region: Region, email: string) : Promise<null> {
+    return await TAURI_INVOKE("backend_send_direct_email_code", { region, email });
+},
+async backendSaveDirectAccount(account: DirectAccountInput) : Promise<DirectAccountSummary[]> {
+    return await TAURI_INVOKE("backend_save_direct_account", { account });
+},
+async backendDeleteDirectAccount(id: string) : Promise<DirectAccountSummary[]> {
+    return await TAURI_INVOKE("backend_delete_direct_account", { id });
+},
+async backendDirectRoutes(region: Region) : Promise<Route[]> {
+    return await TAURI_INVOKE("backend_direct_routes", { region });
+},
+async backendDirectStatus() : Promise<DirectStatus> {
+    return await TAURI_INVOKE("backend_direct_status");
+},
+async backendConnectDirect(accountId: string) : Promise<DirectStatus> {
+    return await TAURI_INVOKE("backend_connect_direct", { accountId });
+},
+async backendDisconnectDirect() : Promise<DirectStatus> {
+    return await TAURI_INVOKE("backend_disconnect_direct");
+},
+async backendCaptureDirectAccount(accountId: string | null) : Promise<DirectStatus> {
+    return await TAURI_INVOKE("backend_capture_direct_account", { accountId });
+},
 async backendGetPacketPipeline() : Promise<PipelineConfig> {
     return await TAURI_INVOKE("backend_get_packet_pipeline");
 },
@@ -116,14 +143,17 @@ async backendUpgradeShopBuff(activityId: number, id: number) : Promise<CommandRe
 async backendAmuletAction(request: AmuletActionRequest) : Promise<CommandResult> {
     return await TAURI_INVOKE("backend_amulet_action", { request });
 },
+async backendExecuteAction(request: ActionExecutionRequest) : Promise<CommandResult> {
+    return await TAURI_INVOKE("backend_execute_action", { request });
+},
 async backendStartTsumoLoop(intervalMs: number, resetCount: boolean) : Promise<TsumoLoopStatus> {
     return await TAURI_INVOKE("backend_start_tsumo_loop", { intervalMs, resetCount });
 },
 async backendStopTsumoLoop() : Promise<TsumoLoopStatus> {
     return await TAURI_INVOKE("backend_stop_tsumo_loop");
 },
-async backendAutorun(action: AutorunAction, force: boolean, mode: string | null) : Promise<CommandResult> {
-    return await TAURI_INVOKE("backend_autorun", { action, force, mode });
+async backendAutorun(action: AutorunAction, force: boolean) : Promise<CommandResult> {
+    return await TAURI_INVOKE("backend_autorun", { action, force });
 },
 async backendResolveConfirmation(id: string, ok: boolean) : Promise<void> {
     await TAURI_INVOKE("backend_resolve_confirmation", { id, ok });
@@ -155,22 +185,32 @@ async backendOpenPluginDir() : Promise<null> {
 
 /** user-defined types **/
 
+export type ActionCandidate = { id: string; kind: string; params: JsonValue; cost: string | null; cost_resource: string; availability: Availability; reasons: ActionReason[] }
+export type ActionExecutionRequest = { action_id: string; session_id: number; revision: number }
+export type ActionReason = { code: string; values: JsonValue }
+export type ActionReport = { stage: number; interrupt: number | null; status: string; actions: ActionCandidate[]; global_actions: ActionCandidate[]; issues: ActionReason[] }
+export type ActionScore = { action_id: string; total: number | null; rules: RuleScore[] }
 export type AmuletAction = "buy_pack" | "refresh_shop" | "skip" | "select_candidate" | "sell_effect" | "sort_effect" | "sell_recent"
 export type AmuletActionRequest = { action: AmuletAction; goodId?: number | null; selectedIndex?: number | null; uid?: number | null; sortedUid?: number[] | null; rawId?: number | null }
-export type AutoRunnerConfig = { end_count: number; targets: JsonValue[]; cutoff_level: number | null; op_interval_ms: number | null; need_pionner_badge_count: number | null; record_detailed_operations: boolean | null; email_notify: EmailNotifyConfig | null }
-export type AutoRunnerStatus = { mode: string | null; running: boolean; runs: number; elapsed_ms: number; best_achieved_count: number; current_achieved_count: number | null; current_step: string | null; last_error: string | null; started_at: number | null; game_ready: boolean | null; has_live_game: boolean | null; game_ready_reason: string | null; game_ready_code: string | null; probe_fail_count: number | null; preferred_flow_ready: boolean | null; preferred_flow_peer: string | null; remake_records: JsonValue[] | null; best_remake_record: JsonValue | null; record_detailed_operations: boolean | null; operation_records: JsonValue[] | null; operation_count_by_run: Partial<{ [key in string]: number }> | null }
-export type AutorunAction = "start" | "stop" | "step" | "probe" | "notify_test_email" | "set_mode"
+export type AutoRunnerConfig = { playbook: JsonValue; op_interval_ms: number | null; record_detailed_operations: boolean | null; email_notify: EmailNotifyConfig | null }
+export type AutoRunnerStatus = { active_profile: JsonValue | null; running: boolean; runs: number; elapsed_ms: number; best_achieved_count: number; current_achieved_count: number | null; current_step: string | null; last_error: string | null; started_at: number | null; game_ready: boolean | null; has_live_game: boolean | null; game_ready_reason: string | null; game_ready_code: string | null; probe_fail_count: number | null; preferred_flow_ready: boolean | null; preferred_flow_peer: string | null; remake_records: JsonValue[] | null; best_remake_record: JsonValue | null; record_detailed_operations: boolean | null; operation_records: JsonValue[] | null; operation_count_by_run: Partial<{ [key in string]: number }> | null }
+export type AutorunAction = "start" | "stop" | "probe" | "notify_test_email"
+export type Availability = "available" | "unavailable" | "unknown"
 export type BackendSnapshot = { version: string; proxyStatus: ProxyStatus; backendLogs: LogEntry[]; packetPipeline: PipelineConfig; fuseConfig: FuseConfig; autorunConfig: AutoRunnerConfig; registry: RegistryPayload; config: Partial<{ [key in string]: Partial<{ [key in string]: JsonValue }> }>; gameState: GameStateData; autorunStatus: AutoRunnerStatus; tsumoLoopStatus: TsumoLoopStatus; packetLog: PacketLogSnapshot }
 export type CommandResult = { ok: boolean; reason?: string | null; error?: string | null; requires_confirmation?: boolean | null; reason_key?: string | null; reason_values?: Partial<{ [key in string]: JsonValue }> | null; action?: string | null; stage?: number | null; cost?: number | null; coin?: number | null; msg_id?: number | null; response?: JsonValue | null }
 export type DataSource = "qyzz" | "packet"
 export type DataSourceStatus = { active: DataSource | null; pending: boolean; qyzz: boolean; packet: boolean; revision: number }
+export type DecisionReport = { actions: ActionScore[] }
+export type DirectAccountInput = { id: string | null; label: string; region: string; login_method: string; username?: string; uid?: string; oauth_type?: number; client_version_string?: string; route: string | null; password: string | null; code: string | null; verification_code: string | null }
+export type DirectAccountSummary = { id: string; label: string; region: string; login_method: string; username: string; uid: string; oauth_type: number; client_version_string: string; route: string | null; has_password: boolean; has_code: boolean; has_session: boolean }
+export type DirectStatus = { state: string; account_id: string | null; route: string | null; last_heartbeat_ms: number | null; error: string | null; capture_account_id: string | null }
 export type Direction = "outbound" | "inbound"
 export type EmailNotifyConfig = { enabled: boolean; host: string; port: number; ssl: boolean; from: string; pass: string; to: string }
 export type FlowDumpItem = { id: number; peer_key: string; client: string; server: string; websocket: boolean; toServer: boolean; toClient: boolean; is_preferred: boolean; activity: number; business_activity: number }
 export type FlowDumpResult = { ok: boolean; count: number; flows: FlowDumpItem[] }
 export type FuseConfig = { guard_skip_contains: FuseGuardItems; enable_skip_guard: boolean | null; enable_shop_force_pick: boolean | null; enable_ting_ready_skip_guard: boolean | null; enable_prestart_kavi_guard: boolean | null; conduction_min_count: number | null; enable_anti_steal_eat: boolean | null; enable_missing_hand_tile_guard: boolean | null; enable_kavi_plus_buffer_guard: boolean | null; enable_hanabi_win_guard: boolean | null; enable_exit_coin_guard: boolean | null; enable_exit_life_guard: boolean | null }
 export type FuseGuardItems = { amulets: number[]; badges: number[] }
-export type GameStateData = { source: DataSource | null; qyzz_connected: boolean | null; session_id: number | null; revision: number | null; flow_id: number | null; stage: number; coin: string; point: string | null; target_point: string | null; level: number | null; node: number | null; map_nodes: JsonValue[] | null; deck_map: Partial<{ [key in string]: string }>; hand_tiles: number[]; dora_tiles: number[]; tian_dora_tiles: JsonValue[] | null; ming: JsonValue[] | null; replacement_tiles: number[]; wall_tiles: number[]; ended: boolean | null; desktop_remain: number; locked_tiles: number[]; switch_used_tiles: number[]; effect_list: JsonValue[] | null; goods: JsonValue[] | null; refresh_price: string | null; candidate_effect_list: JsonValue[] | null; boss_buff: number[] | null; shop_buff_list: Partial<{ [key in string]: number }> | null; change_tile_count: number | null; total_change_tile_count: number | null; max_effect_volume: number | null; tile_score_map: Partial<{ [key in string]: string }> | null; fan_value_map: Partial<{ [key in string]: string }> | null; character_id: JsonValue | null; hp: JsonValue | null; max_hp: JsonValue | null; update_reason: string[] | null }
+export type GameStateData = { action_report: ActionReport | null; decision_report: DecisionReport | null; source: DataSource | null; qyzz_connected: boolean | null; session_id: number | null; revision: number | null; flow_id: number | null; stage: number; coin: string; point: string | null; target_point: string | null; level: number | null; node: number | null; map_nodes: JsonValue[] | null; deck_map: Partial<{ [key in string]: string }>; hand_tiles: number[]; dora_tiles: number[]; tian_dora_tiles: JsonValue[] | null; ming: JsonValue[] | null; replacement_tiles: number[]; wall_tiles: number[]; ended: boolean | null; desktop_remain: number; locked_tiles: number[]; switch_used_tiles: number[]; effect_list: JsonValue[] | null; goods: JsonValue[] | null; refresh_price: string | null; candidate_effect_list: JsonValue[] | null; boss_buff: number[] | null; shop_buff_list: Partial<{ [key in string]: number }> | null; change_tile_count: number | null; total_change_tile_count: number | null; max_effect_volume: number | null; tile_score_map: Partial<{ [key in string]: string }> | null; fan_value_map: Partial<{ [key in string]: string }> | null; character_id: JsonValue | null; hp: JsonValue | null; max_hp: JsonValue | null; update_reason: string[] | null }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LogEntry = { ts_ms: number; level: string; target: string; file: string | null; line: number | null; message: string; fields: Partial<{ [key in string]: JsonValue }> }
 export type MarketplaceInstallBlock = "blocked" | "unsupported_api" | "app_too_old"
@@ -192,11 +232,14 @@ export type PluginInfo = { id: string; name: string; version: string; descriptio
 export type PluginScanError = { path: string; error: string }
 export type PluginUpdateInfo = { pluginId: string; currentVersion: string; latestVersion: string | null; available: boolean; releaseNotes: string | null; error: string | null }
 export type ProxyStatus = { running: boolean; error: string | null }
+export type Region = "cn" | "jp" | "en" | "kr"
 export type RegistryAmulet = { id: number; icon_id: number; name: string; rarity: string; plus_name?: string | null; sell_price?: number | null; plus_sell_price?: number | null; metadata?: RegistryMetadata | null; plus_metadata?: RegistryMetadata | null; names?: RegistryTranslations | null; plus_names?: RegistryTranslations | null }
 export type RegistryBadge = { id: number; icon_id: number; name: string; rarity: string; metadata?: RegistryMetadata | null }
 export type RegistryMetadata = { data_id: number; names: RegistryTranslations; descriptions: RegistryTranslations; price: number | null; sell_price: number | null; icon_name: string; icon_id: number; deprecated: boolean; rarity: string }
 export type RegistryPayload = { source?: DataSource | null; amulets: RegistryAmulet[]; badges: RegistryBadge[] }
 export type RegistryTranslations = { chs: string; chs_t: string; jp: string; en: string; kr: string }
+export type Route = { id: string; endpoint: string; latency_ms?: number | null }
+export type RuleScore = { rule_id: string; score: number | null; reason: ActionReason }
 export type SwitchAction = "start" | "start_debug" | "list_quads" | "validate_manual_debug" | "execute_plan" | "execute_full_plan" | "stop"
 export type SwitchRequest = { action: SwitchAction; options?: Partial<{ [key in string]: JsonValue }> | null; snapshot?: JsonValue | null; quadGroups?: JsonValue | null; structureGroups?: JsonValue | null; notify?: boolean | null }
 export type TsumoLoopStatus = { running: boolean; lastReason: string; winCount: number }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate liqi and packet-source registries from the Mahjong Soul Unity client."""
+"""Generate liqi, registries and stages from the Mahjong Soul Unity client."""
 from __future__ import annotations
 
 import argparse
@@ -7,6 +7,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from decimal import Decimal, localcontext
 from pathlib import Path
 
 from majsoul_client import CLIENT_URL, build_outputs, fetch_from_unity, wanted_excel
@@ -146,8 +147,7 @@ def unpack_rows(source: str, fields: dict, defaults: list) -> list[dict]:
     if len(defaults) != width:
         raise ValueError("Excel default count does not match fields")
     rows = []
-    for match in re.finditer(r"\b\w+\[\d+\]\s*=\s*\w+\s*\(", source):
-        values = LuaValues(source, match.end()).value()
+    def unpack(values, key):
         if not isinstance(values, list):
             raise ValueError("invalid packed Excel row")
         result, position, skipped = list(defaults), 1, set()
@@ -165,13 +165,17 @@ def unpack_rows(source: str, fields: dict, defaults: list) -> list[dict]:
                 result[position - 1] = value
             position += 1
         row = {name: result[index - 1] for name, index in positions.items()}
-        if row.get("id") != int(re.search(r"\[(\d+)\]", match.group())[1]):
+        if row.get("id", row.get("activity_id")) != key:
             raise ValueError("packed row ID differs from its key")
-        rows.append(row)
+        return row
+    for match in re.finditer(r"\b\w+\[(\d+)\]\s*=\s*(\{|\w+\s*\()", source):
+        grouped = match[2] == "{"
+        values = LuaValues(source, match.end() - int(grouped)).value()
+        rows.extend(unpack(row, int(match[1])) for row in (values if grouped else [values]))
     return rows
 
 
-def load_sheet(sources: dict[str, str], sheet: str) -> list[dict]:
+def load_sheet(sources: dict[str, str], sheet: str, keys: tuple[str, ...] = ("id",)) -> list[dict]:
     path = EXCEL + "Data/" + sheet
     source = sources[path + ".lua.bytes"]
     tables = local_tables(source)
@@ -186,9 +190,10 @@ def load_sheet(sources: dict[str, str], sheet: str) -> list[dict]:
         boundaries = tables[blocks[1]]
         for index in range(1, len(boundaries) + 1):
             rows.extend(unpack_rows(sources[f"{path}_b{index}.lua.bytes"], fields, defaults))
-    if not rows or len({row["id"] for row in rows}) != len(rows):
+    row_key = lambda row: tuple(row[key] for key in keys)
+    if not rows or len({row_key(row) for row in rows}) != len(rows):
         raise ValueError(f"empty or duplicate Excel rows: {sheet}")
-    return sorted(rows, key=lambda row: row["id"])
+    return sorted(rows, key=row_key)
 
 
 def integer(value, name: str, minimum: int = 0) -> int:
@@ -280,6 +285,93 @@ def build_registries(sources: dict[str, str]) -> tuple[list[dict], list[dict]]:
     return amulets, badges
 
 
+def build_levels(sources: dict[str, str]) -> dict:
+    activities = {row["activity_id"]: row for row in load_sheet(sources, "amulet/amulet_activity", ("activity_id",))}
+    nodes = load_sheet(sources, "amulet/amulet_node", ("id", "node"))
+    enemies = load_sheet(sources, "amulet/amulet_enemy")
+
+    def score(value):
+        if not isinstance(value, str) or not re.fullmatch(r"\d+(?:\.\d+)?(?:[eE][+-]?\d+)?", value) or Decimal(value) <= 0:
+            raise ValueError(f"invalid stage score: {value}")
+        return value
+
+    groups = {integer(row["group"], "enemy group", 1) for row in enemies}
+    levels = []
+    for row in load_sheet(sources, "amulet/amulet_level", ("activity_id", "level")):
+        activity = integer(row["activity_id"], "activity ID", 1)
+        level = integer(row["level"], "level ID", 1)
+        stages = []
+        for node in (node for node in nodes if node["id"] == row["node_id"]):
+            kind = integer(node["type"], "node type", 1)
+            battle = kind in (2, 4)
+            if not isinstance(node["node_name"], str) or not node["node_name"].strip():
+                raise ValueError("missing stage name")
+            group = integer(node["node_sub_id"], "enemy group", 1) if battle else None
+            if battle and group not in groups:
+                raise ValueError(f"missing enemy group: {group}")
+            rate = score(node["hp_rate"]) if battle else None
+            targets = None
+            if battle:
+                targets = {}
+                for enemy in (enemy for enemy in enemies if enemy["group"] == group):
+                    hp = score(enemy["hp"])
+                    with localcontext() as context:
+                        context.prec = max(28, len(Decimal(hp).as_tuple().digits) + len(Decimal(rate).as_tuple().digits))
+                        targets[hp] = str(Decimal(hp) * Decimal(rate) / 100)
+            stages.append({"node": integer(node["node"], "node number", 1), "type": kind,
+                           "label": node["node_name"], "hp_rate": rate, "target_points": targets,
+                           "enemy_group": group})
+        if not stages or [node["node"] for node in stages] != list(range(1, len(stages) + 1)):
+            raise ValueError(f"missing or unordered map nodes: {level}")
+        levels.append({"activity_id": activity, "level": level, "next_level": integer(row["next_level"] or 0, "next level"),
+                       "label": stages[0]["label"].removesuffix("-START"), "nodes": stages})
+    if len({row["level"] for row in levels}) != len(levels):
+        raise ValueError("ambiguous level IDs across activities")
+    exported = []
+    for activity in sorted({row["activity_id"] for row in levels}):
+        by_id = {row["level"]: row for row in levels if row["activity_id"] == activity}
+        level, seen = activities[activity]["init_level"], set()
+        while level in by_id:
+            if level in seen:
+                raise ValueError(f"cyclic stage progression: {level}")
+            seen.add(level)
+            exported.append(by_id[level])
+            level = by_id[level]["next_level"]
+        if len(seen) != len(by_id):
+            raise ValueError(f"unreachable stages: {activity}")
+    return {"levels": exported, "enemies": [{"id": integer(row["id"], "enemy ID", 1),
+            "group": row["group"], "hp": score(row["hp"])} for row in enemies]}
+
+
+def build_action_rules(excels: dict) -> dict:
+    def sheet(name, keys=("id",)):
+        return load_sheet(excels, "amulet/amulet_" + name, keys)
+    def select(row, fields):
+        return {field: row[field] for field in fields}
+    effects = sheet("effect")
+    gamble = sheet("gamble_selection", ("id", "selection_id"))
+    if len({row["selection_id"] for row in gamble}) != len(gamble):
+        raise ValueError("duplicate gamble selection IDs")
+    return {
+        "effects": {str(row["id"]): select(row, ("upgrade", "duplicate_enabled", "effect_group", "can_sell", "rarity"))
+                    for row in effects},
+        "shop_hp_rates": {str(row["id"]): row["args"][0] for row in effects if row["id"] in (3630, 3631)},
+        "acquire_damage": {str(row["id"]): integer(row["args"][1], "acquisition damage")
+                           for row in effects if row["id"] in (3550, 3551)},
+        "badges": {str(row["id"]): select(row, ("volume", "rarity")) for row in sheet("badge")},
+        "shop_upgrades": sheet("shop_upgrade", ("id", "level")),
+        "characters": [select(row, ("activity_id", "character_id", "init_desktop_count", "init_open_desktop_count", "init_tian_count"))
+                       for row in sheet("character", ("activity_id", "character_id"))],
+        "forge": sheet("forge", ("activity_id", "type", "rarity")),
+        "transport": sheet("transport", ("activity_id",)),
+        "trade_types": {str(row["id"]): row["type"] for row in sheet("trade_item")},
+        "gamble_selections": {str(integer(row["selection_id"], "gamble selection ID", 1)): {
+            "type": integer(row["type"], "gamble selection type", 1),
+            "args": [integer(arg, "gamble argument") for arg in (row["args"] or [])],
+        } for row in gamble},
+    }
+
+
 def updated_registry(previous: dict, incoming: list[dict], meta: dict) -> dict:
     if previous.get("schema_version") != 1:
         raise ValueError("unsupported registry schema")
@@ -306,7 +398,17 @@ def generate(root: Path, lua: dict, config: dict, excels: dict, meta: dict) -> b
     if missing := REQUIRED_RPC - rpc.keys():
         raise ValueError(f"required amulet RPCs missing: {sorted(missing)}")
     amulets, badges = build_registries(excels)
+    levels = build_levels(excels)
+    action_rules = build_action_rules(excels)
     outputs = {root / "proto/liqi.proto": proto.encode("utf-8")}
+    rule_path = root / "backend/assets/action_rules.json"
+    previous_rules = json.loads(rule_path.read_bytes()) if rule_path.exists() else {}
+    if previous_rules.get("rules") != action_rules:
+        outputs[rule_path] = (json.dumps({"source": {"client_url": CLIENT_URL, **meta}, "rules": action_rules}, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    level_path = root / "backend/assets/levels.json"
+    previous_levels = json.loads(level_path.read_bytes()) if level_path.exists() else {}
+    if any(previous_levels.get(key) != value for key, value in levels.items()):
+        outputs[level_path] = (json.dumps({"schema_version": 1, "source": {"client_url": CLIENT_URL, **meta}, **levels}, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     for filename, incoming in (("amulets.json", amulets), ("badges.json", badges)):
         path = root / "backend/assets" / filename
         previous = json.loads(path.read_bytes())
@@ -316,14 +418,15 @@ def generate(root: Path, lua: dict, config: dict, excels: dict, meta: dict) -> b
     changed = False
     # All parsing and validation completes before any generated file is replaced.
     for path, data in outputs.items():
-        if path.read_bytes().replace(b"\r\n", b"\n") != data:
+        if not path.exists() or path.read_bytes().replace(b"\r\n", b"\n") != data:
             path.write_bytes(data)
             changed = True
             print(f"updated {path.relative_to(root)}")
-    values = {"changed": str(changed).lower(), **meta, "amulet_count": len(amulets), "badge_count": len(badges)}
+    values = {"changed": str(changed).lower(), **meta, "amulet_count": len(amulets), "badge_count": len(badges),
+              "level_count": len(levels["levels"]), "stage_count": sum(len(row["nodes"]) for row in levels["levels"])}
     if output := os.environ.get("GITHUB_OUTPUT"):
         with open(output, "a", encoding="utf-8") as stream:
-            for key in ("changed", "product_version", "bundle_hash", "amulet_count", "badge_count"):
+            for key in ("changed", "product_version", "bundle_hash", "amulet_count", "badge_count", "level_count", "stage_count"):
                 stream.write(f"{key}={values[key]}\n")
     print(json.dumps(values, ensure_ascii=False))
     return changed

@@ -146,12 +146,14 @@ impl Rule {
 struct Choices {
     group: usize,
     values: Vec<Vec<usize>>,
+    minimum_nonwall: usize,
 }
 
 struct Search<'a> {
     state: &'a Value,
     groups: &'a [Group],
     entries: &'a [Entry],
+    faces: Vec<Option<u8>>,
     exclude_invalid_shapes: bool,
     emit: &'a mut dyn FnMut(Value),
     stopped: &'a dyn Fn() -> bool,
@@ -230,29 +232,48 @@ impl Search<'_> {
         values
     }
 
-    fn groups_match(&self, selected: &[Vec<usize>], joker_as: Option<u8>) -> bool {
-        if joker_as.is_none() && self.groups.iter().all(|group| group.suit_group.trim().is_empty() && group.distinct_group.trim().is_empty()) {
+    fn group_matches(&self, g: usize, tiles: &[usize], selected: &[Vec<usize>], joker_as: Option<u8>) -> bool {
+        let group = &self.groups[g];
+        if joker_as.is_none() && group.suit_group.trim().is_empty() && group.distinct_group.trim().is_empty() {
             return true;
         }
-        let faces = selected.iter().map(|tiles| tiles.iter().filter_map(|&i|
-            souzu::tile(&self.entries[i].face).or(joker_as)
-        ).collect::<Vec<_>>()).collect::<Vec<_>>();
-        for (g, tiles) in selected.iter().enumerate().filter(|(_, tiles)| !tiles.is_empty()) {
-            let group = &self.groups[g];
-            if faces[g].len() == tiles.len() && !group.kind().accepts(&faces[g]) { return false; }
-            for other in 0..g {
-                let linked = &self.groups[other];
-                if !group.suit_group.trim().is_empty() && group.suit_group.trim() == linked.suit_group.trim()
-                    && faces[g].first().zip(faces[other].first()).is_some_and(|(a, b)| a / 9 != b / 9) {
-                    return false;
-                }
-                if !group.distinct_group.trim().is_empty() && group.distinct_group.trim() == linked.distinct_group.trim()
-                    && faces[g].iter().any(|face| faces[other].contains(face)) {
-                    return false;
-                }
+        let faces = tiles.iter().filter_map(|&i| self.faces[i].or(joker_as)).collect::<Vec<_>>();
+        if faces.len() == tiles.len() && !group.kind().accepts(&faces) { return false; }
+        for (other, linked_tiles) in selected.iter().enumerate().filter(|(other, tiles)| *other != g && !tiles.is_empty()) {
+            let linked = &self.groups[other];
+            if !group.suit_group.trim().is_empty() && group.suit_group.trim() == linked.suit_group.trim()
+                && faces.first().copied().zip(linked_tiles.iter().find_map(|&i| self.faces[i].or(joker_as)))
+                    .is_some_and(|(a, b)| a / 9 != b / 9) {
+                return false;
+            }
+            if !group.distinct_group.trim().is_empty() && group.distinct_group.trim() == linked.distinct_group.trim()
+                && linked_tiles.iter().filter_map(|&i| self.faces[i].or(joker_as)).any(|face| faces.contains(&face)) {
+                return false;
             }
         }
         true
+    }
+
+    fn groups_match(&self, selected: &[Vec<usize>], joker_as: Option<u8>) -> bool {
+        selected.iter().enumerate().filter(|(_, tiles)| !tiles.is_empty())
+            .all(|(g, tiles)| self.group_matches(g, tiles, selected, joker_as))
+    }
+
+    fn exchange_prefix(&self, used: &HashSet<usize>) -> usize {
+        let hand_size = self.state["hand_tiles"].as_array().unwrap().len();
+        let replacement_size = self.entries.iter().filter(|e| e.source == "replacement").count();
+        let mut kept = self.entries.iter().enumerate()
+            .filter(|(i, e)| e.source == "hand" && (used.contains(i) || e.face == "bd")).count();
+        let (rounds, limit) = search_limits(self.state);
+        let mut cursor = 0;
+        for _ in 0..rounds {
+            let end = cursor + limit.min(hand_size - kept).min(replacement_size - cursor);
+            if end == cursor { break; }
+            kept += used.iter().map(|&i| &self.entries[i])
+                .filter(|e| e.source == "replacement" && (cursor..end).contains(&e.index)).count();
+            cursor = end;
+        }
+        cursor
     }
 
     fn visit(
@@ -266,6 +287,25 @@ impl Search<'_> {
         if !self.pulse() {
             return None;
         }
+        let exchange_prefix = self.exchange_prefix(used);
+        if used.iter().map(|&i| &self.entries[i])
+            .any(|e| e.source == "replacement" && e.index >= exchange_prefix) { return None; }
+        // Every complete target needs enough wall tiles to fit the remaining tiles in the hand.
+        let mut minimum_nonwall = nonwall;
+        for choice in &choices[depth..] {
+            let mut minimum = None;
+            for candidate in &choice.values {
+                if candidate.iter().any(|i| used.contains(i)
+                    || (self.entries[*i].source == "replacement" && self.entries[*i].index >= exchange_prefix)) { continue; }
+                if self.group_matches(choice.group, candidate, selected, None) {
+                    let count = candidate.iter().filter(|&&i| self.entries[i].source != "wall").count();
+                    minimum = Some(minimum.map_or(count, |old: usize| old.min(count)));
+                    if count == choice.minimum_nonwall { break; }
+                }
+            }
+            minimum_nonwall += minimum?;
+        }
+        if minimum_nonwall > self.state["hand_tiles"].as_array().unwrap().len() { return None; }
         if depth == choices.len() {
             let hand = ids(self.state.get("hand_tiles"));
             if self
@@ -360,11 +400,10 @@ impl Search<'_> {
             if next_nonwall > self.state["hand_tiles"].as_array().unwrap().len() {
                 continue;
             }
-            selected[group] = candidate.clone();
-            if !self.groups_match(selected, None) {
-                selected[group].clear();
+            if !self.group_matches(group, candidate, selected, None) {
                 continue;
             }
+            selected[group] = candidate.clone();
             used.extend(candidate);
             if let Some(plan) = self.visit(choices, depth + 1, selected, used, next_nonwall) {
                 return Some(plan);
@@ -421,9 +460,9 @@ fn can_match(domains: &[Vec<usize>], size: usize) -> bool {
     (0..domains.len()).all(|slot| augment(slot, domains, &mut vec![false; size], &mut owner))
 }
 
-type Simulation = (Vec<Value>, Vec<Vec<u64>>, Vec<Vec<u64>>, usize);
+pub(super) type Simulation = (Vec<Value>, Vec<Vec<u64>>, Vec<Vec<u64>>, usize);
 
-fn simulate(
+pub(super) fn simulate(
     state: &Value,
     entries: &[Entry],
     target: &[u64],
@@ -519,24 +558,15 @@ fn simulate(
     }
 }
 
-pub(super) fn search(
-    state: &Value,
-    target: &Value,
-    wall_limit: usize,
-    exclude_invalid_shapes: bool,
-    emit: &mut dyn FnMut(Value),
-    stopped: &dyn Fn() -> bool,
-) -> Value {
-    let fail =
-        |reason| json!({"status":"impossible","reason":reason,"search_algorithm":"custom_target"});
+fn parse_groups(target: &Value) -> Option<Vec<Group>> {
     if target
         .as_array()
         .is_none_or(|groups| groups.is_empty() || groups.len() > 14)
     {
-        return fail("custom-invalid-target");
+        return None;
     }
     let Ok(groups) = serde_json::from_value::<Vec<Group>>(target.clone()) else {
-        return fail("custom-invalid-target");
+        return None;
     };
     if groups.is_empty()
         || groups.len() > 14
@@ -552,8 +582,28 @@ pub(super) fn search(
                 || (g.quad && !matches!(g.kind, Kind::Single | Kind::Quad))
                 || g.suit_group.chars().count() > 32 || g.distinct_group.chars().count() > 32)
     {
-        return fail("custom-invalid-target");
+        return None;
     }
+    Some(groups)
+}
+
+pub(super) fn valid_target(target: &Value) -> bool {
+    parse_groups(target).is_some()
+}
+
+pub(super) fn search(
+    state: &Value,
+    target: &Value,
+    wall_limit: usize,
+    exclude_invalid_shapes: bool,
+    emit: &mut dyn FnMut(Value),
+    stopped: &dyn Fn() -> bool,
+) -> Value {
+    let fail =
+        |reason| json!({"status":"impossible","reason":reason,"search_algorithm":"custom_target"});
+    let Some(groups) = parse_groups(target) else {
+        return fail("custom-invalid-target");
+    };
     let hand = ids(state.get("hand_tiles"));
     if !(13..=14).contains(&hand.len()) || state["ming"].as_array().is_some_and(|m| !m.is_empty()) {
         return fail("custom-hand-size");
@@ -607,6 +657,7 @@ pub(super) fn search(
         state: &state,
         groups: &groups,
         entries: &entries,
+        faces: entries.iter().map(|e| souzu::tile(&e.face)).collect(),
         exclude_invalid_shapes,
         emit,
         stopped,
@@ -649,7 +700,9 @@ pub(super) fn search(
         for (group, domain) in domains.iter().enumerate() {
             let values = search.candidates(group, domain);
             if let Some(reason) = search.aborted { return fail(reason); }
-            choices.push(Choices { group, values });
+            let minimum_nonwall = values.iter().map(|candidate|
+                candidate.iter().filter(|&&i| entries[i].source != "wall").count()).min().unwrap_or(0);
+            choices.push(Choices { group, values, minimum_nonwall });
         }
         choices.sort_by_key(|c| c.values.len());
         if let Some(plan) = search.visit(
@@ -693,6 +746,35 @@ mod tests {
     }
     fn run(state: &Value, target: &Value) -> Value {
         search(state, target, 36, false, &mut |_| {}, &|| false)
+    }
+
+    #[test]
+    fn sorted_wall_reaches_nine_gates_orphans_and_seven_pairs() {
+        let mut s = state(
+            &["6p","2z","4p","4z","3p","7z","3s","6p","1p","9p","3z","1z","3p"],
+            &["1m","5z","3s","4z","6z","2z","1p","2s","9p","9s","9s","8s","4s","7z","2s","2s",
+                "1m","8s","1p","1z","4p","7p","1z","6z","7z","7p","1s","6p","8p","7z","6s","5p",
+                "1z","0p","3z","6s","3z","3s","1p","6s","6s","9s","2z","9p","7s","8p","9p","5s","1m"],
+            &["9m","9m","9m","2p","2p","2p","2p","3p","4p","4p","5p","5p","7p","7p","8p","8p",
+                "1s","1s","3s","4s","4s","5s","5s","0s","7s","7s","8s","8s","9s","2z","3z","4z","5z","5z","6z","6z"],
+            5,
+        );
+        s["stage"] = json!(5);
+        s["next_operation"] = json!([{"type":101}]);
+        s["boss_buff"] = json!([907]);
+        let mut gates = [1,1,1,2,3,4,5,6,7,8,9,9,9].iter()
+            .map(|rank| json!({"suit_group":"red","rule":{"ranks":[rank]}})).collect::<Vec<_>>();
+        gates.push(json!({"suit_group":"red","rule":{}}));
+        let orphans = ["1m","9m","1p","9p","1s","9s","1z","2z","3z","4z","5z","6z","7z"];
+        let mut orphan_groups = exact(&orphans).as_array().unwrap().clone();
+        orphan_groups.push(json!({"rule":{"faces":orphans}}));
+        let pairs = json!(vec![json!({"kind":"pair","distinct_group":"red","rule":{}}); 7]);
+        for (target, draws) in [(json!(gates), 9), (json!(orphan_groups), 1), (pairs, 2)] {
+            let plan = run(&s, &target);
+            replay(&s, &plan);
+            assert_eq!(plan["draws_needed"], draws);
+            assert!(plan["search_nodes"].as_u64().unwrap() < 50_000);
+        }
     }
 
     #[test]

@@ -19,6 +19,14 @@ export type TargetPreset = {
     exclude_invalid_shapes: boolean;
 };
 
+export const TARGET_PRESETS_KEY = "sl-custom-switch:presets-v1";
+export function readTargetPresets(): TargetPreset[] {
+    try {
+        const saved = JSON.parse(localStorage.getItem(TARGET_PRESETS_KEY) ?? "[]");
+        return Array.isArray(saved) ? saved.map(parseTargetPreset).filter((preset): preset is TargetPreset => preset !== null) : [];
+    } catch { return []; }
+}
+
 export function targetKind(group: Pick<TargetGroup, "quad" | "kind">): TargetKind {
     return group.quad ? "quad" : group.kind ?? "single";
 }
