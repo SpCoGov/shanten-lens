@@ -16,6 +16,10 @@ pub mod upstream;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod automation;
+pub mod action_provider;
+pub mod action_executor;
+pub mod decision;
+pub mod direct_connection;
 pub mod embedded;
 pub mod mail;
 pub mod recommendations;

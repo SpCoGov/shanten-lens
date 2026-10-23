@@ -8,6 +8,7 @@ export type SearchPreferences = {
     any_waits: boolean;
     preferred_suit?: "m" | "p" | "s" | "z" | null;
     preferred_meld_type?: "triplet" | "sequence" | null;
+    coin_objective?: "heavenly_blessing" | "shining_pearl" | null;
 };
 
 export type QuadCatalogItem = {
@@ -62,6 +63,7 @@ export type PlanData = {
     search_algorithm?: string;
     search_algorithm_label?: string;
     search_preferences?: SearchPreferences;
+    coin_reward?: number;
     preferred_quad_count?: number;
     preferred_meld_count?: number;
     preferred_suit_count?: number;

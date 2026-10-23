@@ -6,10 +6,12 @@ import {
     readHudShowBlackhole,
     readHudShowScoreProjection,
     readHudShowWanxiang,
+    readHudShowCustomSwitch,
     writeHudEnabled,
     writeHudShowBlackhole,
     writeHudShowScoreProjection,
     writeHudShowWanxiang,
+    writeHudShowCustomSwitch,
 } from "../lib/hudSettings";
 
 type OverlayStatus = {
@@ -24,6 +26,7 @@ export default function OverlayPage() {
     const [saving, setSaving] = React.useState(false);
     const [showBlackhole, setShowBlackhole] = React.useState(() => readHudShowBlackhole());
     const [showWanxiang, setShowWanxiang] = React.useState(() => readHudShowWanxiang());
+    const [showCustomSwitch, setShowCustomSwitch] = React.useState(() => readHudShowCustomSwitch());
     const [showScoreProjection, setShowScoreProjection] = React.useState(() => readHudShowScoreProjection());
 
     const refresh = React.useCallback(() => {
@@ -117,6 +120,13 @@ export default function OverlayPage() {
                 <label className="overlay-option-card">
                     <span>{t("overlay.show_wanxiang")}</span>
                     <input type="checkbox" className="config-switch" checked={showWanxiang} onChange={(event) => toggleShowWanxiang(event.currentTarget.checked)}/>
+                </label>
+                <label className="overlay-option-card">
+                    <span>{t("overlay.show_custom_switch")}</span>
+                    <input type="checkbox" className="config-switch" checked={showCustomSwitch} onChange={(event) => {
+                        setShowCustomSwitch(event.currentTarget.checked);
+                        writeHudShowCustomSwitch(event.currentTarget.checked);
+                    }}/>
                 </label>
                 <label className="overlay-option-card">
                     <span>{t("overlay.show_score_projection")}</span>

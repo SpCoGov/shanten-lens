@@ -11,16 +11,19 @@ export default function AmuletPickerModal({
                                               open,
                                               onClose,
                                               onSelect,
+                                              allowedRarities,
                                           }: {
     open: boolean;
     onClose: () => void;
     onSelect: (amuletId: number) => void;
+    allowedRarities?: readonly string[];
 }) {
     const {t} = useTranslation();
     const {amulets} = useRegistry();
     const [q, setQ] = React.useState("");
     const [rarity, setRarity] = React.useState<RarityKey>("ALL");
     const [sel, setSel] = React.useState<number | null>(null);
+    const rarities = RARITIES.filter(r => r === "ALL" || !allowedRarities || allowedRarities.includes(r));
 
     React.useEffect(() => {
         if (!open) {
@@ -32,6 +35,7 @@ export default function AmuletPickerModal({
 
     const list = amulets.filter((a) => {
         if (a.metadata?.deprecated) return false;
+        if (allowedRarities && !allowedRarities.includes(a.rarity)) return false;
         const okR = rarity === "ALL" ? true : a.rarity === rarity;
         const key = q.trim().toLowerCase();
         const okQ = key ? a.name.toLowerCase().includes(key) || String(a.id).includes(key) : true;
@@ -48,13 +52,13 @@ export default function AmuletPickerModal({
             disabled={sel == null}
             title={sel == null ? t("amulet_picker.action_confirm_hint") : undefined}
         >
-            {t("amulet_picker.action_confirm")}
+            <span className="ms" aria-hidden="true">check</span>{t("amulet_picker.action_confirm")}
         </button>
     );
 
     return (
         <Modal open={open} onClose={onClose} title={t("amulet_picker.title")} actions={actions}>
-            <div style={{display: "flex", gap: 8, marginBottom: 12}}>
+            <div style={{display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 12}}>
                 <input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
@@ -62,6 +66,7 @@ export default function AmuletPickerModal({
                     aria-label={t("amulet_picker.search_aria")}
                     style={{
                         flex: 1,
+                        minWidth: 160,
                         padding: "8px 10px",
                         borderRadius: 8,
                         border: "1px solid var(--border)",
@@ -71,7 +76,10 @@ export default function AmuletPickerModal({
                     onFocus={(e) => (e.currentTarget.style.boxShadow = "var(--input-focus-ring)")}
                     onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
                 />
-                <select
+                {rarities.length <= 4 ? <div role="group" aria-label={t("amulet_picker.rarity_label")} style={{display: "flex", flexWrap: "wrap", gap: 4}}>
+                    {rarities.map(r => <button type="button" className={`switch-guide-button ${rarity === r ? "is-primary" : ""}`} key={r}
+                        aria-pressed={rarity === r} onClick={() => setRarity(r)}><span className="ms" aria-hidden="true">{r === "ALL" ? "apps" : "diamond"}</span>{t(`amulet_picker.rarity.${r}`)}</button>)}
+                </div> : <select
                     value={rarity}
                     onChange={(e) => setRarity(e.target.value as RarityKey)}
                     aria-label={t("amulet_picker.rarity_label")}
@@ -85,12 +93,12 @@ export default function AmuletPickerModal({
                     onFocus={(e) => (e.currentTarget.style.boxShadow = "var(--input-focus_ring)")}
                     onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
                 >
-                    {RARITIES.map((r) => (
+                    {rarities.map((r) => (
                         <option key={r} value={r}>
                             {t(`amulet_picker.rarity.${r}`)}
                         </option>
                     ))}
-                </select>
+                </select>}
             </div>
 
             <div

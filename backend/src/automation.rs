@@ -5,10 +5,7 @@ use crate::{
 };
 use serde_json::{json, Value};
 use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -17,12 +14,12 @@ pub struct Automation {
     services: Arc<Services>,
     proxy: ProxyControl,
     autorun: Arc<Mutex<AutoStatus>>,
-    autorun_running: Arc<AtomicBool>,
     tsumo: Arc<Mutex<TsumoStatus>>,
 }
 
 struct AutoStatus {
-    mode: String,
+    profile: Option<Value>,
+    task: Option<tokio::task::JoinHandle<()>>,
     running: bool,
     runs: u64,
     started: Option<Instant>,
@@ -47,7 +44,8 @@ impl Automation {
             services,
             proxy,
             autorun: Arc::new(Mutex::new(AutoStatus {
-                mode: "continuous".into(),
+                profile: None,
+                task: None,
                 running: false,
                 runs: 0,
                 started: None,
@@ -56,23 +54,23 @@ impl Automation {
                 step: "-".into(),
                 error: String::new(),
             })),
-            autorun_running: Arc::new(AtomicBool::new(false)),
             tsumo: Arc::new(Mutex::new(TsumoStatus::default())),
         }
     }
 
     pub fn autorun_status(&self) -> Value {
         let status = self.autorun.lock().unwrap();
-        let achieved = achieved_count(&self.services.game_state(), &self.services.table("autorun"));
+        let flow_ready = self.proxy.flows().iter().any(|flow| flow.is_preferred);
+        let achieved = status.profile.as_ref().map(|profile| achieved_count(&self.services.game_state(), profile));
         json!({
-            "mode":status.mode,"running":status.running,"runs":status.runs,
+            "active_profile":status.profile,"running":status.running,"runs":status.runs,
             "elapsed_ms":status.started.map_or(0, |started| started.elapsed().as_millis()),
             "best_achieved_count":status.best,"current_achieved_count":achieved,
             "current_step":status.step,"last_error":status.error,"started_at":status.started_at,
-            "game_ready":!self.proxy.flows().is_empty(),
+            "game_ready":flow_ready,
             "has_live_game":self.services.game_state().get("stage").and_then(Value::as_i64).unwrap_or(-1) >= 0,
             "game_ready_reason":"","game_ready_code":"","probe_fail_count":0,"probe_ok":true,"probe_reason":"",
-            "probe_at":0,"preferred_flow_ready":!self.proxy.flows().is_empty(),
+            "probe_at":0,"preferred_flow_ready":flow_ready,
             "preferred_flow_peer":Value::Null,"remake_records":[],"best_remake_record":Value::Null,
             "record_detailed_operations":false,"operation_records":[],"operation_count_by_run":{},"decision_trace":[]
         })
@@ -87,65 +85,66 @@ impl Automation {
         }
     }
 
-    pub fn set_mode(&self, mode: &str) {
-        self.autorun.lock().unwrap().mode =
-            if mode == "step" { "step" } else { "continuous" }.into();
+    pub fn start_autorun(&self) -> Result<(), &'static str> {
+        let config = self.services.table("autorun");
+        crate::services::playbook::validate(&config["playbook"]).map_err(|_| "autoplay.invalid_config")?;
+        let profile = selected_opening_profile(&config)?.clone();
+        let mut status = self.autorun.lock().unwrap();
+        if status.running {
+            return Ok(());
+        }
+        status.profile = Some(profile);
+        status.best = 0;
+        status.running = true;
+        status.started = Some(Instant::now());
+        status.started_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        status.error.clear();
+        status.step = "monitoring".into();
+        let this = self.clone();
+        status.task = Some(tokio::spawn(async move {
+            while this.autorun.lock().unwrap().running {
+                this.tick().await;
+                let delay = this
+                    .services
+                    .table("autorun")
+                    .get("op_interval_ms")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(1000)
+                    .clamp(100, 30_000);
+                tokio::time::sleep(Duration::from_millis(delay)).await;
+            }
+        }));
+        drop(status);
         self.emit_autorun();
-    }
-
-    pub fn start_autorun(&self, _continue_existing: bool) {
-        if self.autorun_running.swap(true, Ordering::SeqCst) {
-            return;
-        }
-        {
-            let mut status = self.autorun.lock().unwrap();
-            status.running = true;
-            status.started = Some(Instant::now());
-            status.started_at = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis();
-            status.error.clear();
-            status.step = "monitoring".into();
-        }
-        self.emit_autorun();
-        if self.autorun.lock().unwrap().mode == "continuous" {
-            let this = self.clone();
-            tokio::spawn(async move {
-                while this.autorun_running.load(Ordering::SeqCst) {
-                    this.tick().await;
-                    let delay = this
-                        .services
-                        .table("autorun")
-                        .get("op_interval_ms")
-                        .and_then(Value::as_u64)
-                        .unwrap_or(1000)
-                        .clamp(100, 30_000);
-                    tokio::time::sleep(Duration::from_millis(delay)).await;
-                }
-            });
-        }
+        Ok(())
     }
 
     pub fn stop_autorun(&self) {
-        self.autorun_running.store(false, Ordering::SeqCst);
         let mut status = self.autorun.lock().unwrap();
         status.running = false;
+        if let Some(task) = status.task.take() {
+            task.abort();
+        }
         drop(status);
         self.emit_autorun();
     }
 
-    pub async fn tick(&self) {
-        if !self.autorun_running.load(Ordering::SeqCst) {
-            return;
-        }
+    async fn tick(&self) {
+        let profile = {
+            let status = self.autorun.lock().unwrap();
+            if !status.running { return; }
+            status.profile.clone().unwrap()
+        };
         let state = self.services.game_state();
         let config = self.services.table("autorun");
-        let achieved = achieved_count(&state, &config);
+        let achieved = achieved_count(&state, &profile);
         {
             let mut status = self.autorun.lock().unwrap();
             status.best = status.best.max(achieved);
-            if achieved >= config.get("end_count").and_then(Value::as_u64).unwrap_or(1) {
+            if achieved >= profile["end_count"].as_u64().unwrap() {
                 status.step = "goal_met".into();
                 drop(status);
                 self.stop_autorun();
@@ -191,7 +190,7 @@ impl Automation {
                     .proxy
                     .request_with_retry(
                         ".lq.Lobby.amuletActivityGameOperate",
-                        &json!({"activityId":260511,"type":8,"tileList":[]}),
+                        &json!({"activityId":261081,"type":8,"tileList":[]}),
                         Duration::from_secs(12),
                     )
                     .await;
@@ -257,6 +256,17 @@ impl Automation {
     }
 }
 
+fn selected_opening_profile(config: &Value) -> Result<&Value, &'static str> {
+    let book = &config["playbook"];
+    let profile = book["profiles"].as_array()
+        .and_then(|profiles| profiles.iter().find(|profile| profile["id"] == book["selected_profile_id"]))
+        .ok_or("autoplay.select_profile")?;
+    if profile["strategy"] != "opening" {
+        return Err("autoplay.full_not_ready");
+    }
+    Ok(profile)
+}
+
 fn signature(item: &Value) -> (u64, bool, Option<u64>) {
     let raw = item.get("id").and_then(Value::as_u64).unwrap_or(0);
     (
@@ -282,8 +292,8 @@ fn matches(item: &Value, target: &Value) -> bool {
         _ => false,
     }
 }
-fn achieved_count(state: &Value, config: &Value) -> u64 {
-    let targets = config
+fn achieved_count(state: &Value, profile: &Value) -> u64 {
+    let targets = profile
         .get("targets")
         .and_then(Value::as_array)
         .map(Vec::as_slice)
@@ -298,4 +308,71 @@ fn achieved_count(state: &Value, config: &Value) -> u64 {
         .filter(|target| effects.iter().any(|item| matches(item, target)))
         .map(|target| target.get("value").and_then(Value::as_u64).unwrap_or(1))
         .sum()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn opening_targets_come_from_the_selected_playbook_profile() {
+        let mut book: Value = serde_json::from_str(include_str!("../tests/fixtures/playbook.json")).unwrap();
+        book["selected_profile_id"] = json!("opening-profile");
+        let config = json!({"playbook": book});
+        let profile = selected_opening_profile(&config).unwrap();
+        assert_eq!(profile["end_count"], 5);
+        assert_eq!(profile["cutoff_level"], 13002);
+        assert_eq!(profile["cutoff_node"], 4);
+        assert_eq!(achieved_count(&json!({"effect_list": [{"id": 11, "badge": {"id": 600010}}]}), profile), 5);
+        assert_eq!(achieved_count(&json!({"effect_list": [{"id": 10, "badge": {"id": 600010}}]}), profile), 2);
+        assert_eq!(selected_opening_profile(&json!({})), Err("autoplay.select_profile"));
+        let mut full = config.clone();
+        full["playbook"]["selected_profile_id"] = json!("profile-a");
+        assert_eq!(selected_opening_profile(&full), Err("autoplay.full_not_ready"));
+    }
+
+    #[tokio::test]
+    async fn autorun_continuously_monitors_a_snapshot_of_the_started_profile() {
+        let root = std::env::temp_dir().join(format!("shanten-autorun-{}-{}", std::process::id(),
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let (events, mut received) = tokio::sync::broadcast::channel(128);
+        let services = Arc::new(Services::load(root.clone(), events).unwrap());
+        let mut book: Value = serde_json::from_str(include_str!("../tests/fixtures/playbook.json")).unwrap();
+        book["selected_profile_id"] = json!("opening-profile");
+        services.patch_config(&json!({"autorun": {"playbook": book, "op_interval_ms": 100}})).unwrap();
+        let proxy = ProxyControl::new(services.clone(), Arc::new(tokio::sync::RwLock::new(crate::pipeline::PipelineConfig::default())));
+        let automation = Automation::new(services.clone(), proxy);
+        automation.start_autorun().unwrap();
+        let profile = automation.autorun_status()["active_profile"].clone();
+        book["selected_profile_id"] = json!("profile-a");
+        services.patch_config(&json!({"autorun": {"playbook": book}})).unwrap();
+        assert_eq!(automation.autorun_status()["active_profile"], profile);
+        services.publish_qyzz_state(&json!({
+            "source": "qyzz", "qyzz_run_id": "autorun-test", "qyzz_version": 1, "qyzz_deal_id": 1,
+            "deck_map": {}, "hand_tiles": [], "wall_tiles": [], "locked_tiles": [],
+            "replacement_tiles": [], "dora_tiles": [],
+            "effect_list": [{"id": 11, "uid": 1, "volume": 1, "store": [], "tags": [], "badge": {"id": 600010, "uid": 1, "random": 0, "store": []}}]
+        })).unwrap();
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let event = received.recv().await.unwrap();
+                if event["type"] == "autorun_status" && event["data"]["current_step"] == "goal_met" { break; }
+            }
+        }).await.expect("continuous execution must reach the target without a manual step");
+        let status = automation.autorun_status();
+        assert_eq!(status["running"], false);
+        assert_eq!(status["current_achieved_count"], 5);
+        assert_eq!(status["active_profile"], profile);
+        assert!(status.get("mode").is_none());
+        serde_json::from_value::<crate::ipc::AutoRunnerStatus>(status).unwrap();
+        assert_eq!(automation.start_autorun(), Err("autoplay.full_not_ready"));
+        book["selected_profile_id"] = json!("opening-profile");
+        services.patch_config(&json!({"autorun": {"playbook": book}})).unwrap();
+        automation.start_autorun().unwrap();
+        automation.stop_autorun();
+        assert!(automation.autorun.lock().unwrap().task.is_none());
+        drop(automation);
+        drop(services);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

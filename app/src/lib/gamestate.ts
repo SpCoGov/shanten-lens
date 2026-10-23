@@ -1,4 +1,8 @@
+import type {ActionReport, DecisionReport} from "../bindings";
+
 export interface GameStateData {
+    action_report?: ActionReport | null;
+    decision_report?: DecisionReport | null;
     source?: "qyzz" | "packet" | null;
     qyzz_connected?: boolean | null;
     session_id?: number;

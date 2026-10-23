@@ -64,15 +64,30 @@ export default function Modal({
             }}
         >
             <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
                 className={`${styles.card}${className ? ` ${className}` : ""}`}
                 style={{width}}
                 onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                    if (e.key !== "Tab") return;
+                    const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>(
+                        'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+                    )).filter(control => control.tabIndex >= 0 && control.getClientRects().length > 0);
+                    const first = controls[0];
+                    const last = controls[controls.length - 1];
+                    if (e.shiftKey ? document.activeElement === first : document.activeElement === last) {
+                        e.preventDefault();
+                        (e.shiftKey ? last : first)?.focus();
+                    }
+                }}
             >
                 <div className={`${styles.header} modal-header`}>
                     <div className={`${styles.headerTitle} modal-title`}>{title}</div>
                     <div className={`${styles.headerActions} modal-actions`}>
                         {actions}
-                        <button className="nav-btn" onClick={onClose}>{t("modal.close")}</button>
+                        <button autoFocus className="nav-btn" onClick={onClose}><span className="ms" aria-hidden="true">close</span>{t("modal.close")}</button>
                     </div>
                 </div>
 

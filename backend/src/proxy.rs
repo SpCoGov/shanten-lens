@@ -37,6 +37,9 @@ use std::{
 };
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, info, trace, warn};
+mod direct;
+#[cfg(test)]
+mod action_tests;
 
 type SharedFlow = Arc<Mutex<FlowProcessor>>;
 
@@ -81,6 +84,7 @@ struct FlowInfo {
 #[derive(Clone)]
 pub struct ProxyControl {
     flows: Arc<Mutex<HashMap<SocketAddr, FlowEntry>>>,
+    direct: Arc<Mutex<Option<FlowEntry>>>,
     next_id: Arc<AtomicU16>,
     activity: Arc<std::sync::atomic::AtomicU64>,
     config: Arc<RwLock<PipelineConfig>>,
@@ -91,6 +95,7 @@ impl ProxyControl {
     pub fn new(services: Arc<Services>, config: Arc<RwLock<PipelineConfig>>) -> Self {
         Self {
             flows: Arc::new(Mutex::new(HashMap::new())),
+            direct: Arc::new(Mutex::new(None)),
             next_id: Arc::new(AtomicU16::new(u16::MAX)),
             activity: Arc::new(std::sync::atomic::AtomicU64::new(1)),
             config,
@@ -105,8 +110,16 @@ impl ProxyControl {
         timeout: Duration,
     ) -> Result<(u16, Value), String> {
         let config = self.config.read().await.clone();
-        self.request_inner(method, data, timeout, false, config, None)
+        self.request_inner(method, data, timeout, false, config, None, false, None)
             .await
+    }
+
+    pub(crate) async fn request_action(
+        &self, method: &str, data: &Value, timeout: Duration,
+        request: &crate::action_executor::ActionExecutionRequest, submitted: &mut Option<(u64, u64)>,
+    ) -> Result<(u16, Value), String> {
+        let config = self.config.read().await.clone();
+        self.request_inner(method, data, timeout, false, config, None, false, Some((request, submitted))).await
     }
 
     pub async fn replay(
@@ -116,7 +129,7 @@ impl ProxyControl {
         timeout: Duration,
         config: PipelineConfig,
     ) -> Result<(u16, Value), String> {
-        self.request_inner(method, data, timeout, true, config, Some(REPLAY_INJECTOR.into()))
+        self.request_inner(method, data, timeout, true, config, Some(REPLAY_INJECTOR.into()), false, None)
             .await
     }
 
@@ -128,7 +141,7 @@ impl ProxyControl {
         config: PipelineConfig,
         source: &str,
     ) -> Result<(u16, Value), String> {
-        self.request_inner(method, data, timeout, false, config, Some(source.into()))
+        self.request_inner(method, data, timeout, false, config, Some(source.into()), false, None)
             .await
     }
 
@@ -140,18 +153,28 @@ impl ProxyControl {
         replay_id: bool,
         config: PipelineConfig,
         source: Option<String>,
+        maintenance: bool,
+        action: Option<(&crate::action_executor::ActionExecutionRequest, &mut Option<(u64, u64)>)>,
     ) -> Result<(u16, Value), String> {
-        if !self.services.packet_processing_allowed() {
+        if !maintenance && !self.services.packet_processing_allowed() {
             return Err("qyzz-operation-not-supported-use-game-controls".into());
         }
-        let (processor, outbound, inbound) = {
+        let (processor, outbound, inbound, transport, flow_id) = {
+            let direct = self.direct.lock().map_err(|_| "direct flow poisoned")?;
             let flows = self.flows.lock().map_err(|_| "flow map poisoned")?;
-            self.preferred_flow(&flows)
-                .map(|(_, flow)| {
+            let transport = self.services.packet_transport();
+            let selected = if transport.0.is_some() {
+                direct.as_ref()
+            } else if maintenance { None } else {
+                self.preferred_flow(&flows).map(|(_, flow)| flow)
+            };
+            selected.map(|flow| {
                     (
                         flow.processor.clone(),
                         flow.outbound.as_ref().unwrap().clone(),
                         flow.inbound.clone(),
+                        transport,
+                        flow.info.id,
                     )
                 })
                 .ok_or("no-preferred-websocket-flow")?
@@ -216,18 +239,29 @@ impl ProxyControl {
                 }
             }
         };
-        if !self.services.packet_processing_allowed() {
-            return Err("data-source-not-selected".into());
-        }
-        for (direction, frame) in frames {
-            let sender = match direction {
-                Direction::Outbound => Some(&outbound),
-                Direction::Inbound => inbound.as_ref(),
-            };
-            if sender.is_none_or(|sender| sender.send(Message::Binary(frame.into())).is_err()) {
-                return Err("websocket-flow-closed".into());
+        let mut submitted = false;
+        let send = || {
+            for (direction, frame) in frames {
+                let sender = match direction {
+                    Direction::Outbound => Some(&outbound),
+                    Direction::Inbound => inbound.as_ref(),
+                };
+                if sender.is_none_or(|sender| sender.send(Message::Binary(frame.into())).is_err()) {
+                    return Err("websocket-flow-closed".into());
+                }
+                submitted = true;
             }
+            Ok(())
+        };
+        let sent = self.services.send_on_packet_transport(transport, maintenance, || match &action {
+            Some((request, _)) => self.services.send_current_action(request, flow_id, send),
+            None => send(),
+        });
+        // Remember submission before awaiting the reply, including if the caller is cancelled.
+        if let Some((request, stamp)) = action {
+            if submitted { *stamp = Some((request.session_id, request.revision)); }
         }
+        sent?;
         match tokio::time::timeout(timeout, receiver).await {
             Ok(Ok(response)) => Ok((id, response)),
             Ok(Err(_)) => Err("response-waiter-closed".into()),
@@ -239,6 +273,7 @@ impl ProxyControl {
         &self,
         flows: &'a HashMap<SocketAddr, FlowEntry>,
     ) -> Option<(&'a SocketAddr, &'a FlowEntry)> {
+        if self.services.direct_flow_id().is_some() { return None; }
         let active = self.services.active_flow_id();
         flows
             .iter()
@@ -257,9 +292,10 @@ impl ProxyControl {
     }
 
     pub fn flows(&self) -> Vec<FlowDumpItem> {
+        let direct = self.direct.lock().unwrap();
         let flows = self.flows.lock().unwrap();
         let preferred = self.preferred_flow(&flows).map(|(address, _)| *address);
-        flows
+        let mut result: Vec<_> = flows
             .iter()
             .map(|(address, flow)| FlowDumpItem {
                 id: flow.info.id,
@@ -273,7 +309,16 @@ impl ProxyControl {
                 activity: flow.activity,
                 business_activity: flow.business_activity,
             })
-            .collect()
+            .collect();
+        if let Some(flow) = direct.as_ref() {
+            result.push(FlowDumpItem {
+                id: flow.info.id, peer_key: flow.info.peer_key.clone(),
+                client: flow.info.client.clone(), server: flow.info.server.clone(),
+                websocket: true, to_server: true, to_client: false, is_preferred: true,
+                activity: flow.activity, business_activity: flow.business_activity,
+            });
+        }
+        result
     }
 
     pub async fn request_with_retry(
@@ -294,7 +339,7 @@ impl ProxyControl {
         let (_, refresh) = self
             .request(
                 ".lq.Lobby.fetchAmuletActivityData",
-                &json!({"activityId":260511}),
+                &json!({"activityId":261081}),
                 timeout,
             )
             .await?;
@@ -325,11 +370,12 @@ impl Handler {
         let config = self.config.read().await.clone();
         let mut flows = self.control.flows.lock().expect("flow map poisoned");
         let entry = flows.entry(client).or_insert_with(|| {
-            let processor = FlowProcessor::with_registry(
+            let mut processor = FlowProcessor::with_registry(
                 config,
                 self.services.clone(),
                 self.module_registry.clone(),
             );
+            processor.capture_region = direct::capture_region(server);
             let info = FlowInfo {
                 id: processor.flow_id,
                 peer_key: client.to_string(),
@@ -489,6 +535,7 @@ impl WebSocketHandler for Handler {
                 // Only frames already processed by request_inner or pipeline injection enter this queue.
                 message = injected_rx.recv() => match message {
                     Some(message) => {
+                        if self.services.direct_flow_id().is_some() { continue; }
                         log_websocket_message(arrow, &uri, client, direction_name, &message, true);
                         if let Err(error) = sink.send(message).await {
                             warn!(target: "shanten_backend::hudsucker", %client, direction = direction_name, %uri, %error, "injected WebSocket send failed");

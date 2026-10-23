@@ -59,11 +59,8 @@ pub struct EmailNotifyConfig {
 #[allow(dead_code)]
 #[derive(Deserialize, Serialize, Type)]
 pub struct AutoRunnerConfig {
-    end_count: u64,
-    targets: Vec<Value>,
-    cutoff_level: Option<u64>,
+    playbook: Value,
     op_interval_ms: Option<u64>,
-    need_pionner_badge_count: Option<u64>,
     record_detailed_operations: Option<bool>,
     email_notify: Option<EmailNotifyConfig>,
 }
@@ -138,6 +135,8 @@ pub struct RegistryPayload {
 #[allow(dead_code)]
 #[derive(Deserialize, Serialize, Type)]
 pub struct GameStateData {
+    action_report: Option<crate::action_provider::ActionReport>,
+    decision_report: Option<crate::decision::DecisionReport>,
     source: Option<DataSource>,
     qyzz_connected: Option<bool>,
     session_id: Option<u64>,
@@ -181,7 +180,7 @@ pub struct GameStateData {
 #[allow(dead_code)]
 #[derive(Deserialize, Serialize, Type)]
 pub struct AutoRunnerStatus {
-    mode: Option<String>,
+    active_profile: Option<Value>,
     running: bool,
     runs: u64,
     elapsed_ms: u64,
@@ -356,10 +355,8 @@ pub struct AmuletActionRequest {
 pub enum AutorunAction {
     Start,
     Stop,
-    Step,
     Probe,
     NotifyTestEmail,
-    SetMode,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Type)]

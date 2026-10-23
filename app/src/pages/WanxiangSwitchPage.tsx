@@ -7,9 +7,11 @@ import {buildDebugSnapshotFromState, type GameStateData} from "../lib/gamestate"
 import {BlackHoleStrategyCard, searchProgressText} from "./BlackHolePage";
 import {
     readWanxiangPreferences,
+    updateWanxiangPreferences,
     WANXIANG_PREFER_BONUS_KEY,
     WANXIANG_PREFERRED_SUIT_KEY,
     WANXIANG_PREFERRED_MELD_TYPE_KEY,
+    WANXIANG_COIN_OBJECTIVE_KEY,
 } from "../lib/wanxiangSettings";
 
 const LS_VERBOSE = "sl-wanxiang-switch:verbose-progress";
@@ -83,12 +85,14 @@ export default function WanxiangSwitchPage({
     const [wallLimitInput, setWallLimitInput] = React.useState<string>(() => String(readWallLimit()));
     const [seenSignatures, setSeenSignatures] = React.useState<string[]>([]);
     const [mainData, setMainData] = React.useState<PlanData | null>(null);
+    const [executing, setExecuting] = React.useState(false);
 
     React.useEffect(() => localStorage.setItem(LS_VERBOSE, verboseProgress ? "1" : "0"), [verboseProgress]);
     React.useEffect(() => {
         localStorage.setItem(WANXIANG_PREFER_BONUS_KEY, preferences.prefer_dora ? "1" : "0");
         localStorage.setItem(WANXIANG_PREFERRED_SUIT_KEY, preferences.preferred_suit ?? "");
         localStorage.setItem(WANXIANG_PREFERRED_MELD_TYPE_KEY, preferences.preferred_meld_type ?? "");
+        localStorage.setItem(WANXIANG_COIN_OBJECTIVE_KEY, preferences.coin_objective ?? "");
     }, [preferences]);
     React.useEffect(() => localStorage.setItem(LS_WALL_LIMIT, String(wallLimit)), [wallLimit]);
     React.useEffect(() => {
@@ -116,6 +120,9 @@ export default function WanxiangSwitchPage({
     const isSearching = mainData?.status === "searching";
     const canResume = !!planSignature && !isSearching;
     const hasExecutablePlan = mainData?.status === "plan";
+    const hasFullPlan = !!mainData?.search_preferences?.coin_objective && !!mainData.custom_steps;
+    const canExecuteFullPlan = canOperate && hasExecutablePlan && hasFullPlan && !!mainData?.plan_id
+        && mainData.request_source === "live" && mainData.state_revision === currentState?.revision && !executing;
 
     const resolveWallLimit = React.useCallback(() => {
         const parsed = parseWallLimitInput(wallLimitInput.trim(), t);
@@ -163,6 +170,15 @@ export default function WanxiangSwitchPage({
         if (!canOperate || !hasExecutablePlan) return;
         void backendIpc.runSwitch({action: "execute_plan", options: {plan_id: mainData?.plan_id ?? ""}});
     }, [canOperate, hasExecutablePlan, mainData?.plan_id]);
+    const executeFullPlan = async () => {
+        if (!canExecuteFullPlan) return;
+        setExecuting(true);
+        try {
+            await backendIpc.runSwitch({action: "execute_full_plan", options: {plan_id: mainData!.plan_id!}});
+        } finally {
+            setExecuting(false);
+        }
+    };
     const exportCurrentSnapshot = React.useCallback(async () => {
         if (!currentState) {
             pushToast(t("blackhole.export_empty"), "error", 1800);
@@ -182,6 +198,10 @@ export default function WanxiangSwitchPage({
         setMainData(null);
         onClear?.();
     }, [onClear]);
+    const updatePreferences = (patch: Partial<SearchPreferences>) => {
+        setPreferences(previous => updateWanxiangPreferences(previous, patch));
+        clearCache();
+    };
 
     const viewData = React.useMemo(() => {
         if (!mainData || mainData.status !== "searching") return mainData;
@@ -212,29 +232,32 @@ export default function WanxiangSwitchPage({
 
                 <div className="switch-guide-command-bar">
                     <div className="switch-guide-actions">
-                        <button className="switch-guide-button is-primary" onClick={() => startSearch()} disabled={isSearching}>
+                        <button className="switch-guide-button is-primary" onClick={() => startSearch()} disabled={isSearching || executing}>
                             <span className="ms" aria-hidden="true">search</span>{t("blackhole.start")}
                         </button>
                         <button className="switch-guide-button is-danger" onClick={stopSearch} disabled={!isSearching}>
                             <span className="ms" aria-hidden="true">stop_circle</span>{t("blackhole.stop")}
                         </button>
-                        <button className="switch-guide-button" onClick={() => startSearch({resume: true})} disabled={!canResume}>
+                        <button className="switch-guide-button" onClick={() => startSearch({resume: true})} disabled={!canResume || executing}>
                             <span className="ms" aria-hidden="true">resume</span>{t("blackhole.continue")}
                         </button>
-                        <button className="switch-guide-button is-success" onClick={executePlan} disabled={!canOperate || !hasExecutablePlan || isSearching}>
+                        <button className="switch-guide-button is-success" onClick={executePlan} disabled={!canOperate || !hasExecutablePlan || isSearching || executing}>
                             <span className="ms" aria-hidden="true">play_arrow</span>{t("blackhole.execute_plan")}
                         </button>
+                        {hasFullPlan && <button className="switch-guide-button is-success" onClick={() => void executeFullPlan()} disabled={!canExecuteFullPlan}>
+                            <span className="ms" aria-hidden="true">fast_forward</span>{t("blackhole.execute_full_plan")}
+                        </button>}
                     </div>
 
                     <div className="switch-guide-options">
                         <label className="switch-guide-toggle">
-                            <input type="checkbox" checked={verboseProgress} onChange={(e) => setVerboseProgress(e.target.checked)}/>
+                            <input type="checkbox" checked={verboseProgress} disabled={executing} onChange={(e) => setVerboseProgress(e.target.checked)}/>
                             <span className="switch-guide-toggle-track" aria-hidden="true"><span/></span>
                             <span>{t("blackhole.verbose_progress")}</span>
                         </label>
                         <label className="switch-guide-number">
                             <span>{t("blackhole.wall_limit")}</span>
-                            <input className="form-input" type="number" value={wallLimitInput} onChange={(e) => setWallLimitInput(e.target.value)}/>
+                            <input className="form-input" type="number" value={wallLimitInput} disabled={executing} onChange={(e) => setWallLimitInput(e.target.value)}/>
                         </label>
                     </div>
                 </div>
@@ -244,8 +267,8 @@ export default function WanxiangSwitchPage({
                     <div className="switch-guide-preference-fields">
                         <label className="switch-guide-preference-select">
                             <span>{t("blackhole.preferred_meld_suit")}</span>
-                            <select value={preferences.preferred_suit ?? ""} disabled={isSearching}
-                                    onChange={e => {setPreferences({...preferences, preferred_suit: e.target.value as SearchPreferences["preferred_suit"] || null}); clearCache();}}>
+                            <select value={preferences.preferred_suit ?? ""} disabled={isSearching || executing}
+                                    onChange={e => updatePreferences({preferred_suit: e.target.value as SearchPreferences["preferred_suit"] || null})}>
                                 <option value="">{t("blackhole.no_preference")}</option>
                                 {(["z", "p", "s", "m"] as const).map(suit => (
                                     <option key={suit} value={suit}>{t(suit === "z" ? "about.tile_groups.honors" : `tile.suits.${suit}`)}</option>
@@ -254,8 +277,8 @@ export default function WanxiangSwitchPage({
                         </label>
                         <label className="switch-guide-preference-select">
                             <span>{t("blackhole.preferred_meld_type")}</span>
-                            <select value={preferences.preferred_meld_type ?? ""} disabled={isSearching}
-                                    onChange={e => {setPreferences({...preferences, preferred_meld_type: e.target.value as SearchPreferences["preferred_meld_type"] || null}); clearCache();}}>
+                            <select value={preferences.preferred_meld_type ?? ""} disabled={isSearching || executing}
+                                    onChange={e => updatePreferences({preferred_meld_type: e.target.value as SearchPreferences["preferred_meld_type"] || null})}>
                                 <option value="">{t("blackhole.no_preference")}</option>
                                 {(["triplet", "sequence"] as const).map(type => (
                                     <option key={type} value={type}>{t(`blackhole.meld_${type}`)}</option>
@@ -263,20 +286,29 @@ export default function WanxiangSwitchPage({
                             </select>
                         </label>
                         <label className="switch-guide-toggle">
-                            <input type="checkbox" checked={preferences.prefer_dora} disabled={isSearching}
-                                   onChange={e => {setPreferences({...preferences, prefer_dora: e.target.checked, prefer_soul: e.target.checked}); clearCache();}}/>
+                            <input type="checkbox" checked={preferences.prefer_dora} disabled={isSearching || executing}
+                                   onChange={e => updatePreferences({prefer_dora: e.target.checked, prefer_soul: e.target.checked})}/>
                             <span className="switch-guide-toggle-track" aria-hidden="true"><span/></span>
                             <span>{t("blackhole.wanxiang_prefer_bonus")}</span>
                         </label>
+                        {(["heavenly_blessing", "shining_pearl"] as const).map(objective => (
+                            <label className="switch-guide-toggle" key={objective}>
+                                <input type="checkbox" checked={preferences.coin_objective === objective} disabled={isSearching || executing}
+                                       onChange={e => updatePreferences({coin_objective: e.target.checked ? objective : null})}/>
+                                <span className="switch-guide-toggle-track" aria-hidden="true"><span/></span>
+                                <span>{t(`blackhole.wanxiang_${objective}`)}</span>
+                            </label>
+                        ))}
                     </div>
-                    <p>{t("blackhole.wanxiang_preference_hint")}</p>
+                    <p>{t(preferences.coin_objective ? "blackhole.wanxiang_coin_hint" : "blackhole.wanxiang_preference_hint")}</p>
+                    {preferences.coin_objective && <p>{t(`blackhole.wanxiang_${preferences.coin_objective}_hint`)}</p>}
                 </details>
 
                 <div className="switch-guide-utility-bar">
                     <span>{t("blackhole.wall_limit_hint")}</span>
                     <div>
                         <button type="button" onClick={exportCurrentSnapshot}><span className="ms" aria-hidden="true">content_copy</span>{t("blackhole.export_current")}</button>
-                        <button type="button" onClick={clearCache}><span className="ms" aria-hidden="true">delete_sweep</span>{t("blackhole.clear_cache")}</button>
+                        <button type="button" onClick={clearCache} disabled={executing}><span className="ms" aria-hidden="true">delete_sweep</span>{t("blackhole.clear_cache")}</button>
                     </div>
                 </div>
             </section>

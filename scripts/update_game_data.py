@@ -343,6 +343,35 @@ def build_levels(sources: dict[str, str]) -> dict:
             "group": row["group"], "hp": score(row["hp"])} for row in enemies]}
 
 
+def build_action_rules(excels: dict) -> dict:
+    def sheet(name, keys=("id",)):
+        return load_sheet(excels, "amulet/amulet_" + name, keys)
+    def select(row, fields):
+        return {field: row[field] for field in fields}
+    effects = sheet("effect")
+    gamble = sheet("gamble_selection", ("id", "selection_id"))
+    if len({row["selection_id"] for row in gamble}) != len(gamble):
+        raise ValueError("duplicate gamble selection IDs")
+    return {
+        "effects": {str(row["id"]): select(row, ("upgrade", "duplicate_enabled", "effect_group", "can_sell", "rarity"))
+                    for row in effects},
+        "shop_hp_rates": {str(row["id"]): row["args"][0] for row in effects if row["id"] in (3630, 3631)},
+        "acquire_damage": {str(row["id"]): integer(row["args"][1], "acquisition damage")
+                           for row in effects if row["id"] in (3550, 3551)},
+        "badges": {str(row["id"]): select(row, ("volume", "rarity")) for row in sheet("badge")},
+        "shop_upgrades": sheet("shop_upgrade", ("id", "level")),
+        "characters": [select(row, ("activity_id", "character_id", "init_desktop_count", "init_open_desktop_count", "init_tian_count"))
+                       for row in sheet("character", ("activity_id", "character_id"))],
+        "forge": sheet("forge", ("activity_id", "type", "rarity")),
+        "transport": sheet("transport", ("activity_id",)),
+        "trade_types": {str(row["id"]): row["type"] for row in sheet("trade_item")},
+        "gamble_selections": {str(integer(row["selection_id"], "gamble selection ID", 1)): {
+            "type": integer(row["type"], "gamble selection type", 1),
+            "args": [integer(arg, "gamble argument") for arg in (row["args"] or [])],
+        } for row in gamble},
+    }
+
+
 def updated_registry(previous: dict, incoming: list[dict], meta: dict) -> dict:
     if previous.get("schema_version") != 1:
         raise ValueError("unsupported registry schema")
@@ -370,7 +399,12 @@ def generate(root: Path, lua: dict, config: dict, excels: dict, meta: dict) -> b
         raise ValueError(f"required amulet RPCs missing: {sorted(missing)}")
     amulets, badges = build_registries(excels)
     levels = build_levels(excels)
+    action_rules = build_action_rules(excels)
     outputs = {root / "proto/liqi.proto": proto.encode("utf-8")}
+    rule_path = root / "backend/assets/action_rules.json"
+    previous_rules = json.loads(rule_path.read_bytes()) if rule_path.exists() else {}
+    if previous_rules.get("rules") != action_rules:
+        outputs[rule_path] = (json.dumps({"source": {"client_url": CLIENT_URL, **meta}, "rules": action_rules}, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     level_path = root / "backend/assets/levels.json"
     previous_levels = json.loads(level_path.read_bytes()) if level_path.exists() else {}
     if any(previous_levels.get(key) != value for key, value in levels.items()):

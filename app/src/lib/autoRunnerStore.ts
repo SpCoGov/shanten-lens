@@ -1,16 +1,13 @@
 import {useSyncExternalStore} from "react";
+import {emptyAutoPlayConfig, type AutoPlayConfig, type OpeningPlayProfile} from "./autoPlayConfig";
 
 export type TargetBadge = { kind: "badge"; id: number; value?: number };
 export type TargetAmulet = { kind: "amulet"; id: number; plus?: boolean; badge?: number | null; value?: number };
 export type TargetItem = TargetBadge | TargetAmulet;
 
 export type AutoRunnerConfig = {
-    end_count: number;
-    targets: TargetItem[];
-    cutoff_level?: number;
-    __tick__?: number; // 轻量刷新
+    playbook: AutoPlayConfig;
     op_interval_ms?: number;
-    need_pionner_badge_count?: number;
     record_detailed_operations?: boolean;
     email_notify?: EmailNotifyConfig;
 };
@@ -54,12 +51,12 @@ export type AutoRunnerOperationRecord = {
 };
 
 export type AutoRunnerStatus = {
-    mode?: "continuous" | "step";
+    active_profile?: OpeningPlayProfile | null;
     running: boolean;
     runs: number;
     elapsed_ms: number;
     best_achieved_count: number;
-    current_achieved_count?: number;
+    current_achieved_count?: number | null;
     current_step?: string;
     last_error?: string;
     started_at?: number;
@@ -79,11 +76,8 @@ export type AutoRunnerStatus = {
 };
 
 const defaultConfig: AutoRunnerConfig = {
-    end_count: 1,
-    targets: [],
-    cutoff_level: 102,
+    playbook: emptyAutoPlayConfig,
     op_interval_ms: 1000,
-    need_pionner_badge_count: 4,
     record_detailed_operations: false,
     email_notify: {
         enabled: false,
@@ -97,7 +91,7 @@ const defaultConfig: AutoRunnerConfig = {
 };
 
 const defaultStatus: AutoRunnerStatus = {
-    mode: "continuous",
+    active_profile: null,
     running: false,
     runs: 0,
     elapsed_ms: 0,
@@ -121,26 +115,14 @@ const defaultStatus: AutoRunnerStatus = {
 type State = {
     config: AutoRunnerConfig;
     status: AutoRunnerStatus;
+    playbookDirty: boolean;
 };
 
 let state: State = {
     config: defaultConfig,
     status: defaultStatus,
+    playbookDirty: false,
 };
-
-function normalizeTargets(arr: TargetItem[] | undefined | null): TargetItem[] {
-    if (!Array.isArray(arr)) return [];
-    return arr.map((t) => {
-        const v = Number.isFinite(Number((t as any).value)) ? Math.max(1, Math.floor(Number((t as any).value))) : 1;
-        if (t.kind === "amulet") {
-            const a = t as TargetAmulet;
-            return {kind: "amulet", id: a.id, plus: !!a.plus, badge: a.badge ?? null, value: v};
-        } else {
-            const b = t as TargetBadge;
-            return {kind: "badge", id: b.id, value: v};
-        }
-    });
-}
 
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((fn) => fn());
@@ -151,85 +133,35 @@ export function setAutoConfig(cfg: AutoRunnerConfig) {
         config: {
             ...defaultConfig,
             ...(cfg ?? defaultConfig),
-            targets: normalizeTargets(cfg?.targets),
+            ...(state.playbookDirty ? {playbook: state.config.playbook} : {}),
         },
     };
     emit();
 }
 
 export function patchAutoConfig(patch: Partial<AutoRunnerConfig>) {
-    const nextTargets = patch.targets ? normalizeTargets(patch.targets) : state.config.targets;
     state = {
         ...state,
+        playbookDirty: state.playbookDirty || patch.playbook !== undefined,
         config: {
             ...state.config,
             ...patch,
-            targets: nextTargets,
         },
     };
     emit();
 }
 
+export function markPlaybookSaved(saved: AutoPlayConfig) {
+    if (state.config.playbook !== saved) return;
+    state = {...state, playbookDirty: false};
+    emit();
+}
+
+export const getAutoRunnerSnapshot = () => state;
+
 export function setAutoStatus(newStatus: AutoRunnerStatus) {
     state = {...state, status: {...defaultStatus, ...(newStatus ?? {})}};
     emit();
-}
-
-export function addTargetAmulet(item: { id: number; plus?: boolean; badge?: number | null; value?: number }) {
-    const next: TargetItem = {
-        kind: "amulet",
-        id: item.id,
-        plus: !!item.plus,
-        badge: item.badge ?? null,
-        value: Number.isFinite(Number(item.value)) ? Math.max(1, Math.floor(Number(item.value))) : 1,
-    };
-    state = {...state, config: {...state.config, targets: [...state.config.targets, next]}};
-    emit();
-}
-
-export function addTargetBadge(badgeId: number, value: number = 1) {
-    const next: TargetItem = {kind: "badge", id: badgeId, value: Math.max(1, Math.floor(Number(value)))};
-    state = {...state, config: {...state.config, targets: [...state.config.targets, next]}};
-    emit();
-}
-
-export function removeTargetAt(index: number) {
-    const arr = state.config.targets.slice();
-    if (index >= 0 && index < arr.length) arr.splice(index, 1);
-    state = {...state, config: {...state.config, targets: arr}};
-    emit();
-}
-
-export function replaceTargetAt(index: number, item: TargetItem) {
-    const arr = state.config.targets.slice();
-    if (index >= 0 && index < arr.length) arr[index] = {...item, value: Math.max(1, Math.floor(Number((item as any).value ?? 1)))};
-    state = {...state, config: {...state.config, targets: arr}};
-    emit();
-}
-
-export function setTargetValue(index: number, value: number) {
-    const v = Math.max(1, Math.floor(Number(value || 1)));
-    const arr = state.config.targets.slice();
-    if (index >= 0 && index < arr.length) {
-        const t = arr[index];
-        arr[index] = {...t, value: v};
-        state = {...state, config: {...state.config, targets: arr}};
-        emit();
-    }
-}
-
-export function parseLevelText(s: string): number | null {
-    const m = /^\s*([1-5])\s*-\s*([1-3])\s*$/.exec(s);
-    if (!m) return null;
-    const a = Number(m[1]), b = Number(m[2]);
-    return a * 100 + b;
-}
-
-export function formatLevelNum(n?: number): string {
-    if (!n || n <= 0) return "";
-    const a = Math.floor(n / 100);
-    const b = n % 100;
-    return `${a}-${b}`;
 }
 
 export function useAutoRunner() {
@@ -238,6 +170,6 @@ export function useAutoRunner() {
             subs.add(fn);
             return () => subs.delete(fn);
         },
-        () => state
+        getAutoRunnerSnapshot
     );
 }

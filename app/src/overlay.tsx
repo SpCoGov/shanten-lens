@@ -8,6 +8,8 @@ import {t} from "i18next";
 import * as backendIpc from "./lib/ipc";
 import type {PlanData} from "./lib/planTypes";
 import {readWanxiangPreferences} from "./lib/wanxiangSettings";
+import {readCustomSwitchOptions, CUSTOM_SWITCH_TARGET_KEY, CUSTOM_SWITCH_WALL_LIMIT_KEY, CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY} from "./lib/customSwitchSettings";
+import {targetSize, targetKind} from "./lib/customTarget";
 import type {EffectItem, GameStateData} from "./lib/gamestate";
 import {toDeckMap} from "./lib/gamestate";
 import {
@@ -28,10 +30,12 @@ import {
     readHudShowBlackhole,
     readHudShowScoreProjection,
     readHudShowWanxiang,
+    readHudShowCustomSwitch,
     HUD_ENABLED_KEY,
     HUD_SHOW_BLACKHOLE_KEY,
     HUD_SHOW_SCORE_PROJECTION_KEY,
     HUD_SHOW_WANXIANG_KEY,
+    HUD_SHOW_CUSTOM_SWITCH_KEY,
 } from "./lib/hudSettings";
 
 type ExecutionState = {
@@ -41,12 +45,15 @@ type ExecutionState = {
     reason: string;
     reason_key: string;
     phase: string;
+    search_algorithm: string;
+    plan_id: string;
 };
 
 const DEFAULT_SEARCH_ALGORITHM = "target_enumeration_search";
 const WANXIANG_SEARCH_ALGORITHM = "wanxiang_four_meld_switch";
 const BLACKHOLE_PANEL_STORAGE_KEY = "sl-hud-panel:blackhole";
 const WANXIANG_PANEL_STORAGE_KEY = "sl-hud-panel:wanxiang";
+const CUSTOM_SWITCH_PANEL_STORAGE_KEY = "sl-hud-panel:custom-switch";
 const SCORE_PROJECTION_PANEL_STORAGE_KEY = "sl-hud-panel:score-projection";
 const SCORE_FAN_STORAGE_KEY = "shanten:point-fan:v1";
 const SCORE_WIN_COUNT_STORAGE_KEY = "shanten:point-win-count:v1";
@@ -79,20 +86,27 @@ function sendWanxiangAction(action: backendIpc.SwitchAction, planId?: string) {
 function HudOverlay() {
     const [showBlackhole, setShowBlackhole] = React.useState(() => readHudShowBlackhole());
     const [showWanxiang, setShowWanxiang] = React.useState(() => readHudShowWanxiang());
+    const [showCustomSwitch, setShowCustomSwitch] = React.useState(() => readHudShowCustomSwitch());
     const [showScoreProjection, setShowScoreProjection] = React.useState(() => readHudShowScoreProjection());
     const [stage, setStage] = React.useState(0);
     const [gameState, setGameState] = React.useState<GameStateData | null>(null);
     const [plan, setPlan] = React.useState<PlanData | null>(null);
     const [wanxiangPlan, setWanxiangPlan] = React.useState<PlanData | null>(null);
+    const [customPlan, setCustomPlan] = React.useState<PlanData | null>(null);
+    const [customOptions, setCustomOptions] = React.useState(readCustomSwitchOptions);
+    const [customBusy, setCustomBusy] = React.useState(false);
+    const customSearchOptions = React.useRef<string | null>(null);
     const [execution, setExecution] = React.useState<ExecutionState | null>(null);
     const blackholePanelRef = React.useRef<HTMLDivElement | null>(null);
     const wanxiangPanelRef = React.useRef<HTMLDivElement | null>(null);
+    const customSwitchPanelRef = React.useRef<HTMLDivElement | null>(null);
     const scoreProjectionPanelRef = React.useRef<HTMLDivElement | null>(null);
     const visiblePanels = React.useCallback(() => [
         showBlackhole ? blackholePanelRef.current : null,
         showWanxiang ? wanxiangPanelRef.current : null,
+        showCustomSwitch ? customSwitchPanelRef.current : null,
         showScoreProjection ? scoreProjectionPanelRef.current : null,
-    ], [showBlackhole, showScoreProjection, showWanxiang]);
+    ], [showBlackhole, showScoreProjection, showWanxiang, showCustomSwitch]);
 
     React.useEffect(() => {
         invoke("set_overlay_enabled", {enabled: readHudEnabled()}).catch(() => {
@@ -112,7 +126,18 @@ function HudOverlay() {
                 const arr = Array.isArray(data) ? data : [];
                 for (const item of arr) {
                     if (item?.yaku === "souzu_switch" && item.data?.request_source !== "debug") {
-                        if (item.data?.search_algorithm === "custom_target") continue;
+                        if (item.data?.search_algorithm === "custom_target") {
+                            const options = JSON.stringify(readCustomSwitchOptions());
+                            if (item.data.status === "searching" && !item.data.search_progress) {
+                                customSearchOptions.current = options;
+                                setExecution(null);
+                            }
+                            if (customSearchOptions.current === null || customSearchOptions.current === options) {
+                                setCustomPlan(item.data ?? null);
+                            }
+                            continue;
+                        }
+                        setCustomPlan(null);
                         if (isWanxiangPlanData(item.data ?? null)) {
                             setWanxiangPlan(item.data ?? null);
                         } else {
@@ -131,6 +156,8 @@ function HudOverlay() {
                         reason: String(d.reason || ""),
                         reason_key: String(d.reason_key || ""),
                         phase: String(d.phase || ""),
+                        search_algorithm: String(d.search_algorithm || ""),
+                        plan_id: String(d.plan_id || ""),
                     });
                 }
             }),
@@ -147,8 +174,14 @@ function HudOverlay() {
                 setShowBlackhole(readHudShowBlackhole());
             } else if (event.key === HUD_SHOW_WANXIANG_KEY) {
                 setShowWanxiang(readHudShowWanxiang());
+            } else if (event.key === HUD_SHOW_CUSTOM_SWITCH_KEY) {
+                setShowCustomSwitch(readHudShowCustomSwitch());
             } else if (event.key === HUD_SHOW_SCORE_PROJECTION_KEY) {
                 setShowScoreProjection(readHudShowScoreProjection());
+            } else if (event.key === null || [CUSTOM_SWITCH_TARGET_KEY, CUSTOM_SWITCH_WALL_LIMIT_KEY, CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY].includes(event.key)) {
+                setCustomOptions(readCustomSwitchOptions());
+                setCustomPlan(null);
+                setExecution(previous => previous?.search_algorithm === "custom_target" ? null : previous);
             }
         };
         window.addEventListener("storage", onStorage);
@@ -156,7 +189,7 @@ function HudOverlay() {
     }, []);
 
     React.useEffect(() => {
-        const interactive = showBlackhole || showWanxiang || showScoreProjection;
+        const interactive = showBlackhole || showWanxiang || showCustomSwitch || showScoreProjection;
         invoke("set_overlay_interactive", {interactive}).catch(() => {
         });
         reportPanelRegions(visiblePanels());
@@ -165,10 +198,10 @@ function HudOverlay() {
             });
             reportPanelRegions([]);
         };
-    }, [showBlackhole, showScoreProjection, showWanxiang, visiblePanels]);
+    }, [showBlackhole, showScoreProjection, showWanxiang, showCustomSwitch, visiblePanels]);
 
     React.useEffect(() => {
-        if (!showBlackhole && !showWanxiang && !showScoreProjection) return;
+        if (!showBlackhole && !showWanxiang && !showCustomSwitch && !showScoreProjection) return;
         const report = () => reportPanelRegions(visiblePanels());
         report();
         window.addEventListener("resize", report);
@@ -177,9 +210,9 @@ function HudOverlay() {
             window.removeEventListener("resize", report);
             window.clearInterval(timer);
         };
-    }, [showBlackhole, showScoreProjection, showWanxiang, visiblePanels]);
+    }, [showBlackhole, showScoreProjection, showWanxiang, showCustomSwitch, visiblePanels]);
 
-    if (!showBlackhole && !showWanxiang && !showScoreProjection) {
+    if (!showBlackhole && !showWanxiang && !showCustomSwitch && !showScoreProjection) {
         return <div className="hud-root" aria-hidden="true"/>;
     }
 
@@ -187,6 +220,27 @@ function HudOverlay() {
     const hasPlan = plan?.status === "plan";
     const wanxiangSearching = wanxiangPlan?.status === "searching";
     const hasWanxiangPlan = wanxiangPlan?.status === "plan";
+    const customSearching = customPlan?.status === "searching";
+    const customReady = gameState && (gameState.source === "packet" ? [5, 6] : [4, 5]).includes(stage);
+    const customValid = targetSize(customOptions.target_groups) === 14
+        && customOptions.target_groups.filter(group => targetKind(group) === "quad").length <= 4;
+    const customStale = customPlan?.status === "plan" && customPlan.state_revision !== gameState?.revision;
+    const customExecution = execution?.search_algorithm === "custom_target" && execution.plan_id === customPlan?.plan_id ? execution : null;
+    const canExecuteCustom = customReady && customPlan?.status === "plan" && customPlan.request_source === "live"
+        && Boolean(customPlan.plan_id) && !customStale && !customBusy && execution?.status !== "running";
+    const customProgress = customExecution ? progressText(customPlan, customExecution)
+        : !customValid ? t("custom_target.reason_custom-invalid-target")
+        : !customReady ? t("custom_target.waiting")
+        : customStale ? t("custom_target.stale") : progressText(customPlan, null);
+    const sendCustomAction = async (action: "start" | "execute_plan" | "execute_full_plan") => {
+        if (customBusy || execution?.status === "running") return;
+        if (action === "start" ? !customReady || !customValid || customSearching : !canExecuteCustom) return;
+        setCustomBusy(true);
+        setExecution(null);
+        try {
+            await backendIpc.runSwitch({action, options: action === "start" ? readCustomSwitchOptions() : {plan_id: customPlan!.plan_id!}});
+        } finally { setCustomBusy(false); }
+    };
     const canOperate = stage === 4 || stage === 5;
     const hasWanxiang = hasWanxiangInState(gameState);
     const scoreProjection = getScoreProjection(gameState);
@@ -255,9 +309,46 @@ function HudOverlay() {
                             <strong>{progressText(wanxiangPlan, execution)}</strong>
                         </div>
                         <div className="hud-line">
-                            <span>{t("blackhole.wanxiang_draws_needed_label")}</span>
+                            <span>{t(wanxiangPlan?.search_preferences?.coin_objective
+                                ? "blackhole.wanxiang_win_draws_label" : "blackhole.wanxiang_draws_needed_label")}</span>
                             <strong>{wanxiangPlan?.draws_needed ?? "-"}</strong>
                         </div>
+                        {wanxiangPlan?.search_preferences?.coin_objective && wanxiangPlan.coin_reward != null && <div className="hud-line">
+                            <span>{t("action_provider.coin")}</span>
+                            <strong>{t("blackhole.wanxiang_coin_result", {
+                                objective: t(`blackhole.wanxiang_${wanxiangPlan.search_preferences.coin_objective}`),
+                                count: wanxiangPlan.coin_reward,
+                            })}</strong>
+                        </div>}
+                    </div>
+                </HudPanel>
+            ) : null}
+
+            {showCustomSwitch ? (
+                <HudPanel
+                    id="custom-switch"
+                    className="hud-blackhole"
+                    storageKey={CUSTOM_SWITCH_PANEL_STORAGE_KEY}
+                    defaultBounds={defaultCustomSwitchBounds()}
+                    panelRef={customSwitchPanelRef}
+                    onBoundsChange={() => reportPanelRegions(visiblePanels())}
+                    ariaLabel={t("custom_target.title")}
+                    title={t("custom_target.title")}
+                >
+                    <div className="hud-blackhole-actions">
+                        <button onClick={() => void sendCustomAction("start")} disabled={!customReady || !customValid || customSearching || customBusy || execution?.status === "running"}>
+                            {t("custom_target.start")}
+                        </button>
+                        <button onClick={() => void sendCustomAction("execute_plan")} disabled={!canExecuteCustom}>
+                            {t("blackhole.execute_plan")}
+                        </button>
+                        <button onClick={() => void sendCustomAction("execute_full_plan")} disabled={!canExecuteCustom}>
+                            {t("blackhole.execute_full_plan")}
+                        </button>
+                    </div>
+                    <div className="hud-blackhole-body" aria-live="polite">
+                        <div className="hud-line"><span>{t("overlay.blackhole_progress")}</span><strong title={customProgress}>{customProgress}</strong></div>
+                        <div className="hud-line"><span>{t("overlay.blackhole_draws_needed")}</span><strong>{customPlan?.draws_needed ?? "-"}</strong></div>
                     </div>
                 </HudPanel>
             ) : null}
@@ -445,6 +536,11 @@ function defaultScoreProjectionBounds(): PanelBounds {
         height,
         collapsed: false,
     };
+}
+
+function defaultCustomSwitchBounds(): PanelBounds {
+    const bounds = defaultBlackholeBounds();
+    return {...bounds, x: 16, y: 18};
 }
 
 function clampBounds(bounds: PanelBounds): PanelBounds {

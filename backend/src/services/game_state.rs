@@ -64,6 +64,8 @@ impl Services {
             return;
         }
         let fetch = packet.method == ".lq.Lobby.fetchAmuletActivityData";
+        let missing_game = fetch && packet.data.pointer("/data/game")
+            .or_else(|| packet.data.get("game")).is_none();
         let giveup = packet.method == ".lq.Lobby.amuletActivityGiveup";
         let events = packet.data.get("events").and_then(Value::as_array);
         if !fetch && !giveup && events.is_none_or(Vec::is_empty) {
@@ -76,6 +78,9 @@ impl Services {
         });
         let mut sources = self.data_sources.lock().unwrap();
         let mut packet_state = sources.packet.clone().unwrap_or_else(empty_game_state);
+        if sources.direct_flow.is_some_and(|selected| selected != flow_id) {
+            return;
+        }
         let target = packet_state.as_object_mut().unwrap();
         let old_flow = target.get("flow_id").and_then(Value::as_u64).unwrap_or(0);
         if old_flow != 0 && old_flow != flow_id && !fetch && !new_game {
@@ -91,12 +96,13 @@ impl Services {
         if fetch || new_game || giveup || old_flow != flow_id {
             target.insert("session_id".into(), json!(session + 1));
         }
-        if giveup {
+        if giveup || missing_game {
             *target = empty_game_state().as_object().unwrap().clone();
             target.insert("session_id".into(), json!(session + 1));
             target.insert("revision".into(), json!(revision + 1));
             target.insert("flow_id".into(), json!(flow_id));
             target.insert("ended".into(), Value::Bool(true));
+            if missing_game { target.insert("stage".into(), json!(100)); }
             target.insert("update_reason".into(), json!([packet.method]));
             sources.packet = Some(Value::Object(target.clone()));
             self.publish_selected_source(&mut sources, Some(crate::ipc::DataSource::Packet));
@@ -136,6 +142,7 @@ pub(super) fn apply_fetch_state(target: &mut Map<String, Value>, response: &Valu
         .and_then(|v| v.get("game"))
         .or_else(|| response.get("game"));
     let Some(game) = game else { return };
+    crate::action_provider::snapshot(target, game);
     target.insert("ended".into(), Value::Bool(false));
     let round = game.get("round").unwrap_or(&Value::Null);
     for (source, dest) in [
@@ -203,6 +210,7 @@ fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
     {
         apply_fetch_state(target, &json!({"data":{"game":game}}));
     }
+    crate::action_provider::update(target, item);
     if let Some(current) = item
         .get("state")
         .or_else(|| {
@@ -301,7 +309,9 @@ fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
             rebuild_redeal_wall(target, round);
         } else {
             rebuild_pool_sections(target, round, event_type == 4);
-            if event_type == 10 {
+            if event_type == 5 {
+                sync_opening_hand(target);
+            } else if event_type == 10 {
                 remove_drawn_tile_from_wall(target);
             }
         }
@@ -422,6 +432,27 @@ pub(super) fn rebuild_pool_sections(
         "replacement_tiles".into(),
         json!(remaining.iter().skip(wall_end).copied().collect::<Vec<_>>()),
     );
+    sync_opening_hand(target);
+}
+
+fn sync_opening_hand(target: &mut Map<String, Value>) {
+    if target.get("change_tile_count").and_then(Value::as_u64).unwrap_or(0) != 0
+        || !ints_from_state(target, "switch_used_tiles").is_empty()
+    {
+        return;
+    }
+    let opening = ints_from_state(target, "opening_hand_tiles");
+    let hand = ints_from_state(target, "hand_tiles");
+    let replacement = ints_from_state(target, "replacement_tiles");
+    let added = hand.iter().filter(|id| !opening.contains(id)).collect::<Vec<_>>();
+    if hand.len() != opening.len() || added.is_empty() || added.iter().any(|id| !replacement.contains(id)) {
+        return;
+    }
+    // Opening badges return displaced tiles to the front of the replacement queue.
+    let replacement = opening.iter().copied().filter(|id| !hand.contains(id))
+        .chain(replacement.into_iter().filter(|id| !hand.contains(id))).collect::<Vec<_>>();
+    target.insert("replacement_tiles".into(), json!(replacement));
+    target.insert("opening_hand_tiles".into(), json!(hand));
 }
 
 fn rebuild_redeal_wall(target: &mut Map<String, Value>, round: &Value) {
@@ -662,6 +693,69 @@ fn update_boss_buff(target: &mut Map<String, Value>) {
         .cloned()
         .unwrap_or_else(|| json!([]));
     target.insert("boss_buff".into(), buffs);
+}
+
+#[cfg(test)]
+mod pool_tests {
+    use super::*;
+
+    fn initial_round() -> Value {
+        json!({
+            "pool": (1..=108).map(|id| json!({"id": id, "tile": if id == 108 { "5z" } else { "1m" }})).collect::<Vec<_>>(),
+            "hands": (1..=13).collect::<Vec<_>>(), "dora": [14], "desktopRemain": 36,
+            "used": [], "changeTileCount": 0, "totalChangeTileCount": 5,
+            "nextOperation": [{"type": 101}]
+        })
+    }
+
+    #[test]
+    fn opening_badge_returns_the_displaced_tile_before_the_next_exchange() {
+        let mut state = empty_game_state().as_object().unwrap().clone();
+        apply_event_state(&mut state, &json!({"type": 4, "valueChanges": {"round": initial_round()}}));
+        let mut hand = (1..=13).filter(|id| *id != 4).collect::<Vec<_>>();
+        hand.push(108);
+        apply_event_state(&mut state, &json!({"type": 5, "valueChanges": {"round": {"hands": {"dirty": true, "value": hand}}}}));
+        let replacement = std::iter::once(4).chain(60..108).collect::<Vec<_>>();
+        assert_eq!(state["replacement_tiles"], json!(replacement));
+        assert_eq!(state["dora_tiles"], json!((14..24).collect::<Vec<_>>()));
+        assert_eq!(state["wall_tiles"], json!((24..60).collect::<Vec<_>>()));
+
+        let target = json!(vec![json!({"rule": {}}); 14]);
+        let plan = crate::recommendations::custom_switch_plan(&Value::Object(state.clone()), &target, 36, false, &mut |_| {}, &|| false);
+        assert_eq!(plan["status"], "plan", "{plan}");
+
+        hand.pop();
+        hand.push(4);
+        apply_event_state(&mut state, &json!({"type": 7, "valueChanges": {"round": {"hands": hand, "used": [108], "changeTileCount": 1}}}));
+        assert_eq!(state["replacement_tiles"], json!(replacement));
+        assert_eq!(ints_from_state(&state, "replacement_tiles")[ints_from_state(&state, "switch_used_tiles").len()], 60);
+    }
+
+    #[test]
+    fn fetching_an_opening_badge_hand_is_idempotent_and_a_new_round_resets_it() {
+        let mut state = empty_game_state().as_object().unwrap().clone();
+        let mut round = initial_round();
+        round["hands"] = json!((1..=13).filter(|id| *id != 4).chain(std::iter::once(108)).collect::<Vec<_>>());
+        let snapshot = json!({"game": {"round": round}});
+        for _ in 0..2 {
+            apply_fetch_state(&mut state, &snapshot);
+            assert_eq!(state["replacement_tiles"], json!(std::iter::once(4).chain(60..108).collect::<Vec<_>>()));
+        }
+        apply_event_state(&mut state, &json!({"type": 4, "valueChanges": {"round": initial_round()}}));
+        assert_eq!(state["replacement_tiles"], json!((60..=108).collect::<Vec<_>>()));
+    }
+
+    #[test]
+    fn fetching_a_normal_exchange_keeps_the_consumed_replacement_prefix() {
+        let mut state = empty_game_state().as_object().unwrap().clone();
+        let mut round = initial_round();
+        round["hands"] = json!((2..=13).chain(std::iter::once(60)).collect::<Vec<_>>());
+        round["used"] = json!([1]);
+        round["changeTileCount"] = json!(1);
+        apply_fetch_state(&mut state, &json!({"game": {"round": round}}));
+        assert_eq!(state["replacement_tiles"], json!((60..=108).collect::<Vec<_>>()));
+        assert_eq!(ints_from_state(&state, "replacement_tiles")[ints_from_state(&state, "switch_used_tiles").len()], 61);
+    }
 }
 
 #[cfg(test)]

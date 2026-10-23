@@ -54,7 +54,7 @@ export default function AmuletEditorModal({
                 }
                 disabled={amuletId == null}
             >
-                {t("amulet_editor.confirm")}
+                <span className="ms" aria-hidden="true">check</span>{t("amulet_editor.confirm")}
             </button>
         </>
     );
@@ -91,7 +91,7 @@ export default function AmuletEditorModal({
                         />
                         <div className="toolbar" style={{gap: 8, alignItems: "center", display: "flex"}}>
                             <button className="nav-btn" onClick={() => setPickA(true)}>
-                                {t("amulet_editor.pickFromList")}
+                                <span className="ms" aria-hidden="true">search</span>{t("amulet_editor.pickFromList")}
                             </button>
                             <span
                                 className="hint"
@@ -125,10 +125,10 @@ export default function AmuletEditorModal({
                         />
                         <div className="toolbar" style={{gap: 8, alignItems: "center", display: "flex"}}>
                             <button className="nav-btn" onClick={() => setPickB(true)}>
-                                {t("amulet_editor.pickFromList")}
+                                <span className="ms" aria-hidden="true">search</span>{t("amulet_editor.pickFromList")}
                             </button>
                             <button className="nav-btn" onClick={() => setBadgeId(null)} disabled={badgeId == null}>
-                                {t("amulet_editor.clear")}
+                                <span className="ms" aria-hidden="true">clear</span>{t("amulet_editor.clear")}
                             </button>
                             <span
                                 className="hint"

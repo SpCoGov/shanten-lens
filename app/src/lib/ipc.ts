@@ -35,6 +35,7 @@ import {type AutoRunnerConfig, type AutoRunnerStatus, setAutoConfig, setAutoStat
 import {pushToast} from "./toast";
 import type {GameStateData} from "./gamestate";
 import {t} from "i18next";
+import type {DirectStatus} from "./directConnection";
 
 export type ConfigTables = Partial<Record<string, Partial<Record<string, JsonValue>>>>;
 export type PipelineModule = PipelineConfig["modules"][number];
@@ -79,6 +80,9 @@ export type {
 };
 
 export type BackendEventMap = {
+    direct_connection_status: DirectStatus;
+    direct_accounts_changed: null;
+    direct_account_captured: {account_id: string; uid: string};
     data_source_status: DataSourceStatus;
     backend_log: BackendSnapshot["backendLogs"][number];
     proxy_status: {running: boolean; error: string | null};
@@ -141,6 +145,7 @@ export function subscribeBackendEvent<K extends keyof BackendEventMap>(
 }
 
 export const getSnapshot = commands.backendSnapshot;
+export const executeAction = commands.backendExecuteAction;
 export const getDataSources = commands.backendDataSources;
 export const selectDataSource = commands.backendSelectDataSource;
 export const getPacketPipeline = commands.backendGetPacketPipeline;
@@ -173,14 +178,14 @@ export const replayPacket = commands.backendReplayPacket;
 export const updateConfig = (config: ConfigTables) => commands.backendUpdateConfig(config);
 export const setBackendLocale = commands.backendSetLocale;
 export const dumpFlows = commands.backendDumpFlows;
-export const fetchActivity = (activityId = 260511) => commands.backendFetchActivity(activityId);
+export const fetchActivity = (activityId = 261081) => commands.backendFetchActivity(activityId);
 export const discardTile = commands.backendDiscardTile;
-export const upgradeShopBuff = (id: number, activityId = 260511) => commands.backendUpgradeShopBuff(activityId, id);
+export const upgradeShopBuff = (id: number, activityId = 261081) => commands.backendUpgradeShopBuff(activityId, id);
 export const runAmuletAction = commands.backendAmuletAction;
 export const startTsumoLoop = (intervalMs: number, resetCount = false) => commands.backendStartTsumoLoop(intervalMs, resetCount);
 export const stopTsumoLoop = commands.backendStopTsumoLoop;
-export const runAutorun = (action: "start" | "stop" | "step" | "probe" | "notify_test_email" | "set_mode", options: {force?: boolean; mode?: "continuous" | "step"} = {}) =>
-    commands.backendAutorun(action, options.force ?? false, options.mode ?? null);
+export const runAutorun = (action: "start" | "stop" | "probe" | "notify_test_email", options: {force?: boolean} = {}) =>
+    commands.backendAutorun(action, options.force ?? false);
 export const resolveConfirmation = commands.backendResolveConfirmation;
 const pendingSearches = new Map<SwitchAction, symbol>();
 export async function runSwitch(request: SwitchRequest) {

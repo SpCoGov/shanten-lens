@@ -508,11 +508,18 @@ function PlanBody({
                     userSelect: "none",
                 }}
             >
-                <div className={styles.bandActionLabel}>{t(data.mode === "wanxiang-four-meld-switch" ? "blackhole.wanxiang_draws_needed_label" : "blackhole.draws_needed_label")}</div>
+                <div className={styles.bandActionLabel}>{t(data.search_preferences?.coin_objective ? "blackhole.wanxiang_win_draws_label"
+                    : data.mode === "wanxiang-four-meld-switch" ? "blackhole.wanxiang_draws_needed_label" : "blackhole.draws_needed_label")}</div>
                 <div className={styles.bandValue}>{String(data.draws_needed ?? "-")}</div>
             </div>
 
             {finalResult}
+            {data.search_preferences?.coin_objective && (
+                <div className={styles.label}>{t("blackhole.wanxiang_coin_result", {
+                    objective: t(`blackhole.wanxiang_${data.search_preferences.coin_objective}`),
+                    count: data.coin_reward ?? 0,
+                })}</div>
+            )}
             {data.search_preferences?.preferred_suit && (
                 <div className={styles.label}>{t(data.mode === "wanxiang-four-meld-switch" ? "blackhole.wanxiang_suit_preference_result" : "blackhole.suit_preference_result", {
                     suit: t(data.search_preferences.preferred_suit === "z" ? "about.tile_groups.honors" : `tile.suits.${data.search_preferences.preferred_suit}`),
@@ -531,7 +538,13 @@ function PlanBody({
                     : t("blackhole.preference_result", {count: data.preferred_quad_count ?? 0})}</div>
             )}
 
-            {batches.map((batch, index) => (
+            {data.custom_steps ? data.custom_steps.map((step, index) => (
+                <div key={index} className="blackhole-section" style={{display: "grid", gap: 10}}>
+                    <div className={styles.label}>{index + 1}. {t(`custom_target.step_${step.kind}`)}</div>
+                    {step.kind === "exchange" && <TileGroup title={t("advisor.switch_out")} ids={step.out ?? []} resolveFace={resolveFace}/>}
+                    <TileGroup title={t(step.kind === "exchange" ? "advisor.switch_in" : `custom_target.step_${step.kind}`)} ids={step.tiles} resolveFace={resolveFace}/>
+                </div>
+            )) : batches.map((batch, index) => (
                 <div key={index} className="blackhole-section">
                     <details>
                         <summary style={{cursor: "pointer", listStylePosition: "inside"}}>
@@ -557,9 +570,11 @@ function PlanFinalResult({
     resolveFace?: (id: number) => string | null;
 }) {
     const {t} = useTranslation();
+    const coinPlan = !!data.search_preferences?.coin_objective;
+    const targetFaces = coinPlan ? data.target_physical_faces ?? data.target14 ?? [] : data.target13 ?? [];
     const hasFinalResult = !!(
         (data.quad_faces && data.quad_faces.length > 0) ||
-        (data.target13 && data.target13.length > 0) ||
+        targetFaces.length ||
         (data.wall_draws && data.wall_draws.length > 0) ||
         (data.waits && data.waits.length > 0)
     );
@@ -567,9 +582,11 @@ function PlanFinalResult({
 
     return (
         <div style={{display: "grid", gap: 14}}>
-            <FinalShapeGroup quadFaces={data.quad_faces || []} tenpaiFaces={data.target13 || []} resolvedGroups={data.resolved_groups}/>
-            <TileGroup title={t("advisor.wall_draw_sequence")} ids={data.wall_draws || []} resolveFace={resolveFace}/>
-            <FaceChipList title={t("advisor.final_waits")} faces={data.waits || []}/>
+            <FinalShapeGroup quadFaces={data.quad_faces || []} tenpaiFaces={targetFaces} resolvedGroups={data.resolved_groups}/>
+            {!coinPlan && <>
+                <TileGroup title={t("advisor.wall_draw_sequence")} ids={data.wall_draws || []} resolveFace={resolveFace}/>
+                <FaceChipList title={t("advisor.final_waits")} faces={data.waits || []}/>
+            </>}
         </div>
     );
 }

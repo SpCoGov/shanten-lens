@@ -212,7 +212,7 @@ def build_outputs(lua_sources: dict[str, str], proto_config: dict) -> tuple[str,
 def wanted_excel(path: str) -> bool:
     relative = path.removeprefix("LuaByte/Lua/Excels/")
     return path != relative and bool(re.fullmatch(
-        r"Data/(?:amulet/amulet_(?:effect|badge|activity|level|node|enemy)|str/event)(?:_b\d+)?\.lua\.bytes|"
+        r"Data/(?:amulet/amulet_(?:effect|badge|activity|level|node|enemy|character|shop_upgrade|forge|transport|trade_item|gamble_selection)|str/event)(?:_b\d+)?\.lua\.bytes|"
         r"Langs/str_event_(?:chs|chs_t|jp|en|kr)\.lua\.bytes", relative))
 
 

@@ -742,6 +742,13 @@ input, textarea, select, code, pre, .selectable {
     background: var(--hover-bg);
 }
 
+.nav-btn.is-danger:not(:disabled):hover,
+.nav-btn.is-danger:not(:disabled):focus-visible {
+    color: var(--state-down);
+    background: var(--danger-weak-bg);
+    border-color: var(--danger-weak-border);
+}
+
 .btn-mini {
     padding: 3px 8px;
     font-size: 12px;

@@ -1,0 +1,82 @@
+.page { display: grid; gap: 20px; padding-bottom: 24px; }
+.page, .dialog { color: var(--text); font-size: 13px; line-height: 1.5; }
+.page h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.panel { background: var(--panel-bg); border: 1px solid var(--border); border-radius: 14px; padding: 20px; min-width: 0; }
+.heading, .connectionTitle, .connectBar, .accountName, .accountActions, .routeHeading, .footer { display: flex; align-items: center; gap: 12px; }
+.heading, .connectBar, .routeHeading { justify-content: space-between; }
+.heading { flex-wrap: wrap; margin-bottom: 18px; }
+.connectionTitle > div { display: grid; gap: 4px; }
+.statusIcon, .messageIcon { display: grid; place-items: center; background: var(--input-bg); color: var(--muted); border-radius: 12px; }
+.statusIcon { width: 44px; height: 44px; }
+.success { color: var(--badge-ok-fg); background: var(--badge-ok-bg); }
+.successText { color: var(--badge-ok-fg); }
+.muted, .eyebrow, .identity, .accountMeta { color: var(--muted); }
+.tag { font-size: 11px; font-weight: 400; padding: 3px 8px; border-radius: 6px; background: var(--input-bg); color: var(--muted); white-space: nowrap; }
+.count { font-size: 12px; color: var(--muted); margin-left: 6px; font-weight: 400; }
+.connectBar { border-top: 1px solid var(--border); padding-top: 18px; }
+.connectionAccount { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.connectionAccount strong { font-size: 18px; font-weight: 600; }
+.eyebrow { font-size: 11px; }
+.connectionMeta { display: flex; flex-wrap: wrap; gap: 8px 24px; color: var(--muted); font-size: 12px; margin-top: 16px; }
+.accountList { display: grid; gap: 10px; }
+.accountCard { display: flex; align-items: center; gap: 16px; border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.accountCard[data-selected="true"] { border-color: var(--color-ring); background: var(--autoplay-selected-bg); }
+.accountChoice { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; cursor: pointer; }
+.accountChoice input, .choice input { width: 16px; height: 16px; margin: 0; accent-color: var(--color-ring); flex-shrink: 0; }
+.accountDetails { display: grid; gap: 5px; min-width: 0; }
+.accountName { flex-wrap: wrap; gap: 6px 10px; }
+.accountName strong, .identity { overflow-wrap: anywhere; }
+.accountMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; }
+.accountActions { flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
+.page :global(.nav-btn), .dialog :global(.nav-btn) { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; box-sizing: border-box; font-family: inherit; line-height: 1; white-space: nowrap; }
+.page :global(.nav-btn .ms), .dialog :global(.nav-btn .ms) { font-size: 18px; }
+.page .primary, .dialog .primary { background: var(--autoplay-action-bg); border-color: var(--autoplay-action-bg); color: var(--autoplay-action-fg); }
+.page .danger, .dialog .danger, .error { color: var(--autoplay-error); }
+.warning { color: var(--notice-fg); }
+.error { overflow-wrap: anywhere; }
+.empty { padding: 40px 12px; text-align: center; color: var(--muted); }
+.empty > :global(.ms) { font-size: 36px; }
+.notice { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: var(--notice-bg); color: var(--notice-fg); padding: 12px; border: 1px solid var(--notice-border); border-radius: 10px; margin-bottom: 14px; }
+.notice > span:nth-child(2) { flex: 1; min-width: 160px; }
+.dialog :global(.modal-body) { padding: 0; scrollbar-gutter: auto; }
+.form, .choiceGroup { border: 0; margin: 0; padding: 0; min-width: 0; }
+.formBody { display: grid; gap: 16px; padding: 18px 22px; }
+.field { display: grid; gap: 7px; min-width: 0; }
+.field :global(.form-input) { width: 100%; max-width: none; height: 38px; box-sizing: border-box; }
+.choiceGroup legend { font-weight: 600; margin-bottom: 10px; padding: 0; }
+.regionChoices { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.methodChoices, .routeChoices, .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.choice { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; cursor: pointer; min-width: 0; }
+.choice:has(input:checked) { border-color: var(--color-ring); background: var(--autoplay-selected-bg); }
+.choice:has(input:focus-visible), .accountChoice:has(input:focus-visible) { outline: 2px solid var(--color-ring); outline-offset: 3px; }
+.choice:hover { background: var(--hover-bg); }
+.choice > span { overflow-wrap: anywhere; }
+.choice > :global(.ms) { color: var(--muted); font-size: 20px; }
+.credentials { padding: 16px; border: 1px solid var(--border); background: var(--input-bg); border-radius: 10px; display: grid; gap: 14px; }
+.credentials p, .messageBody p { margin: 0; }
+.emailRow { display: flex; align-items: flex-end; gap: 10px; }
+.emailRow .field { flex: 1; }
+.emailRow :global(.nav-btn) { height: 38px; }
+.routeHeading { margin-bottom: 10px; font-size: 12px; flex-wrap: wrap; }
+.autoRoute { grid-column: 1 / -1; }
+.choice small { color: var(--muted); margin-left: auto; font-size: 11px; }
+.latency { margin-left: auto; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
+.footer { justify-content: flex-end; position: sticky; bottom: 0; padding: 14px 22px; background: var(--panel-bg); border-top: 1px solid var(--border); z-index: 1; }
+.messageBody { display: grid; justify-items: center; gap: 16px; text-align: center; padding: 28px 24px; line-height: 1.8; overflow-wrap: anywhere; }
+.messageIcon { width: 56px; height: 56px; border-radius: 16px; }
+.messageIcon :global(.ms) { font-size: 30px; }
+@media (max-width: 900px) {
+    .accountCard { flex-wrap: wrap; }
+    .accountActions { margin-left: 30px; }
+}
+@media (max-width: 520px) {
+    .panel { padding: 14px; }
+    .heading { gap: 10px; }
+    .connectBar { align-items: flex-end; gap: 8px; }
+    .formBody { padding: 16px; gap: 18px; }
+    .regionChoices, .methodChoices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .routeChoices, .fields { grid-template-columns: minmax(0, 1fr); }
+    .autoRoute { flex-wrap: wrap; }
+    .autoRoute small { width: 100%; margin-left: 24px; }
+    .footer { padding: 12px 16px; }
+}

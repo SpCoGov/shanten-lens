@@ -48,13 +48,13 @@ export default function BadgePickerModal({
             disabled={sel == null}
             title={sel == null ? t("badge_picker.action_confirm_hint") : undefined}
         >
-            {t("badge_picker.action_confirm")}
+            <span className="ms" aria-hidden="true">check</span>{t("badge_picker.action_confirm")}
         </button>
     );
 
     return (
         <Modal open={open} onClose={onClose} title={t("badge_picker.title")} actions={actions}>
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 12 }}>
                 <input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
@@ -62,6 +62,7 @@ export default function BadgePickerModal({
                     aria-label={t("badge_picker.search_aria")}
                     style={{
                         flex: 1,
+                        minWidth: 160,
                         padding: "8px 10px",
                         borderRadius: 8,
                         border: "1px solid var(--border)",
@@ -71,26 +72,10 @@ export default function BadgePickerModal({
                     onFocus={(e) => (e.currentTarget.style.boxShadow = "var(--input-focus-ring)")}
                     onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
                 />
-                <select
-                    value={rar}
-                    onChange={(e) => setRar(e.target.value as Rar)}
-                    aria-label={t("badge_picker.rarity_label")}
-                    style={{
-                        padding: "8px 10px",
-                        borderRadius: 8,
-                        border: "1px solid var(--border)",
-                        background: "var(--input-bg)",
-                        outline: "none",
-                    }}
-                    onFocus={(e) => (e.currentTarget.style.boxShadow = "var(--input-focus-ring)")}
-                    onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
-                >
-                    {RARS.map((r) => (
-                        <option key={r} value={r}>
-                            {t(`badge_picker.rarity.${r}`)}
-                        </option>
-                    ))}
-                </select>
+                <div role="group" aria-label={t("badge_picker.rarity_label")} style={{display: "flex", flexWrap: "wrap", gap: 4}}>
+                    {RARS.map(r => <button type="button" className={`switch-guide-button ${rar === r ? "is-primary" : ""}`} key={r}
+                        aria-pressed={rar === r} onClick={() => setRar(r)}><span className="ms" aria-hidden="true">{r === "ALL" ? "apps" : "verified"}</span>{t(`badge_picker.rarity.${r}`)}</button>)}
+                </div>
             </div>
 
             <div

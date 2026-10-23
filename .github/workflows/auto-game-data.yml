@@ -76,3 +76,4 @@ jobs:
             backend/assets/amulets.json
             backend/assets/badges.json
             backend/assets/levels.json
+            backend/assets/action_rules.json

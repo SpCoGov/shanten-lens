@@ -19,8 +19,8 @@ pub(super) fn defaults() -> Value {
             "enable_exit_coin_guard": true, "enable_exit_life_guard": false
         },
         "autorun": {
-            "end_count": 1, "targets": [], "cutoff_level": 0, "op_interval_ms": 1000,
-            "need_pionner_badge_count": 4, "record_detailed_operations": false,
+            "playbook": {"version": 1, "selected_profile_id": "", "profiles": []},
+            "op_interval_ms": 1000, "record_detailed_operations": false,
             "email_notify": {"enabled": false, "host": "", "port": 587, "ssl": false, "from": "", "pass": "", "to": ""}
         }
     })
@@ -103,6 +103,10 @@ impl Services {
             config[name] = candidate[name].clone();
             applied.push(name);
         }
+        drop(config);
+        if tables.get("autorun").is_some_and(|autorun| autorun.get("playbook").is_some()) {
+            self.refresh_decisions();
+        }
         Ok(())
     }
 
@@ -119,7 +123,7 @@ impl Services {
                 let (loaded, need_write) =
                     match load_config_table(&path, &default_config[name], &current).and_then(
                         |loaded| {
-                            validate_config(name, &loaded.0).map_err(anyhow::Error::msg)?;
+                            validate_config_for_editing(name, &loaded.0).map_err(anyhow::Error::msg)?;
                             Ok(loaded)
                         },
                     ) {
@@ -129,7 +133,7 @@ impl Services {
                             continue;
                         }
                     };
-                if need_write {
+                if need_write && validate_config(name, &loaded).is_ok() {
                     if let Err(error) = write_json(&path, &loaded) {
                         tracing::warn!(%name, %error, "config backfill failed");
                         continue;
@@ -154,6 +158,7 @@ impl Services {
             let _ = self
                 .events
                 .send(event("update_autorun_config", self.table("autorun")));
+            self.refresh_decisions();
         }
         if changed_normal {
             let _ = self
@@ -213,6 +218,14 @@ pub(super) fn load_config_table(
 }
 
 pub(super) fn validate_config(name: &str, value: &Value) -> Result<(), String> {
+    validate_config_inner(name, value, false)
+}
+
+pub(super) fn validate_config_for_editing(name: &str, value: &Value) -> Result<(), String> {
+    validate_config_inner(name, value, true)
+}
+
+fn validate_config_inner(name: &str, value: &Value, allow_invalid_levels: bool) -> Result<(), String> {
     fn validate(schema: &Value, value: &Value, path: &str) -> Result<(), String> {
         let valid = match (schema, value) {
             (Value::Object(schema), Value::Object(values)) => {
@@ -245,6 +258,11 @@ pub(super) fn validate_config(name: &str, value: &Value) -> Result<(), String> {
         "autorun" => {
             serde_json::from_value::<crate::ipc::AutoRunnerConfig>(value.clone())
                 .map_err(|error| error.to_string())?;
+            if allow_invalid_levels {
+                super::playbook::validate_for_editing(&value["playbook"])?;
+            } else {
+                super::playbook::validate(&value["playbook"])?;
+            }
         }
         "backend"
             if !value["mitm_port"]

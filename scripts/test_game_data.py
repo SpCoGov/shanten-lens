@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from majsoul_client import wanted_excel
-from update_game_data import EXCEL, build_levels, generate, load_sheet
+from update_game_data import EXCEL, build_action_rules, build_levels, generate, load_sheet
 
 
 class GameDataTests(unittest.TestCase):
@@ -69,9 +69,35 @@ rows[20001]={Pack({false,false,false,false},get),Pack({false,2,2,"1-1"},get)}'''
                 build_levels({})
 
     def test_required_assets_selected(self):
-        for name in ("level", "node", "node_b8", "enemy", "activity"):
+        for name in ("level", "node", "node_b8", "enemy", "activity", "character", "shop_upgrade", "forge", "transport", "trade_item", "gamble_selection"):
             self.assertTrue(wanted_excel(EXCEL + "Data/amulet/amulet_" + name + ".lua.bytes"))
         self.assertFalse(wanted_excel(EXCEL + "Data/mmo/mmo_level.lua.bytes"))
+
+    def test_acquisition_damage_uses_effect_args(self):
+        effects = [dict(id=effect_id, args=args, upgrade=None, duplicate_enabled=None,
+                        effect_group=None, can_sell=1, rarity=2)
+                   for effect_id, args in ((3550, [100, 6]), (3551, [200, 12]), (3650, [300, 9]))]
+        with patch("update_game_data.load_sheet", side_effect=lambda sources, sheet, *args:
+                   effects if sheet == "amulet/amulet_effect" else []):
+            damage = build_action_rules({})["acquire_damage"]
+        self.assertEqual(damage, {"3550": 6, "3551": 12})
+        asset = Path(__file__).resolve().parents[1] / "backend/assets/action_rules.json"
+        self.assertEqual(json.loads(asset.read_bytes())["rules"]["acquire_damage"], damage)
+
+    def test_gamble_selection_ids_and_effect_arguments(self):
+        expected = {"6": {"type": 2, "args": [10]}, "26": {"type": 10, "args": [10, 3]},
+                    "13": {"type": 4, "args": [927]}, "11": {"type": 3, "args": [75]},
+                    "42": {"type": 17, "args": [25]}}
+        rows = [dict(id=50201, selection_id=int(key), **value) for key, value in expected.items()]
+        with patch("update_game_data.load_sheet", side_effect=lambda sources, sheet, *args:
+                   rows if sheet == "amulet/amulet_gamble_selection" else []):
+            self.assertEqual(build_action_rules({})["gamble_selections"], expected)
+            rows.append(dict(rows[0], id=50202))
+            with self.assertRaisesRegex(ValueError, "duplicate gamble selection"):
+                build_action_rules({})
+        asset = Path(__file__).resolve().parents[1] / "backend/assets/action_rules.json"
+        actual = json.loads(asset.read_bytes())["rules"]["gamble_selections"]
+        self.assertEqual({key: actual[key] for key in expected}, expected)
 
     def test_generation_is_idempotent_and_validates_before_writing(self):
         from update_game_data import REQUIRED_RPC
@@ -82,7 +108,7 @@ rows[20001]={Pack({false,false,false,false},get),Pack({false,2,2,"1-1"},get)}'''
             (root / "proto/liqi.proto").write_text("old")
             for name in ("amulets", "badges"):
                 (root / ("backend/assets/" + name + ".json")).write_text(json.dumps({"schema_version": 1, "version": 1, "items": [{"id": 1}]}))
-            with patch("update_game_data.build_outputs", return_value=("proto", dict.fromkeys(REQUIRED_RPC))), patch("update_game_data.build_registries", return_value=([{"id": 1}], [{"id": 1}])), patch("update_game_data.build_levels", return_value={"levels": [{"nodes": []}], "enemies": []}) as levels:
+            with patch("update_game_data.build_outputs", return_value=("proto", dict.fromkeys(REQUIRED_RPC))), patch("update_game_data.build_registries", return_value=([{"id": 1}], [{"id": 1}])), patch("update_game_data.build_action_rules", return_value={"effects": {}}), patch("update_game_data.build_levels", return_value={"levels": [{"nodes": []}], "enemies": []}) as levels:
                 meta = {"product_version": "offline", "bundle_hash": "offline"}
                 self.assertTrue(generate(root, {}, {}, {}, meta))
                 self.assertFalse(generate(root, {}, {}, {}, meta))

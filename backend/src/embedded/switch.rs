@@ -255,6 +255,7 @@ pub(super) async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
             let _ = state.services.events.send(event(
                 "souzu_switch_execution",
                 json!({"status":if ok{"completed"}else{"failed"},"phase":"done","reason":reason,"reason_key":reason_key,
+                    "search_algorithm":plan["search_algorithm"],"plan_id":plan["plan_id"],
                     "execution_kind":if action=="execute_full_plan" {"full_plan"}else{"switch"}}),
             ));
             vec![event(
@@ -342,9 +343,9 @@ async fn send_game_operation(
     }
     // A resync may change the hand; never replay a mutating request against the new state.
     let (method, data) = if operation_type == 100 {
-        (".lq.Lobby.amuletActivityOperate", json!({"activityId":260511,"type":3,"args":[]}))
+        (".lq.Lobby.amuletActivityOperate", json!({"activityId":261081,"type":3,"args":[]}))
     } else {
-        (".lq.Lobby.amuletActivityGameOperate", json!({"activityId":260511,"type":operation_type,"tileList":tile_list}))
+        (".lq.Lobby.amuletActivityGameOperate", json!({"activityId":261081,"type":operation_type,"tileList":tile_list}))
     };
     match state
         .proxy
@@ -414,6 +415,7 @@ async fn execute_switch_batches(
         let _ = state.services.events.send(event(
             "souzu_switch_execution",
             json!({"status":"running","phase":"switch","phase_key":"blackhole.execute_phase_sending",
+                "search_algorithm":plan["search_algorithm"],"plan_id":plan["plan_id"],
                 "execution_kind":if finish_switch {"full_plan"}else{"switch"},
                 "batch_index":index+1,"batch_total":batches.len(),"batch_count":batches.len()}),
         ));
@@ -431,8 +433,7 @@ async fn execute_switch_batches(
         }
         let game = state.services.game_state();
         // The last exchange can enter play directly, without offering a finish operation.
-        if game["stage"] == 5
-            || [1, 4, 8].iter().any(|kind| operation_available(&game, *kind))
+        if [1, 4, 8].iter().any(|kind| operation_available(&game, *kind))
         {
             wait_for_play_turn(state, plan, &game).await?;
             return Ok(());
@@ -441,6 +442,7 @@ async fn execute_switch_batches(
             let _ = state.services.events.send(event(
                 "souzu_switch_execution",
                 json!({"status":"running","phase":"finish-switch","execution_kind":"full_plan",
+                    "search_algorithm":plan["search_algorithm"],"plan_id":plan["plan_id"],
                     "phase_key":"blackhole.execute_phase_finish_switch"}),
             ));
             send_game_operation(state, plan, &game, 100, &[]).await?;
@@ -484,7 +486,12 @@ fn choose_discard(game: &Value, plan: &Value, pending_quads: &[String]) -> Optio
 }
 
 async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), String> {
-    if plan["search_algorithm"] == "custom_target" {
+    if plan["search_algorithm"] == "custom_target"
+        || (plan["search_algorithm"] == "wanxiang_four_meld_switch"
+            && plan["custom_steps"].is_array()
+            && serde_json::from_value::<recommendations::SearchPreferences>(plan["search_preferences"].clone())
+                .is_ok_and(|preferences| preferences.coin_objective.is_some()))
+    {
         return execute_custom_switch_plan(state, plan).await;
     }
     if plan
@@ -535,6 +542,7 @@ async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), Str
             let _ = state.services.events.send(event(
                 "souzu_switch_execution",
                 json!({"status":"running","phase":"kan","execution_kind":"full_plan",
+                    "search_algorithm":plan["search_algorithm"],"plan_id":plan["plan_id"],
                     "phase_key":"blackhole.execute_phase_kan","quad_face":pending_quads[quad_index]}),
             ));
             game = execute_play_operation(state, plan, &game, 4, &quad_ids).await?;
@@ -561,6 +569,7 @@ async fn execute_full_switch_plan(state: &State, plan: &Value) -> Result<(), Str
         let _ = state.services.events.send(event(
             "souzu_switch_execution",
             json!({"status":"running","phase":"discard","execution_kind":"full_plan",
+                "search_algorithm":plan["search_algorithm"],"plan_id":plan["plan_id"],
                 "phase_key":"blackhole.execute_phase_auto_discard","reason_values":{"tile_id":discard}}),
         ));
         game = execute_play_operation(state, plan, &game, 1, &[discard]).await?;
@@ -624,7 +633,7 @@ async fn wait_for_play_turn(state: &State, plan: &Value, game: &Value) -> Result
 async fn execute_play_operation(state: &State, plan: &Value, game: &Value, kind: u64, tiles: &[u64]) -> Result<Value, String> {
     let mut hand = value_ids(game.get("hand_tiles"));
     let mut melds = meld_ids(game);
-    if game["stage"] != 5 || hand.len() + melds.len() * 3 != 14
+    if !operation_available(game, kind) || hand.len() + melds.len() * 3 != 14
         || !matches!((kind, tiles.len()), (1, 1) | (4, 4))
         || tiles.iter().enumerate().any(|(i, id)| tiles[..i].contains(id)
             || !hand.contains(id) || deck_face(game, *id).is_none_or(|face| face == "bd"))
@@ -667,6 +676,7 @@ async fn execute_custom_switch_plan(state: &State, plan: &Value) -> Result<(), S
         };
         let _ = state.services.events.send(event("souzu_switch_execution", json!({
             "status":"running", "phase":kind, "execution_kind":"full_plan",
+            "search_algorithm":plan["search_algorithm"],"plan_id":plan["plan_id"],
             "phase_key":format!("blackhole.execute_phase_{kind}"),
             "reason_values":{"tile_id":tiles.first()},
         })));

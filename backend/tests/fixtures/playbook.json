@@ -1,0 +1,341 @@
+{
+  "version": 1,
+  "selected_profile_id": "profile-a",
+  "profiles": [
+    {
+      "id": "profile-a",
+      "name": "Full test profile",
+      "character_id": 201,
+      "initial_amulet_id": 1,
+      "first_level_min_coin": "9007199254740993",
+      "stages": [
+        {
+          "id": "stage-0",
+          "name": "Stage 1",
+          "start_level": 13001,
+          "start_node": 3,
+          "deadline_level": 13002,
+          "deadline_node": 4,
+          "enter_early_if_unreachable": false,
+          "loadouts": [
+            {
+              "id": "loadout-a",
+              "name": "Test loadout",
+              "amulets": [
+                {
+                  "key": "a",
+                  "id": 1,
+                  "plus": false,
+                  "badge": null
+                },
+                {
+                  "key": "b",
+                  "id": 1,
+                  "plus": true,
+                  "badge": 600010
+                }
+              ],
+              "entry_order": [
+                "a",
+                "b"
+              ],
+              "win_order": [
+                "b",
+                "a"
+              ]
+            }
+          ],
+          "hands": [
+            {
+              "id": "hand-a",
+              "name": "Seven pairs",
+              "target_groups": [
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "1m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                },
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "2m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                },
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "3m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                },
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "4m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                },
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "5m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                },
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "6m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                },
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "7m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                }
+              ],
+              "exclude_invalid_shapes": true
+            }
+          ],
+          "hand_selection": "most_wins"
+        },
+        {
+          "id": "stage-1",
+          "name": "Stage 2",
+          "start_level": 13002,
+          "start_node": 2,
+          "deadline_level": 13003,
+          "deadline_node": 4,
+          "enter_early_if_unreachable": false,
+          "loadouts": [
+            {
+              "id": "loadout-a",
+              "name": "Test loadout",
+              "amulets": [
+                {
+                  "key": "a",
+                  "id": 1,
+                  "plus": false,
+                  "badge": null
+                },
+                {
+                  "key": "b",
+                  "id": 1,
+                  "plus": true,
+                  "badge": 600010
+                }
+              ],
+              "entry_order": [
+                "a",
+                "b"
+              ],
+              "win_order": [
+                "b",
+                "a"
+              ]
+            }
+          ],
+          "hands": [
+            {
+              "id": "hand-a",
+              "name": "Seven pairs",
+              "target_groups": [
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "1m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                },
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "2m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                },
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "3m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                },
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "4m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                },
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "5m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                },
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "6m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                },
+                {
+                  "quad": false,
+                  "kind": "pair",
+                  "rule": {
+                    "faces": [
+                      "7m"
+                    ],
+                    "suits": [],
+                    "ranks": [],
+                    "red": false,
+                    "dora": false,
+                    "soul": false,
+                    "joker": "allow"
+                  }
+                }
+              ],
+              "exclude_invalid_shapes": true
+            }
+          ],
+          "hand_selection": "most_wins"
+        }
+      ]
+    },
+    {
+      "id": "opening-profile",
+      "name": "Opening test profile",
+      "strategy": "opening",
+      "end_count": 5,
+      "targets": [
+        {
+          "kind": "amulet",
+          "id": 1,
+          "plus": true,
+          "badge": 600010,
+          "value": 3
+        },
+        {
+          "kind": "badge",
+          "id": 600010,
+          "value": 2
+        }
+      ],
+      "cutoff_level": 13002,
+      "cutoff_node": 4
+    }
+  ]
+}

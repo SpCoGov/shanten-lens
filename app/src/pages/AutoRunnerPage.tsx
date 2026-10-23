@@ -1,27 +1,25 @@
 import React from "react";
+import type {GameStateData} from "../lib/gamestate";
+import ActionProviderPanel from "../components/ActionProviderPanel";
 import "../styles/theme.css";
 import * as backendIpc from "../lib/ipc";
 import {
-    addTargetAmulet,
-    addTargetBadge,
-    formatLevelNum,
-    parseLevelText,
     patchAutoConfig,
-    removeTargetAt,
-    setTargetValue,
-    type AutoRunnerConfig,
+    markPlaybookSaved,
     type AutoRunnerOperationRecord,
     type AutoRunnerRemakeRecord,
-    type TargetItem,
     useAutoRunner,
 } from "../lib/autoRunnerStore";
 import {useRegistry} from "../lib/registryStore";
-import AmuletEditorModal, {type EditedAmulet} from "../components/AmuletEditorModal";
-import BadgePickerModal from "../components/BadgePickerModal";
 import AmuletCard from "../components/AmuletCard";
 import Modal from "../components/Modal";
-import {Trans, useTranslation} from "react-i18next";
+import {useTranslation} from "react-i18next";
 import {formatLevelIdToLabel} from "../lib/levelFormat";
+import AutoPlayConfigPage from "./AutoPlayConfigPage";
+import DirectConnectionPage from "./DirectConnectionPage";
+import styles from "./AutoPlayConfigPage.module.css";
+import AutoPlayTargets from "./AutoPlayTargets";
+import {openingLevels, validateAutoPlayConfig} from "../lib/autoPlayConfig";
 
 function formatDuration(ms: number): string {
     if (!ms || ms < 0) ms = 0;
@@ -33,154 +31,37 @@ function formatDuration(ms: number): string {
     return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
 }
 
-const DENSE_ALPHABET = Array.from({length: 94}, (_, i) => String.fromCharCode(i + 33))
-    .filter((ch) => ch !== "\\" && ch !== "`" && ch !== "\"")
-    .join("");
-const PIONNER_BADGE_COUNT_SENTINEL = 990000;
-
-function toDenseText(text: string): string {
-    if (!text) return "!";
-    const bytes = new TextEncoder().encode(text);
-    let value = 0n;
-    for (const byte of bytes) {
-        value = (value << 8n) + BigInt(byte);
-    }
-    const base = BigInt(DENSE_ALPHABET.length);
-    let out = "";
-    while (value > 0n) {
-        out = DENSE_ALPHABET[Number(value % base)] + out;
-        value /= base;
-    }
-    return out;
+export default function AutoRunnerPage({currentState}: {currentState: GameStateData | null}) {
+    const {t} = useTranslation();
+    const [tab, setTab] = React.useState<"strategy" | "monitor" | "connection">("strategy");
+    return <div className={`settings-wrap wide-page ${styles.shell}`}>
+        <header className={styles.pageHeader}>
+            <h2 className="title"><span className="ms" aria-hidden="true">smart_toy</span>{t("autoplay.title")}</h2>
+            <nav className={styles.pageTabs} aria-label={t("autoplay.title")}>
+                {(["strategy", "monitor", "connection"] as const).map(value => <button className="nav-btn" key={value} aria-pressed={tab === value}
+                    onClick={() => setTab(value)}><span className="ms" aria-hidden="true">{{strategy: "tune", monitor: "monitoring", connection: "link"}[value]}</span>{t(value === "connection" ? "direct_connection.title" : `autoplay.tab_${value}`)}</button>)}
+            </nav>
+        </header>
+        {tab === "strategy" ? <AutoPlayConfigPage/> : tab === "connection" ? <DirectConnectionPage/> : <AutoRunnerMonitorPage currentState={currentState}/>}
+    </div>;
 }
 
-function fromDenseText(text: string): string {
-    if (text === "!") return "";
-    if (!text) return "";
-    const base = BigInt(DENSE_ALPHABET.length);
-    let value = 0n;
-    for (const ch of text) {
-        const digit = DENSE_ALPHABET.indexOf(ch);
-        if (digit < 0) throw new Error("bad_dense_char");
-        value = value * base + BigInt(digit);
-    }
-    const bytes: number[] = [];
-    while (value > 0n) {
-        bytes.unshift(Number(value & 0xffn));
-        value >>= 8n;
-    }
-    return new TextDecoder().decode(new Uint8Array(bytes));
-}
-
-function encodeShortConfig(config: AutoRunnerConfig): string {
-    const parts: string[] = [];
-    const endCount = Math.max(1, Math.floor(Number(config.end_count ?? 1)));
-    const cutoffLevel = Number(config.cutoff_level ?? 0) || 0;
-    const interval = Math.max(0, Math.round(Number(config.op_interval_ms ?? 1000)));
-    const needPionnerBadgeCount = Math.max(0, Math.floor(Number(config.need_pionner_badge_count ?? 4)));
-    if (endCount !== 1) parts.push(`e${endCount}`);
-    if (needPionnerBadgeCount !== 4) {
-        parts.push(`l${PIONNER_BADGE_COUNT_SENTINEL + Math.min(99, needPionnerBadgeCount)}`);
-    }
-    if (cutoffLevel > 0) parts.push(`l${cutoffLevel}`);
-    if (needPionnerBadgeCount !== 4 && cutoffLevel <= 0) parts.push("l0");
-    if (interval !== 1000) parts.push(`i${interval}`);
-    parts.push(...(config.targets ?? []).map((target) => {
-        const value = Math.max(1, Math.floor(Number((target as any).value ?? 1)));
-        const valueSuffix = value === 1 ? "" : `:${value}`;
-        if (target.kind === "amulet") {
-            const plus = target.plus ? "+" : "";
-            const badge = target.badge == null ? "" : `.${target.badge}`;
-            return `a${target.id}${plus}${badge}${valueSuffix}`;
-        }
-        return `b${target.id}${valueSuffix}`;
-    }));
-    return toDenseText(parts.join(";"));
-}
-
-function decodeShortConfig(text: string): Partial<AutoRunnerConfig> {
-    const raw = text.trim();
-    return decodeCompactConfigText(fromDenseText(raw));
-}
-
-function decodeCompactConfigText(payloadText: string): Partial<AutoRunnerConfig> {
-    const targets: TargetItem[] = [];
-    let endCount = 1;
-    let cutoffLevel = 0;
-    let interval = 1000;
-    let needPionnerBadgeCount = 4;
-
-    for (const part of payloadText.split(";").filter(Boolean)) {
-        if (part.startsWith("e")) {
-            endCount = Math.max(1, Math.floor(Number(part.slice(1))));
-            continue;
-        }
-        if (part.startsWith("l")) {
-            const level = Math.max(0, Math.floor(Number(part.slice(1))));
-            if (level >= PIONNER_BADGE_COUNT_SENTINEL && level < PIONNER_BADGE_COUNT_SENTINEL + 100) {
-                needPionnerBadgeCount = level - PIONNER_BADGE_COUNT_SENTINEL;
-                continue;
-            }
-            cutoffLevel = level;
-            continue;
-        }
-        if (part.startsWith("i")) {
-            interval = Math.max(0, Math.min(5000, Math.round(Number(part.slice(1)))));
-            continue;
-        }
-        if (part.startsWith("p")) {
-            needPionnerBadgeCount = Math.max(0, Math.floor(Number(part.slice(1))));
-            continue;
-        }
-        const valueSplit = part.split(":");
-        const head = valueSplit[0];
-        const value = Math.max(1, Math.floor(Number(valueSplit[1] ?? 1)));
-        if (head.startsWith("b")) {
-            const id = Number(head.slice(1));
-            if (!Number.isFinite(id)) throw new Error("bad_target");
-            targets.push({kind: "badge", id, value});
-            continue;
-        }
-        if (head.startsWith("a")) {
-            const match = /^a(\d+)(\+?)(?:\.(\d+))?$/.exec(head);
-            if (!match) throw new Error("bad_target");
-            targets.push({
-                kind: "amulet",
-                id: Number(match[1]),
-                plus: match[2] === "+",
-                badge: match[3] == null ? null : Number(match[3]),
-                value,
-            });
-            continue;
-        }
-        throw new Error("bad_part");
-    }
-
-    return {
-        end_count: endCount,
-        cutoff_level: cutoffLevel,
-        op_interval_ms: interval,
-        need_pionner_badge_count: needPionnerBadgeCount,
-        targets,
-    };
-}
-
-export default function AutoRunnerPage() {
+function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | null}) {
     const {t} = useTranslation();
     const {config, status} = useAutoRunner();
+    const selectedProfile = config.playbook.profiles.find(profile => profile.id === config.playbook.selected_profile_id);
+    const profile = status.running ? status.active_profile : selectedProfile;
+    const openingProfile = profile?.strategy === "opening" ? profile : undefined;
+    const openingCutoff = openingProfile && openingLevels.find(level => level.level === openingProfile.cutoff_level && level.node === openingProfile.cutoff_node);
+    const achieved = status.running ? status.current_achieved_count : undefined;
+    const startUnavailable = !selectedProfile ? "autoplay.select_profile" : selectedProfile.strategy !== "opening" ? "autoplay.full_not_ready" : "";
     const {badgeById, amuletById} = useRegistry();
 
     const [saving, setSaving] = React.useState(false);
-    const [openAmuletEditor, setOpenAmuletEditor] = React.useState(false);
-    const [openBadgePicker, setOpenBadgePicker] = React.useState(false);
-    const [detailTargetIndex, setDetailTargetIndex] = React.useState<number | null>(null);
+    const [settingsOpen, setSettingsOpen] = React.useState(false);
+    const [saveNotice, setSaveNotice] = React.useState("");
+    const [recordView, setRecordView] = React.useState<"remakes" | "operations">("remakes");
     const [selectedRecordSeq, setSelectedRecordSeq] = React.useState<number | null>(null);
-    const [levelText, setLevelText] = React.useState<string>(formatLevelNum(config.cutoff_level));
-    const [exportOpen, setExportOpen] = React.useState(false);
-    const [exportText, setExportText] = React.useState("");
-    const [importOpen, setImportOpen] = React.useState(false);
-    const [importText, setImportText] = React.useState("");
-    const [importError, setImportError] = React.useState("");
     const [starting, setStarting] = React.useState(false);
     const [existingGameConfirm, setExistingGameConfirm] = React.useState(false);
     const [controlError, setControlError] = React.useState("");
@@ -194,10 +75,6 @@ export default function AutoRunnerPage() {
         return () => clearInterval(timer);
     }, [status.running]);
 
-    React.useEffect(() => {
-        setLevelText(formatLevelNum(config.cutoff_level));
-    }, [config.cutoff_level]);
-
     const acceptControlResult = React.useCallback((data: backendIpc.CommandResult) => {
         setStarting(false);
         if (data.requires_confirmation) {
@@ -210,20 +87,31 @@ export default function AutoRunnerPage() {
     }, [t]);
 
     const onSave = React.useCallback(async () => {
-        setSaving(true);
+        setSaving(true); setSaveNotice("");
         try {
-            await backendIpc.updateConfig({autorun: config});
+            const {playbook: _playbook, ...monitorConfig} = config;
+            await backendIpc.updateConfig({autorun: monitorConfig});
+            setSaveNotice(t("autoplay.runtime_saved"));
+        } catch {
+            setSaveNotice(t("autoplay.save_failed"));
         } finally {
             setSaving(false);
         }
-    }, [config]);
+    }, [config, t]);
 
-    const start = React.useCallback(async () => {
-        setStarting(true);
-        setExistingGameConfirm(false);
-        setControlError("");
-        acceptControlResult(await backendIpc.runAutorun("start"));
-    }, [acceptControlResult]);
+    const start = async (force = false) => {
+        if (startUnavailable) {setControlError(t(startUnavailable)); return;}
+        const invalid = validateAutoPlayConfig(config.playbook, amuletById, badgeById);
+        if (invalid) {setControlError(t(`autoplay.error_${invalid}`)); return;}
+        setStarting(true); setExistingGameConfirm(false); setControlError("");
+        try {
+            await backendIpc.updateConfig({autorun: config});
+            markPlaybookSaved(config.playbook);
+            acceptControlResult(await backendIpc.runAutorun("start", {force}));
+        } catch {
+            setControlError(t("autoplay.start_failed"));
+        } finally { setStarting(false); }
+    };
 
     const stop = React.useCallback(async () => {
         setExistingGameConfirm(false);
@@ -231,145 +119,11 @@ export default function AutoRunnerPage() {
         acceptControlResult(await backendIpc.runAutorun("stop"));
     }, [acceptControlResult]);
 
-    const continueExistingGame = React.useCallback(async () => {
-        setStarting(true);
-        setExistingGameConfirm(false);
-        setControlError("");
-        acceptControlResult(await backendIpc.runAutorun("start", {force: true}));
-    }, [acceptControlResult]);
-
     const cancelExistingGame = React.useCallback(() => {
         setStarting(false);
         setExistingGameConfirm(false);
         setControlError("");
     }, []);
-
-    const openExport = React.useCallback(async () => {
-        const text = encodeShortConfig(config);
-        setExportText(text);
-        setExportOpen(true);
-        try {
-            await navigator.clipboard.writeText(text);
-        } catch {
-            // Clipboard access can be unavailable; the modal still shows the code.
-        }
-    }, [config]);
-
-    const applyImport = React.useCallback(() => {
-        try {
-            const next = decodeShortConfig(importText);
-            patchAutoConfig(next);
-            setLevelText(formatLevelNum(next.cutoff_level));
-            setImportOpen(false);
-            setImportText("");
-            setImportError("");
-        } catch {
-            setImportError(t("autorun.import_error"));
-            return;
-        }
-    }, [importText, t]);
-
-    const renderTarget = (target: TargetItem, idx: number) => {
-        const value = Math.max(1, Math.floor(Number((target as any).value ?? 1)));
-        const judgeText = target.kind === "amulet" ? t("autorun.target_judge_amulet") : t("autorun.target_judge_badge");
-
-        const valueBox = (
-            <label className="target-value-box" onClick={(e) => e.stopPropagation()}>
-                <span>{t("autorun.target_value_label")}</span>
-                <input
-                    className="form-input"
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={value}
-                    onChange={(e) => {
-                        const v = Math.max(1, Math.floor(Number(e.target.value || 1)));
-                        setTargetValue(idx, v);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{width: 90}}
-                    title={t("autorun.target_value_title")}
-                />
-            </label>
-        );
-
-        const actionBar = (
-            <div className="target-card-actions">
-                {valueBox}
-                <button className="nav-btn" onClick={(e) => {
-                    e.stopPropagation();
-                    removeTargetAt(idx);
-                }}>
-                    {t("autorun.btn_delete_target")}
-                </button>
-            </div>
-        );
-
-        if (target.kind === "amulet") {
-            const rawId = target.id * 10 + (target.plus ? 1 : 0);
-            const effectItem = {id: rawId, volume: 1, badge: target.badge != null ? {id: target.badge} : undefined} as any;
-            const amulet = amuletById.get(target.id);
-            const amuletName = target.plus && amulet?.plus_name ? amulet.plus_name : `${amulet?.name ?? `ID ${target.id}`}${target.plus ? "+" : ""}`;
-            const badgeName = target.badge != null ? (badgeById.get(target.badge)?.name ?? String(target.badge)) : t("autorun.target_any_badge");
-
-            return (
-                <button
-                    key={idx}
-                    type="button"
-                    className="panel target-card target-card-button"
-                    style={{padding: 10}}
-                    title={judgeText}
-                    onClick={() => setDetailTargetIndex(idx)}
-                >
-                    <div className="target-card-main">
-                        <AmuletCard item={effectItem} scale={0.7}/>
-                        <div className="target-card-copy">
-                            <div><b>{t("autorun.target_amulet_label")}</b>{`：${amuletName}`}</div>
-                            <div><b>{t("autorun.target_badge_label")}</b>{`：${badgeName}`}</div>
-                        </div>
-                    </div>
-                    {actionBar}
-                </button>
-            );
-        }
-
-        const badgeName = badgeById.get(target.id)?.name ?? `ID ${target.id}`;
-        const icon = `/assets/badge/badge_${target.id}.png`;
-        return (
-            <button
-                key={idx}
-                type="button"
-                className="panel target-card target-card-button"
-                style={{padding: 10}}
-                title={judgeText}
-                onClick={() => setDetailTargetIndex(idx)}
-            >
-                <div className="target-card-main">
-                    <img src={icon} alt={badgeName} style={{width: 64, height: 64}} draggable={false}/>
-                    <div className="target-card-copy">
-                        <div><b>{t("autorun.target_badge_label")}</b>{`：${badgeName}`}</div>
-                    </div>
-                </div>
-                {actionBar}
-            </button>
-        );
-    };
-
-    const detailTarget = detailTargetIndex != null ? config.targets[detailTargetIndex] : null;
-    const detailTitle = React.useMemo(() => {
-        if (!detailTarget) return "";
-        if (detailTarget.kind === "amulet") {
-            const amulet = amuletById.get(detailTarget.id);
-            const amuletName = detailTarget.plus && amulet?.plus_name ? amulet.plus_name : `${amulet?.name ?? `ID ${detailTarget.id}`}${detailTarget.plus ? "+" : ""}`;
-            return t("autorun.target_judge_title", {name: amuletName});
-        }
-        return t("autorun.target_judge_title", {name: badgeById.get(detailTarget.id)?.name ?? `ID ${detailTarget.id}`});
-    }, [detailTarget, amuletById, badgeById, t]);
-    const detailBody = detailTarget
-        ? detailTarget.kind === "amulet"
-            ? t("autorun.target_judge_amulet")
-            : t("autorun.target_judge_badge")
-        : "";
 
     const elapsedDisplay = formatDuration(status.elapsed_ms ?? 0);
 
@@ -611,293 +365,101 @@ export default function AutoRunnerPage() {
         );
     }, [renderOperationDetails, t]);
 
-    return (
-        <div className="settings-wrap wide-page" style={{paddingBlock: 16}}>
-            <h2 className="title">{t("autorun.title")}</h2>
-
-            <div className="page-stack">
-                <div className="responsive-two-col">
-                    <section className="panel">
-                        <div className="panel-title">{t("autorun.section_runtime_title")}</div>
-                        <div style={{display: "flex", gap: 12, flexWrap: "wrap"}}>
-                            <span className="badge">{t("autorun.badge_elapsed", {time: elapsedDisplay})}</span>
-                            <span className="badge">{t("autorun.badge_runs", {count: status.runs ?? 0})}</span>
-                            <span className="badge">{t("autorun.badge_best", {count: status.best_achieved_count ?? 0})}</span>
-                            <span className="badge">{t("autorun.badge_interval", {ms: opInterval})}</span>
-                        </div>
-                        <div className="hint" style={{marginTop: 8, lineHeight: 1.45}}>
-                            <div>{t("autorun.hint_current_step", {text: status.current_step ?? "-"})}</div>
-                            <div>{t("autorun.hint_last_error", {text: status.last_error ?? "-"})}</div>
-                            <div>{t("autorun.hint_started_at", {time: status.started_at ? new Date(status.started_at).toLocaleString() : "-"})}</div>
-                        </div>
-                    </section>
-
-                    <section className="panel">
-                        <div className="panel-title">{t("autorun.section_control_title")}</div>
-
-                        <div className="toolbar" style={{gap: 8, flexWrap: "wrap" as const}}>
-                            {existingGameConfirm ? (
-                                <div style={{display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap"}}>
-                                    <span className="hint">{t("autorun.confirm_existing_game")}</span>
-                                    <button className="nav-btn" onClick={continueExistingGame} disabled={starting}>
-                                        {starting ? t("autorun.btn_starting") : t("autorun.btn_continue_remake")}
-                                    </button>
-                                    <button className="nav-btn" onClick={cancelExistingGame} disabled={starting}>
-                                        {t("autorun.btn_cancel")}
-                                    </button>
-                                </div>
-                            ) : (
-                                <button
-                                    className="nav-btn"
-                                    onClick={working ? stop : start}
-                                    disabled={starting || status.mode === "step"}
-                                    title={status.mode === "step" ? t("autorun.tip_no_need_start_in_step") : undefined}
-                                >
-                                    {working ? t("autorun.btn_pause") : starting ? t("autorun.btn_starting") : t("autorun.btn_start")}
-                                </button>
-                            )}
-
-                            <label style={{display: "inline-flex", alignItems: "center", gap: 8, marginLeft: 6}}>
-                                <span>{t("autorun.label_op_interval")}</span>
-                                <input
-                                    className="form-input"
-                                    type="number"
-                                    min={0}
-                                    max={5000}
-                                    value={Number.isFinite(Number(config.op_interval_ms)) ? Number(config.op_interval_ms) : 50}
-                                    onChange={(e) => {
-                                        const raw = Number(e.target.value || 0);
-                                        const clamped = Math.max(0, Math.min(5000, Math.round(raw)));
-                                        patchAutoConfig({op_interval_ms: clamped});
-                                    }}
-                                    title={t("autorun.tip_op_interval")}
-                                    style={{width: 120}}
-                                />
-                                <span className="hint">{t("autorun.suffix_ms")}</span>
-                            </label>
-
-                            <span className={`badge ${working ? "ok" : "down"}`}>{working ? t("autorun.status_running") : t("autorun.status_stopped")}</span>
-                        </div>
-
-                        <p className="hint" style={{marginTop: 8, lineHeight: 1.5}}>
-                            {t("autorun.control_note")}
-                        </p>
-                        {controlError ? <p className="notice error" style={{marginTop: 8}}>{controlError}</p> : null}
-                    </section>
+    return <div className={`${styles.page} ${styles.monitor}`}>
+        <section className={`panel ${styles.runOverview}`}>
+            <div className={styles.runHeading}>
+                <div className={styles.runState}>
+                    <span className={`${styles.stateIcon} ${working ? styles.running : ""}`}><span className="ms" aria-hidden="true">{working ? "play_arrow" : "pause"}</span></span>
+                    <div><h3>{t(working ? "autorun.status_running" : "autorun.status_stopped")}</h3>
+                        <p>{t("autorun.hint_current_step", {text: status.current_step ?? "-"})}</p></div>
                 </div>
-
-                <section className="panel">
-                    <div className="panel-title">{t("autorun.section_remake_records_title")}</div>
-                    <div style={{display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 10}}>
-                        <span className="badge">{t("autorun.remake_record_count", {count: remakeRecords.length})}</span>
-                        <span className="badge ok">{t("autorun.remake_best_value", {value: bestRecord?.target_value ?? 0})}</span>
-                        <span className="badge">{t("autorun.remake_best_record", {text: describeRecord(bestRecord)})}</span>
-                    </div>
-
-                    {remakeRecords.length === 0 ? (
-                        <div className="hint">{t("autorun.remake_empty")}</div>
-                    ) : (
-                        <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, alignItems: "start"}}>
-                            <div style={{display: "grid", gap: 6, maxHeight: 360, overflowY: "auto", paddingRight: 4}}>
-                                {remakeRecords.map((record) => {
-                                    const active = selectedRecord?.seq === record.seq;
-                                    const isBest = bestRecord?.seq === record.seq;
-                                    return (
-                                        <button
-                                            key={record.seq}
-                                            type="button"
-                                            className={`nav-btn ${active ? "active" : ""}`}
-                                            onClick={() => setSelectedRecordSeq(record.seq)}
-                                            style={{
-                                                display: "grid",
-                                                gridTemplateColumns: "auto 1fr auto",
-                                                gap: 8,
-                                                alignItems: "center",
-                                                textAlign: "left",
-                                                width: "100%",
-                                            }}
-                                            title={reasonText(record.reason)}
-                                        >
-                                            <span>#{record.seq}</span>
-                                            <span style={{overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
-                                                {t("autorun.remake_record_row", {
-                                                    run: record.run_index ?? "-",
-                                                    value: record.target_value ?? 0,
-                                                    level: formatLevelIdToLabel(record.level),
-                                                })}
-                                            </span>
-                                            {isBest ? <span className="badge ok">{t("autorun.remake_best_marker")}</span> : null}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            <div style={{display: "grid", gap: 10, minWidth: 0}}>
-                                <div style={{display: "flex", gap: 8, flexWrap: "wrap"}}>
-                                    <span className="badge">{describeRecord(selectedRecord)}</span>
-                                    <span className="badge">{t("autorun.remake_reason_label", {reason: reasonText(selectedRecord?.reason)})}</span>
-                                    <span className="badge">
-                                        {t("autorun.remake_time_label", {time: selectedRecord?.ts ? new Date(selectedRecord.ts).toLocaleString() : "-"})}
-                                    </span>
-                                    {recordDetailedOperations ? (
-                                        <span className="badge">
-                                            {t("autorun.remake_operation_count", {count: selectedRecord?.operation_count ?? selectedRecord?.operation_records?.length ?? 0})}
-                                        </span>
-                                    ) : null}
-                                </div>
-                                <div style={{maxHeight: 360, overflowY: "auto", paddingRight: 4}}>
-                                    {renderRecordAmulets(selectedRecord)}
-                                </div>
-                                {recordDetailedOperations ? (
-                                    <div style={{display: "grid", gap: 8}}>
-                                        <div className="panel-title" style={{fontSize: 14}}>{t("autorun.remake_operation_records_title")}</div>
-                                        {renderOperationRecords(selectedRecord?.operation_records ?? [])}
-                                    </div>
-                                ) : null}
-                            </div>
-                        </div>
-                    )}
-                </section>
-
-                {recordDetailedOperations ? (
-                    <section className="panel">
-                        <div className="panel-title">{t("autorun.section_operation_records_title")}</div>
-                        <div style={{display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 10}}>
-                            <span className="badge">{t("autorun.operation_record_count", {count: operationRecords.length})}</span>
-                            {Object.entries(operationCounts)
-                                .sort(([a], [b]) => Number(b) - Number(a))
-                                .slice(0, 6)
-                                .map(([run, count]) => (
-                                    <span className="badge" key={run}>
-                                        {t("autorun.operation_count_by_run", {run, count})}
-                                    </span>
-                                ))}
-                        </div>
-                        {operationRecords.length === 0 ? (
-                            <div className="hint">{t("autorun.operation_empty")}</div>
-                        ) : (
-                            renderOperationRecords(operationRecords)
-                        )}
-                    </section>
-                ) : null}
-
-                <section className="panel">
-                    <div className="panel-title">{t("autorun.section_goal_title")}</div>
-
-                    <div className="rows" style={{marginBottom: 8}}>
-                        <div className="row" style={{gridTemplateColumns: "auto auto 1fr", alignItems: "center"}}>
-                            <label>{t("autorun.label_end_count")}</label>
-                            <input
-                                className="form-input"
-                                type="number"
-                                min={1}
-                                value={Number(config.end_count ?? 1)}
-                                onChange={(e) => patchAutoConfig({end_count: Math.max(1, Number(e.target.value || 1))})}
-                                style={{width: 100}}
-                            />
-                            <span className="hint">{t("autorun.hint_end_count")}</span>
-                        </div>
-                    </div>
-
-                    <div className="toolbar" style={{gap: 8, flexWrap: "wrap" as const, marginBottom: 10}}>
-                        <button className="nav-btn" onClick={() => setOpenAmuletEditor(true)}>
-                            {t("autorun.btn_add_amulet")}
-                        </button>
-                        <button className="nav-btn" onClick={() => setOpenBadgePicker(true)}>
-                            {t("autorun.btn_add_badge")}
-                        </button>
-                    </div>
-
-                    <div className="target-list">
-                        {config.targets.length === 0 ? (
-                            <div className="hint">{t("autorun.empty_targets")}</div>
-                        ) : (
-                            config.targets.map((item, i) => renderTarget(item, i))
-                        )}
-                    </div>
-                </section>
-
-                <div className="responsive-two-col">
-                    <section className="panel">
-                        <div className="panel-title">{t("autorun.section_cutoff_title")}</div>
-                        <div className="rows">
-                            <div className="row flush" style={{gridTemplateColumns: "max-content max-content", alignItems: "center"}}>
-                                <label>{t("autorun.label_level")}</label>
-                                <input
-                                    className="form-input"
-                                    value={levelText}
-                                    placeholder={t("autorun.placeholder_level")}
-                                    onChange={(e) => {
-                                        const s = e.target.value;
-                                        setLevelText(s);
-                                        const n = parseLevelText(s);
-                                        patchAutoConfig({cutoff_level: n ?? 0});
-                                    }}
-                                    style={{width: 130}}
-                                />
-                            </div>
-                            <div className="row flush" style={{gridTemplateColumns: "max-content max-content", alignItems: "center"}}>
-                                <label>{t("autorun.label_need_pionner_badge_count")}</label>
-                                <input
-                                    className="form-input"
-                                    type="number"
-                                    min={0}
-                                    max={99}
-                                    value={Number(config.need_pionner_badge_count ?? 4)}
-                                    onChange={(e) => {
-                                        const value = Math.max(0, Math.min(99, Math.floor(Number(e.target.value || 0))));
-                                        patchAutoConfig({need_pionner_badge_count: value});
-                                    }}
-                                    style={{width: 130}}
-                                />
-                            </div>
-                        </div>
-                        <p className="hint">{t("autorun.hint_cutoff")}</p>
-                    </section>
-
-                    <section className="panel">
-                        <div className="panel-title">{t("autorun.section_mode_title")}</div>
-                        <div className="toolbar" style={{gap: 8, flexWrap: "wrap" as const}}>
-                            <label style={{display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap"}}>
-                                <span>{t("autorun.label_mode")}</span>
-                                <select
-                                    className="form-input"
-                                    value={status.mode ?? "continuous"}
-                                    onChange={(e) => void backendIpc.runAutorun("set_mode", {mode: e.target.value as "continuous" | "step"})}
-                                    style={{width: 160}}
-                                >
-                                    <option value="continuous">{t("autorun.mode_continuous")}</option>
-                                    <option value="step">{t("autorun.mode_step")}</option>
-                                </select>
-                            </label>
-
-                            <button
-                                className="nav-btn"
-                                onClick={() => void backendIpc.runAutorun("step")}
-                                disabled={status.mode !== "step"}
-                                title={status.mode !== "step" ? t("autorun.tip_step_only") : undefined}
-                            >
-                                {t("autorun.btn_next_step")}
-                            </button>
-
-                            <label style={{display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap"}}>
-                                <input
-                                    type="checkbox"
-                                    checked={recordDetailedOperations}
-                                    onChange={(e) => patchAutoConfig({record_detailed_operations: e.target.checked})}
-                                />
-                                <span>{t("autorun.toggle_record_detailed_operations")}</span>
-                            </label>
-                        </div>
-                        <p className="hint" style={{marginTop: 8, lineHeight: 1.5}}>
-                            <Trans i18nKey="autorun.hint_modes"/>
-                        </p>
-                    </section>
+                <div className={styles.toolbar}>
+                    <button className="nav-btn" onClick={() => {setSaveNotice(""); setSettingsOpen(true);}}><span className="ms" aria-hidden="true">tune</span>{t("autoplay.runtime_settings")}</button>
+                    <button className={`nav-btn ${styles.primary}`} onClick={() => working ? void stop() : void start()} disabled={starting || existingGameConfirm || (!working && !!startUnavailable)} title={!working && startUnavailable ? t(startUnavailable) : undefined}>
+                        <span className="ms" aria-hidden="true">{working ? "pause" : "play_arrow"}</span>{t(working ? "autorun.btn_pause" : starting ? "autorun.btn_starting" : "autorun.btn_start")}</button>
                 </div>
+            </div>
+            {existingGameConfirm && <div className={styles.confirmation} role="alert">
+                <span>{t("autorun.confirm_existing_game")}</span><div className={styles.toolbar}>
+                    <button className="nav-btn" onClick={() => void start(true)} disabled={starting}><span className="ms" aria-hidden="true">restart_alt</span>{t("autorun.btn_continue_remake")}</button>
+                    <button className="nav-btn" onClick={cancelExistingGame} disabled={starting}><span className="ms" aria-hidden="true">close</span>{t("autorun.btn_cancel")}</button>
+                </div>
+            </div>}
+            {controlError && <p className="notice error" role="alert">{controlError}</p>}
+            {status.last_error && <p className="notice error">{t("autorun.hint_last_error", {text: status.last_error})}</p>}
+            <div className={styles.metrics}>
+                <div><span><span className="ms" aria-hidden="true">timer</span>{t("autoplay.elapsed")}</span><strong>{elapsedDisplay}</strong></div>
+                <div><span><span className="ms" aria-hidden="true">replay</span>{t("autoplay.runs")}</span><strong>{status.runs ?? 0}</strong></div>
+                <div><span><span className="ms" aria-hidden="true">workspace_premium</span>{t("autoplay.best_value")}</span><strong>{status.best_achieved_count ?? 0}</strong></div>
+                <div><span><span className="ms" aria-hidden="true">speed</span>{t("autorun.label_op_interval")}</span><strong>{opInterval}<small>{t("autorun.suffix_ms")}</small></strong></div>
+            </div>
+            <div className={styles.runMeta}><span>{t("autorun.hint_started_at", {time: status.started_at ? new Date(status.started_at).toLocaleString() : "-"})}</span>
+                {profile && <span>{t("autoplay.running_profile", {name: profile.name})}</span>}</div>
+        </section>
 
-                <section className="panel">
-                    <div className="panel-title">{t("autorun.section_email_title")}</div>
+        <ActionProviderPanel state={currentState}/>
 
+        {openingProfile ? <section className={`panel ${styles.progressPanel}`}>
+            <div className={styles.goalProgress}>
+                <h3 className="panel-title">{openingProfile.name}</h3>
+                <div className={styles.progressValue}><strong>{achieved ?? "—"}</strong><span>/ {openingProfile.end_count}</span></div>
+                <progress max={openingProfile.end_count} value={achieved == null ? undefined : Math.max(0, achieved)} aria-label={t("autoplay.goal_progress")}/>
+                <span className="hint">{openingCutoff ? t("autoplay.cutoff_at", {level: openingCutoff.label}) : t("autoplay.error_cutoff")}</span>
+            </div>
+            <div className={styles.currentTargets}><AutoPlayTargets targets={openingProfile.targets}/></div>
+        </section> : <section className="panel">
+            <h3 className="panel-title">{profile?.name ?? t("autoplay.profile")}</h3>
+            {profile && profile.strategy !== "opening" && <div className={styles.toolbar}>{profile.stages.map(stage => <span className="badge" key={stage.id}>
+                {stage.name} · {t("autoplay.cutoff_at", {level: formatLevelIdToLabel(stage.deadline_level, "packet", stage.deadline_node)})}
+            </span>)}</div>}
+            <p className="hint">{t(profile ? "autoplay.full_not_ready" : "autoplay.select_profile")}</p>
+        </section>}
+
+        <section className={`panel ${styles.historyPanel}`}>
+            <div className={styles.historyHeader}>
+                <div className={styles.choices} role="group" aria-label={t("autoplay.records")}>
+                    <button className="nav-btn" aria-pressed={recordView === "remakes"} onClick={() => setRecordView("remakes")}><span className="ms" aria-hidden="true">history</span>{t("autorun.section_remake_records_title")}<span className="badge">{remakeRecords.length}</span></button>
+                    <button className="nav-btn" aria-pressed={recordView === "operations"} onClick={() => setRecordView("operations")}><span className="ms" aria-hidden="true">list_alt</span>{t("autorun.section_operation_records_title")}<span className="badge">{operationRecords.length}</span></button>
+                </div>
+                {recordView === "remakes" && bestRecord && <button className="nav-btn" onClick={() => setSelectedRecordSeq(bestRecord.seq)}><span className="ms" aria-hidden="true">workspace_premium</span>{t("autoplay.view_best")}</button>}
+            </div>
+            {recordView === "remakes" ? remakeRecords.length === 0 ? <div className={styles.empty}><span className="ms" aria-hidden="true">history</span><p>{t("autorun.remake_empty")}</p></div> :
+                <div className={styles.recordLayout}>
+                    <div className={styles.recordList} role="group" aria-label={t("autorun.section_remake_records_title")}>
+                        {remakeRecords.map(record => <button key={record.seq} className={styles.recordButton} aria-pressed={selectedRecord?.seq === record.seq}
+                            onClick={() => setSelectedRecordSeq(record.seq)} title={reasonText(record.reason)}>
+                            <span className="ms" aria-hidden="true">{bestRecord?.seq === record.seq ? "workspace_premium" : "replay"}</span>
+                            <span><strong>#{record.seq} · {t("autoplay.run_number", {run: record.run_index})}</strong><small>{formatLevelIdToLabel(record.level)} · {reasonText(record.reason)}</small></span>
+                            <span className={styles.recordValue}><b>{record.target_value}</b><small>{t(bestRecord?.seq === record.seq ? "autorun.remake_best_marker" : "autoplay.value")}</small></span>
+                        </button>)}
+                    </div>
+                    <div className={styles.recordDetail}>
+                        <div className={styles.recordDetailHeading}><strong>{describeRecord(selectedRecord)}</strong><span className="hint">{selectedRecord?.ts ? new Date(selectedRecord.ts).toLocaleString() : "—"}</span></div>
+                        <p className="hint">{t("autorun.remake_reason_label", {reason: reasonText(selectedRecord?.reason)})}</p>
+                        <div className={styles.recordAmulets}>{renderRecordAmulets(selectedRecord)}</div>
+                        {recordDetailedOperations && <details className={styles.recordOperations}><summary>{t("autorun.remake_operation_count", {count: selectedRecord?.operation_count ?? selectedRecord?.operation_records?.length ?? 0})}</summary>
+                            {renderOperationRecords(selectedRecord?.operation_records ?? [])}</details>}
+                    </div>
+                </div> : <div className={styles.operationPanel}>
+                    <div className={styles.toolbar}><label className={styles.check}><input type="checkbox" checked={recordDetailedOperations} onChange={event => patchAutoConfig({record_detailed_operations: event.target.checked})}/>{t("autorun.toggle_record_detailed_operations")}</label>
+                        {Object.entries(operationCounts).sort(([a], [b]) => Number(b) - Number(a)).slice(0, 6).map(([run, count]) => <span className="badge" key={run}>{t("autorun.operation_count_by_run", {run, count})}</span>)}
+                    </div>
+                    {renderOperationRecords(operationRecords)}
+                </div>}
+        </section>
+
+        <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title={t("autoplay.runtime_settings")} width={720} className={`${styles.dialog} ${styles.page}`}
+            actions={<button className={`nav-btn ${styles.primary}`} onClick={onSave} disabled={saving}><span className="ms" aria-hidden="true">save</span>{t(saving ? "autorun.btn_saving" : "autorun.btn_save")}</button>}>
+            <fieldset className={styles.content} disabled={saving}>
+                <section className="panel"><h3 className="panel-title">{t("autoplay.runtime_options")}</h3>
+                    <div className={styles.openingFields}>
+                        <label className={`${styles.field} ${styles.valueField}`}>{t("autorun.label_op_interval")} ({t("autorun.suffix_ms")})<input className="form-input" type="number" min={0} max={5000} value={opInterval}
+                            title={t("autorun.tip_op_interval")} onChange={event => patchAutoConfig({op_interval_ms: Math.max(0, Math.min(5000, Math.round(Number(event.target.value || 0))))})}/></label>
+
+                    </div>
+                    <label className={styles.check}><input type="checkbox" checked={recordDetailedOperations} onChange={event => patchAutoConfig({record_detailed_operations: event.target.checked})}/>{t("autorun.toggle_record_detailed_operations")}</label>
+                </section>
+                <details className={`panel ${styles.emailSettings}`}><summary><span className="ms" aria-hidden="true">mail</span>{t("autorun.section_email_title")}</summary>
                     {(() => {
                         const email = (config.email_notify ?? {
                             enabled: false,
@@ -910,8 +472,7 @@ export default function AutoRunnerPage() {
                         });
 
                         const patchEmail = (kv: Partial<typeof email>) => patchAutoConfig({email_notify: {...email, ...kv}});
-                        const rowCols = (cols: string) =>
-                            ({display: "grid", gridTemplateColumns: cols, columnGap: 12, rowGap: 10, alignItems: "start"} as const);
+
 
                         return (
                             <div style={{display: "grid", gap: 10}}>
@@ -925,37 +486,37 @@ export default function AutoRunnerPage() {
                                     <span>{t("autorun.toggle_email")}</span>
                                 </label>
 
-                                <div style={rowCols("minmax(220px, 320px) 160px 160px")}>
-                                    <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                                <div className={styles.emailFields}>
+                                    <label className={styles.field}>
                                         <span>{t("autorun.label_smtp_host")}</span>
                                         <input className="form-input" placeholder="smtp.example.com" value={email.host ?? ""} onChange={(e) => patchEmail({host: e.target.value.trim()})}/>
                                     </label>
 
-                                    <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                                    <label className={styles.field}>
                                         <span>{t("autorun.label_smtp_port")}</span>
                                         <input className="form-input" type="number" min={1} max={65535} value={Number(email.port ?? 587)} onChange={(e) => patchEmail({port: Math.max(1, Math.min(65535, Number(e.target.value || 587)))})}/>
                                     </label>
 
-                                    <label className="row" style={{gridTemplateColumns: "auto auto"}}>
+                                    <label className={styles.field}>
                                         <span>{t("autorun.label_smtp_ssl")}</span>
                                         <input className="form-checkbox" type="checkbox" checked={!!email.ssl} onChange={(e) => patchEmail({ssl: e.target.checked})}/>
                                     </label>
                                 </div>
 
-                                <div style={rowCols("minmax(220px, 320px) minmax(220px, 320px)")}>
-                                    <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                                <div className={styles.emailFields}>
+                                    <label className={styles.field}>
                                         <span>{t("autorun.label_email_from")}</span>
                                         <input className="form-input" type="email" placeholder="sender@example.com" value={email.from ?? ""} onChange={(e) => patchEmail({from: e.target.value.trim()})}/>
                                     </label>
 
-                                    <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                                    <label className={styles.field}>
                                         <span>{t("autorun.label_email_pass")}</span>
                                         <input className="form-input" type="password" placeholder={t("autorun.label_email_pass_placeholder")} value={email.pass ?? ""} onChange={(e) => patchEmail({pass: e.target.value})}/>
                                     </label>
                                 </div>
 
-                                <div style={rowCols("minmax(220px, 320px)")}>
-                                    <label className="row" style={{gridTemplateColumns: "auto 1fr"}}>
+                                <div className={styles.emailFields}>
+                                    <label className={styles.field}>
                                         <span>{t("autorun.label_email_to")}</span>
                                         <input className="form-input" type="email" placeholder="you@example.com" value={email.to ?? ""} onChange={(e) => patchEmail({to: e.target.value.trim()})}/>
                                     </label>
@@ -980,84 +541,16 @@ export default function AutoRunnerPage() {
                                                                 : undefined
                                         }
                                     >
-                                        {t("autorun.btn_send_test")}
+                                        <span className="ms" aria-hidden="true">send</span>{t("autorun.btn_send_test")}
                                     </button>
                                 </div>
                             </div>
                         );
                     })()}
-                </section>
+                </details>
+                <div role="status">{saveNotice}</div>
+            </fieldset>
+        </Modal>
 
-                <div className="page-footer-actions">
-                    <button className="nav-btn" onClick={openExport}>
-                        {t("autorun.btn_export_config")}
-                    </button>
-                    <button className="nav-btn" onClick={() => {
-                        setImportOpen(true);
-                        setImportText("");
-                        setImportError("");
-                    }}>
-                        {t("autorun.btn_import_config")}
-                    </button>
-                    <button className="nav-btn" onClick={onSave} disabled={saving}>
-                        {saving ? t("autorun.btn_saving") : t("autorun.btn_save")}
-                    </button>
-                </div>
-            </div>
-
-            <AmuletEditorModal
-                open={openAmuletEditor}
-                onClose={() => setOpenAmuletEditor(false)}
-                onConfirm={(data: EditedAmulet) => {
-                    addTargetAmulet({id: data.id, plus: data.plus, badge: data.badge ?? null, value: 1});
-                    setOpenAmuletEditor(false);
-                }}
-            />
-            <BadgePickerModal
-                open={openBadgePicker}
-                onClose={() => setOpenBadgePicker(false)}
-                onSelect={(id) => {
-                    addTargetBadge(id, 1);
-                    setOpenBadgePicker(false);
-                }}
-            />
-            <Modal open={detailTarget != null} onClose={() => setDetailTargetIndex(null)} title={detailTitle} width={560}>
-                <div style={{lineHeight: 1.7}}>{detailBody}</div>
-            </Modal>
-            <Modal open={exportOpen} onClose={() => {
-                setExportOpen(false);
-                setExportText("");
-            }} title={t("autorun.export_title")} width={640}>
-                <div style={{display: "grid", gap: 10}}>
-                    <textarea className="form-input" value={exportText} readOnly rows={4} style={{fontFamily: "monospace", resize: "vertical"}}/>
-                    <div className="hint">{t("autorun.export_hint")}</div>
-                </div>
-            </Modal>
-            <Modal open={importOpen} onClose={() => {
-                setImportOpen(false);
-                setImportText("");
-                setImportError("");
-            }} title={t("autorun.import_title")} width={640}>
-                <div style={{display: "grid", gap: 10}}>
-                    <textarea
-                        className="form-input"
-                        value={importText}
-                        onChange={(e) => {
-                            setImportText(e.target.value);
-                            setImportError("");
-                        }}
-                        rows={4}
-                        placeholder={t("autorun.import_placeholder")}
-                        style={{fontFamily: "monospace", resize: "vertical"}}
-                    />
-                    {importError ? <div className="notice error">{importError}</div> : <div className="hint">{t("autorun.import_hint")}</div>}
-                    <div className="toolbar" style={{justifyContent: "flex-end", gap: 8}}>
-                        <button className="nav-btn" onClick={applyImport} disabled={!importText.trim()}>
-                            {t("autorun.btn_apply_import")}
-                        </button>
-                    </div>
-                </div>
-            </Modal>
-        </div>
-    );
+    </div>;
 }

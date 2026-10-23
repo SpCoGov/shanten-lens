@@ -1,6 +1,6 @@
 use super::game_state::{apply_fetch_state, rebuild_pool_sections};
 use super::*;
-use crate::pipeline::Packet;
+use crate::pipeline::{Direction, Packet};
 
 fn temp_root(name: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
@@ -11,6 +11,181 @@ fn temp_root(name: &str) -> PathBuf {
             .unwrap()
             .as_nanos()
     ))
+}
+
+#[test]
+fn fetch_without_game_clears_previous_game_and_offers_start_game() {
+    let root = temp_root("fetch-no-game");
+    let (events, mut receiver) = broadcast::channel(64);
+    let services = Services::load(root.clone(), events).unwrap();
+    let mut packet = Packet {
+        direction: Direction::Inbound, packet_type: "Res".into(),
+        method: ".lq.Lobby.fetchAmuletActivityData".into(), id: Some(1),
+        data: json!({"data":{"activityId":261081,"bookEffectId":0,"gameRecords":[],"version":0}}),
+    };
+    for with_previous_game in [false, true] {
+        if with_previous_game {
+            packet.data = json!({"data":{"game":{"state":{"current":9,"interrupt":0},
+                "round":{"hands":[1,2]},"effect":{"effectList":[{"id":3020,"uid":1}]},
+                "shop":{"goods":[{"id":1,"goodsId":101,"price":5,"sold":false}]},"game":{"coin":"20"}}}});
+            services.update_game_state_from_flow(&packet, 7);
+            assert_eq!(services.game_state()["stage"], 9);
+            let live = services.game_state();
+            packet.data = json!({"error":{"code":1004},"data":{"activityId":261081}});
+            services.update_game_state_from_flow(&packet, 7);
+            assert_eq!(services.game_state(), live, "Failed fetches must preserve the current game");
+            packet.data = json!({"data":{"activityId":261081,"statistic":{"roundCount":37}}});
+        }
+        let before = services.game_state();
+        services.update_game_state_from_flow(&packet, 7);
+        let current = services.game_state();
+        assert_eq!(current["source"], "packet");
+        assert_eq!(current["flow_id"], 7);
+        assert_eq!(current["stage"], 100);
+        assert_eq!(current["ended"], true);
+        assert!(current["session_id"].as_u64().unwrap() > before["session_id"].as_u64().unwrap());
+        assert!(current["revision"].as_u64().unwrap() > before["revision"].as_u64().unwrap());
+        for key in ["hand_tiles", "effect_list", "goods", "candidate_effect_list"] {
+            assert_eq!(current[key], json!([]), "{key}");
+        }
+        assert_eq!(current["coin"], "0");
+        assert_eq!(current["action_report"]["stage"], 100);
+        assert_eq!(current["action_report"]["actions"].as_array().unwrap().len(), 1);
+        assert_eq!(current["action_report"]["actions"][0]["kind"], "start_game");
+        assert_eq!(current["action_report"]["actions"][0]["availability"], "available");
+        assert_eq!(current["action_report"]["global_actions"], json!([]));
+        let published = std::iter::from_fn(|| receiver.try_recv().ok())
+            .filter(|event| event["type"] == "update_gamestate").last().unwrap();
+        assert_eq!(published["data"], current);
+    }
+    packet.data = json!({"game":{"state":{"current":1,"interrupt":0}}});
+    services.update_game_state_from_flow(&packet, 7);
+    assert_eq!(services.game_state()["stage"], 1);
+    assert_eq!(services.game_state()["ended"], false);
+    assert_eq!(services.game_state()["action_report"]["actions"][0]["kind"], "select_character");
+    drop(services);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn action_provider_replays_documented_events_and_survives_ipc() {
+    let root = temp_root("action-provider");
+    let (events, _) = broadcast::channel(64);
+    let services = Services::load(root.clone(), events).unwrap();
+    let fixtures: Value = serde_json::from_str(include_str!("../../tests/fixtures/provider-events.json")).unwrap();
+    for (name, stage, count) in [("start",1,4),("character",2,4),("initial",3,1),("next",5,0),("trade",12,3)] {
+        services.update_game_state_from_flow(&Packet {direction: Direction::Inbound, packet_type:"Res".into(),
+            method:".lq.Lobby.amuletActivityOperate".into(), id:Some(1), data:fixtures[name].clone()},7);
+        let state = services.game_state();
+        assert_eq!(state["stage"],stage,"{name}");
+        assert_eq!(state["action_report"]["actions"].as_array().unwrap().len(),count,"{name}");
+        let typed: crate::ipc::GameStateData = serde_json::from_value(state.clone()).unwrap();
+        assert_eq!(serde_json::to_value(typed).unwrap()["action_report"],state["action_report"]);
+        assert!(state.get("provider_state").is_none());
+        if name == "character" {
+            assert_eq!(state["action_report"]["actions"][0]["availability"],"available");
+            assert_eq!(state["action_report"]["actions"][3]["reasons"][0]["code"],"initial_must_choose");
+        }
+    }
+    let before = services.game_state()["revision"].as_u64().unwrap();
+    services.update_game_state_from_flow(&Packet {direction: Direction::Inbound,packet_type:"Res".into(),
+        method:".lq.Lobby.amuletActivityOperate".into(),id:Some(2),data:json!({"events":[{"state":{"current":12,"interrupt":0},
+        "valueChanges":{"nodeEvent":{"tradeItems":{"dirty":true,"value":[{"id":2,"store":[999]}]}}}}]})},7);
+    let after = services.game_state();
+    assert!(after["revision"].as_u64().unwrap() > before);
+    assert_eq!(after["action_report"]["actions"][0]["reasons"][0]["code"],"insufficient_coin");
+    services.disconnect_game_flow(7);
+    assert_eq!(services.game_state()["action_report"]["status"],"waiting_state");
+    drop(services);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn playbook_roundtrips_with_runtime_settings() {
+    let root = temp_root("playbook");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("autorun.json"), r#"{"op_interval_ms":700}"#).unwrap();
+    let (events, _) = broadcast::channel(16);
+    let services = Services::load(root.clone(), events.clone()).unwrap();
+    assert_eq!(services.table("autorun")["op_interval_ms"], 700);
+    assert_eq!(services.table("autorun")["playbook"]["profiles"], json!([]));
+    let book: Value = serde_json::from_str(include_str!("../../tests/fixtures/playbook.json")).unwrap();
+    services.patch_config(&json!({"autorun":{"playbook":book}})).unwrap();
+    let saved = fs::read(root.join("autorun.json")).unwrap();
+    let mut invalid = book.clone();
+    invalid["profiles"][0]["initial_amulet_id"] = json!(230);
+    assert!(services.patch_config(&json!({"autorun":{"playbook":invalid}})).is_err());
+    assert_eq!(fs::read(root.join("autorun.json")).unwrap(), saved);
+    let mut invalid_opening = book.clone();
+    invalid_opening["profiles"][1]["targets"][0]["value"] = json!(0);
+    assert!(services.patch_config(&json!({"autorun":{"playbook":invalid_opening}})).is_err());
+    assert_eq!(fs::read(root.join("autorun.json")).unwrap(), saved);
+    drop(services);
+    let reloaded = Services::load(root.clone(), events).unwrap();
+    assert_eq!(reloaded.table("autorun")["playbook"], book);
+    assert_eq!(reloaded.table("autorun")["op_interval_ms"], 700);
+    for field in ["end_count", "targets", "cutoff_level", "need_pionner_badge_count"] {
+        assert!(reloaded.table("autorun").get(field).is_none());
+        assert!(reloaded.patch_config(&json!({"autorun": {field: 1}})).is_err());
+    }
+    let wire = serde_json::from_value::<crate::ipc::AutoRunnerConfig>(reloaded.table("autorun")).unwrap();
+    assert_eq!(serde_json::to_value(wire).unwrap()["playbook"], book);
+    drop(reloaded);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn playbook_invalid_levels_can_be_repaired_without_blocking_startup_or_overwriting_disk() {
+    let root = temp_root("playbook-repair");
+    fs::create_dir_all(&root).unwrap();
+    let mut valid: Value = serde_json::from_str(include_str!("../../tests/fixtures/playbook.json")).unwrap();
+    valid["selected_profile_id"] = json!("opening-profile");
+    let mut old = valid.clone();
+    old["profiles"][1]["cutoff_level"] = json!(203);
+    old["profiles"][1].as_object_mut().unwrap().remove("cutoff_node");
+    for stage in old["profiles"][0]["stages"].as_array_mut().unwrap() {
+        stage["start_level"] = json!(201);
+        stage["deadline_level"] = json!(201);
+        stage.as_object_mut().unwrap().remove("start_node");
+        stage.as_object_mut().unwrap().remove("deadline_node");
+    }
+    let path = root.join("autorun.json");
+    let original = serde_json::to_vec(&json!({"playbook": old, "op_interval_ms": 700})).unwrap();
+    fs::write(&path, &original).unwrap();
+    let (events, _) = broadcast::channel(16);
+    let services = Arc::new(Services::load(root.clone(), events.clone()).expect("outdated level IDs must not prevent startup"));
+    assert_eq!(services.table("autorun")["playbook"], old);
+    assert_eq!(fs::read(&path).unwrap(), original);
+    services.reload_files();
+    assert_eq!(services.table("autorun")["playbook"], old);
+    assert_eq!(fs::read(&path).unwrap(), original);
+    assert!(services.patch_config(&json!({"autorun": {"playbook": old}})).is_err());
+    assert_eq!(fs::read(&path).unwrap(), original);
+    let proxy = crate::proxy::ProxyControl::new(services.clone(), Arc::new(tokio::sync::RwLock::new(crate::pipeline::PipelineConfig::default())));
+    let automation = crate::automation::Automation::new(services.clone(), proxy);
+    assert_eq!(automation.start_autorun(), Err("autoplay.invalid_config"));
+    assert_eq!(automation.autorun_status()["running"], false);
+    let mut unset = valid.clone();
+    unset["profiles"][1]["cutoff_level"] = json!(0);
+    unset["profiles"][1]["cutoff_node"] = json!(0);
+    let unset_bytes = serde_json::to_vec(&json!({"playbook": unset, "op_interval_ms": 700})).unwrap();
+    fs::write(&path, &unset_bytes).unwrap();
+    services.reload_files();
+    assert_eq!(services.table("autorun")["playbook"], unset);
+    assert!(services.patch_config(&json!({"autorun": {"playbook": unset}})).is_err());
+    assert_eq!(automation.start_autorun(), Err("autoplay.invalid_config"));
+    assert_eq!(fs::read(&path).unwrap(), unset_bytes);
+    services.patch_config(&json!({"autorun": {"playbook": valid}})).unwrap();
+    assert_eq!(services.table("autorun")["playbook"], valid);
+    automation.start_autorun().unwrap();
+    automation.stop_autorun();
+    drop(automation);
+    drop(services);
+    let reloaded = Services::load(root.clone(), events).unwrap();
+    assert_eq!(reloaded.table("autorun")["playbook"], valid);
+    assert_eq!(reloaded.table("autorun")["op_interval_ms"], 700);
+    drop(reloaded);
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]

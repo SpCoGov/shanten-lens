@@ -1,15 +1,19 @@
 //! Shared configuration, game state, packet records and UI events.
 mod config;
+pub(crate) mod playbook;
 mod game_state;
 mod packets;
 mod registry;
 mod qyzz;
 mod data_sources;
+mod direct_accounts;
+pub use direct_accounts::{DirectAccountInput, DirectAccountSummary, StoredDirectAccount};
+pub(crate) use direct_accounts::new_id as new_direct_device_id;
 #[cfg(test)]
 mod tests;
 
 use crate::{ipc::PacketLogItem, logging::JsonLineLog, storage::write_json};
-use config::{defaults, load_config_table, validate_config};
+use config::{defaults, load_config_table, validate_config, validate_config_for_editing};
 use game_state::empty_game_state;
 use packets::PacketRecording;
 use registry::{registry_items, AMULETS, BADGES};
@@ -33,6 +37,7 @@ pub struct Services {
     locale: Arc<Mutex<String>>,
     game_state: Arc<Mutex<Value>>,
     data_sources: Arc<Mutex<data_sources::DataSources>>,
+    direct_accounts: Arc<Mutex<direct_accounts::DirectAccounts>>,
     packet_log: Arc<Mutex<VecDeque<PacketLogItem>>>,
     packet_log_file: Arc<JsonLineLog>,
     // ponytail: Serialize file writes for ordering; use a writer queue if disk I/O delays packets.
@@ -52,13 +57,14 @@ impl Services {
             let path = root.join(format!("{name}.json"));
             let registered = config[name].clone();
             let (loaded, need_write) = load_config_table(&path, &registered, &registered)?;
-            validate_config(name, &loaded).map_err(anyhow::Error::msg)?;
+            validate_config_for_editing(name, &loaded).map_err(anyhow::Error::msg)?;
             config[name] = loaded;
-            if need_write {
+            if need_write && validate_config(name, &config[name]).is_ok() {
                 write_json(&path, &config[name])?;
             }
         }
         let data_dir = root.parent().unwrap_or(&root).join("data");
+        let direct_accounts = direct_accounts::DirectAccounts::load(&data_dir.join("direct-accounts.json"))?;
         let log_dir = root.parent().unwrap_or(&root).join("logs");
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let packet_log_file =
@@ -73,6 +79,7 @@ impl Services {
             locale: Arc::new(Mutex::new("zh-CN".into())),
             game_state: Arc::new(Mutex::new(empty_game_state())),
             data_sources: Arc::new(Mutex::new(data_sources::DataSources::default())),
+            direct_accounts: Arc::new(Mutex::new(direct_accounts)),
             packet_log: Arc::new(Mutex::new(VecDeque::new())),
             packet_log_file: Arc::new(packet_log_file),
             packet_recording: Arc::new(Mutex::new(None)),
