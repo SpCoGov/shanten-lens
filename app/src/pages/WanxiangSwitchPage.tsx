@@ -16,7 +16,7 @@ import {
 
 const LS_VERBOSE = "sl-wanxiang-switch:verbose-progress";
 const LS_WALL_LIMIT = "sl-wanxiang-switch:wall-limit";
-const WALL_LIMIT_MIN = 2;
+const WALL_LIMIT_MIN = 1;
 const WALL_LIMIT_MAX = 36;
 
 function readBool(key: string, fallback: boolean) {
@@ -28,16 +28,16 @@ function readBool(key: string, fallback: boolean) {
 function readWallLimit() {
     const raw = Number(localStorage.getItem(LS_WALL_LIMIT) || "36");
     if (!Number.isFinite(raw)) return 36;
-    return Math.min(36, Math.max(2, Math.trunc(raw)));
+    return Math.min(WALL_LIMIT_MAX, Math.max(WALL_LIMIT_MIN, Math.trunc(raw)));
 }
 
 function parseWallLimitInput(raw: string, t: (key: string) => string) {
     const value = Number(raw);
     if (!Number.isFinite(value) || !Number.isInteger(value)) {
-        return {ok: false as const, message: t("blackhole.wall_limit_error_integer")};
+        return {ok: false as const, message: t("blackhole.wanxiang_wall_limit_error_integer")};
     }
     if (value < WALL_LIMIT_MIN || value > WALL_LIMIT_MAX) {
-        return {ok: false as const, message: t("blackhole.wall_limit_error_range")};
+        return {ok: false as const, message: t("blackhole.wanxiang_wall_limit_error_range")};
     }
     return {ok: true as const, value};
 }
@@ -257,7 +257,7 @@ export default function WanxiangSwitchPage({
                         </label>
                         <label className="switch-guide-number">
                             <span>{t("blackhole.wall_limit")}</span>
-                            <input className="form-input" type="number" value={wallLimitInput} disabled={executing} onChange={(e) => setWallLimitInput(e.target.value)}/>
+                            <input className="form-input" type="number" min={WALL_LIMIT_MIN} max={WALL_LIMIT_MAX} step={1} value={wallLimitInput} disabled={executing} onChange={(e) => setWallLimitInput(e.target.value)}/>
                         </label>
                     </div>
                 </div>
@@ -305,7 +305,7 @@ export default function WanxiangSwitchPage({
                 </details>
 
                 <div className="switch-guide-utility-bar">
-                    <span>{t("blackhole.wall_limit_hint")}</span>
+                    <span>{t("blackhole.wanxiang_wall_limit_hint")}</span>
                     <div>
                         <button type="button" onClick={exportCurrentSnapshot}><span className="ms" aria-hidden="true">content_copy</span>{t("blackhole.export_current")}</button>
                         <button type="button" onClick={clearCache} disabled={executing}><span className="ms" aria-hidden="true">delete_sweep</span>{t("blackhole.clear_cache")}</button>

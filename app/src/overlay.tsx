@@ -310,16 +310,20 @@ function HudOverlay() {
                         </div>
                         <div className="hud-line">
                             <span>{t(wanxiangPlan?.search_preferences?.coin_objective
-                                ? "blackhole.wanxiang_win_draws_label" : "blackhole.wanxiang_draws_needed_label")}</span>
-                            <strong>{wanxiangPlan?.draws_needed ?? "-"}</strong>
+                                ? "blackhole.draws_needed_label" : "blackhole.wanxiang_draws_needed_label")}</span>
+                            <strong>{(wanxiangPlan?.search_preferences?.coin_objective
+                                ? wanxiangPlan.tenpai_draws_needed : wanxiangPlan?.draws_needed) ?? "-"}</strong>
                         </div>
-                        {wanxiangPlan?.search_preferences?.coin_objective && wanxiangPlan.coin_reward != null && <div className="hud-line">
-                            <span>{t("action_provider.coin")}</span>
-                            <strong>{t("blackhole.wanxiang_coin_result", {
-                                objective: t(`blackhole.wanxiang_${wanxiangPlan.search_preferences.coin_objective}`),
-                                count: wanxiangPlan.coin_reward,
-                            })}</strong>
-                        </div>}
+                        {wanxiangPlan?.search_preferences?.coin_objective && wanxiangPlan.coin_reward != null && <>
+                            <div className="hud-line">
+                                <span>{t("blackhole.wanxiang_coin_per_win")}</span>
+                                <strong>{wanxiangPlan.coin_reward}</strong>
+                            </div>
+                            <div className="hud-line">
+                                <span>{t("blackhole.wanxiang_total_coin")}</span>
+                                <strong>{wanxiangPlan.total_coin_reward ?? wanxiangPlan.coin_reward}</strong>
+                            </div>
+                        </>}
                     </div>
                 </HudPanel>
             ) : null}

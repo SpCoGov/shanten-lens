@@ -1,5 +1,5 @@
 //! Physical-meld enumeration with reachability checks and preference bounds.
-//! Ordinary preferences rank ready hands; coin objectives also search later winning hands.
+//! Ordinary preferences rank ready hands; coin objectives maximize reward per win times wins.
 use super::{
     custom, deck, face, ids, norm, pool, search_limits, souzu, CoinObjective, Entry, MeldType,
     SearchPreferences, SwitchBatches,
@@ -245,6 +245,7 @@ struct CoinSearch<'a, 'p> {
     best: Option<Value>,
     best_reward: Option<usize>,
     wall_limit: usize,
+    wall_size: usize,
 }
 
 impl CoinSearch<'_, '_> {
@@ -277,7 +278,11 @@ impl CoinSearch<'_, '_> {
         let tile_upper = reward + available.clone().take(13 - chosen.len()).map(|(coins, _)| coins).sum::<usize>();
         let meld_upper = reward + self.melds[start..].iter().take(slots).map(|(coins, _)| coins).sum::<usize>()
             + available.clone().next().map_or(0, |(coins, _)| *coins);
-        if self.best_reward.is_some_and(|best| tile_upper.min(meld_upper) <= best) {
+        // A selected wall tile cannot be won before its draw; include that first win.
+        let wins_upper = self.wall_size.saturating_sub(self.entries.iter()
+            .filter(|entry| entry.source == "wall" && chosen.contains(&entry.id))
+            .map(|entry| entry.index).max().unwrap_or(0));
+        if self.best_reward.is_some_and(|best| tile_upper.min(meld_upper) * wins_upper <= best) {
             return;
         }
         if slots == 0 {
@@ -285,7 +290,7 @@ impl CoinSearch<'_, '_> {
             for (extra_reward, extra) in &self.tiles {
                 if (self.progress.stopped)() { return; }
                 let coins = reward + extra_reward;
-                if self.best_reward.is_some_and(|best| coins <= best) { break; }
+                if self.best_reward.is_some_and(|best| coins * wins_upper <= best) { break; }
                 if chosen.contains(&extra.id) || (extra.source == "replacement" && extra.index >= prefix) { continue; }
                 let target = candidate_ids(chosen.iter().copied().chain([1000, extra.id]).collect(), &deck);
                 if self.entries.iter().filter(|e| e.source != "wall" && target.contains(&e.id)).count() > 13 {
@@ -299,7 +304,13 @@ impl CoinSearch<'_, '_> {
                 let Some((steps, discards, incoming, draws)) = custom::simulate(self.state, self.entries, &target, &[], self.wall_limit) else {
                     continue;
                 };
+                let win_count = self.wall_size.saturating_sub(draws.saturating_sub(1));
+                let total_coin_reward = coins * win_count;
+                if self.best_reward.is_some_and(|best| total_coin_reward <= best) { continue; }
                 let winning = steps.last().unwrap()["tiles"][0].as_u64().unwrap();
+                let tenpai_draws = self.entries.iter()
+                    .filter(|entry| entry.source == "wall" && entry.id != winning && target.contains(&entry.id))
+                    .map(|entry| entry.index + 1).max().unwrap_or(0);
                 let pair = [1000, extra.id];
                 let groups = chosen.chunks_exact(3).chain(std::iter::once(pair.as_slice())).map(|group| {
                     let mut group = group.to_vec();
@@ -309,7 +320,8 @@ impl CoinSearch<'_, '_> {
                 let (rounds, limit) = search_limits(self.state);
                 self.best = Some(json!({
                     "status":"plan","mode":"wanxiang-four-meld-switch","search_algorithm":"wanxiang_four_meld_switch",
-                    "coin_reward":coins,"draws_needed":draws,"custom_steps":steps,
+                    "coin_reward":coins,"win_count":win_count,"total_coin_reward":total_coin_reward,
+                    "draws_needed":draws,"tenpai_draws_needed":tenpai_draws,"custom_steps":steps,
                     "initial_hand":ids(self.state.get("hand_tiles")),
                     "target13":target.iter().filter(|&&id| id != winning).map(|&id| norm(face(&deck,id))).collect::<Vec<_>>(),
                     "target14":target.iter().map(|&id| norm(face(&deck,id))).collect::<Vec<_>>(),
@@ -325,9 +337,7 @@ impl CoinSearch<'_, '_> {
                     "per_change_limit":limit,"max_change_count":rounds,"considered_tile_count":self.entries.len(),
                     "plan_signature":signature
                 }));
-                self.best_reward = Some(coins);
-                // Remaining pair candidates cannot improve this hand's reward.
-                break;
+                self.best_reward = Some(total_coin_reward);
             }
             return;
         }
@@ -413,6 +423,9 @@ pub(super) fn search(
     emit: &mut dyn FnMut(Value),
     should_stop: &dyn Fn() -> bool,
 ) -> Value {
+    if !(1..=36).contains(&wall_limit) {
+        return json!({"status":"impossible","reason":"wanxiang-wall-limit"});
+    }
     let hand = ids(state.get("hand_tiles"));
     if !hand.contains(&1000) {
         return json!({"status":"impossible","reason":"wanxiang-not-in-hand"});
@@ -457,7 +470,8 @@ pub(super) fn search(
         tiles.sort_by_key(|(coins, _)| Reverse(*coins));
         search.progress(false, true);
         let mut coins = CoinSearch { progress: &mut search, state, entries: &entries, melds, tiles,
-            seen: skip.iter().cloned().collect(), best: None, best_reward: None, wall_limit };
+            seen: skip.iter().cloned().collect(), best: None, best_reward: None, wall_limit,
+            wall_size: ids(state.get("wall_tiles")).len() };
         coins.visit(0, &mut Vec::new(), 0);
         let result = coins.best;
         search.progress(false, true);
@@ -499,7 +513,7 @@ pub(super) fn search(
         }).collect::<Vec<_>>();
         Some(json!({
             "status":"plan","mode":"wanxiang-four-meld-switch","search_algorithm":"wanxiang_four_meld_switch",
-            "draws_needed":0,"target13":faces,"target14":faces,
+            "draws_needed":0,"tenpai_draws_needed":0,"target13":faces,"target14":faces,
             "target_physical_ids":target,"target_physical_faces":faces,
             "resolved_groups":resolved,
             "discards":discards.first().cloned().unwrap_or_default(),
@@ -592,6 +606,18 @@ mod tests {
     }
 
     #[test]
+    fn wall_limit_accepts_one_through_thirty_six() {
+        let snapshot = state(&["1m","2m","3m","1p","2p","3p","1s","2s","3s","1z","1z","1z"], &[]);
+        let preferences = SearchPreferences::default();
+        for limit in [1,36] {
+            assert_eq!(search(&snapshot, limit, &[], &preferences, &mut |_| {}, &||false)["status"], "plan");
+        }
+        for limit in [0,37,usize::MAX] {
+            assert_eq!(search(&snapshot, limit, &[], &preferences, &mut |_| {}, &||false)["reason"], "wanxiang-wall-limit");
+        }
+    }
+
+    #[test]
     fn coin_rewards_count_each_indicator_but_cap_pearl_per_physical_tile() {
         let snapshot = json!({
             "deck_map":{"1":"5p","2":"0p","3":"0m","4":"0s","5":"3p","6":"1p","7":"9m","8":"1z","9":"bd",
@@ -625,9 +651,15 @@ mod tests {
             let early = search(&snapshot, 1, &[], &preferences, &mut |_| {}, &||false);
             assert_eq!(early["coin_reward"], early_reward, "{early}");
             assert_eq!(early["draws_needed"], 1);
+            assert_eq!(early["tenpai_draws_needed"], 0);
+            assert_eq!(early["win_count"], 2);
+            assert_eq!(early["total_coin_reward"], early_reward * 2);
             let best = plan(&snapshot, &preferences, &[]);
             assert_eq!(best["coin_reward"], best_reward, "{best}");
             assert_eq!(best["draws_needed"], 2);
+            assert_eq!(best["tenpai_draws_needed"], 0);
+            assert_eq!(best["win_count"], 1);
+            assert_eq!(best["total_coin_reward"], best_reward);
             assert_eq!(best["post_draw_discards"], json!([14]));
             assert!(ids(best.get("target_physical_ids")).contains(&15));
             assert_eq!(best["search_preferences"]["prefer_dora"], false);
@@ -636,12 +668,51 @@ mod tests {
             assert!(best["search_preferences"]["preferred_meld_type"].is_null());
             let next = plan(&snapshot, &preferences, &[best["plan_signature"].as_str().unwrap().into()]);
             assert_ne!(best["plan_signature"], next["plan_signature"]);
-            assert_eq!(next["coin_reward"], best_reward - early_reward);
+            assert_eq!(next["coin_reward"], early_reward);
+            assert_eq!(next["total_coin_reward"], early_reward * 2);
             assert_eq!(search(&snapshot, 0, &[], &preferences, &mut |_| {}, &||false)["status"], "impossible");
             assert_eq!(search(&snapshot, 36, &[], &preferences, &mut |_| {}, &||true)["reason"], "stopped-by-user");
         }
         snapshot["total_change_tile_count"] = json!(0);
         assert_eq!(plan(&snapshot, &SearchPreferences { coin_objective:Some(CoinObjective::HeavenlyBlessing), ..Default::default() }, &[])["status"], "impossible");
+    }
+
+    #[test]
+    fn coin_search_maximizes_reward_times_wins_instead_of_one_win() {
+        let mut snapshot = state(&["1m","2m","3m","1s","2s","3s","1z","1z","1z","4p","5p","8p"], &["6p"]);
+        snapshot["wall_tiles"] = json!([14,15,16,17,18]);
+        for (id, tile) in [(14,"7z"),(15,"7z"),(16,"7z"),(17,"7z"),(18,"0p"),(101,"4p"),(102,"4p")] {
+            snapshot["deck_map"][id.to_string()] = json!(tile);
+        }
+        snapshot["dora_tiles"] = json!([101,102]);
+        snapshot["tian_dora_tiles"] = json!(["5p"]);
+        for (objective, reward) in [(CoinObjective::HeavenlyBlessing,6),(CoinObjective::ShiningPearl,5)] {
+            let preferences = SearchPreferences {coin_objective:Some(objective), ..Default::default()};
+            for wall_limit in [5,1] {
+                let result = search(&snapshot, wall_limit, &[], &preferences, &mut |_| {}, &||false);
+                assert_eq!(result["coin_reward"], reward, "{result}");
+                assert_eq!(result["draws_needed"], 1, "{result}");
+                assert_eq!(result["win_count"], 5, "{result}");
+                assert_eq!(result["total_coin_reward"], reward * 5, "{result}");
+            }
+        }
+    }
+
+    #[test]
+    fn coin_plan_reports_when_the_target_is_ready_before_the_winning_draw() {
+        let mut snapshot = state(&["1m","2m","3m","1s","2s","3s","1z","1z","1z","4p","8p","9p"], &["6p"]);
+        snapshot["wall_tiles"] = json!([14,15,16]);
+        for (id, tile) in [(14,"7z"),(15,"5p"),(16,"0p"),(101,"4p"),(102,"4p")] {
+            snapshot["deck_map"][id.to_string()] = json!(tile);
+        }
+        snapshot["dora_tiles"] = json!([101,102]);
+        snapshot["tian_dora_tiles"] = json!(["5p"]);
+        for (objective, reward) in [(CoinObjective::HeavenlyBlessing,14),(CoinObjective::ShiningPearl,10)] {
+            let result = plan(&snapshot, &SearchPreferences {coin_objective:Some(objective), ..Default::default()}, &[]);
+            assert_eq!(result["coin_reward"], reward, "{result}");
+            assert_eq!(result["tenpai_draws_needed"], 2, "{result}");
+            assert_eq!(result["draws_needed"], 3, "{result}");
+        }
     }
 
     #[test]
@@ -667,7 +738,6 @@ mod tests {
                     let selected = ordinary.iter().enumerate().filter(|(i, _)| mask & (1 << i) != 0)
                         .map(|(_, e)| *e).collect::<Vec<_>>();
                     let reward = selected.iter().map(|e| rewards[&e.id]).sum::<usize>();
-                    if expected.is_some_and(|best| reward <= best) { continue; }
                     let mut counts = HashMap::new();
                     for entry in &selected { *counts.entry(entry.face.clone()).or_insert(0) += 1; }
                     let shape = counts.keys().cloned().collect::<Vec<_>>().into_iter().any(|pair| {
@@ -677,12 +747,15 @@ mod tests {
                         complete
                     });
                     let target = selected.iter().map(|e| e.id).chain([1000]).collect::<Vec<_>>();
-                    if shape && custom::simulate(&snapshot, &entries, &target, &[], 3).is_some() {
-                        expected = Some(reward);
+                    if shape {
+                        if let Some((_, _, _, draws)) = custom::simulate(&snapshot, &entries, &target, &[], 3) {
+                            let total = reward * (3 - draws + 1);
+                            expected = Some(expected.map_or(total, |best: usize| best.max(total)));
+                        }
                     }
                 }
                 let result = plan(&snapshot, &SearchPreferences {coin_objective:Some(objective), ..Default::default()}, &[]);
-                assert_eq!(result["coin_reward"].as_u64().map(|n| n as usize), expected, "{result}");
+                assert_eq!(result["total_coin_reward"].as_u64().map(|n| n as usize), expected, "{result}");
             }
         }
     }
