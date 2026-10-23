@@ -839,6 +839,7 @@ export default function App() {
     const {toast, visible: toastVisible} = useGlobalToast();
     const {config: autoConfig, status: autoStatus} = useAutoRunner();
     const [route, setRoute] = React.useState<Route>("home");
+    const [debugEnabled, setDebugEnabled] = React.useState(false);
     const [activePluginPageId, setActivePluginPageId] = React.useState<string>();
     const pluginPages = usePluginStore((state) => state.pages);
     const activePluginPage = pluginPages.find((page) => page.id === activePluginPageId);
@@ -899,6 +900,9 @@ export default function App() {
     React.useEffect(() => {
         if (route === "plugin" && !activePluginPage) setRoute("plugins");
     }, [activePluginPage, route]);
+    React.useEffect(() => {
+        if (!debugEnabled && route === "autorun") setRoute("home");
+    }, [debugEnabled, route]);
 
     const homeTutorialSteps = React.useMemo<TutorialStep[]>(() => [
         {
@@ -920,11 +924,11 @@ export default function App() {
             body: t("tutorial.home.step_blackhole.body"),
             targetSelector: '[data-tutorial="nav-blackhole"]',
         },
-        {
+        ...(debugEnabled ? [{
             title: t("tutorial.home.step_autorun.title"),
             body: t("tutorial.home.step_autorun.body"),
             targetSelector: '[data-tutorial="nav-autorun"]',
-        },
+        }] : []),
         {
             title: t("tutorial.home.step_more.title"),
             body: t("tutorial.home.step_more.body"),
@@ -940,7 +944,7 @@ export default function App() {
             body: t("tutorial.home.step_refresh.body"),
             targetSelector: '[data-tutorial="nav-refresh"]',
         },
-    ], [t]);
+    ], [t, debugEnabled]);
 
     const blackHoleTutorialSteps = React.useMemo<TutorialStep[]>(() => [
         {
@@ -1457,10 +1461,12 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
-        type EventName = "update_gamestate" | "discard_recommendation" | "souzu_switch_execution" | "autorun_status" | "tsumo_loop_status" | "msgbox";
+        type EventName = "update_config" | "update_gamestate" | "discard_recommendation" | "souzu_switch_execution" | "autorun_status" | "tsumo_loop_status" | "msgbox";
         type AppBackendEvent = {[K in EventName]: {type: K; data: backendIpc.BackendEventMap[K]}}[EventName];
         const handleBackendEvent = (pkt: AppBackendEvent) => {
-            if (pkt.type === "update_gamestate") {
+            if (pkt.type === "update_config") {
+                setDebugEnabled(pkt.data.general?.debug === true);
+            } else if (pkt.type === "update_gamestate") {
                 const d = pkt.data as GameStateData;
                 if (sourceSession.current !== d.session_id) {
                     setPlanSouzuSwitch(null);
@@ -1593,12 +1599,13 @@ export default function App() {
 
         let active = true;
         const backendUnlisteners = ([
-            "update_gamestate", "discard_recommendation", "souzu_switch_execution",
+            "update_config", "update_gamestate", "discard_recommendation", "souzu_switch_execution",
             "autorun_status", "tsumo_loop_status", "msgbox",
         ] as EventName[]).map((name) => backendIpc.subscribeBackendEvent(name, (data) => handleBackendEvent({type: name, data} as AppBackendEvent)));
         void backendIpc.initializeBackend().then((snapshot) => {
             if (!active) return;
             setConnected(true);
+            handleBackendEvent({type: "update_config", data: snapshot.config});
             handleBackendEvent({type: "update_gamestate", data: snapshot.gameState});
             handleBackendEvent({type: "autorun_status", data: snapshot.autorunStatus});
             handleBackendEvent({type: "tsumo_loop_status", data: snapshot.tsumoLoopStatus});
@@ -1885,6 +1892,7 @@ export default function App() {
         {id:"plugins", icon:"extension", title:t("nav.plugins"), active:route === "plugins", tutorial:"nav-plugins", onClick:() => setRoute("plugins")},
         {id:"wanxiang", icon:"all_inclusive", title:t("nav.wanxiang"), active:route === "wanxiang", tutorial:"nav-wanxiang", onClick:() => setRoute("wanxiang")},
         {id:"custom-switch", icon:"tune", title:t("custom_target.title"), active:route === "custom-switch", onClick:() => setRoute("custom-switch")},
+        {id:"autorun", icon:"smart_toy", title:t("nav.autorun"), active:route === "autorun", hidden:!debugEnabled, tutorial:"nav-autorun", onClick:() => setRoute("autorun")},
         {id:"overlay", icon:"picture_in_picture", title:t("nav.overlay"), active:route === "overlay", tutorial:"nav-overlay", onClick:() => setRoute("overlay")},
         {id:"diagnostics", icon:"article", title:t("nav.diagnostics"), active:route === "diagnostics", tutorial:"nav-diagnostics", onClick:() => setRoute("diagnostics")},
         {id:"about", icon:"help", title:t("nav.about"), active:route === "about", tutorial:"nav-about", onClick:() => setRoute("about")},
@@ -1898,7 +1906,7 @@ export default function App() {
     ];
     const navigationDefaults = {
         outside:["home", "score", "blackhole", "more", "spacer", "hotkeys", "refresh", "settings", "theme"],
-        more:["fuse", "pipeline", "plugins", ...pluginPages.map(page => "plugin:" + page.id), "wanxiang", "custom-switch", "overlay", "diagnostics", "about", "separator:tools", "today-win", "gamestate"],
+        more:["fuse", "pipeline", "plugins", ...pluginPages.map(page => "plugin:" + page.id), "wanxiang", "custom-switch", "autorun", "overlay", "diagnostics", "about", "separator:tools", "today-win", "gamestate"],
     };
 
     return (
@@ -2208,7 +2216,7 @@ export default function App() {
                         {route === "custom-switch" && (
                             <CustomSwitchPage currentState={latestGameState} data={planCustomSwitch} onClear={() => setPlanCustomSwitch(null)}/>
                         )}
-                        {route === "autorun" && <AutoRunnerPage/>}
+                        {debugEnabled && route === "autorun" && <AutoRunnerPage/>}
                         {route === "overlay" && <OverlayPage/>}
                         {route === "diagnostics" && <DiagnosticsPage connected={connected}/>}
                         {route === "about" && (
