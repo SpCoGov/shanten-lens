@@ -490,6 +490,13 @@ function PlanBody({
 }) {
     const {t} = useTranslation();
     const batches = zipBatches(data.switch_discards, data.switch_in, data.switch_batch_sizes);
+    const coinObjective = data.search_preferences?.coin_objective;
+    const metrics = [{
+        label: t(coinObjective ? "blackhole.draws_needed_label"
+            : data.mode === "wanxiang-four-meld-switch" ? "blackhole.wanxiang_draws_needed_label" : "blackhole.draws_needed_label"),
+        value: String((coinObjective ? data.tenpai_draws_needed : data.draws_needed) ?? "-"),
+    }];
+    if (coinObjective) metrics.push({label: t("blackhole.wanxiang_coin_per_win"), value: String(data.coin_reward ?? "-")});
     const finalResult = (
         <PlanFinalResult
             data={data}
@@ -499,18 +506,20 @@ function PlanBody({
     return (
         <div style={{padding: 12, display: "grid", gap: 14}}>
             <SearchParamsBand data={data} onOpenConsideredTiles={onOpenConsideredTiles}/>
-            <div
-                className={styles.bandSingle}
-                style={{
-                    border: "1px solid var(--color-divider)",
-                    borderRadius: 10,
-                    background: "var(--panel)",
-                    userSelect: "none",
-                }}
-            >
-                <div className={styles.bandActionLabel}>{t(data.search_preferences?.coin_objective ? "blackhole.wanxiang_win_draws_label"
-                    : data.mode === "wanxiang-four-meld-switch" ? "blackhole.wanxiang_draws_needed_label" : "blackhole.draws_needed_label")}</div>
-                <div className={styles.bandValue}>{String(data.draws_needed ?? "-")}</div>
+            <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12}}>
+                {metrics.map(metric => <div
+                    key={metric.label}
+                    className={styles.bandSingle}
+                    style={{
+                        border: "1px solid var(--color-divider)",
+                        borderRadius: 10,
+                        background: "var(--panel)",
+                        userSelect: "none",
+                    }}
+                >
+                    <div className={styles.bandActionLabel}>{metric.label}</div>
+                    <div className={styles.bandValue}>{metric.value}</div>
+                </div>)}
             </div>
 
             {finalResult}
@@ -518,6 +527,8 @@ function PlanBody({
                 <div className={styles.label}>{t("blackhole.wanxiang_coin_result", {
                     objective: t(`blackhole.wanxiang_${data.search_preferences.coin_objective}`),
                     count: data.coin_reward ?? 0,
+                    wins: data.win_count ?? 1,
+                    total: data.total_coin_reward ?? data.coin_reward ?? 0,
                 })}</div>
             )}
             {data.search_preferences?.preferred_suit && (

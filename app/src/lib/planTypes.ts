@@ -60,10 +60,13 @@ export type PlanData = {
     plan_id?: string;
     status?: "win_now" | "plan" | "impossible" | "searching" | "catalog";
     draws_needed?: number | null;
+    tenpai_draws_needed?: number;
     search_algorithm?: string;
     search_algorithm_label?: string;
     search_preferences?: SearchPreferences;
     coin_reward?: number;
+    win_count?: number;
+    total_coin_reward?: number;
     preferred_quad_count?: number;
     preferred_meld_count?: number;
     preferred_suit_count?: number;
