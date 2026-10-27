@@ -1,0 +1,653 @@
+{
+  "game": {
+    "round": {
+      "changeTileCount": 0,
+      "desktopRemain": 33,
+      "dora": [
+        39
+      ],
+      "hands": [
+        90,
+        53,
+        58,
+        75,
+        92,
+        83,
+        50,
+        24,
+        5,
+        66,
+        30,
+        101,
+        88
+      ],
+      "lockedTile": [
+        61,
+        62,
+        23
+      ],
+      "ming": [],
+      "nextOperation": [
+        {
+          "gang": [],
+          "type": 101,
+          "value": 0
+        }
+      ],
+      "pool": [
+        {
+          "id": 90,
+          "tile": "4s"
+        },
+        {
+          "id": 53,
+          "tile": "6z"
+        },
+        {
+          "id": 58,
+          "tile": "2p"
+        },
+        {
+          "id": 75,
+          "tile": "1z"
+        },
+        {
+          "id": 92,
+          "tile": "5s"
+        },
+        {
+          "id": 83,
+          "tile": "1p"
+        },
+        {
+          "id": 50,
+          "tile": "3z"
+        },
+        {
+          "id": 24,
+          "tile": "4z"
+        },
+        {
+          "id": 5,
+          "tile": "2s"
+        },
+        {
+          "id": 66,
+          "tile": "6p"
+        },
+        {
+          "id": 30,
+          "tile": "1s"
+        },
+        {
+          "id": 101,
+          "tile": "9s"
+        },
+        {
+          "id": 88,
+          "tile": "3s"
+        },
+        {
+          "id": 39,
+          "tile": "6p"
+        },
+        {
+          "id": 96,
+          "tile": "7s"
+        },
+        {
+          "id": 27,
+          "tile": "7z"
+        },
+        {
+          "id": 79,
+          "tile": "5z"
+        },
+        {
+          "id": 21,
+          "tile": "1z"
+        },
+        {
+          "id": 49,
+          "tile": "2z"
+        },
+        {
+          "id": 87,
+          "tile": "3p"
+        },
+        {
+          "id": 7,
+          "tile": "3s"
+        },
+        {
+          "id": 8,
+          "tile": "4p"
+        },
+        {
+          "id": 9,
+          "tile": "4s"
+        },
+        {
+          "id": 61,
+          "tile": "3s"
+        },
+        {
+          "id": 62,
+          "tile": "4p"
+        },
+        {
+          "id": 23,
+          "tile": "3z"
+        },
+        {
+          "id": 94,
+          "tile": "6s"
+        },
+        {
+          "id": 15,
+          "tile": "7s"
+        },
+        {
+          "id": 13,
+          "tile": "6s"
+        },
+        {
+          "id": 43,
+          "tile": "8p"
+        },
+        {
+          "id": 26,
+          "tile": "6z"
+        },
+        {
+          "id": 33,
+          "tile": "3p"
+        },
+        {
+          "id": 51,
+          "tile": "4z"
+        },
+        {
+          "id": 25,
+          "tile": "5z"
+        },
+        {
+          "id": 104,
+          "tile": "3z"
+        },
+        {
+          "id": 34,
+          "tile": "3s"
+        },
+        {
+          "id": 65,
+          "tile": "5s"
+        },
+        {
+          "id": 97,
+          "tile": "8p"
+        },
+        {
+          "id": 71,
+          "tile": "8s"
+        },
+        {
+          "id": 38,
+          "tile": "5s"
+        },
+        {
+          "id": 12,
+          "tile": "6p"
+        },
+        {
+          "id": 76,
+          "tile": "2z"
+        },
+        {
+          "id": 59,
+          "tile": "2s"
+        },
+        {
+          "id": 70,
+          "tile": "8p"
+        },
+        {
+          "id": 48,
+          "tile": "1z"
+        },
+        {
+          "id": 86,
+          "tile": "2s"
+        },
+        {
+          "id": 67,
+          "tile": "6s"
+        },
+        {
+          "id": 84,
+          "tile": "1s"
+        },
+        {
+          "id": 81,
+          "tile": "7z"
+        },
+        {
+          "id": 40,
+          "tile": "6s"
+        },
+        {
+          "id": 102,
+          "tile": "1z"
+        },
+        {
+          "id": 4,
+          "tile": "2p"
+        },
+        {
+          "id": 108,
+          "tile": "7z"
+        },
+        {
+          "id": 98,
+          "tile": "8s"
+        },
+        {
+          "id": 16,
+          "tile": "8p"
+        },
+        {
+          "id": 89,
+          "tile": "4p"
+        },
+        {
+          "id": 10,
+          "tile": "0p"
+        },
+        {
+          "id": 64,
+          "tile": "5p"
+        },
+        {
+          "id": 56,
+          "tile": "1p"
+        },
+        {
+          "id": 93,
+          "tile": "6p"
+        },
+        {
+          "id": 105,
+          "tile": "4z"
+        },
+        {
+          "id": 14,
+          "tile": "7p"
+        },
+        {
+          "id": 22,
+          "tile": "2z"
+        },
+        {
+          "id": 3,
+          "tile": "1s"
+        },
+        {
+          "id": 52,
+          "tile": "5z"
+        },
+        {
+          "id": 18,
+          "tile": "9m"
+        },
+        {
+          "id": 68,
+          "tile": "7p"
+        },
+        {
+          "id": 85,
+          "tile": "2p"
+        },
+        {
+          "id": 17,
+          "tile": "8s"
+        },
+        {
+          "id": 99,
+          "tile": "9m"
+        },
+        {
+          "id": 60,
+          "tile": "3p"
+        },
+        {
+          "id": 42,
+          "tile": "7s"
+        },
+        {
+          "id": 73,
+          "tile": "9p"
+        },
+        {
+          "id": 54,
+          "tile": "7z"
+        },
+        {
+          "id": 95,
+          "tile": "7p"
+        },
+        {
+          "id": 74,
+          "tile": "9s"
+        },
+        {
+          "id": 77,
+          "tile": "3z"
+        },
+        {
+          "id": 28,
+          "tile": "1m"
+        },
+        {
+          "id": 82,
+          "tile": "1m"
+        },
+        {
+          "id": 69,
+          "tile": "7s"
+        },
+        {
+          "id": 91,
+          "tile": "5p"
+        },
+        {
+          "id": 103,
+          "tile": "2z"
+        },
+        {
+          "id": 19,
+          "tile": "9p"
+        },
+        {
+          "id": 100,
+          "tile": "9p"
+        },
+        {
+          "id": 36,
+          "tile": "4s"
+        },
+        {
+          "id": 1,
+          "tile": "1m"
+        },
+        {
+          "id": 41,
+          "tile": "7p"
+        },
+        {
+          "id": 20,
+          "tile": "9s"
+        },
+        {
+          "id": 11,
+          "tile": "0s"
+        },
+        {
+          "id": 31,
+          "tile": "2p"
+        },
+        {
+          "id": 55,
+          "tile": "1m"
+        },
+        {
+          "id": 63,
+          "tile": "4s"
+        },
+        {
+          "id": 107,
+          "tile": "6z"
+        },
+        {
+          "id": 57,
+          "tile": "1s"
+        },
+        {
+          "id": 29,
+          "tile": "1p"
+        },
+        {
+          "id": 106,
+          "tile": "5z"
+        },
+        {
+          "id": 6,
+          "tile": "3p"
+        },
+        {
+          "id": 35,
+          "tile": "4p"
+        },
+        {
+          "id": 78,
+          "tile": "4z"
+        },
+        {
+          "id": 37,
+          "tile": "5p"
+        },
+        {
+          "id": 45,
+          "tile": "9m"
+        },
+        {
+          "id": 80,
+          "tile": "6z"
+        },
+        {
+          "id": 72,
+          "tile": "9m"
+        },
+        {
+          "id": 32,
+          "tile": "2s"
+        },
+        {
+          "id": 2,
+          "tile": "1p"
+        },
+        {
+          "id": 46,
+          "tile": "9p"
+        },
+        {
+          "id": 44,
+          "tile": "8s"
+        },
+        {
+          "id": 47,
+          "tile": "9s"
+        }
+      ],
+      "totalChangeTileCount": 5,
+      "used": [],
+      "usedDesktop": []
+    },
+    "effect": {
+      "effectList": [
+        {
+          "id": 620,
+          "store": [],
+          "tags": [],
+          "uid": 1,
+          "volume": 1
+        },
+        {
+          "badge": {
+            "id": 600070,
+            "random": 820,
+            "store": [],
+            "uid": 3
+          },
+          "id": 1300,
+          "store": [],
+          "tags": [],
+          "uid": 2,
+          "volume": 1
+        },
+        {
+          "badge": {
+            "id": 600070,
+            "random": 4124,
+            "store": [],
+            "uid": 6
+          },
+          "id": 4010,
+          "store": [
+            "0"
+          ],
+          "tags": [],
+          "uid": 5,
+          "volume": 1
+        },
+        {
+          "badge": {
+            "id": 600070,
+            "random": 88994,
+            "store": [],
+            "uid": 11
+          },
+          "id": 2180,
+          "store": [
+            "2"
+          ],
+          "tags": [],
+          "uid": 10,
+          "volume": 1
+        },
+        {
+          "badge": {
+            "id": 600070,
+            "random": 76519,
+            "store": [],
+            "uid": 14
+          },
+          "id": 3180,
+          "store": [],
+          "tags": [],
+          "uid": 13,
+          "volume": 1
+        }
+      ]
+    },
+    "state": {
+      "current": 5,
+      "interrupt": 0
+    },
+    "map": {
+      "level": 13001,
+      "node": 4
+    }
+  },
+  "request": {
+    "method": ".lq.Lobby.amuletActivityGameOperate",
+    "data": {
+      "activityId": 261081,
+      "tileList": [
+        58,
+        66
+      ],
+      "type": 101
+    }
+  },
+  "response": {
+    "events": [
+      {
+        "type": 7,
+        "state": {
+          "current": 5,
+          "interrupt": 0
+        },
+        "effectedHooks": [
+          {
+            "id": 2180,
+            "type": 1,
+            "uid": 10,
+            "result": {
+              "modifyChangeHandsList": [
+                58,
+                66,
+                42,
+                74,
+                69,
+                36,
+                20,
+                11,
+                63,
+                57,
+                32,
+                44,
+                47
+              ]
+            }
+          }
+        ],
+        "valueChanges": {
+          "round": {
+            "changeTileCount": {
+              "dirty": true,
+              "value": 1
+            },
+            "hands": {
+              "dirty": true,
+              "value": [
+                58,
+                66,
+                42,
+                74,
+                69,
+                36,
+                20,
+                11,
+                63,
+                57,
+                32,
+                44,
+                47
+              ]
+            },
+            "nextOperation": {
+              "dirty": true,
+              "value": [
+                {
+                  "gang": [],
+                  "type": 101,
+                  "value": 0
+                }
+              ]
+            },
+            "tingList": {
+              "dirty": true,
+              "value": []
+            },
+            "used": {
+              "dirty": true,
+              "value": [
+                90,
+                53,
+                75,
+                92,
+                83,
+                50,
+                24,
+                5,
+                30,
+                101,
+                88
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

@@ -154,6 +154,12 @@ fn hanabi_guard_distinguishes_game_operate_from_sort_effect() {
         ModuleAction::Forward
     ));
     packet.method = ".lq.Lobby.amuletActivityGameOperate".into();
+    let config = services.table("fuse");
+    services.set_autorun_active(true);
+    assert!(matches!(guard.process(&mut packet, &Value::Null), ModuleAction::Forward));
+    while let Ok(event) = receiver.try_recv() { assert_ne!(event["type"], "msgbox"); }
+    services.set_autorun_active(false);
+    assert_eq!(services.table("fuse"), config, "autoplay must not modify saved fuse settings");
     let responder = services.clone();
     let answer = std::thread::spawn(move || {
         while let Ok(event) = receiver.blocking_recv() {

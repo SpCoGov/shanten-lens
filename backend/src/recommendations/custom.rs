@@ -162,6 +162,8 @@ struct Search<'a> {
     nodes: usize,
     prefix: usize,
     aborted: Option<&'static str>,
+    matching_melds: Option<Vec<Vec<u64>>>,
+    hand_capacity: usize,
 }
 
 impl Search<'_> {
@@ -305,14 +307,14 @@ impl Search<'_> {
             }
             minimum_nonwall += minimum?;
         }
-        if minimum_nonwall > self.state["hand_tiles"].as_array().unwrap().len() { return None; }
+        if minimum_nonwall > self.hand_capacity { return None; }
         if depth == choices.len() {
             let hand = ids(self.state.get("hand_tiles"));
             if self
                 .entries
                 .iter()
                 .enumerate()
-                .any(|(i, e)| e.source == "hand" && e.face == "bd" && !used.contains(&i))
+                .any(|(i, e)| (e.source == "meld" || (e.source == "hand" && e.face == "bd")) && !used.contains(&i))
             {
                 return None;
             }
@@ -359,8 +361,15 @@ impl Search<'_> {
                     return None;
                 }
             }
-            let (steps, discards, incoming, draws) =
-                simulate(self.state, self.entries, &target, &quads, self.prefix)?;
+            let (steps, discards, incoming, draws) = if let Some(melds) = &self.matching_melds {
+                let mut planned = quads.clone();
+                for group in &mut planned { group.sort_unstable(); }
+                planned.sort_unstable();
+                if &planned != melds { return None; }
+                (Vec::new(), Vec::new(), Vec::new(), 0)
+            } else {
+                simulate(self.state, self.entries, &target, &quads, self.prefix)?
+            };
             let resolved = selected.iter().enumerate().map(|(g, selected)| json!({
                 "quad":self.groups[g].is_quad(),"kind":self.groups[g].kind(),
                 "tiles":selected.iter().map(|&i| json!({"id":self.entries[i].id,
@@ -368,13 +377,12 @@ impl Search<'_> {
                     "joker_as":if self.entries[i].face=="bd" {joker_as.clone()}else{None},
                 })).collect::<Vec<_>>()
             })).collect::<Vec<_>>();
-            return Some(
-                json!({"status":"plan","mode":"custom-target","search_algorithm":"custom_target",
+            let plan = json!({"status":"plan","mode":"custom-target","search_algorithm":"custom_target",
                 "draws_needed":draws,"target_physical_ids":target,"resolved_groups":resolved,"custom_steps":steps,
                 "target_physical_faces":target.iter().map(|&id|face(&deck(self.state),id).to_owned()).collect::<Vec<_>>(),
                 "switch_discards":discards,"switch_in":incoming,"initial_hand":hand,
-                "target_groups":self.groups,"search_nodes":self.nodes}),
-            );
+                "target_groups":self.groups,"search_nodes":self.nodes});
+            return Some(plan);
         }
         let choices_at = &choices[depth];
         let group = choices_at.group;
@@ -397,7 +405,7 @@ impl Search<'_> {
                     .iter()
                     .filter(|&&i| self.entries[i].source != "wall")
                     .count();
-            if next_nonwall > self.state["hand_tiles"].as_array().unwrap().len() {
+            if next_nonwall > self.hand_capacity {
                 continue;
             }
             if !self.group_matches(group, candidate, selected, None) {
@@ -462,6 +470,21 @@ fn can_match(domains: &[Vec<usize>], size: usize) -> bool {
 
 pub(super) type Simulation = (Vec<Value>, Vec<Vec<u64>>, Vec<Vec<u64>>, usize);
 
+fn declared_quads(state: &Value) -> Option<Vec<Vec<u64>>> {
+    let deck = deck(state);
+    let mut groups = Vec::new();
+    for meld in state["ming"].as_array().into_iter().flatten() {
+        let mut tiles = ids(meld.get("tileList"));
+        tiles.sort_unstable();
+        if tiles.len() != 4 || tiles.windows(2).any(|pair| pair[0] == pair[1])
+            || souzu::tile(face(&deck, tiles[0])).is_none()
+            || tiles.iter().any(|&id| norm(face(&deck, id)) != norm(face(&deck, tiles[0]))) { return None; }
+        groups.push(tiles);
+    }
+    groups.sort_unstable();
+    (groups.len() <= 4).then_some(groups)
+}
+
 pub(super) fn simulate(
     state: &Value,
     entries: &[Entry],
@@ -473,7 +496,7 @@ pub(super) fn simulate(
     let mut hand = ids(state.get("hand_tiles"));
     let essential = entries
         .iter()
-        .filter(|e| e.source != "wall" && target.contains(&e.id))
+        .filter(|e| matches!(e.source, "hand" | "replacement") && target.contains(&e.id))
         .map(|e| e.id)
         .collect::<HashSet<_>>();
     let replacement = entries
@@ -519,8 +542,17 @@ pub(super) fn simulate(
     if !essential.iter().all(|id| hand.contains(id)) {
         return None;
     }
-    let mut opened = Vec::<u64>::new();
+    let declared = declared_quads(state)?;
     let mut pending = quads.to_vec();
+    for group in &declared {
+        let index = pending.iter().position(|quad| {
+            let mut sorted = quad.clone();
+            sorted.sort_unstable();
+            &sorted == group
+        })?;
+        pending.remove(index);
+    }
+    let mut opened = declared.into_iter().flatten().collect::<Vec<_>>();
     let mut draws = 0;
     loop {
         let effective = hand.len() + opened.len() / 4 * 3;
@@ -599,19 +631,103 @@ pub(super) fn search(
     emit: &mut dyn FnMut(Value),
     stopped: &dyn Fn() -> bool,
 ) -> Value {
+    search_internal(state, target, wall_limit, exclude_invalid_shapes, emit, stopped, false)
+}
+
+pub(super) fn matches_target(state: &Value, target: &Value) -> bool {
+    search_internal(state, target, 0, true, &mut |_| {}, &|| false, true)["status"] == "plan"
+}
+
+pub(super) fn opening_plan(state: &Value, wall_limit: usize,
+    emit: &mut dyn FnMut(Value), stopped: &dyn Fn() -> bool) -> Value {
+    if wall_limit > 36 { return json!({"status":"impossible","reason":"custom-wall-limit"}); }
+    let deck = deck(state);
+    let joker = ids(state.get("hand_tiles")).iter().any(|&id| face(&deck, id) == "bd");
+    let group = |kind: &str, pinzu| json!({"kind":kind,"rule":{
+        "suits":if pinzu {vec!["p"]} else {vec!["m","s","z"]},"joker":"exclude"}});
+    let mut templates = Vec::new();
+    for melds in 0..=4 {
+        for pair in [false, true] {
+            let mut groups = (0..4).map(|i| group("meld", i < melds)).collect::<Vec<_>>();
+            groups.push(group("pair", pair));
+            opening_templates(&mut templates, groups, melds * 3 + usize::from(pair) * 2, joker);
+        }
+    }
+    for pairs in 0..=7 {
+        let groups = (0..7).map(|i| {
+            let mut g = group("pair", i < pairs);
+            g["distinct_group"] = json!("pairs");
+            g
+        }).collect();
+        opening_templates(&mut templates, groups, pairs * 2, joker);
+    }
+    let orphans = ["1m","9m","1p","9p","1s","9s","1z","2z","3z","4z","5z","6z","7z"];
+    for pair in orphans {
+        let groups = orphans.iter().map(|&face| json!({"kind":if face == pair {"pair"} else {"single"},
+            "rule":{"faces":[face],"suits":[&face[1..]],"joker":"exclude"}})).collect();
+        opening_templates(&mut templates, groups, 2 + usize::from(pair.ends_with('p')), joker);
+    }
+    templates.sort_by_key(|(pinzu, _)| std::cmp::Reverse(*pinzu));
+    let mut best = json!({"status":"impossible","reason":"custom-not-reachable","search_algorithm":"custom_target"});
+    let wall = ids(state.get("wall_tiles")).len();
+    let max_wins = wall + usize::from(ids(state.get("hand_tiles")).len() == 14);
+    for (pinzu, target) in templates {
+        let best_score = best["opening_score"].as_u64().map(|score| score as usize);
+        if best_score.is_some_and(|score| score >= pinzu * max_wins) { continue; }
+        // Each template fixes the physical pinzu count, so its earliest win maximizes its product.
+        let limit = best_score.filter(|_| pinzu > 0).map_or(wall_limit, |score| wall_limit.min(wall.saturating_sub(score / pinzu)));
+        let mut plan = search(state, &target, limit, true, emit, stopped);
+        if plan["status"] == "plan" {
+            let wins = wall.saturating_sub(plan["draws_needed"].as_u64().unwrap_or(0) as usize) + 1;
+            plan["pinzu_count"] = json!(pinzu);
+            plan["win_count"] = json!(wins);
+            plan["opening_score"] = json!(pinzu * wins);
+            best = plan;
+        } else if plan["reason"] != "custom-not-reachable" {
+            return plan;
+        }
+    }
+    best
+}
+
+fn opening_templates(templates: &mut Vec<(usize, Value)>, groups: Vec<Value>, pinzu: usize, joker: bool) {
+    if !joker {
+        templates.push((pinzu, json!(groups)));
+        return;
+    }
+    // The fixed joker counts as zero pinzu, even when it completes a pinzu meld or pair.
+    for i in 0..groups.len() {
+        if groups[..i].contains(&groups[i]) { continue; }
+        let mut target = groups.clone();
+        target[i]["rule"]["joker"] = json!("allow");
+        let count = pinzu - usize::from(target[i]["rule"]["suits"] == json!(["p"]));
+        templates.push((count, json!(target)));
+    }
+}
+
+fn search_internal(
+    state: &Value, target: &Value, wall_limit: usize, exclude_invalid_shapes: bool,
+    emit: &mut dyn FnMut(Value), stopped: &dyn Fn() -> bool,
+    matching: bool,
+) -> Value {
     let fail =
         |reason| json!({"status":"impossible","reason":reason,"search_algorithm":"custom_target"});
     let Some(groups) = parse_groups(target) else {
         return fail("custom-invalid-target");
     };
+    let mut state = state.clone();
+    let Some(declared) = declared_quads(&state) else { return fail("custom-hand-size"); };
     let hand = ids(state.get("hand_tiles"));
-    if !(13..=14).contains(&hand.len()) || state["ming"].as_array().is_some_and(|m| !m.is_empty()) {
+    let effective = hand.len() + declared.len() * 3;
+    let quads = groups.iter().filter(|g| g.is_quad()).count();
+    if !(13..=14).contains(&effective) || quads < declared.len()
+        || (matching && (effective != 14 || quads != declared.len())) {
         return fail("custom-hand-size");
     }
+    if matching { state["total_change_tile_count"] = json!(0); }
     if wall_limit > 36 {
         return fail("custom-wall-limit");
     }
-    let mut state = state.clone();
     if state["next_operation"]
         .as_array()
         .is_some_and(|ops| !ops.iter().any(|op| op["type"] == 101))
@@ -621,7 +737,11 @@ pub(super) fn search(
     let (rounds, _) = search_limits(&state);
     state["total_change_tile_count"] = json!(rounds.min(256));
     state["change_tile_count"] = json!(0);
-    let entries = pool(&state, wall_limit);
+    let mut entries = pool(&state, wall_limit);
+    let deck = deck(&state);
+    entries.extend(declared.iter().flatten().enumerate().map(|(index, &id)| Entry {
+        id, face: norm(face(&deck, id)), source:"meld", index,
+    }));
     let mut unique = HashSet::new();
     if entries.len() > 256
         || entries
@@ -635,7 +755,6 @@ pub(super) fn search(
     {
         return fail("custom-joker-state");
     }
-    let deck = deck(&state);
     let dora = souzu::preferred_tiles(
         &state,
         &SearchPreferences {
@@ -666,9 +785,12 @@ pub(super) fn search(
         nodes: 0,
         prefix: 0,
         aborted: None,
+        matching_melds: matching.then_some(declared.clone()),
+        hand_capacity: hand.len() + declared.len() * 4,
     };
-    let minimum_draws = (14 + groups.iter().filter(|g| g.is_quad()).count()).saturating_sub(hand.len());
-    for prefix in minimum_draws..=entries.iter().filter(|e| e.source == "wall").count() {
+    let minimum_draws = (14 + quads).saturating_sub(search.hand_capacity);
+    let wall_size = entries.iter().filter(|e| e.source == "wall").count();
+    for prefix in minimum_draws..=wall_size {
         search.prefix = prefix;
         if !search.pulse() {
             break;
@@ -681,6 +803,7 @@ pub(super) fn search(
                     .enumerate()
                     .filter(|(_, e)| {
                         (e.source != "wall" || e.index < prefix)
+                            && (e.source != "meld" || g.is_quad())
                             && (!g.is_quad() || e.face != "bd")
                             && g.rule.matches(face(&deck, e.id), &dora, &soul)
                     })
@@ -698,7 +821,14 @@ pub(super) fn search(
         }
         let mut choices = Vec::new();
         for (group, domain) in domains.iter().enumerate() {
-            let values = search.candidates(group, domain);
+            let mut values = search.candidates(group, domain);
+            if groups[group].is_quad() && !declared.is_empty() {
+                values.retain(|candidate| {
+                    let mut tiles = candidate.iter().map(|&i| entries[i].id).collect::<Vec<_>>();
+                    tiles.sort_unstable();
+                    declared.contains(&tiles) || (quads > declared.len() && candidate.iter().all(|&i| entries[i].source != "meld"))
+                });
+            }
             if let Some(reason) = search.aborted { return fail(reason); }
             let minimum_nonwall = values.iter().map(|candidate|
                 candidate.iter().filter(|&&i| entries[i].source != "wall").count()).min().unwrap_or(0);
@@ -924,7 +1054,7 @@ mod tests {
         let replacement = ids(state.get("replacement_tiles"));
         let wall = ids(state.get("wall_tiles"));
         let (mut cursor, mut drawn, mut rounds, mut opened) =
-            (ids(state.get("switch_used_tiles")).len(), 0, 0, Vec::new());
+            (ids(state.get("switch_used_tiles")).len(), 0, 0, declared_quads(state).unwrap().into_iter().flatten().collect::<Vec<_>>());
         for step in plan["custom_steps"].as_array().unwrap() {
             let tiles = ids(step.get("tiles"));
             match step["kind"].as_str().unwrap() {
@@ -1091,6 +1221,11 @@ mod tests {
         let plan = run(&s, &target);
         replay(&s, &plan);
         assert_eq!(plan["switch_discards"].as_array().unwrap().len(), 2);
+        s["boss_buff"] = json!([]);
+        s["next_operation"] = json!([{"type":101,"value":3}]);
+        let from_operation = run(&s, &target);
+        replay(&s, &from_operation);
+        assert_eq!(from_operation["switch_discards"], plan["switch_discards"]);
         s["total_change_tile_count"] = json!(1);
         assert_eq!(run(&s, &target)["reason"], "custom-not-reachable");
         s["total_change_tile_count"] = json!(3);
@@ -1169,5 +1304,159 @@ mod tests {
         let plan = run(&s, &target);
         replay(&s, &plan);
         assert_eq!(plan["custom_steps"], json!([]));
+    }
+
+    #[test]
+    fn opening_maximizes_pinzu_times_wins_and_replays_ordinary_exchanges() {
+        let s = state(&["1p","1p","1p","2p","3p","4p","4p","5p","6p","7m","8m","9m","5z"],
+            &["7p","8p","9p"], &["5z","7p","8p","9p"], 1);
+        let plan = opening_plan(&s, 36, &mut |_| {}, &|| false);
+        assert_eq!(plan["status"], "plan", "{plan}");
+        assert_eq!(plan["pinzu_count"], 12, "{plan}");
+        assert_eq!(plan["win_count"], 4, "{plan}");
+        assert_eq!(plan["opening_score"], 48, "{plan}");
+        replay(&s, &plan);
+
+        let mut no_exchange = s.clone();
+        no_exchange["next_operation"] = json!([{"type":1}]);
+        let plan = opening_plan(&no_exchange, 36, &mut |_| {}, &|| false);
+        assert_eq!(plan["pinzu_count"], 9, "{plan}");
+        assert_eq!(plan["win_count"], 4, "{plan}");
+        assert_eq!(plan["draws_needed"], 1, "{plan}");
+        assert_eq!(plan["switch_discards"], json!([]));
+        replay(&no_exchange, &plan);
+    }
+
+    #[test]
+    fn opening_includes_current_win_seven_pairs_and_zero_pinzu_orphans() {
+        for hand in [
+            vec!["1p","1p","2p","2p","3p","3p","4p","4p","6p","6p","7p","7p","9p","9p"],
+            vec!["1m","1m","2m","2m","3m","3m","4m","4m","6m","6m","7m","7m","9m","9m"],
+            vec!["1m","9m","1p","9p","1s","9s","1z","2z","3z","4z","5z","6z","7z","1p"],
+        ] {
+            let s = state(&hand, &[], &["5z","6z"], 0);
+            let plan = opening_plan(&s, 36, &mut |_| {}, &|| false);
+            assert_eq!(plan["status"], "plan", "{plan}");
+            assert_eq!(plan["draws_needed"], 0, "{plan}");
+            assert_eq!(plan["win_count"], 3, "{plan}");
+            assert_eq!(plan["pinzu_count"], hand.iter().filter(|f| f.ends_with('p')).count(), "{plan}");
+            assert!(matches_target(&s, &plan["target_groups"]));
+            replay(&s, &plan);
+        }
+    }
+
+    #[test]
+    fn opening_counts_fixed_joker_as_zero_and_matches_equivalent_completed_hands() {
+        for (hand, expected) in [
+            (vec!["1p","1p","bd","2p","3p","4p","5p","6p","7p","1m","2m","3m","5z","5z"], 8),
+            (vec!["1p","1p","1p","2p","3p","4p","5p","6p","7p","1m","2m","3m","5z","bd"], 9),
+        ] {
+            let s = state(&hand, &[], &["4s","8s"], 0);
+            let plan = opening_plan(&s, 36, &mut |_| {}, &|| false);
+            assert_eq!(plan["status"], "plan", "{plan}");
+            assert_eq!(plan["pinzu_count"], expected, "{plan}");
+            assert_eq!(plan["opening_score"], expected * 3, "{plan}");
+            assert!(matches_target(&s, &plan["target_groups"]));
+            replay(&s, &plan);
+        }
+        let mut s = state(&["1p","1p","2p","2p","3p","3p","4p","4p","6p","6p","7p","7p","9p","9p"], &[], &[], 0);
+        let plan = opening_plan(&s, 36, &mut |_| {}, &|| false);
+        s["deck_map"]["3"] = json!("5p");
+        s["deck_map"]["4"] = json!("5p");
+        assert!(matches_target(&s, &plan["target_groups"]));
+    }
+
+    #[test]
+    fn completed_target_matching_checks_actual_tiles_and_declared_quads() {
+        let hand = ["1p","1p","1p","1p","2p","3p","4p","5p","6p","7p","8p","8p","8p","9p","9p"];
+        let mut s = state(&hand, &[], &[], 0);
+        s["hand_tiles"] = json!((5..=15).collect::<Vec<_>>());
+        s["ming"] = json!([{"tileList":[1,2,3,4]}]);
+        let mut target = vec![json!({"kind":"quad","rule":{"faces":["1p"]}})];
+        target.extend(hand[4..].iter().map(|f| json!({"rule":{"faces":[f]}})));
+        assert!(matches_target(&s, &json!(target)));
+        s["deck_map"]["15"] = json!("8m");
+        assert!(!matches_target(&s, &json!(target)));
+        s["deck_map"]["15"] = json!("9p");
+        s["ming"] = json!([{"tileList":[1,2,3]}]);
+        assert!(!matches_target(&s, &json!(target)));
+    }
+
+    #[test]
+    fn resumes_an_incomplete_hand_after_a_declared_quad_without_repeating_it() {
+        let mut s = state(&["1p","1p","1p","1p","2p","3p","4p","5p","6p","7p","8p","8p","8p","9p"],
+            &[], &["9p"], 0);
+        s["hand_tiles"] = json!((5..=14).collect::<Vec<_>>());
+        s["ming"] = json!([{"tileList":[1,2,3,4]}]);
+        let mut groups = vec![json!({"kind":"quad","rule":{"faces":["1p"]}})];
+        groups.extend(["2p","3p","4p","5p","6p","7p","8p","8p","8p","9p","9p"]
+            .iter().map(|f| json!({"rule":{"faces":[f]}})));
+        let target = json!(groups);
+        let plan = search(&s, &target, 36, true, &mut |_| {}, &|| false);
+        assert_eq!(plan["custom_steps"], json!([{"kind":"draw","tiles":[15]}]), "{plan}");
+        replay(&s, &plan);
+        s["hand_tiles"].as_array_mut().unwrap().push(json!(15));
+        s["wall_tiles"] = json!([]);
+        let ready = search(&s, &target, 36, true, &mut |_| {}, &|| false);
+        assert_eq!(ready["custom_steps"], json!([]), "{ready}");
+        assert!(matches_target(&s, &target));
+        replay(&s, &ready);
+
+        let mut s = state(&["1p","1p","1p","1p","2p","2p","2p","2p","3s","4s","5s","6s","7s","9s"],
+            &[], &["8s","9s"], 0);
+        s["hand_tiles"] = json!((5..=14).collect::<Vec<_>>());
+        s["ming"] = json!([{"tileList":[1,2,3,4]}]);
+        let mut groups = vec![json!({"kind":"quad","rule":{"faces":["1p"]}}), json!({"kind":"quad","rule":{"faces":["2p"]}})];
+        groups.extend(["3s","4s","5s","6s","7s","8s","9s","9s"].iter().map(|f| json!({"rule":{"faces":[f]}})));
+        let plan = search(&s, &json!(groups), 36, true, &mut |_| {}, &|| false);
+        assert_eq!(plan["custom_steps"], json!([{"kind":"draw","tiles":[15]},
+            {"kind":"kan","tiles":[5,6,7,8]}, {"kind":"draw","tiles":[16]}]), "{plan}");
+        replay(&s, &plan);
+    }
+
+    #[test]
+    fn opening_rejects_invalid_inputs_and_obeys_cancellation() {
+        let s = state(&["1p"; 13], &[], &["2p"], 0);
+        assert_eq!(opening_plan(&s, 37, &mut |_| {}, &|| false)["reason"], "custom-wall-limit");
+        assert_eq!(opening_plan(&s, 36, &mut |_| {}, &|| true)["reason"], "stopped-by-user");
+        assert!(!matches_target(&s, &json!(vec![json!({"rule":{}});14])));
+    }
+
+    #[test]
+    fn opening_matches_exhaustive_small_physical_tile_pool() {
+        let s = state(&["1p","1p","1p","2p","3p","4p","5p","5p","6m","7m","8m","2s","3s"],
+            &["4s","5p"], &["4s","6p","7p"], 1);
+        let entries = pool(&s, 36);
+        let mut expected = None;
+        for mask in 0u32..(1 << entries.len()) {
+            if mask.count_ones() != 14 { continue; }
+            let chosen = entries.iter().enumerate().filter(|(i, _)| mask & (1 << i) != 0).map(|(_,e)|e).collect::<Vec<_>>();
+            let mut counts = [0u8;34];
+            for entry in &chosen { counts[souzu::tile(&entry.face).unwrap() as usize] += 1; }
+            if !legal_shape(&counts, 0) { continue; }
+            let target = chosen.iter().map(|e|e.id).collect::<Vec<_>>();
+            let Some((_, _, _, draws)) = simulate(&s, &entries, &target, &[], 36) else { continue; };
+            let score = chosen.iter().filter(|e|e.face.ends_with('p')).count() * (3 - draws + 1);
+            expected = Some(expected.map_or(score, |old:usize|old.max(score)));
+        }
+        let plan = opening_plan(&s, 36, &mut |_| {}, &|| false);
+        assert_eq!(plan["opening_score"].as_u64(), expected.map(|n|n as u64), "{plan}");
+        replay(&s, &plan);
+    }
+
+    #[test]
+    fn opening_solves_a_complete_shuffled_tile_pool() {
+        let mut random = 1u64;
+        let mut tiles = (0..34).flat_map(|tile| vec![format!("{}{}", tile % 9 + 1, ['m','p','s','z'][tile / 9]);4]).collect::<Vec<_>>();
+        for i in (1..tiles.len()).rev() {
+            random = random.wrapping_mul(6364136223846793005).wrapping_add(1);
+            tiles.swap(i, (random as usize) % (i + 1));
+        }
+        let faces = tiles.iter().map(String::as_str).collect::<Vec<_>>();
+        let s = state(&faces[..13], &faces[13..52], &faces[52..88], 3);
+        let plan = opening_plan(&s, 36, &mut |_| {}, &|| false);
+        assert_eq!(plan["status"], "plan", "{plan}");
+        assert_eq!(plan["opening_score"], 280, "{plan}");
+        replay(&s, &plan);
     }
 }

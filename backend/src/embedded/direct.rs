@@ -67,6 +67,9 @@ impl State {
 
     async fn fail_direct_session(&self, error: String) {
         // Stop account-specific work before restoring the MITM transport.
+        if let Some((generation, _)) = self.automation.round_context() {
+            self.automation.fail(generation, &error);
+        }
         self.stop_direct_operations().await;
         self.proxy.unregister_direct();
         self.services.select_packet_transport(None);

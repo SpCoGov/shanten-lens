@@ -23,6 +23,40 @@ pub struct DecisionReport {
     pub actions: Vec<ActionScore>,
 }
 
+pub(crate) fn first_action(state: &Value) -> Option<ActionCandidate> {
+    let scores = state["decision_report"]["actions"].as_array();
+    let mut best: Option<(&Value, f64)> = None;
+    for action in ["actions", "global_actions"].iter()
+        .flat_map(|key| state["action_report"][key].as_array().into_iter().flatten()) {
+        if action["availability"] != "available" { continue; }
+        let score = scores.and_then(|scores| scores.iter().find(|score| score["action_id"] == action["id"]))
+            .and_then(|score| score["total"].as_f64()).unwrap_or(0.0);
+        // Match the UI's stable descending sort, including zero for absent scores.
+        if best.is_none_or(|(_, current)| score > current) { best = Some((action, score)); }
+    }
+    best.and_then(|(action, _)| serde_json::from_value(action.clone()).ok())
+}
+
+#[cfg(test)]
+#[test]
+fn first_action_uses_stable_scores_and_skips_illegal_actions() {
+    let action = |id: &str, availability: &str| json!({"id":id,"kind":id,"params":{},
+        "cost":null,"cost_resource":"coin","availability":availability,"reasons":[]});
+    let mut state = json!({"action_report":{
+        "actions":[action("first", "available"),action("second", "available"),action("illegal", "unavailable")],
+        "global_actions":[action("remake", "available")]},"decision_report":{"actions":[
+            {"action_id":"illegal","total":1000},{"action_id":"first","total":null},
+            {"action_id":"second","total":0},{"action_id":"remake","total":-1}]}});
+    assert_eq!(first_action(&state).unwrap().id, "first");
+    state["decision_report"]["actions"][2]["total"] = json!(30);
+    assert_eq!(first_action(&state).unwrap().id, "second");
+    state["decision_report"]["actions"][3]["total"] = json!(50);
+    assert_eq!(first_action(&state).unwrap().id, "remake");
+    state["action_report"]["actions"] = json!([]);
+    state["action_report"]["global_actions"][0]["availability"] = json!("unknown");
+    assert!(first_action(&state).is_none());
+}
+
 struct Rule {
     id: &'static str,
     action_kind: Option<&'static str>,
@@ -69,6 +103,14 @@ const RULES: &[Rule] = &[Rule {
     id: "configured_target",
     action_kind: None,
     evaluate: configured_target,
+}, Rule {
+    id: "remake_at_cutoff",
+    action_kind: Some("remake"),
+    evaluate: remake_at_cutoff,
+}, Rule {
+    id: "remake_penalty",
+    action_kind: Some("remake"),
+    evaluate: remake_penalty,
 }, Rule {
     id: "upgrade_penalty",
     action_kind: None,
@@ -221,7 +263,8 @@ fn shop_pack_priorities(state: &Value, packs: &[&ActionCandidate], actions: &[&A
         let chosen = available.iter().filter(|(_, tier)| Some(*tier) == lowest)
             .max_by(|(left, _), (right, _)| scores[*left].total.unwrap().total_cmp(&scores[*right].total.unwrap()));
         if let Some(&(index, _)) = chosen {
-            let other_best = scores.iter().enumerate().filter(|(other, _)| *other != index)
+            let other_best = scores.iter().enumerate().filter(|(other, _)| *other != index && actions[*other].kind != "remake"
+                && !(actions[*other].kind == "sell_effect" && badge_id(&actions[*other].params["effect"]) == Some(600110)))
                 .filter_map(|(_, score)| score.total).fold(0.0, f64::max);
             if scores[index].total.unwrap() <= other_best {
                 adjust(&mut scores[index], other_best + 1.0, "pack_purchase_order");
@@ -281,6 +324,10 @@ fn coin_cost(_state: &Value, action: &ActionCandidate, _registry: &Value, _playb
 
 fn sell_bonus(_state: &Value, _action: &ActionCandidate, _registry: &Value, _playbook: &Value) -> Option<(Option<f64>, &'static str)> {
     Some((Some(5.0), "sell_bonus"))
+}
+
+fn remake_penalty(_state: &Value, _action: &ActionCandidate, _registry: &Value, _playbook: &Value) -> Option<(Option<f64>, &'static str)> {
+    Some((Some(-9999.0), "remake_penalty"))
 }
 
 fn retain_amulet(_state: &Value, action: &ActionCandidate, _registry: &Value, _playbook: &Value) -> Option<(Option<f64>, &'static str)> {
@@ -367,24 +414,84 @@ fn configured_target(state: &Value, action: &ActionCandidate, _registry: &Value,
         if score.is_none() { "invalid_target_value" } else if selling { "sell_configured_target" } else { "select_configured_target" }))
 }
 
-fn tactical_stage<'a>(state: &Value, profile: &'a Value) -> Result<Option<&'a Value>, &'static str> {
+fn map_position(level: &Value, node: &Value) -> Option<(u64, usize, usize)> {
+    let level_id = level.as_u64()?;
+    let node_id = node.as_u64()?;
+    let levels = LEVELS.as_array()?;
+    let index = levels.iter().position(|level| level["level"].as_u64() == Some(level_id))?;
+    let level = &levels[index];
+    Some((level["activity_id"].as_u64()?, index,
+        level["nodes"].as_array()?.iter().position(|node| node["node"].as_u64() == Some(node_id))?))
+}
+
+fn remake_at_cutoff(state: &Value, _action: &ActionCandidate, _registry: &Value, book: &Value) -> Option<(Option<f64>, &'static str)> {
+    let profile = book["profiles"].as_array()?.iter().find(|profile| profile["id"] == book["selected_profile_id"])?;
+    let opening = profile["strategy"] == "opening";
+    let cutoff = if opening { profile } else {
+        match tactical_stage(state, profile) {
+            Ok(Some(stage)) => stage,
+            Ok(None) => return None,
+            Err(reason) => return Some((None, reason)),
+        }
+    };
+    let unmet = (|| {
+        let map = &state["provider_state"]["map"];
+        let current = map_position(&map["level"], &map["node"])?;
+        let deadline = if opening { map_position(&cutoff["cutoff_level"], &cutoff["cutoff_node"])? }
+            else { map_position(&cutoff["deadline_level"], &cutoff["deadline_node"])? };
+        if current.0 != deadline.0 { return None; }
+        if current < deadline { return Some(false); }
+        let effects = state["provider_state"]["effect"]["effectList"].as_array()?;
+        if effects.iter().any(|effect| effect["id"].as_u64().is_none_or(|id| id == 0) || badge_id(effect).is_none()) { return None; }
+        let matches = |effect: &Value, target: &Value| {
+            let id = effect["id"].as_u64().unwrap();
+            target["id"].as_u64() == Some(id / 10) && target["plus"].as_bool().unwrap_or(false) == (id % 10 == 1)
+                && target["badge"].as_u64().is_none_or(|badge| badge_id(effect) == Some(badge))
+        };
+        if opening {
+            let goal = profile["end_count"].as_u64().filter(|goal| *goal > 0)?;
+            let value = profile["targets"].as_array()?.iter().try_fold(0u64, |sum, target| {
+                let hit = match target["kind"].as_str()? {
+                    "amulet" => effects.iter().any(|effect| matches(effect, target)),
+                    "badge" => effects.iter().any(|effect| badge_id(effect) == target["id"].as_u64()),
+                    _ => return None,
+                };
+                let value = target.get("value").map_or(Some(1), Value::as_u64).filter(|value| *value > 0)?;
+                sum.checked_add(if hit { value } else { 0 })
+            })?;
+            Some(value < goal)
+        } else {
+            let met = cutoff["loadouts"].as_array()?.iter().try_fold(false, |met, loadout| {
+                let mut targets: Vec<_> = loadout["amulets"].as_array()?.iter().collect();
+                // Match specific seals first so wildcard slots cannot consume their only match.
+                targets.sort_by_key(|target| target["badge"].is_null());
+                let mut remaining: Vec<_> = effects.iter().collect();
+                Some(met || targets.iter().all(|target| {
+                    if let Some(index) = remaining.iter().position(|effect| matches(effect, target)) {
+                        remaining.remove(index);
+                        true
+                    } else { false }
+                }))
+            })?;
+            Some(!met)
+        }
+    })();
+    match unmet {
+        Some(true) => Some((Some(99999.0), "remake_at_cutoff")),
+        Some(false) => None,
+        None => Some((None, "missing_cutoff_data")),
+    }
+}
+
+pub(crate) fn tactical_stage<'a>(state: &Value, profile: &'a Value) -> Result<Option<&'a Value>, &'static str> {
     if state["stage"] == 2 { return Ok(None); }
     let missing = "missing_tactical_stage";
-    let levels = LEVELS.as_array().ok_or(missing)?;
-    let position = |level: &Value, node: &Value| -> Option<(u64, usize, usize)> {
-        let level_id = level.as_u64()?;
-        let node_id = node.as_u64()?;
-        let index = levels.iter().position(|level| level["level"].as_u64() == Some(level_id))?;
-        let level = &levels[index];
-        Some((level["activity_id"].as_u64()?, index,
-            level["nodes"].as_array()?.iter().position(|node| node["node"].as_u64() == Some(node_id))?))
-    };
-    let map = &state["provider_state"]["map"];
-    let current = position(&map["level"], &map["node"]).ok_or(missing)?;
+    let map = state.pointer("/provider_state/map").filter(|map| map.is_object()).unwrap_or(state);
+    let current = map_position(&map["level"], &map["node"]).ok_or(missing)?;
     let mut active = None;
     // shortcut: stage selection follows map starts; use runtime stage state when early transitions are implemented.
     for stage in profile["stages"].as_array().ok_or(missing)? {
-        let start = position(&stage["start_level"], &stage["start_node"]).ok_or(missing)?;
+        let start = map_position(&stage["start_level"], &stage["start_node"]).ok_or(missing)?;
         if start.0 != current.0 { return Err(missing); }
         if start <= current { active = Some(stage); }
     }
@@ -589,8 +696,9 @@ fn happiness(state: &Value, action: &ActionCandidate, _registry: &Value, _playbo
         }),
         _ => None,
     };
-    Some((cost.map(|cost| cost as f64 - if cost < 15 { 15.0 } else { 14.0 }),
-        if cost.is_some() { "sell_happiness" } else { "missing_happiness_pack_cost" }))
+    let score = cost.map(|cost| (cost as f64 - 10.0) * 2.0)
+        .filter(|score| score.abs() <= MAX_EXACT_SCORE as f64);
+    Some((score, if score.is_some() { "sell_happiness" } else { "missing_happiness_pack_cost" }))
 }
 
 fn replacement_losses(state: &Value, action: &ActionCandidate, registry: &Value, playbook: &Value) -> Vec<RuleScore> {

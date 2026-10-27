@@ -1,0 +1,20 @@
+.panel { min-width: 0; }
+.header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
+.header h3 { display: flex; align-items: center; gap: 8px; margin: 0 !important; }
+.status { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.status :global(.ms) { font-size: 18px; }
+.searching, .executing, .winning { color: var(--badge-ok-fg); }
+.blocked { color: var(--badge-down-fg); }
+.summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; margin-top: 14px; }
+.objective { display: grid; gap: 5px; font-size: 13px; overflow-wrap: anywhere; }
+.objective span { font-size: 12px; color: var(--muted); }
+.metrics { display: flex; flex-wrap: wrap; gap: 10px 24px; margin: 0; }
+.metrics > div { display: grid; gap: 4px; }
+.metrics dt { font-size: 11px; color: var(--muted); }
+.metrics dd { margin: 0; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.target { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 12px; }
+.target > span { font-size: 12px; color: var(--muted); }
+.tiles { display: flex; flex-wrap: wrap; gap: 3px; min-width: 0; }
+.reason, .hint { font-size: 12px; line-height: 1.6; margin: 10px 0 0; overflow-wrap: anywhere; }
+.reason { color: var(--text); }
+.hint { color: var(--muted); }

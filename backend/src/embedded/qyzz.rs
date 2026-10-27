@@ -390,6 +390,106 @@ mod tests {
         game_task.abort();
     }
 
+    #[tokio::test]
+    async fn round_profiles_execute_plan_repeat_wins_and_stop() {
+        const CHILD_ROOT: &str = "SHANTEN_ROUND_EXECUTION_TEST_ROOT";
+        let root = match std::env::var_os(CHILD_ROOT) {
+            Some(root) => PathBuf::from(root),
+            None => {
+                let root = std::env::temp_dir().join(format!("lens-round-execution-{}", std::process::id()));
+                let output = std::process::Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", "embedded::qyzz::tests::round_profiles_execute_plan_repeat_wins_and_stop", "--nocapture"])
+                    .env(CHILD_ROOT, &root).output().unwrap();
+                assert!(output.status.success(), "{output:?}");
+                std::fs::remove_dir_all(root).unwrap();
+                return;
+            }
+        };
+        let runtime = tokio::task::spawn_blocking(move || super::super::BackendRuntime::load(root.join("configs")))
+            .await.unwrap().unwrap();
+        let state = &runtime.state;
+        for profile_id in ["opening-profile", "profile-a"] {
+            let mut book: Value = serde_json::from_str(include_str!("../../tests/fixtures/playbook.json")).unwrap();
+            book["selected_profile_id"] = json!(profile_id);
+            let target = ["1p","1p","1p","2p","2p","2p","3p","3p","3p","4p","4p","4p","5p","5p"];
+            book["profiles"][0]["stages"][0]["hands"][0]["target_groups"] = json!(target.map(|face|
+                json!({"kind":"single","rule":{"faces":[face]}})));
+            state.services.patch_config(&json!({"autorun":{"playbook":book,"op_interval_ms":100}})).unwrap();
+            let faces = ["1p","1p","1p","2p","2p","2p","3p","3p","3p","4p","4p","4p","5m","5p","5p","9s","8s"];
+            let game = json!({"source":"qyzz","qyzz_run_id":profile_id,"qyzz_version":1,"qyzz_deal_id":1,
+                "stage":5,"level":13001,"node":3,"deck_map":faces.iter().enumerate()
+                    .map(|(i, face)|((i+1).to_string(),json!(face))).collect::<serde_json::Map<_,_>>(),
+                "hand_tiles":(1..=13).collect::<Vec<_>>(),"wall_tiles":[15,16,17],"replacement_tiles":[14],
+                "locked_tiles":[],"dora_tiles":[],"effect_list":[],"ming":[],"total_change_tile_count":1,
+                "change_tile_count":0,"next_operation":[{"type":101},{"type":100}]});
+            state.services.publish_qyzz_state(&game).unwrap();
+            let (sender, mut receiver) = mpsc::channel::<Operation>(8);
+            *state.qyzz.sender.lock().unwrap() = Some(sender);
+            let services = state.services.clone();
+            let game_task = tokio::spawn(async move {
+                let mut operations = Vec::new();
+                let mut wins = 0;
+                while let Some(command) = receiver.recv().await {
+                    let mut game = services.game_state();
+                    assert_eq!(command.packet["version"], game["qyzz_version"]);
+                    let kind = command.packet["operation"].as_u64().unwrap();
+                    operations.push(kind);
+                    match kind {
+                        101 => {
+                            let mut hand = command.packet["tiles"].as_array().unwrap().clone();
+                            assert_eq!(hand.len(), 12);
+                            assert!(!hand.contains(&json!(13)));
+                            hand.push(game["replacement_tiles"].as_array_mut().unwrap().remove(0));
+                            game["hand_tiles"] = json!(hand);
+                            game["change_tile_count"] = json!(1);
+                            game["next_operation"] = json!([{"type":100}]);
+                        },
+                        100 => {
+                            let tile = game["wall_tiles"].as_array_mut().unwrap().remove(0);
+                            game["hand_tiles"].as_array_mut().unwrap().push(tile);
+                            game["stage"] = json!(6);
+                            game["next_operation"] = json!([{"type":1},{"type":8}]);
+                        },
+                        8 => {
+                            wins += 1;
+                            game["wall_tiles"].as_array_mut().unwrap().remove(0);
+                            let _ = command.reply.send(Ok(()));
+                            tokio::time::sleep(Duration::from_millis(220)).await;
+                            assert!(receiver.try_recv().is_err(), "tsumo repeated without a new snapshot");
+                            game["qyzz_version"] = json!(game["qyzz_version"].as_u64().unwrap() + 1);
+                            services.publish_qyzz_state(&game).unwrap();
+                            if wins == 2 {
+                                tokio::time::sleep(Duration::from_millis(220)).await;
+                                assert!(receiver.try_recv().is_err(), "an operation was sent after Stop");
+                                return operations;
+                            }
+                            continue;
+                        },
+                        other => panic!("unexpected round operation {other}"),
+                    }
+                    game["qyzz_version"] = json!(game["qyzz_version"].as_u64().unwrap() + 1);
+                    services.publish_qyzz_state(&game).unwrap();
+                    let _ = command.reply.send(Ok(()));
+                }
+                panic!("round runner disconnected before repeated wins");
+            });
+            let mut updates = state.events.subscribe();
+            assert!(runtime.autorun(crate::ipc::AutorunAction::Start, true).await.ok);
+            tokio::time::timeout(Duration::from_secs(15), async {
+                loop {
+                    let event = updates.recv().await.unwrap();
+                    assert_ne!(event["type"], "souzu_switch_execution", "automatic round execution must only report progress through the monitor panel");
+                    if event["type"] == "autorun_status" && event["data"]["round_decision"]["actual_wins"] == 2 { break; }
+                }
+            }).await.expect("round runner did not complete two wins");
+            assert_eq!(state.automation.autorun_status()["round_decision"]["strategy"],
+                if profile_id == "opening-profile" { "opening" } else { "full" });
+            assert!(runtime.autorun(crate::ipc::AutorunAction::Stop, false).await.ok);
+            assert_eq!(game_task.await.unwrap(), [101,100,8,8]);
+            assert_eq!(state.automation.autorun_status()["round_decision"]["status"], "stopped");
+        }
+    }
+
     /// Run alongside tests/lens_bridge_test.gd -- --serve-lens-test in the Qyzz checkout.
     #[tokio::test]
     #[ignore = "requires an isolated running Qyzz bridge fixture"]

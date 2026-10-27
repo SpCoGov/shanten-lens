@@ -1,5 +1,5 @@
 import {useSyncExternalStore} from "react";
-import {emptyAutoPlayConfig, type AutoPlayConfig, type OpeningPlayProfile} from "./autoPlayConfig";
+import {emptyAutoPlayConfig, type AutoPlayConfig, type PlayProfile} from "./autoPlayConfig";
 
 export type TargetBadge = { kind: "badge"; id: number; value?: number };
 export type TargetAmulet = { kind: "amulet"; id: number; plus?: boolean; badge?: number | null; value?: number };
@@ -29,6 +29,10 @@ export type AutoRunnerRemakeRecord = {
     reason: string;
     stage?: number | null;
     level?: number | null;
+    node?: number | null;
+    source?: "packet" | "qyzz" | null;
+    profile_id?: string;
+    profile_name?: string;
     target_value: number;
     amulet_count: number;
     effect_list: any[];
@@ -50,8 +54,24 @@ export type AutoRunnerOperationRecord = {
     details?: Record<string, unknown>;
 };
 
+export type RoundDecisionStatus = {
+    status: "waiting" | "searching" | "executing" | "winning" | "blocked" | "stopped";
+    reason?: string;
+    strategy?: "opening" | "full";
+    stage_name?: string;
+    hand_name?: string;
+    target_faces?: string[];
+    pinzu_count?: number;
+    win_count?: number;
+    score?: number;
+    draws_needed?: number;
+    actual_wins?: number;
+    progress?: Record<string, unknown>;
+};
+
 export type AutoRunnerStatus = {
-    active_profile?: OpeningPlayProfile | null;
+    active_profile?: PlayProfile | null;
+    round_decision?: RoundDecisionStatus | null;
     running: boolean;
     runs: number;
     elapsed_ms: number;
@@ -59,6 +79,8 @@ export type AutoRunnerStatus = {
     current_achieved_count?: number | null;
     current_step?: string;
     last_error?: string;
+    email_status?: "" | "disabled" | "sending" | "sent" | "failed";
+    email_error?: string;
     started_at?: number;
 
     game_ready?: boolean;

@@ -176,6 +176,7 @@ impl BackendRuntime {
     }
 
     pub fn start_tsumo_loop(&self, interval_ms: u64, reset_count: bool) -> TsumoLoopStatus {
+        self.state.automation.stop_autorun();
         self.state.automation.start_tsumo(interval_ms, reset_count);
         self.state.automation.tsumo_status()
     }
@@ -206,7 +207,11 @@ impl BackendRuntime {
                     }
                 } else {
                     match self.state.automation.start_autorun() {
-                        Ok(()) => CommandResult { ok: true, ..Default::default() },
+                        Ok(()) => {
+                            self.state.automation.stop_tsumo();
+                            super::round::start(&self.state);
+                            CommandResult { ok: true, ..Default::default() }
+                        },
                         Err(key) => CommandResult { reason_key: Some(key.into()), ..Default::default() },
                     }
                 }

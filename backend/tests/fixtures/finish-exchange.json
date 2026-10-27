@@ -1,0 +1,24 @@
+{
+  "request": {
+    "method": ".lq.Lobby.amuletActivityOperate",
+    "data": {"activityId": 261081, "type": 3, "args": []}
+  },
+  "response": {
+    "events": [
+      {"type": 8, "state": {"current": 5, "interrupt": 0}},
+      {"type": 9, "state": {"current": 6, "interrupt": 0}},
+      {
+        "type": 10,
+        "state": {"current": 6, "interrupt": 0},
+        "result": {"dealResult": {"tile": 51}},
+        "valueChanges": {
+          "round": {
+            "desktopRemain": {"dirty": true, "value": 35},
+            "hands": {"dirty": true, "value": [84, 91, 43, 41, 39, 14, 66, 62, 10, 19, 37, 93, 68, 51]},
+            "nextOperation": {"dirty": true, "value": [{"gang": [], "type": 1, "value": 0}]}
+          }
+        }
+      }
+    ]
+  }
+}
