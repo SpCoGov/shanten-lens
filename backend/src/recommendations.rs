@@ -13,6 +13,15 @@ pub fn custom_switch_plan(state: &Value, target: &Value, wall_limit: usize, excl
     custom::search(state, target, wall_limit, exclude_invalid_shapes, progress, stopped)
 }
 
+pub fn opening_round_plan(state: &Value, wall_limit: usize,
+    progress: &mut dyn FnMut(Value), stopped: &dyn Fn() -> bool) -> Value {
+    custom::opening_plan(state, wall_limit, progress, stopped)
+}
+
+pub fn matches_custom_target(state: &Value, target: &Value) -> bool {
+    custom::matches_target(state, target)
+}
+
 #[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
 pub enum TileSuit {
     #[serde(rename = "m")]
@@ -214,21 +223,7 @@ struct Entry {
 fn pool(state: &Value, wall_limit: usize) -> Vec<Entry> {
     let deck = deck(state);
     let mut out = Vec::new();
-    let remaining_changes = state
-        .get("total_change_tile_count")
-        .and_then(Value::as_u64)
-        .unwrap_or(0)
-        .saturating_sub(
-            state
-                .get("change_tile_count")
-                .and_then(Value::as_u64)
-                .unwrap_or(0),
-        ) as usize;
-    let per_change = if ids(state.get("boss_buff")).contains(&901) {
-        3
-    } else {
-        13
-    };
+    let (remaining_changes, per_change) = search_limits(state);
     let used = ids(state.get("switch_used_tiles")).len();
     for (source, key, skip, limit) in [
         ("hand", "hand_tiles", 0, usize::MAX),
@@ -236,7 +231,7 @@ fn pool(state: &Value, wall_limit: usize) -> Vec<Entry> {
             "replacement",
             "replacement_tiles",
             used,
-            remaining_changes * per_change,
+            remaining_changes.saturating_mul(per_change),
         ),
         ("wall", "wall_tiles", 0, wall_limit),
     ] {
@@ -442,7 +437,7 @@ fn is_meld(faces: &[String]) -> bool {
         && ordered[2] == format!("{}{}", bytes[0] - b'0' + 2, bytes[1] as char)
 }
 
-fn search_limits(state: &Value) -> (usize, usize) {
+pub(crate) fn search_limits(state: &Value) -> (usize, usize) {
     let total = state
         .get("total_change_tile_count")
         .and_then(Value::as_u64)
@@ -451,14 +446,12 @@ fn search_limits(state: &Value) -> (usize, usize) {
         .get("change_tile_count")
         .and_then(Value::as_u64)
         .unwrap_or(0) as usize;
-    (
-        total.saturating_sub(used),
-        if ids(state.get("boss_buff")).contains(&901) {
-            3
-        } else {
-            13
-        },
-    )
+    let limit = state["next_operation"].as_array()
+        .and_then(|operations| operations.iter().find(|operation| operation["type"] == 101))
+        .and_then(|operation| operation["value"].as_u64())
+        .map(|value| if value == 0 { 13 } else { value.min(13) as usize })
+        .unwrap_or_else(|| if ids(state.get("boss_buff")).contains(&901) { 3 } else { 13 });
+    (total.saturating_sub(used), limit)
 }
 
 type SwitchBatches = (Vec<Vec<u64>>, Vec<Vec<u64>>);
@@ -687,6 +680,27 @@ pub fn discard_recommendations(state: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn operation_exchange_limit_controls_search_and_replacement_pool_without_boss_flags() {
+        let mut state = json!({"total_change_tile_count":3,"change_tile_count":1,"boss_buff":[],
+            "deck_map":(1..=60).map(|id|(id.to_string(),json!("1p"))).collect::<Map<_,_>>(),
+            "hand_tiles":(1..=13).collect::<Vec<_>>(),"replacement_tiles":(14..=60).collect::<Vec<_>>()});
+        assert_eq!(search_limits(&state), (2, 13));
+        state["boss_buff"] = json!([901]);
+        assert_eq!(search_limits(&state), (2, 3));
+        state["next_operation"] = json!([{"type":101,"value":0}]);
+        assert_eq!(search_limits(&state), (2, 13), "the operation's explicit zero means unlimited");
+        state["boss_buff"] = json!([]);
+        for (value, limit) in [(1,1),(3,3),(5,5),(13,13),(100,13)] {
+            state["next_operation"] = json!([{"type":101,"value":value}]);
+            assert_eq!(search_limits(&state), (2, limit));
+            assert_eq!(pool(&state, 0).iter().filter(|entry| entry.source == "replacement").count(), 2 * limit);
+        }
+        state["change_tile_count"] = json!(4);
+        assert_eq!(search_limits(&state).0, 0);
+        assert!(pool(&state, 0).iter().all(|entry| entry.source == "hand"));
+    }
     #[test]
     fn wanxiang_must_already_be_in_hand() {
         let faces = [

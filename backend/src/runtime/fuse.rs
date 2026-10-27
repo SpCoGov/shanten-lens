@@ -33,7 +33,7 @@ impl PacketModule for FuseRules {
         if packet.direction != Direction::Outbound || packet.packet_type != "Req" {
             return ModuleAction::Forward;
         }
-        if !services.packet_processing_allowed() { return ModuleAction::Forward; }
+        if !services.packet_processing_allowed() || services.autorun_active() { return ModuleAction::Forward; }
         let config = services.table("fuse");
         let state = services.game_state();
         let op = packet

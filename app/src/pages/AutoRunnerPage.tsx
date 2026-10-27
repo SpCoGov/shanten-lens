@@ -1,6 +1,7 @@
 import React from "react";
 import type {GameStateData} from "../lib/gamestate";
 import ActionProviderPanel from "../components/ActionProviderPanel";
+import RoundDecisionPanel from "../components/RoundDecisionPanel";
 import "../styles/theme.css";
 import * as backendIpc from "../lib/ipc";
 import {
@@ -33,7 +34,7 @@ function formatDuration(ms: number): string {
 
 export default function AutoRunnerPage({currentState}: {currentState: GameStateData | null}) {
     const {t} = useTranslation();
-    const [tab, setTab] = React.useState<"strategy" | "monitor" | "connection">("strategy");
+    const [tab, setTab] = React.useState<"strategy" | "monitor" | "connection">("monitor");
     return <div className={`settings-wrap wide-page ${styles.shell}`}>
         <header className={styles.pageHeader}>
             <h2 className="title"><span className="ms" aria-hidden="true">smart_toy</span>{t("autoplay.title")}</h2>
@@ -50,11 +51,16 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
     const {t} = useTranslation();
     const {config, status} = useAutoRunner();
     const selectedProfile = config.playbook.profiles.find(profile => profile.id === config.playbook.selected_profile_id);
-    const profile = status.running ? status.active_profile : selectedProfile;
+    const goalMet = status.current_step === "goal_met";
+    const finished = goalMet || status.current_step === "completed" || status.current_step === "failed";
+    const profile = status.running || finished ? status.active_profile : selectedProfile;
+    const stepText = status.current_step?.startsWith("action:")
+        ? t(`action_provider.actions.${status.current_step.slice(7)}`)
+        : t(`autoplay.step_${status.current_step}`, {defaultValue: status.current_step ?? "—"});
     const openingProfile = profile?.strategy === "opening" ? profile : undefined;
     const openingCutoff = openingProfile && openingLevels.find(level => level.level === openingProfile.cutoff_level && level.node === openingProfile.cutoff_node);
-    const achieved = status.running ? status.current_achieved_count : undefined;
-    const startUnavailable = !selectedProfile ? "autoplay.select_profile" : selectedProfile.strategy !== "opening" ? "autoplay.full_not_ready" : "";
+    const achieved = status.running || goalMet ? status.current_achieved_count : undefined;
+    const startUnavailable = !selectedProfile ? "autoplay.select_profile" : "";
     const {badgeById, amuletById} = useRegistry();
 
     const [saving, setSaving] = React.useState(false);
@@ -158,6 +164,9 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
         if (reason === "impossible") return t("autorun.remake_reason_impossible");
         if (reason === "cutoff_no_shop_options") return t("autorun.remake_reason_cutoff_no_shop_options");
         if (reason === "cutoff_cannot_afford") return t("autorun.remake_reason_cutoff_cannot_afford");
+        if (reason === "custom-search-limit") return t("autorun.remake_reason_search_limit");
+        if (reason === "remake_at_cutoff") return t("autorun.remake_reason_cutoff");
+        if (reason === "decision") return t("autorun.remake_reason_decision");
         return reason || "-";
     }, [t]);
 
@@ -168,7 +177,7 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
             run: record.run_index ?? "-",
             value: record.target_value ?? 0,
             count: record.amulet_count ?? 0,
-            level: formatLevelIdToLabel(record.level),
+            level: formatLevelIdToLabel(record.level, record.source, record.node ?? undefined),
         });
     }, [t]);
 
@@ -370,8 +379,8 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
             <div className={styles.runHeading}>
                 <div className={styles.runState}>
                     <span className={`${styles.stateIcon} ${working ? styles.running : ""}`}><span className="ms" aria-hidden="true">{working ? "play_arrow" : "pause"}</span></span>
-                    <div><h3>{t(working ? "autorun.status_running" : "autorun.status_stopped")}</h3>
-                        <p>{t("autorun.hint_current_step", {text: status.current_step ?? "-"})}</p></div>
+                    <div><h3>{finished ? stepText : t(working ? "autorun.status_running" : "autorun.status_stopped")}</h3>
+                        <p>{t("autorun.hint_current_step", {text: stepText})}</p></div>
                 </div>
                 <div className={styles.toolbar}>
                     <button className="nav-btn" onClick={() => {setSaveNotice(""); setSettingsOpen(true);}}><span className="ms" aria-hidden="true">tune</span>{t("autoplay.runtime_settings")}</button>
@@ -381,12 +390,16 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
             </div>
             {existingGameConfirm && <div className={styles.confirmation} role="alert">
                 <span>{t("autorun.confirm_existing_game")}</span><div className={styles.toolbar}>
-                    <button className="nav-btn" onClick={() => void start(true)} disabled={starting}><span className="ms" aria-hidden="true">restart_alt</span>{t("autorun.btn_continue_remake")}</button>
+                    <button className="nav-btn" onClick={() => void start(true)} disabled={starting}><span className="ms" aria-hidden="true">play_arrow</span>{t("autorun.btn_continue_game")}</button>
                     <button className="nav-btn" onClick={cancelExistingGame} disabled={starting}><span className="ms" aria-hidden="true">close</span>{t("autorun.btn_cancel")}</button>
                 </div>
             </div>}
             {controlError && <p className="notice error" role="alert">{controlError}</p>}
-            {status.last_error && <p className="notice error">{t("autorun.hint_last_error", {text: status.last_error})}</p>}
+            {status.last_error && <p className="notice error">{t("autorun.hint_last_error", {text: t(status.last_error, {defaultValue: status.last_error})})}</p>}
+            {working && <p className="hint">{t("autoplay.fuse_suspended")}</p>}
+            {status.email_status && <p className={status.email_status === "failed" ? "notice error" : "hint"} role="status">
+                <span className="ms" aria-hidden="true">{status.email_status === "failed" ? "error" : "mail"}</span>{t(`autoplay.email_${status.email_status}`, {error: status.email_error ?? ""})}
+            </p>}
             <div className={styles.metrics}>
                 <div><span><span className="ms" aria-hidden="true">timer</span>{t("autoplay.elapsed")}</span><strong>{elapsedDisplay}</strong></div>
                 <div><span><span className="ms" aria-hidden="true">replay</span>{t("autoplay.runs")}</span><strong>{status.runs ?? 0}</strong></div>
@@ -397,6 +410,7 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
                 {profile && <span>{t("autoplay.running_profile", {name: profile.name})}</span>}</div>
         </section>
 
+        <RoundDecisionPanel decision={status.active_profile?.id === profile?.id ? status.round_decision : undefined} running={working} profile={profile}/>
         <ActionProviderPanel state={currentState}/>
 
         {openingProfile ? <section className={`panel ${styles.progressPanel}`}>
@@ -412,7 +426,7 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
             {profile && profile.strategy !== "opening" && <div className={styles.toolbar}>{profile.stages.map(stage => <span className="badge" key={stage.id}>
                 {stage.name} · {t("autoplay.cutoff_at", {level: formatLevelIdToLabel(stage.deadline_level, "packet", stage.deadline_node)})}
             </span>)}</div>}
-            <p className="hint">{t(profile ? "autoplay.full_not_ready" : "autoplay.select_profile")}</p>
+            <p className="hint">{t(profile ? "round.stage_hint" : "autoplay.select_profile")}</p>
         </section>}
 
         <section className={`panel ${styles.historyPanel}`}>
@@ -423,13 +437,14 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
                 </div>
                 {recordView === "remakes" && bestRecord && <button className="nav-btn" onClick={() => setSelectedRecordSeq(bestRecord.seq)}><span className="ms" aria-hidden="true">workspace_premium</span>{t("autoplay.view_best")}</button>}
             </div>
+            {recordView === "remakes" && <p className="hint">{t("autorun.remake_history_hint")}</p>}
             {recordView === "remakes" ? remakeRecords.length === 0 ? <div className={styles.empty}><span className="ms" aria-hidden="true">history</span><p>{t("autorun.remake_empty")}</p></div> :
                 <div className={styles.recordLayout}>
                     <div className={styles.recordList} role="group" aria-label={t("autorun.section_remake_records_title")}>
                         {remakeRecords.map(record => <button key={record.seq} className={styles.recordButton} aria-pressed={selectedRecord?.seq === record.seq}
                             onClick={() => setSelectedRecordSeq(record.seq)} title={reasonText(record.reason)}>
                             <span className="ms" aria-hidden="true">{bestRecord?.seq === record.seq ? "workspace_premium" : "replay"}</span>
-                            <span><strong>#{record.seq} · {t("autoplay.run_number", {run: record.run_index})}</strong><small>{formatLevelIdToLabel(record.level)} · {reasonText(record.reason)}</small></span>
+                            <span><strong>#{record.seq} · {t("autoplay.run_number", {run: record.run_index})}</strong><small>{[record.profile_name, formatLevelIdToLabel(record.level, record.source, record.node ?? undefined), reasonText(record.reason)].filter(Boolean).join(" · ")}</small></span>
                             <span className={styles.recordValue}><b>{record.target_value}</b><small>{t(bestRecord?.seq === record.seq ? "autorun.remake_best_marker" : "autoplay.value")}</small></span>
                         </button>)}
                     </div>

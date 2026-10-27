@@ -68,7 +68,8 @@ fn bonfire_scores_real_options_at_strict_hp_and_coin_thresholds() {
         for action in actions.actions.iter().chain(&actions.global_actions) {
             let score = report.actions.iter().find(|score| score.action_id == action.id).unwrap();
             let expected = match action.params["id"].as_u64() {
-                Some(1) => heal, Some(2) => maximum, Some(4) => coins, Some(5..=9) => 10.0, _ => 0.0,
+                Some(1) => heal, Some(2) => maximum, Some(4) => coins, Some(5..=9) => 10.0,
+                _ if action.kind == "remake" => -9999.0, _ => 0.0,
             };
             assert_eq!(score.total, Some(expected), "{:?}, {state}", action.params);
             assert_eq!(score.rules.iter().any(|rule| rule.rule_id == "bonfire"),
@@ -254,7 +255,8 @@ fn leaving_affordable_packs_deducts_five_once_without_requiring_a_refresh_budget
     state["provider_state"]["state"]["current"] = json!(3);
     let actions = shanten_backend::action_provider::evaluate(&state);
     let report = evaluate(&state, &actions);
-    assert!(report.actions.iter().all(|score| score.total == Some(0.0) && score.rules.is_empty()));
+    assert!(report.actions.iter().filter(|score| score.action_id != actions.global_actions[0].id)
+        .all(|score| score.total == Some(0.0) && score.rules.is_empty()));
 }
 
 #[test]
@@ -394,6 +396,44 @@ fn affordable_pack_sets_are_bought_in_rarity_order_using_the_best_pack_within_a_
             let cost = good["price"].as_u64().unwrap();
             let coin = state["provider_state"]["game"]["coin"].as_u64().unwrap();
             state["provider_state"]["game"]["coin"] = json!(coin - cost);
+        }
+    }
+}
+
+#[test]
+fn pack_order_does_not_outbid_selling_happiness_in_the_full_inventory_screenshot() {
+    let mut state = pack_shop_state(6, json!([
+        {"id":1,"goodsId":101,"price":5,"sold":false},
+        {"id":2,"goodsId":102,"price":10,"sold":false},
+        {"id":3,"goodsId":101,"price":5,"sold":false},
+        {"id":4,"goodsId":102,"price":10,"sold":false},
+        {"id":5,"goodsId":101,"price":5,"sold":false}
+    ]));
+    state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().extend([
+        json!({"id":3020,"uid":68,"volume":1,"badge":{"id":600110}}),
+        json!({"id":620,"uid":69,"volume":1,"badgeId":0}),
+    ]);
+    for coin in [130, 30] {
+        state["provider_state"]["game"]["coin"] = json!(coin);
+        let mut pack_score = None;
+        for (price, book, expected_sale, should_sell) in [
+            (9, Value::Null, 64.0, true),
+            (19, Value::Null, 74.0, true),
+            (9, json!({"selected_profile_id":"opening","profiles":[{"id":"opening","strategy":"opening",
+                "targets":[{"kind":"badge","id":600110,"value":1}]}]}), -35.0, false),
+        ] {
+            let registry = json!({"amulets":[{"id":9,"sell_price":9},{"id":302,"sell_price":price},{"id":62,"sell_price":3}]});
+            let actions = shanten_backend::action_provider::evaluate(&state);
+            let report = decision::evaluate(&state, &actions, &registry, &book);
+            let sale = actions.actions.iter().find(|action| action.kind == "sell_effect" && action.params["uid"] == 68).unwrap();
+            let sale_score = report.actions.iter().find(|score| score.action_id == sale.id).unwrap();
+            assert_eq!(sale_score.total, Some(expected_sale));
+            let best = report.actions.iter().max_by(|left, right| left.total.unwrap().total_cmp(&right.total.unwrap())).unwrap();
+            assert_eq!(best.action_id == sale.id, should_sell, "{coin} coins, {price} sale price");
+            let best_pack = actions.actions.iter().filter(|action| action.kind == "buy_pack")
+                .filter_map(|action| report.actions.iter().find(|score| score.action_id == action.id)?.total).reduce(f64::max).unwrap();
+            if let Some(previous) = pack_score { assert_eq!(best_pack, previous, "pack priority must not track the happiness sale score"); }
+            pack_score = Some(best_pack);
         }
     }
 }
@@ -668,7 +708,7 @@ fn preferred_amulets_and_their_plus_variants_stack_both_retention_penalties_with
 
 #[test]
 fn preferred_amulet_sale_penalty_accumulates_with_target_and_seal_rules() {
-    for (badge, expected) in [(600070,-537.0), (600110,-522.0)] {
+    for (badge, expected) in [(600070,-537.0), (600110,-527.0)] {
         let mut actions = candidate("sell_effect", json!(620), Availability::Available);
         actions.actions[0].params["effect"]["badgeId"] = json!(badge);
         let state = json!({"provider_state":{"effect":{"effectList":[actions.actions[0].params["effect"]]}}});
@@ -684,7 +724,7 @@ fn preferred_amulet_sale_penalty_accumulates_with_target_and_seal_rules() {
 }
 
 #[test]
-fn stage_and_global_actions_start_at_zero_without_applicable_rules() {
+fn unruled_actions_stay_zero_and_remake_deducts_9999() {
     let mut actions = candidate("skip", Value::Null, Availability::Available);
     let mut global = actions.actions[0].clone();
     global.id = "remake".into();
@@ -692,9 +732,14 @@ fn stage_and_global_actions_start_at_zero_without_applicable_rules() {
     actions.global_actions.push(global);
     let report = evaluate(&json!({}), &actions);
     assert_eq!(report.actions.len(), 2);
-    assert!(report.actions.iter().all(|score| score.total == Some(0.0) && score.rules.is_empty()));
+    assert_eq!(report.actions[0].total, Some(0.0));
+    assert!(report.actions[0].rules.is_empty());
+    assert_eq!(report.actions[1].total, Some(-9999.0));
+    assert_eq!(report.actions[1].rules.len(), 1);
+    assert_eq!(report.actions[1].rules[0].rule_id, "remake_penalty");
+    assert_eq!(report.actions[1].rules[0].reason.code, "remake_penalty");
     let round_trip: decision::DecisionReport = serde_json::from_value(serde_json::to_value(report).unwrap()).unwrap();
-    assert!(round_trip.actions.iter().all(|score| score.total == Some(0.0)));
+    assert_eq!(round_trip.actions[1].total, Some(-9999.0));
 }
 
 #[test]
@@ -961,17 +1006,17 @@ fn happiness_selection_adds_twenty_to_other_rules_and_the_skip_penalty() {
         actions.actions[0].kind = "sell_effect".into();
         actions.actions[0].cost = None;
         let report = decision::evaluate(&state, &actions, &registry, &book);
-        assert_eq!(report.actions[0].total, Some(-502.0)); // 5 sale + 3 price - 15 with no packs - 495 target
+        assert_eq!(report.actions[0].total, Some(-507.0)); // 5 sale + 3 price - 20 with no packs - 495 target
     }
 }
 
 #[test]
-fn happiness_sale_uses_total_unsold_pack_cost_with_a_positive_score_at_fifteen() {
+fn happiness_sale_scores_twice_the_total_unsold_pack_cost_minus_ten() {
     let mut actions = candidate("sell_effect", json!(3020), Availability::Available);
     actions.actions[0].params["effect"]["badgeId"] = json!(600110);
     for (prices, expected) in [
-        (vec![], -15.0), (vec![0], -15.0), (vec![5], -10.0), (vec![10], -5.0),
-        (vec![14], -1.0), (vec![15], 1.0), (vec![20], 6.0), (vec![5,10,15], 16.0),
+        (vec![], -20.0), (vec![0], -20.0), (vec![5], -10.0), (vec![10], 0.0),
+        (vec![14], 8.0), (vec![15], 10.0), (vec![20], 20.0), (vec![5,10,15], 40.0),
     ] {
         let goods: Vec<_> = prices.iter().enumerate().map(|(index, price)|
             json!({"goodsId":101 + index,"price":price.to_string(),"sold":0})).collect();
@@ -1005,7 +1050,7 @@ fn happiness_counts_unaffordable_packs_and_keeps_shop_value_during_selection() {
         let sale = actions.actions.iter().find(|action| action.kind == "sell_effect").unwrap();
         let report = evaluate(&state, &actions);
         let score = report.actions.iter().find(|score| score.action_id == sale.id).unwrap();
-        assert_eq!(score.total, Some(12.0)); // 5 sale + 1 + 2 + 3 + 4 + 5 + 6 - 14
+        assert_eq!(score.total, Some(27.0)); // 5 sale + (1 + 2 + 3 + 4 + 5 + 6 - 10) * 2
     }
 }
 
@@ -1018,6 +1063,7 @@ fn happiness_ignores_unrelated_actions_and_reports_invalid_pack_data() {
         json!([{"goodsId":101,"price":-1,"sold":false}]), json!([{"goodsId":101,"price":1.5,"sold":false}]),
         json!([{"goodsId":101,"price":"oops","sold":false}]),
         json!([{"goodsId":101,"price":u64::MAX,"sold":false}]),
+        json!([{"goodsId":101,"price":4_503_599_627_370_506u64,"sold":false}]),
         json!([{"goodsId":101,"price":9_007_199_254_740_991u64,"sold":false},{"goodsId":102,"price":1,"sold":false}])] {
         let state = json!({"stage":9,"provider_state":{"shop":{"goods":goods}}});
         let report = evaluate(&state, &actions);
@@ -1630,6 +1676,116 @@ fn pack_value_requires_a_known_pack_and_inventory_and_adds_to_payment_rules() {
     for kind in ["select_candidate", "buy_effect", "buy_rune", "skip", "select_character"] {
         actions.actions[0].kind = kind.into();
         assert!(evaluate(&state, &actions).actions[0].rules.iter().all(|rule| rule.rule_id != "pack_value"));
+    }
+}
+
+#[test]
+fn remake_at_cutoff_uses_selected_opening_goals_and_map_order() {
+    let book = json!({"selected_profile_id":"opening","profiles":[
+        {"id":"ignored","strategy":"opening","end_count":1,"cutoff_level":13001,"cutoff_node":2,"targets":[]},
+        {"id":"opening","strategy":"opening","end_count":5,"cutoff_level":13002,"cutoff_node":4,"targets":[
+            {"kind":"amulet","id":302,"value":2},{"kind":"badge","id":600050,"value":3}
+        ]}
+    ]});
+    for (level, node, owned, expected) in [
+        (13001,6,json!([]),0.0), (13002,3,json!([]),0.0),
+        (13002,4,json!([]),99999.0), (13002,5,json!([]),99999.0), (13003,2,json!([]),99999.0),
+        (13002,4,json!([{"id":3020},{"id":3020}]),99999.0),
+        (13002,4,json!([{"id":3021,"badgeId":600050}]),99999.0),
+        (13002,4,json!([{"id":3020,"badgeId":600050}]),0.0),
+        (13002,4,json!([{"id":3020,"badge":{"id":600050}}]),0.0),
+    ] {
+        let state = json!({"source":"packet","stage":3,"provider_state":{
+            "state":{"interrupt":0},"map":{"level":level,"node":node},"effect":{"effectList":owned}
+        }});
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &json!({}), &book);
+        let remake = actions.global_actions.iter().find(|action| action.kind == "remake").unwrap();
+        let score = report.actions.iter().find(|score| score.action_id == remake.id).unwrap();
+        assert_eq!(score.total, Some(expected - 9999.0), "{state}");
+        assert_eq!(score.rules.iter().any(|rule| rule.rule_id == "remake_at_cutoff"), expected > 0.0);
+        assert_eq!(report.actions.iter().find(|score| score.action_id != remake.id).unwrap().total, Some(0.0));
+    }
+    let mut state = json!({"source":"packet","stage":3,"provider_state":{
+        "state":{"interrupt":0},"map":{"level":13002,"node":4},"effect":{"effectList":[]}
+    }});
+    for (path, value) in [
+        ("/provider_state/map/level", json!(11002)), ("/provider_state/map/node", json!(99)),
+        ("/provider_state/map/node", Value::Null), ("/provider_state/effect/effectList", Value::Null),
+        ("/provider_state/effect/effectList", json!([{}])),
+    ] {
+        let original = state.pointer(path).unwrap().clone();
+        *state.pointer_mut(path).unwrap() = value;
+        let report = decision::evaluate(&state, &shanten_backend::action_provider::evaluate(&state), &json!({}), &book);
+        let score = report.actions.iter().find(|score| score.rules.iter().any(|rule| rule.rule_id == "remake_at_cutoff")).unwrap();
+        assert_eq!(score.total, Some(-9999.0));
+        assert_eq!(score.rules[0].score, None);
+        assert_eq!(score.rules[0].reason.code, "missing_cutoff_data");
+        *state.pointer_mut(path).unwrap() = original;
+    }
+    for availability in [Availability::Unknown, Availability::Unavailable] {
+        let actions = candidate("remake", Value::Null, availability);
+        assert!(decision::evaluate(&state, &actions, &json!({}), &book).actions.is_empty());
+    }
+    let actions = candidate("remake", Value::Null, Availability::Available);
+    let score = &decision::evaluate(&state, &actions, &json!({}), &json!({})).actions[0];
+    assert_eq!(score.total, Some(-9999.0));
+    assert_eq!(score.rules.len(), 1);
+    assert_eq!(score.rules[0].rule_id, "remake_penalty");
+}
+
+#[test]
+fn remake_at_cutoff_requires_a_complete_current_stage_loadout() {
+    let mut book = json!({"selected_profile_id":"full","profiles":[{"id":"full","stages":[
+        {"start_level":13001,"start_node":3,"deadline_level":13001,"deadline_node":5,"loadouts":[
+            {"amulets":[{"id":302,"plus":false,"badge":null},{"id":302,"plus":false,"badge":600050}]},
+            {"amulets":[{"id":303,"plus":true,"badge":0}]}
+        ]},
+        {"start_level":13002,"start_node":2,"deadline_level":13002,"deadline_node":4,"loadouts":[
+            {"amulets":[{"id":304,"plus":false,"badge":null}]}
+        ]}
+    ]}]});
+    let actions = candidate("remake", Value::Null, Availability::Available);
+    for explicit in [false, true] {
+        if explicit { book["profiles"][0]["strategy"] = json!("full"); }
+        for (level, node, owned, expected) in [
+            (13001,2,json!([]),0.0), (13001,4,json!([]),0.0), (13001,5,json!([]),99999.0),
+            (13001,5,json!([{"id":3020,"badgeId":600050}]),99999.0),
+            (13001,5,json!([{"id":3020,"badgeId":600050},{"id":3020}]),0.0),
+            (13001,5,json!([{"id":3020},{"id":3020}]),99999.0),
+            (13001,5,json!([{"id":3031}]),0.0),
+            (13001,5,json!([{"id":3030}]),99999.0),
+            (13001,5,json!([{"id":3031,"badgeId":600050}]),99999.0),
+            (13002,2,json!([]),0.0), (13002,4,json!([]),99999.0),
+            (13002,4,json!([{"id":3040}]),0.0), (13003,2,json!([]),99999.0),
+        ] {
+            let state = json!({"stage":3,"provider_state":{"map":{"level":level,"node":node},"effect":{"effectList":owned}}});
+            assert_eq!(decision::evaluate(&state, &actions, &json!({}), &book).actions[0].total, Some(expected - 9999.0), "{state}");
+        }
+    }
+}
+
+#[test]
+fn remake_at_cutoff_is_not_outbid_by_shop_pack_ordering() {
+    let mut state = pack_shop_state(0, json!([
+        {"id":101,"price":5,"sold":false},{"id":102,"price":10,"sold":false},{"id":103,"price":15,"sold":false}
+    ]));
+    state["provider_state"]["map"] = json!({"level":13002,"node":4});
+    let book = json!({"selected_profile_id":"opening","profiles":[{
+        "id":"opening","strategy":"opening","end_count":1,"cutoff_level":13002,"cutoff_node":4,
+        "targets":[{"kind":"amulet","id":302}]
+    }]});
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state, &actions, &json!({}), &book);
+    let best = report.actions.iter().max_by(|left, right| left.total.unwrap().total_cmp(&right.total.unwrap())).unwrap();
+    assert_eq!(best.total, Some(90000.0));
+    assert_eq!(best.action_id, actions.global_actions.iter().find(|action| action.kind == "remake").unwrap().id);
+    for locale in [include_str!("../../app/src/locales/zh-CN.json"), include_str!("../../app/src/locales/ja-JP.json")] {
+        let locale: Value = serde_json::from_str(locale).unwrap();
+        assert!(locale["action_provider"]["scoring"]["rules"]["remake_at_cutoff"].is_string());
+        for code in ["remake_at_cutoff", "missing_cutoff_data"] {
+            assert!(locale["action_provider"]["scoring"]["reasons"][code].is_string());
+        }
     }
 }
 

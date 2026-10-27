@@ -201,6 +201,7 @@ pub(super) fn apply_fetch_state(target: &mut Map<String, Value>, response: &Valu
     clear_noncombat_target(target);
     update_boss_buff(target);
     rebuild_pool_sections(target, round, false);
+    sync_consumed_replacements(target);
 }
 
 fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
@@ -315,6 +316,18 @@ fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
                 remove_drawn_tile_from_wall(target);
             }
         }
+    }
+    sync_consumed_replacements(target);
+}
+
+fn sync_consumed_replacements(target: &mut Map<String, Value>) {
+    let used = ints_from_state(target, "switch_used_tiles");
+    if used.is_empty() { return; }
+    let seen = used.iter().copied().chain(ints_from_state(target, "hand_tiles")).collect::<std::collections::HashSet<_>>();
+    let (consumed, remaining): (Vec<_>, Vec<_>) = ints_from_state(target, "replacement_tiles").into_iter().partition(|id| seen.contains(id));
+    // Effects can draw out of order; retain a consumed prefix so the shared cursor stays valid.
+    if consumed.len() == used.len() {
+        target.insert("replacement_tiles".into(), json!(consumed.into_iter().chain(remaining).collect::<Vec<_>>()));
     }
 }
 
@@ -698,6 +711,32 @@ fn update_boss_buff(target: &mut Map<String, Value>) {
 #[cfg(test)]
 mod pool_tests {
     use super::*;
+
+    #[test]
+    fn hand_changing_effect_preserves_consumed_tiles_across_delta_and_fetch() {
+        let trace: Value = serde_json::from_str(include_str!("../../tests/fixtures/amulet-hand-change.json")).unwrap();
+        let mut state = empty_game_state().as_object().unwrap().clone();
+        apply_fetch_state(&mut state, &json!({"game":trace["game"]}));
+        let original = ints_from_state(&state, "replacement_tiles");
+        for event in trace["response"]["events"].as_array().unwrap() { apply_event_state(&mut state, event); }
+        let hand = ints_from_state(&state, "hand_tiles");
+        let used = ints_from_state(&state, "switch_used_tiles");
+        let reordered = ints_from_state(&state, "replacement_tiles");
+        assert_eq!(hand, vec![58,66,42,74,69,36,20,11,63,57,32,44,47]);
+        let remaining = &reordered[used.len()..];
+        assert_eq!(remaining, original.iter().copied().filter(|id| !hand.contains(id)).collect::<Vec<_>>());
+        assert!(remaining.iter().all(|id| !hand.contains(id) && !used.contains(id)));
+        assert_eq!(remaining[0], 93, "the cat consumed non-prefix tiles, so the original front remains available");
+        let mut refreshed = trace["game"].clone();
+        for key in ["hands","used","changeTileCount","nextOperation"] {
+            refreshed["round"][key] = trace["response"]["events"][0]["valueChanges"]["round"][key]["value"].clone();
+        }
+        apply_fetch_state(&mut state, &json!({"game":refreshed}));
+        assert_eq!(ints_from_state(&state, "replacement_tiles"), reordered);
+        let target = json!(vec![json!({"rule":{}});14]);
+        let plan = crate::recommendations::custom_switch_plan(&Value::Object(state), &target, 36, false, &mut |_| {}, &|| false);
+        assert_eq!(plan["status"], "plan", "replanning must not include consumed tiles twice: {plan}");
+    }
 
     fn initial_round() -> Value {
         json!({

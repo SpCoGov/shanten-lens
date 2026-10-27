@@ -37,7 +37,8 @@ pub fn send(config: &Value, subject: &str, body: &str) -> Result<(), String> {
         SmtpTransport::starttls_relay(host)
     }
     .map_err(|e| e.to_string())?
-    .port(port);
+    .port(port)
+    .timeout(Some(std::time::Duration::from_secs(30)));
     let password = config.get("pass").and_then(Value::as_str).unwrap_or("");
     if !password.is_empty() {
         builder = builder.credentials(Credentials::new(from.into(), password.into()));

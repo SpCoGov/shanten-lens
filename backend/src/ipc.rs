@@ -181,6 +181,7 @@ pub struct GameStateData {
 #[derive(Deserialize, Serialize, Type)]
 pub struct AutoRunnerStatus {
     active_profile: Option<Value>,
+    round_decision: Option<Value>,
     running: bool,
     runs: u64,
     elapsed_ms: u64,
@@ -188,6 +189,8 @@ pub struct AutoRunnerStatus {
     current_achieved_count: Option<u64>,
     current_step: Option<String>,
     last_error: Option<String>,
+    email_status: Option<String>,
+    email_error: Option<String>,
     started_at: Option<u64>,
     game_ready: Option<bool>,
     has_live_game: Option<bool>,

@@ -1,11 +1,14 @@
 //! Backend runtime used by the Tauri application.
 #[cfg(test)]
 mod audit_tests;
+#[cfg(test)]
+mod autorun_tests;
 mod commands;
 mod direct;
 pub use direct::DirectStatus;
 mod plugins;
 mod qyzz;
+mod round;
 mod switch;
 
 use crate::{
@@ -166,7 +169,9 @@ impl BackendRuntime {
                 match source_events.recv().await {
                     Ok(event) if event["type"] == "direct_accounts_changed" => self.state.emit_direct_status(),
                     Ok(event) if event["type"] == "data_source_status" => {
-                        self.state.automation.stop_autorun();
+                        if let Some((generation, _)) = self.state.automation.round_context() {
+                            self.state.automation.fail(generation, "autoplay.data_source_changed");
+                        }
                         self.state.automation.stop_tsumo();
                         self.state.switch_generation.send_modify(|generation| *generation += 1);
                         *self.state.switch_plan.write().await = None;
@@ -186,6 +191,9 @@ impl BackendRuntime {
             let proxy_result = proxy.await;
             let reason = proxy_result.err().map(|error| format!("{error:#}")).unwrap_or_else(|| "MITM proxy stopped".into());
             error!(target: "shanten_backend::proxy", error = %reason, "MITM proxy stopped");
+            if let Some((generation, _)) = self.state.automation.round_context() {
+                self.state.automation.fail(generation, &reason);
+            }
             self.state.services.set_proxy_status(false, Some(reason));
         };
         tokio::join!(proxy_task, reload, qyzz::run(&self.state), source_changes);

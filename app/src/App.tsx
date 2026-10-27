@@ -2287,7 +2287,7 @@ export default function App() {
                 <div className="sb-right">
                     {hasGame ? (
                         <>
-                            {autoStatus.running && autoStatus.active_profile ? (
+                            {autoStatus.running && autoStatus.active_profile?.strategy === "opening" ? (
                                 <span className="badge">
                                     {t("status.autorunTargetCount", {
                                         current: autoStatus.current_achieved_count ?? 0,

@@ -23,7 +23,7 @@ use std::{
     fs,
     path::PathBuf,
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc, Arc, Mutex,
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -45,6 +45,7 @@ pub struct Services {
     registry: Arc<Mutex<Value>>,
     confirmations: Arc<Mutex<std::collections::HashMap<String, mpsc::Sender<bool>>>>,
     next_confirmation: Arc<AtomicU64>,
+    autorun_active: Arc<AtomicBool>,
     pub events: broadcast::Sender<Value>,
     proxy_status: Arc<Mutex<crate::ipc::ProxyStatus>>,
 }
@@ -86,6 +87,7 @@ impl Services {
             registry: Arc::new(Mutex::new(registry)),
             confirmations: Arc::new(Mutex::new(std::collections::HashMap::new())),
             next_confirmation: Arc::new(AtomicU64::new(1)),
+            autorun_active: Arc::new(AtomicBool::new(false)),
             events,
             proxy_status: Arc::new(Mutex::new(crate::ipc::ProxyStatus::default())),
         })
@@ -93,6 +95,14 @@ impl Services {
 
     pub fn proxy_status(&self) -> crate::ipc::ProxyStatus {
         self.proxy_status.lock().unwrap().clone()
+    }
+
+    pub(crate) fn autorun_active(&self) -> bool {
+        self.autorun_active.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn set_autorun_active(&self, active: bool) {
+        self.autorun_active.store(active, Ordering::SeqCst);
     }
 
     pub fn set_proxy_status(&self, running: bool, error: Option<String>) {

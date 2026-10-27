@@ -250,6 +250,8 @@ pub(super) async fn switch_command(state: &State, data: &Value) -> Vec<Value> {
             let reason_key = match reason.as_str() {
                 "execution-state-mismatch" => "blackhole.execute_reason_state_mismatch",
                 "execution-game-ended" => "blackhole.execute_reason_game_ended",
+                "blackhole.execute_reason_exchange_limit" => "blackhole.execute_reason_exchange_limit",
+                "blackhole.execute_reason_hand_modified" => "blackhole.execute_reason_hand_modified",
                 _ => "",
             };
             let _ = state.services.events.send(event(
@@ -296,7 +298,11 @@ fn value_ids(value: Option<&Value>) -> Vec<u64> {
         .unwrap_or_default()
 }
 
-fn operation_available(game: &Value, operation_type: u64) -> bool {
+pub(super) fn operation_available(game: &Value, operation_type: u64) -> bool {
+    // Packet stage 5 advertises only exchange (101); finishing uses Lobby.amuletActivityOperate.
+    if operation_type == 100 && game["source"] == "packet" && game["stage"] == 5 && super::round::in_round(game) {
+        return true;
+    }
     game.get("next_operation")
         .and_then(Value::as_array)
         .is_some_and(|operations| {
@@ -312,9 +318,14 @@ fn deck_face(game: &Value, id: u64) -> Option<&str> {
 
 pub(super) async fn plan_is_current(state: &State, plan: &Value) -> bool {
     let id = plan.get("plan_id").and_then(Value::as_str);
+    let game = state.services.game_state();
     id.is_some()
         && plan.get("generation").and_then(Value::as_u64) == Some(*state.switch_generation.borrow())
-        && plan.get("session_id") == state.services.game_state().get("session_id")
+        && plan.get("session_id") == game.get("session_id")
+        && plan.get("round_level").is_none_or(|level| *level == game["level"])
+        && plan.get("round_node").is_none_or(|node| *node == game["node"])
+        && plan.get("round_generation").is_none_or(|generation| generation.as_u64()
+            .is_some_and(|generation| state.automation.round_is_current(generation) && super::round::in_round(&game)))
         && state
             .switch_plan
             .read()
@@ -323,7 +334,7 @@ pub(super) async fn plan_is_current(state: &State, plan: &Value) -> bool {
             .is_some_and(|current| current.get("plan_id").and_then(Value::as_str) == id)
 }
 
-async fn send_game_operation(
+pub(super) async fn send_game_operation(
     state: &State,
     plan: &Value,
     game: &Value,
@@ -338,10 +349,21 @@ async fn send_game_operation(
         || game["ended"] == true || !operation_available(game, operation_type) {
         return Err("execution-state-mismatch".into());
     }
+    if operation_type == 101 {
+        let hand = value_ids(game.get("hand_tiles"));
+        let keep = tile_list.iter().copied().collect::<std::collections::HashSet<_>>();
+        if keep.len() != tile_list.len() || keep.iter().any(|id| !hand.contains(id)) {
+            return Err("switch-plan-no-longer-matches-hand".into());
+        }
+        if hand.len().saturating_sub(keep.len()) > recommendations::search_limits(game).1 {
+            return Err("blackhole.execute_reason_exchange_limit".into());
+        }
+    }
     if game["source"] == "qyzz" {
         return state.qyzz.operate(game, operation_type, tile_list).await;
     }
     // A resync may change the hand; never replay a mutating request against the new state.
+    // Packet transport ends exchanges through Lobby Operate; Qyzz uses operation 100 above.
     let (method, data) = if operation_type == 100 {
         (".lq.Lobby.amuletActivityOperate", json!({"activityId":261081,"type":3,"args":[]}))
     } else {
@@ -352,7 +374,25 @@ async fn send_game_operation(
         .request(method, &data, Duration::from_secs(12))
         .await
     {
-        Ok((_, response)) if response.get("error").is_none() => Ok(()),
+        Ok((_, response)) if response.get("error").is_none() => {
+            let changed_by_effect = operation_type == 101 && response["events"].as_array().is_some_and(|events|
+                events.iter().flat_map(|event| event["effectedHooks"].as_array().into_iter().flatten())
+                    .any(|hook| hook["result"]["modifyChangeHandsList"].as_array().is_some_and(|hand| !hand.is_empty())));
+            if changed_by_effect {
+                let current = state.services.game_state();
+                let mut expected = tile_list.to_vec();
+                expected.extend(value_ids(game.get("replacement_tiles")).into_iter()
+                    .skip(value_ids(game.get("switch_used_tiles")).len())
+                    .take(value_ids(game.get("hand_tiles")).len().saturating_sub(tile_list.len())));
+                let mut actual = value_ids(current.get("hand_tiles"));
+                expected.sort_unstable();
+                actual.sort_unstable();
+                if expected != actual && current["change_tile_count"].as_u64() > game["change_tile_count"].as_u64() {
+                    return Err("blackhole.execute_reason_hand_modified".into());
+                }
+            }
+            Ok(())
+        },
         Ok((_, response)) => Err(format!(
             "protocol-error: {}",
             response.get("error").unwrap_or(&Value::Null)
@@ -412,13 +452,16 @@ async fn execute_switch_batches(
             expected.push(*draw);
             expected_hands.push(expected);
         }
-        let _ = state.services.events.send(event(
-            "souzu_switch_execution",
-            json!({"status":"running","phase":"switch","phase_key":"blackhole.execute_phase_sending",
-                "search_algorithm":plan["search_algorithm"],"plan_id":plan["plan_id"],
-                "execution_kind":if finish_switch {"full_plan"}else{"switch"},
-                "batch_index":index+1,"batch_total":batches.len(),"batch_count":batches.len()}),
-        ));
+        // Automatic plans report progress through autorun_status, without opening the manual dialog.
+        if plan["round_generation"].is_null() {
+            let _ = state.services.events.send(event(
+                "souzu_switch_execution",
+                json!({"status":"running","phase":"switch","phase_key":"blackhole.execute_phase_sending",
+                    "search_algorithm":plan["search_algorithm"],"plan_id":plan["plan_id"],
+                    "execution_kind":if finish_switch {"full_plan"}else{"switch"},
+                    "batch_index":index+1,"batch_total":batches.len(),"batch_count":batches.len()}),
+            ));
+        }
         send_game_operation(state, plan, &game, 101, &keep).await?;
         wait_for_execution_state(state, plan, &expected_hands, &meld_ids(&game), None).await?;
     }
@@ -439,12 +482,14 @@ async fn execute_switch_batches(
             return Ok(());
         }
         if operation_available(&game, 100) {
-            let _ = state.services.events.send(event(
-                "souzu_switch_execution",
-                json!({"status":"running","phase":"finish-switch","execution_kind":"full_plan",
-                    "search_algorithm":plan["search_algorithm"],"plan_id":plan["plan_id"],
-                    "phase_key":"blackhole.execute_phase_finish_switch"}),
-            ));
+            if plan["round_generation"].is_null() {
+                let _ = state.services.events.send(event(
+                    "souzu_switch_execution",
+                    json!({"status":"running","phase":"finish-switch","execution_kind":"full_plan",
+                        "search_algorithm":plan["search_algorithm"],"plan_id":plan["plan_id"],
+                        "phase_key":"blackhole.execute_phase_finish_switch"}),
+                ));
+            }
             send_game_operation(state, plan, &game, 100, &[]).await?;
             wait_for_play_turn(state, plan, &game).await?;
             return Ok(());
@@ -649,14 +694,17 @@ async fn execute_play_operation(state: &State, plan: &Value, game: &Value, kind:
     wait_for_execution_state(state, plan, &[hand], &melds, None).await
 }
 
-async fn execute_custom_switch_plan(state: &State, plan: &Value) -> Result<(), String> {
+pub(super) async fn execute_custom_switch_plan(state: &State, plan: &Value) -> Result<(), String> {
+    if plan.get("state_revision") != state.services.game_state().get("revision") {
+        return Err("stale-plan".into());
+    }
     let steps = plan["custom_steps"].as_array().ok_or("custom-missing-steps")?;
     let mut hand = value_ids(plan.get("initial_hand"));
     let mut melds = meld_ids(&state.services.game_state());
     if hand.is_empty() {
         return Err("custom-missing-hand".into());
     }
-    if !steps.is_empty() {
+    if !steps.is_empty() || operation_available(&state.services.game_state(), 100) {
         execute_switch_batches(state, plan, true).await?;
     }
     for step in steps {
@@ -674,12 +722,14 @@ async fn execute_custom_switch_plan(state: &State, plan: &Value) -> Result<(), S
             "kan" if tiles.len() == 4 => Some(4),
             _ => return Err("custom-invalid-step".into()),
         };
-        let _ = state.services.events.send(event("souzu_switch_execution", json!({
-            "status":"running", "phase":kind, "execution_kind":"full_plan",
-            "search_algorithm":plan["search_algorithm"],"plan_id":plan["plan_id"],
-            "phase_key":format!("blackhole.execute_phase_{kind}"),
-            "reason_values":{"tile_id":tiles.first()},
-        })));
+        if plan["round_generation"].is_null() {
+            let _ = state.services.events.send(event("souzu_switch_execution", json!({
+                "status":"running", "phase":kind, "execution_kind":"full_plan",
+                "search_algorithm":plan["search_algorithm"],"plan_id":plan["plan_id"],
+                "phase_key":format!("blackhole.execute_phase_{kind}"),
+                "reason_values":{"tile_id":tiles.first()},
+            })));
+        }
         if kind == "draw" {
             // Finishing exchanges, discarding and declaring kan draw automatically.
             hand.extend(tiles);
@@ -711,6 +761,15 @@ async fn execute_custom_switch_plan(state: &State, plan: &Value) -> Result<(), S
 #[cfg(test)]
 mod three_quad_execution_tests {
     use super::*;
+    #[test]
+    fn packet_exchange_stage_can_finish_without_synthetic_operation() {
+        let mut game = json!({"source":"packet","stage":5,"action_report":{"interrupt":0},"next_operation":[{"type":101}]});
+        assert!(operation_available(&game, 100));
+        game["action_report"]["interrupt"] = json!(1000);
+        assert!(!operation_available(&game, 100));
+        game["stage"] = json!(6);
+        assert!(!operation_available(&game, 100));
+    }
     #[test]
     fn discard_preserves_pending_quads_and_the_final_wait() {
         let game = json!({"hand_tiles":[1,2,3,4,5],"deck_map":{"1":"1m","2":"1m","3":"4p","4":"7z","5":"9s"}});
