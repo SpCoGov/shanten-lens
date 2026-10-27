@@ -3,7 +3,7 @@ members = ["backend", "app/src-tauri"]
 resolver = "2"
 
 [workspace.package]
-version = "3.4.1"
+version = "3.5.0"
 
 [profile.release]
 lto = "thin"

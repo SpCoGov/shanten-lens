@@ -16,16 +16,44 @@ pub(super) struct QyzzLink {
     sender: Mutex<Option<mpsc::Sender<Operation>>>,
 }
 
+pub(super) fn same_operation_state(before: &Value, after: &Value) -> bool {
+    if before["source"] != "qyzz" || after["source"] != "qyzz" { return false; }
+    let normalize = |game: &Value| {
+        let mut game = game.clone();
+        for key in ["revision", "qyzz_version", "update_reason", "action_report", "decision_report"] {
+            game.as_object_mut().unwrap().remove(key);
+        }
+        if let Some(effects) = game["effect_list"].as_array_mut() {
+            effects.sort_by_key(|effect| effect["uid"].as_u64());
+        }
+        game
+    };
+    normalize(before) == normalize(after)
+}
+
 impl QyzzLink {
-    pub(super) async fn operate(&self, game: &Value, kind: u64, tiles: &[u64]) -> Result<(), String> {
+    pub(super) async fn operate(&self, services: &Services, game: &Value, kind: u64, tiles: &[u64]) -> Result<(), String> {
         let sender = self.sender.lock().unwrap().clone().ok_or("qyzz-disconnected")?;
-        let (reply, receive) = oneshot::channel();
-        let packet = json!({"type":"operation", "run_id":game["qyzz_run_id"],
-            "version":game["qyzz_version"], "operation":kind, "tiles":tiles});
-        sender.try_send(Operation { packet, reply }).map_err(|_| "qyzz-busy")?;
-        tokio::time::timeout(Duration::from_secs(20), receive).await
-            .map_err(|_| "qyzz-operation-timeout".to_owned())?
-            .map_err(|_| "qyzz-disconnected".to_owned())?
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+        let mut current = services.game_state();
+        if !same_operation_state(game, &current) { return Err("execution-state-mismatch".into()); }
+        loop {
+            if tokio::time::Instant::now() >= deadline { return Err("qyzz-operation-timeout".into()); }
+            let (reply, receive) = oneshot::channel();
+            let packet = json!({"type":"operation", "run_id":current["qyzz_run_id"],
+                "version":current["qyzz_version"], "operation":kind, "tiles":tiles});
+            sender.try_send(Operation { packet, reply }).map_err(|_| "qyzz-busy")?;
+            let result = tokio::time::timeout_at(deadline, receive).await
+                .map_err(|_| "qyzz-operation-timeout".to_owned())?
+                .map_err(|_| "qyzz-disconnected".to_owned())?;
+            if result.is_ok() { return result; }
+            // Retry only an explicit rejection after a reorder; missing replies may have applied.
+            tokio::time::sleep(Duration::from_millis(80)).await;
+            let next = services.game_state();
+            if next["qyzz_version"].as_u64() <= current["qyzz_version"].as_u64()
+                || !same_operation_state(game, &next) { return result; }
+            current = next;
+        }
     }
 }
 
@@ -92,6 +120,92 @@ fn record_packet(services: &Services, direction: Direction, data: &Value) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn operation_state_allows_only_reordering_and_metadata() {
+        let game = json!({"source":"qyzz","session_id":1,"qyzz_run_id":"run","qyzz_deal_id":1,
+            "revision":1,"qyzz_version":1,"hand_tiles":[1,2],"wall_tiles":[3,4],
+            "replacement_tiles":[5,6],"locked_tiles":[],"ming":[],"stage":4,"ended":false,
+            "next_operation":[{"type":101}],"total_change_tile_count":2,
+            "effect_list":[{"id":10,"uid":1,"store":["0"]},{"id":20,"uid":2,"store":[]}]});
+        let mut reordered = game.clone();
+        reordered["effect_list"].as_array_mut().unwrap().reverse();
+        reordered["revision"] = json!(2);
+        reordered["qyzz_version"] = json!(2);
+        for key in ["update_reason", "action_report", "decision_report"] { reordered[key] = json!({"updated":true}); }
+        assert!(same_operation_state(&game, &reordered));
+        for (field, changed) in [
+            ("source",json!("packet")), ("session_id",json!(2)), ("qyzz_run_id",json!("new-run")),
+            ("qyzz_deal_id",json!(2)), ("hand_tiles",json!([1,3])), ("wall_tiles",json!([4,3])),
+            ("replacement_tiles",json!([6,5])), ("locked_tiles",json!([1])), ("ming",json!([{"tileList":[1,2]}])),
+            ("stage",json!(5)), ("ended",json!(true)), ("next_operation",json!([])),
+            ("total_change_tile_count",json!(1)), ("new_rule",json!(true)),
+        ] {
+            let mut changed_game = reordered.clone();
+            changed_game[field] = changed;
+            assert!(!same_operation_state(&game, &changed_game), "ignored {field}");
+        }
+        reordered["effect_list"][0]["store"] = json!(["1"]);
+        assert!(!same_operation_state(&game, &reordered));
+        reordered["effect_list"] = json!([]);
+        assert!(!same_operation_state(&game, &reordered));
+    }
+
+    #[tokio::test]
+    async fn reorders_retry_rejections_but_never_replay_unconfirmed_operations() {
+        let root = std::env::temp_dir().join(format!("lens-reorder-{}", std::process::id()));
+        let config = root.join("configs");
+        let services = tokio::task::spawn_blocking(move || {
+            let (events, _) = tokio::sync::broadcast::channel(32);
+            Services::load(config, events).unwrap()
+        }).await.unwrap();
+        let link = QyzzLink::default();
+        let (sender, mut receiver) = mpsc::channel::<Operation>(4);
+        *link.sender.lock().unwrap() = Some(sender);
+        for case in ["before-send", "rejected", "late-state", "accepted", "hand-changed", "lost-reply", "ordinary-error"] {
+            services.publish_qyzz_state(&json!({"source":"qyzz","qyzz_run_id":case,"qyzz_deal_id":1,"qyzz_version":1,
+                "stage":4,"deck_map":{"1":"1m","2":"2m","3":"3m"},"hand_tiles":[1,2],"wall_tiles":[3],
+                "replacement_tiles":[],"locked_tiles":[],"dora_tiles":[],"next_operation":[{"type":101}],
+                "effect_list":[{"id":10,"uid":1,"store":[]},{"id":20,"uid":2,"store":[]}]})).unwrap();
+            let game = services.game_state();
+            let mut reordered = game.clone();
+            reordered["effect_list"].as_array_mut().unwrap().reverse();
+            reordered["qyzz_version"] = json!(2);
+            if case == "before-send" { services.publish_qyzz_state(&reordered).unwrap(); }
+            let respond = async {
+                let command = receiver.recv().await.unwrap();
+                assert_eq!(command.packet["operation"], 101);
+                assert_eq!(command.packet["tiles"], json!([1]));
+                assert_eq!(command.packet["version"], if case == "before-send" {2} else {1});
+                if case == "before-send" { command.reply.send(Ok(())).unwrap(); return; }
+                if case == "late-state" {
+                    command.reply.send(Err("version-conflict".into())).unwrap();
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                    services.publish_qyzz_state(&reordered).unwrap();
+                } else {
+                    if case == "hand-changed" { reordered["hand_tiles"] = json!([2,3]); }
+                    if case != "ordinary-error" { services.publish_qyzz_state(&reordered).unwrap(); }
+                    if case == "lost-reply" { drop(command.reply); return; }
+                    command.reply.send(if case == "accepted" {Ok(())} else {Err("version-conflict".into())}).unwrap();
+                }
+                if matches!(case, "rejected" | "late-state") {
+                    let retry = tokio::time::timeout(Duration::from_secs(1), receiver.recv()).await.unwrap().unwrap();
+                    assert_eq!(retry.packet["version"], 2);
+                    assert_eq!(retry.packet["tiles"], json!([1]));
+                    retry.reply.send(Ok(())).unwrap();
+                }
+            };
+            let (result, ()) = tokio::join!(link.operate(&services, &game, 101, &[1]), respond);
+            match case {
+                "hand-changed" | "ordinary-error" => assert_eq!(result.unwrap_err(), "version-conflict"),
+                "lost-reply" => assert_eq!(result.unwrap_err(), "qyzz-disconnected"),
+                _ => result.unwrap(),
+            }
+            assert!(receiver.try_recv().is_err(), "unexpected duplicate operation: {case}");
+        }
+        drop(services);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn discovery_paths_match_the_game_on_mac_and_windows() {
@@ -186,6 +300,7 @@ mod tests {
         *state.qyzz.sender.lock().unwrap() = Some(sender);
         let services = state.services.clone();
         let game_task = tokio::spawn(async move {
+            let mut reordered = std::collections::HashSet::new();
             while let Some(command) = receiver.recv().await {
                 let mut game = services.game_state();
                 let mut hand = game["hand_tiles"].as_array().unwrap().iter().map(|id| id.as_u64().unwrap()).collect::<Vec<_>>();
@@ -193,6 +308,13 @@ mod tests {
                 assert_eq!(command.packet["version"], game["qyzz_version"]);
                 let kind = command.packet["operation"].as_u64().unwrap();
                 let timing = game["execution_test_timing"].as_str().unwrap_or("").to_owned();
+                if timing.starts_with("reorder") && reordered.insert(format!("{}-{kind}-{tiles:?}", game["qyzz_run_id"])) {
+                    game["effect_list"].as_array_mut().unwrap().reverse();
+                    game["qyzz_version"] = json!(game["qyzz_version"].as_u64().unwrap() + 1);
+                    services.publish_qyzz_state(&game).unwrap();
+                    let _ = command.reply.send(Err("stale-version".into()));
+                    continue;
+                }
                 let exchange_stage = if timing.starts_with("packet-") { 5 } else { 4 };
                 let play_stage = exchange_stage + 1;
                 let previous_melds = game["ming"].clone();
@@ -344,6 +466,8 @@ mod tests {
         for (custom, quads, timing) in [(true, 2, "packet-auto-finish"), (true, 2, "packet-delayed"), (false, 2, "packet-auto-finish"),
             (true, 2, "delayed"), (false, 2, "delayed"), (false, 3, "delayed"),
             (true, 2, "auto-finish"), (false, 2, "auto-finish"),
+            (true, 2, "reorder"), (false, 2, "reorder"),
+            (true, 2, "reorder-auto-finish"), (false, 2, "reorder-auto-finish"),
             (false, 2, "empty-wall"),
             (true, 2, "missing-kan"), (false, 2, "missing-kan")] {
             let mut hand = vec!["1m"; 4];
@@ -360,11 +484,12 @@ mod tests {
                 deck.insert("1".into(), json!("9m"));
                 deck.insert("19".into(), json!("1m"));
             }
-            let game = json!({"source":"qyzz","qyzz_run_id":format!("timing-{custom}-{quads}-{timing}"),"qyzz_version":1,"qyzz_deal_id":1,
+            let mut game = json!({"source":"qyzz","qyzz_run_id":format!("timing-{custom}-{quads}-{timing}"),"qyzz_version":1,"qyzz_deal_id":1,
                 "stage":if timing.starts_with("packet-") {5} else {4},"deck_map":deck,"hand_tiles":(1..=13).collect::<Vec<_>>(),"wall_tiles":(14..14+wall.len()).collect::<Vec<_>>(),
                 "replacement_tiles":if timing.ends_with("auto-finish") {json!([19])} else {json!([])},
                 "locked_tiles":[],"dora_tiles":[],"effect_list":[],"ming":[],"total_change_tile_count":u8::from(timing.ends_with("auto-finish")),
                 "next_operation":[{"type":101},{"type":100}],"execution_test_timing":timing});
+            if timing.starts_with("reorder") { game["effect_list"] = json!([{"id":10,"uid":1,"store":[]},{"id":20,"uid":2,"store":[]}]); }
             state.services.publish_qyzz_state(&game).unwrap();
             let mut groups = vec![json!({"quad":true,"rule":{"faces":["1m"]}}),json!({"quad":true,"rule":{"faces":["5p"]}})];
             let concealed = ["3s","3s","3s","4s","4s","5s","6s","7s"];
@@ -536,7 +661,7 @@ mod tests {
             assert!(!next["used_desktop_tiles"].as_array().unwrap().is_empty(), "Full plan did not discard after switching and declaring quads");
             println!("Full plan completed: {count} quads and {} discards", next["used_desktop_tiles"].as_array().unwrap().len());
         }
-        assert!(state.qyzz.operate(&game, 101, &keep).await.is_err(), "stale revision was accepted");
+        assert!(state.qyzz.operate(&state.services, &game, 101, &keep).await.is_err(), "stale revision was accepted");
         assert!(state.proxy.request(".lq.Lobby.amuletActivityGameOperate", &json!({}), Duration::from_secs(1)).await.is_err());
         let packets = state.services.packet_log_snapshot().packets;
         for method in ["qyzz.bridge.auth", "qyzz.bridge.authenticated", "qyzz.bridge.state", "qyzz.bridge.operation", "qyzz.bridge.result", "qyzz.game.exchange"] {
