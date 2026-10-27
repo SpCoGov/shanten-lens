@@ -345,7 +345,8 @@ pub(super) async fn send_game_operation(
         return Err("stopped-by-user".into());
     }
     let current = state.services.game_state();
-    if current["revision"] != game["revision"] || current["session_id"] != game["session_id"]
+    if (current["revision"] != game["revision"] && !super::qyzz::same_operation_state(game, &current))
+        || current["session_id"] != game["session_id"]
         || game["ended"] == true || !operation_available(game, operation_type) {
         return Err("execution-state-mismatch".into());
     }
@@ -360,7 +361,7 @@ pub(super) async fn send_game_operation(
         }
     }
     if game["source"] == "qyzz" {
-        return state.qyzz.operate(game, operation_type, tile_list).await;
+        return state.qyzz.operate(&state.services, game, operation_type, tile_list).await;
     }
     // A resync may change the hand; never replay a mutating request against the new state.
     // Packet transport ends exchanges through Lobby Operate; Qyzz uses operation 100 above.
