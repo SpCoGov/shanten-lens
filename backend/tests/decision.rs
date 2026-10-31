@@ -2342,3 +2342,266 @@ fn retained_sales_only_add_the_extra_penalty_when_followup_does_not_improve() {
         assert_eq!(rule.and_then(|rule| rule.score), if penalty { Some(-10.0) } else { None });
     }
 }
+
+fn s4_opening_fixture() -> (Value, Value, Value) {
+    let mut state = shop_state();
+    state["stage"] = json!(16);
+    state["provider_state"]["map"] = json!({"level":13001,"node":1});
+    let book = json!({"selected_profile_id":"opening","profiles":[{"id":"opening","strategy":"opening",
+        "end_count":4,"cutoff_level":13002,"cutoff_node":5,
+        "targets":[{"kind":"amulet","id":169,"plus":true,"value":4}]}]});
+    let amulets: Value = serde_json::from_str(include_str!("../assets/amulets.json")).unwrap();
+    (state, book, json!({"amulets":amulets["items"]}))
+}
+
+#[test]
+fn s4_opening_friends_keep_two_and_value_selection_and_sale_symmetrically() {
+    let (mut state, book, registry) = s4_opening_fixture();
+    for count in 0..=3 {
+        let mut owned = vec![json!({"id":1300,"uid":1,"badgeId":600070})];
+        owned.extend([1050,1010,1120].into_iter().take(count).enumerate()
+            .map(|(index,id)| json!({"id":id,"uid":index+2,"badge":{"id":600150}})));
+        state["provider_state"]["effect"]["effectList"] = json!(owned);
+        state["provider_state"]["effect"]["packCandidates"] = json!([{"id":1020,"badgeId":600150}]);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        let select = report.actions.iter().find(|score| score.action_id == actions.actions[0].id).unwrap();
+        assert_eq!(select.rules.iter().find(|rule| rule.rule_id == "friendship").and_then(|rule| rule.score),
+            [Some(24.0),Some(18.0),None,None][count]);
+        if count > 0 {
+            let sale = actions.actions.iter().find(|action| action.kind == "sell_effect" && action.params["uid"] == 2).unwrap();
+            let score = report.actions.iter().find(|score| score.action_id == sale.id).unwrap();
+            assert_eq!(score.rules.iter().find(|rule| rule.rule_id == "friendship").and_then(|rule| rule.score),
+                [None,Some(-24.0),Some(-18.0),None][count]);
+            let followup = score.rules.iter().find(|rule| rule.rule_id == "sale_followup").and_then(|rule| rule.score).unwrap_or(0.0);
+            assert_eq!(score.total, Some([0.0,-16.0,-10.0,8.0][count] + followup));
+            // With no pending replacement, spare slots do not cause the first two friends to be sold.
+            let mut shop = state.clone();
+            shop["stage"] = json!(9);
+            shop["provider_state"]["effect"]["packCandidates"] = json!([]);
+            let shop_actions = shanten_backend::action_provider::evaluate(&shop);
+            let shop_report = decision::evaluate(&shop, &shop_actions, &registry, &book);
+            let sale = shop_actions.actions.iter().find(|action| action.kind == "sell_effect" && action.params["uid"] == 2).unwrap();
+            assert_eq!(shop_report.actions.iter().find(|score| score.action_id == sale.id).unwrap().total,
+                Some([0.0,-16.0,-10.0,8.0][count]));
+        }
+    }
+}
+
+#[test]
+fn s4_opening_friendship_keeps_a_seed_and_revalues_unfinished_plus_targets() {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    state["provider_state"]["effect"]["packCandidates"] = json!([{"id":1020,"badgeId":600150}]);
+    for (owned, expected) in [
+        (json!([]),Some(12.0)),
+        (json!([{"id":1050,"uid":1,"badgeId":600150}]),None),
+        (json!([{"id":1690,"uid":1,"badgeId":0}]),Some(24.0)),
+        (json!([{"id":1690,"uid":1,"badgeId":0},{"id":1050,"uid":2,"badgeId":600150}]),Some(18.0)),
+        (json!([{"id":1691,"uid":1,"badgeId":0},{"id":1050,"uid":2,"badgeId":600150}]),None),
+    ] {
+        state["provider_state"]["effect"]["effectList"] = owned;
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        assert_eq!(report.actions[0].rules.iter().find(|rule| rule.rule_id == "friendship").and_then(|rule| rule.score), expected);
+    }
+    // Finishing the configured PLUS lowers temporary retention, but still wins the target bonus.
+    state["provider_state"]["effect"]["effectList"] = json!([
+        {"id":1690,"uid":1,"badgeId":0},{"id":1050,"uid":2,"badgeId":600150}]);
+    state["provider_state"]["effect"]["packCandidates"] = json!([{"id":1690,"badgeId":0}]);
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    assert_eq!(report.actions[0].rules.iter().find(|rule| rule.rule_id == "friendship").unwrap().score, Some(-12.0));
+    assert!(report.actions[0].total.unwrap() > 300.0);
+    book["profiles"][0]["targets"][0]["badge"] = json!(600150);
+    state["provider_state"]["effect"]["effectList"][0]["id"] = json!(1691);
+    state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().push(json!({"id":1690,"uid":3,"badgeId":0}));
+    state["provider_state"]["effect"]["packCandidates"] = json!([{"id":1020,"badgeId":600150}]);
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    assert_eq!(report.actions[0].rules.iter().find(|rule| rule.rule_id == "friendship").unwrap().score, Some(18.0));
+}
+
+#[test]
+fn s4_opening_friendship_counts_merge_losses_once() {
+    let (mut state, book, registry) = s4_opening_fixture();
+    state["provider_state"]["effect"]["effectList"] = json!([
+        {"id":1300,"uid":1,"badgeId":600070},{"id":1050,"uid":2,"badgeId":600150}]);
+    for (badge, expected) in [(600150,None),(0,Some(-24.0)),(600070,Some(-24.0))] {
+        state["provider_state"]["effect"]["packCandidates"] = json!([{"id":1050,"badgeId":badge}]);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        let rules: Vec<_> = report.actions[0].rules.iter().filter(|rule| rule.rule_id == "friendship").collect();
+        assert_eq!(rules.first().and_then(|rule| rule.score), expected);
+        assert!(rules.len() <= 1);
+    }
+}
+
+#[test]
+fn s4_opening_friends_can_fund_a_pack_without_selling_them_prematurely() {
+    let (mut state, book, registry) = s4_opening_fixture();
+    state["stage"] = json!(9);
+    state["provider_state"]["effect"]["effectList"] = json!([
+        {"id":1300,"uid":1,"badgeId":600070},{"id":1050,"uid":2,"badgeId":600150}]);
+    state["provider_state"]["shop"]["goods"] = json!([{"id":1,"goodsId":101,"sold":false,"price":5}]);
+    for (coin,sold,expected,reason) in [(2,false,-6.0,"friendship_funds_pack"),
+        (0,false,-24.0,"friendship"),(5,false,-24.0,"friendship"),(2,true,-24.0,"friendship")] {
+        state["provider_state"]["game"]["coin"] = json!(coin);
+        state["provider_state"]["shop"]["goods"][0]["sold"] = json!(sold);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        let sale = actions.actions.iter().find(|action| action.kind == "sell_effect" && action.params["uid"] == 2).unwrap();
+        let score = report.actions.iter().find(|score| score.action_id == sale.id).unwrap();
+        let rule = score.rules.iter().find(|rule| rule.rule_id == "friendship").unwrap();
+        assert_eq!(rule.score, Some(expected));
+        assert_eq!(rule.reason.code, reason);
+        assert_eq!(score.total, Some(8.0+expected));
+    }
+}
+
+#[test]
+fn s4_opening_friends_yield_a_slot_for_a_configured_target() {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    book["profiles"][0]["targets"].as_array_mut().unwrap().push(json!({"kind":"amulet","id":375,"plus":false}));
+    state["provider_state"]["effect"]["effectList"] = json!([
+        {"id":1300,"uid":1,"badgeId":600070},{"id":1050,"uid":2,"badgeId":600150},
+        {"id":1691,"uid":3,"badgeId":0,"volume":6}]);
+    state["provider_state"]["effect"]["packCandidates"] = json!([{"id":3750,"badgeId":0}]);
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    let sale = actions.actions.iter().find(|action| action.kind == "sell_effect" && action.params["uid"] == 2).unwrap();
+    let best = report.actions.iter().max_by(|a,b| a.total.unwrap().total_cmp(&b.total.unwrap())).unwrap();
+    assert_eq!(best.action_id, sale.id);
+    assert!(best.rules.iter().find(|rule| rule.rule_id == "sale_followup").unwrap().score.unwrap() > 99.0);
+}
+
+#[test]
+fn s4_opening_skips_imp_candidates_unless_actual_resulting_capacity_blocks_the_imp() {
+    let (mut state, book, registry) = s4_opening_fixture();
+    for (used,badge,penalty,skip_wins) in [(6,600070,-60.0,true),(7,600070,0.0,false),
+        (5,600160,-60.0,true),(6,600160,0.0,false)] {
+        state["provider_state"]["effect"]["effectList"] = json!([{"id":90,"uid":1,"badgeId":0,"volume":used}]);
+        state["provider_state"]["effect"]["packCandidates"] = json!([{"id":3490,"badgeId":badge}]);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        let select = report.actions.iter().find(|score| score.action_id == actions.actions[0].id).unwrap();
+        assert_eq!(select.rules.iter().find(|rule| rule.rule_id == "imp_gain").unwrap().score, Some(penalty));
+        let skip = actions.actions.iter().find(|action| action.kind == "skip").unwrap();
+        let best = report.actions.iter().max_by(|a,b| a.total.unwrap().total_cmp(&b.total.unwrap())).unwrap();
+        assert_eq!(best.action_id == skip.id, skip_wins, "{report:?}");
+    }
+    state["provider_state"]["effect"]["effectList"] = json!([{"id":90,"uid":1,"badgeId":0,"volume":7}]);
+    state["provider_state"]["effect"]["packCandidates"] = json!([{"id":3790,"badgeId":0}]);
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    assert_eq!(report.actions[0].rules.iter().find(|rule| rule.rule_id == "imp_gain").unwrap().score, Some(-60.0));
+}
+
+#[test]
+fn s4_opening_imp_capacity_accounts_for_merges_and_is_rechecked_before_battle() {
+    let (mut state, book, registry) = s4_opening_fixture();
+    for (used,old_badge,new_badge,expected) in [(6,0,600070,-60.0),(7,0,600070,0.0),
+        (6,0,600160,0.0),(6,600160,600070,-60.0)] {
+        state["provider_state"]["effect"]["effectList"] = json!([
+            {"id":3490,"uid":1,"badgeId":old_badge},{"id":90,"uid":2,"badgeId":0,"volume":used}]);
+        state["provider_state"]["effect"]["packCandidates"] = json!([{"id":3490,"badgeId":new_badge}]);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        assert_eq!(report.actions[0].rules.iter().find(|rule| rule.rule_id == "imp_gain").unwrap().score, Some(expected));
+    }
+    state["stage"] = json!(3);
+    state["provider_state"]["effect"]["packCandidates"] = json!([]);
+    for (used,expected) in [(7,0.0),(6,-60.0)] {
+        state["provider_state"]["effect"]["effectList"] = json!([
+            {"id":3010,"uid":1,"badgeId":0},{"id":90,"uid":2,"badgeId":0,"volume":used}]);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        assert_eq!(report.actions[0].rules.iter().find(|rule| rule.rule_id == "imp_gain").unwrap().score, Some(expected));
+    }
+}
+
+#[test]
+fn s4_opening_rules_do_not_affect_other_sources_seasons_or_profiles() {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    state["provider_state"]["effect"]["effectList"] = json!([{ "id":1300,"uid":1,"badgeId":600070}]);
+    state["provider_state"]["effect"]["packCandidates"] = json!([{"id":1050,"badgeId":600150},{"id":3490,"badgeId":0}]);
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    for (source,level,strategy,active) in [("packet",11001,"opening",true),("packet",13001,"opening",true),
+        ("qyzz",13001,"opening",false),("packet",501,"opening",false),("packet",99999,"opening",false),
+        ("packet",13001,"full",false)] {
+        state["source"] = json!(source);
+        state["provider_state"]["map"]["level"] = json!(level);
+        book["profiles"][0]["strategy"] = json!(strategy);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        assert_eq!(report.actions[0].rules.iter().any(|rule| rule.rule_id == "friendship"), active);
+        assert_eq!(report.actions[1].rules.iter().find(|rule| rule.rule_id == "imp_gain").unwrap().score,
+            Some(if active {-60.0} else {-15.0}));
+    }
+    for locale in [include_str!("../../app/src/locales/zh-CN.json"),include_str!("../../app/src/locales/ja-JP.json")] {
+        let locale: Value = serde_json::from_str(locale).unwrap();
+        assert!(locale["action_provider"]["scoring"]["rules"]["friendship"].is_string());
+        for reason in ["friendship","friendship_funds_pack","missing_friendship_data","opening_imp_gain","opening_skip_no_gain"] {
+            assert!(locale["action_provider"]["scoring"]["reasons"][reason].is_string());
+        }
+    }
+}
+
+#[test]
+fn s4_opening_imp_risk_uses_purchase_and_trade_results_including_sacrifices() {
+    let (mut state, book, registry) = s4_opening_fixture();
+    for (kind,used,badge,expected) in [("buy_effect",5,600160,0.0),("buy_effect",4,600160,-60.0),
+        ("trade",7,0,0.0),("trade",6,0,-60.0)] {
+        state["provider_state"]["effect"]["effectList"] = json!([
+            {"id":90,"uid":1,"badgeId":0,"volume":used},{"id":1050,"uid":2,"badgeId":0}]);
+        state["provider_state"]["nodeEvent"] = json!({"tradeItems":[],"tradeReward":{"type":1,"effectId":3490,"badgeId":badge}});
+        let mut actions = candidate(kind,json!(3490),Availability::Available);
+        actions.actions[0].params["effect"]["badgeId"] = json!(badge);
+        actions.actions[0].params["uids"] = json!([2]);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        assert_eq!(report.actions[0].rules.iter().find(|rule| rule.rule_id == "imp_gain").unwrap().score,
+            Some(expected), "{kind}: {state}");
+    }
+    // A trade condition directly acquires an imp, even if the imp then fills the last slot.
+    state["provider_state"]["nodeEvent"] = json!({"tradeItems":[{"id":6}],"tradeReward":{"type":2}});
+    let mut actions = candidate("trade",Value::Null,Availability::Available);
+    actions.actions[0].params["uids"] = json!([]);
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    assert_eq!(report.actions[0].rules.iter().find(|rule| rule.rule_id == "imp_gain").unwrap().score,Some(-60.0));
+}
+
+#[test]
+fn s4_opening_rules_preserve_unknown_data_and_use_only_the_selected_profile() {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    state["provider_state"]["effect"]["packCandidates"] = json!([{"id":1050,"badgeId":600150}]);
+    state["provider_state"]["effect"]["effectList"] = Value::Null;
+    let mut actions = candidate("select_candidate",json!(1050),Availability::Available);
+    actions.actions[0].params["effect"]["badgeId"] = json!(600150);
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    assert_eq!(report.actions[0].rules.iter().find(|rule| rule.rule_id == "friendship").unwrap().reason.code,"missing_friendship_data");
+    state["provider_state"]["effect"]["effectList"] = json!([]);
+    book["selected_profile_id"] = json!("other");
+    book["profiles"].as_array_mut().unwrap().push(json!({"id":"other","strategy":"full"}));
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    assert!(report.actions[0].rules.iter().all(|rule| rule.rule_id != "friendship"));
+    book["selected_profile_id"] = json!("opening");
+    state["provider_state"]["effect"]["maxEffectVolume"] = Value::Null;
+    actions.actions[0].params["effect"] = json!({"id":3490,"badgeId":600070});
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    let rule = report.actions[0].rules.iter().find(|rule| rule.rule_id == "imp_gain").unwrap();
+    assert_eq!(rule.score,None);
+    assert_eq!(rule.reason.code,"missing_imp_capacity");
+}
+
+#[test]
+fn s4_opening_prefers_skipping_zero_value_candidates_instead_of_filling_spare_slots() {
+    let (mut state, mut book, _) = s4_opening_fixture();
+    state["provider_state"]["effect"]["packCandidates"] = json!([{"id":1050,"badgeId":0}]);
+    let registry = json!({"amulets":[{"id":105,"sell_price":0}]});
+    for (strategy,expected) in [("opening",1.0),("full",0.0)] {
+        book["profiles"][0]["strategy"] = json!(strategy);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        assert_eq!(report.actions[0].total,Some(0.0));
+        let skip = actions.actions.iter().find(|action| action.kind == "skip").unwrap();
+        assert_eq!(report.actions.iter().find(|score| score.action_id == skip.id).unwrap().total,Some(expected));
+    }
+}
