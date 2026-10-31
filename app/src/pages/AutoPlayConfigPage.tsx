@@ -2,7 +2,7 @@ import React from "react";
 import {useTranslation} from "react-i18next";
 import {useAutoRunner, patchAutoConfig, markPlaybookSaved} from "../lib/autoRunnerStore";
 import {emptyAutoPlayConfig, newStrategyHand, handFromTargetPreset, newStrategyLoadout, newTacticalStage, moveItem, removeStrategyAmulet,
-    openingLevels, strategyLevels, validateAutoPlayConfig, type AutoPlayConfig, type PlayProfile, type FullPlayProfile, type OpeningPlayProfile, type TacticalStage,
+    getOpeningLevels, getStrategyLevels, validateAutoPlayConfig, type AutoPlayConfig, type PlayProfile, type FullPlayProfile, type OpeningPlayProfile, type TacticalStage,
     type StrategyLoadout, type StrategyAmulet, type StrategyHand} from "../lib/autoPlayConfig";
 import {targetKind, targetSize, readTargetPresets, type TargetPreset} from "../lib/customTarget";
 import type {EffectItem} from "../lib/gamestate";
@@ -70,7 +70,9 @@ function cardItem(item: Pick<StrategyAmulet, "id" | "plus"> & Partial<Pick<Strat
         ...(item.badge ? {badge: {id: item.badge, uid: 0, random: 0, store: []}} : {})};
 }
 
-function OpeningTargets({profile, onChange}: {profile: OpeningPlayProfile; onChange: (profile: OpeningPlayProfile) => void}) {
+function OpeningTargets({profile, onChange, levels: openingLevels}: {
+    profile: OpeningPlayProfile; onChange: (profile: OpeningPlayProfile) => void; levels: ReturnType<typeof getOpeningLevels>;
+}) {
     const {t} = useTranslation();
     const cutoff = openingLevels.find(level => level.level === profile.cutoff_level && level.node === profile.cutoff_node);
     return <section className="panel"><h3 className="panel-title">{t("autoplay.opening_targets")}</h3>
@@ -93,7 +95,8 @@ function OpeningTargets({profile, onChange}: {profile: OpeningPlayProfile; onCha
 export default function AutoPlayConfigPage() {
     const {t} = useTranslation();
     const {config} = useAutoRunner();
-    const {amuletById, badgeById} = useRegistry();
+    const {amuletById, badgeById, source} = useRegistry();
+    const openingLevels = getOpeningLevels(source), strategyLevels = getStrategyLevels(source);
     const book = config.playbook ?? emptyAutoPlayConfig;
     const profile = book.profiles.find(item => item.id === book.selected_profile_id);
     const fullProfile = profile?.strategy !== "opening" ? profile : undefined;
@@ -132,7 +135,7 @@ export default function AutoPlayConfigPage() {
         const common = {id: crypto.randomUUID(), name: t("autoplay.default_profile", {count: book.profiles.length + 1})};
         const next: PlayProfile = strategy === "opening" ? {...common, strategy, end_count: 1, targets: [], cutoff_level: 0, cutoff_node: 0} : {...common, strategy,
             character_id: 201, initial_amulet_id: 0, first_level_min_coin: "0",
-            stages: [newTacticalStage(t("autoplay.default_stage", {count: 1}), t("autoplay.default_loadout", {count: 1}), t("autoplay.default_hand", {count: 1}))]};
+            stages: [newTacticalStage(t("autoplay.default_stage", {count: 1}), t("autoplay.default_loadout", {count: 1}), t("autoplay.default_hand", {count: 1}), strategyLevels[0])]};
         change({...book, selected_profile_id: next.id, profiles: [...book.profiles, next]});
         setCreating(false); setStageId(""); setLoadoutId("");
     }
@@ -230,7 +233,7 @@ export default function AutoPlayConfigPage() {
                 </div>
             </section>
             {!profile && <div className={`panel ${styles.empty}`}><span className="ms" aria-hidden="true">route</span><p>{t("autoplay.empty")}</p></div>}
-            {profile?.strategy === "opening" && <OpeningTargets key={profile.id} profile={profile} onChange={replaceProfile}/>}
+            {profile?.strategy === "opening" && <OpeningTargets levels={openingLevels} key={profile.id} profile={profile} onChange={replaceProfile}/>}
             {profile && profile.strategy !== "opening" && <>
                 <section className="panel"><h3 className="panel-title">{t("autoplay.opening")}</h3>
                     <div className={styles.opening}>
@@ -261,7 +264,7 @@ export default function AutoPlayConfigPage() {
                             const item = profile.stages.find(item => item.id === id)!;
                             return <button className={styles.stageButton} aria-pressed={item.id === stage?.id}
                             onClick={() => {setStageId(item.id); setLoadoutId("");}}><span className="ms" aria-hidden="true">flag</span><strong>{index + 1}. {item.name}</strong>
-                                <small>{t("autoplay.stage_summary", {start: formatLevelIdToLabel(item.start_level, "packet", item.start_node), count: item.loadouts.length})}</small></button>;
+                                <small>{t("autoplay.stage_summary", {start: formatLevelIdToLabel(item.start_level, item.start_node === 0 ? "qyzz" : "packet", item.start_node), count: item.loadouts.length})}</small></button>;
                         }}</SortList>
                         <button className="nav-btn" disabled={profile.stages.length >= 32} onClick={() => {
                             const last = profile.stages[profile.stages.length - 1];

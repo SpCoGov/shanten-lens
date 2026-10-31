@@ -33,6 +33,10 @@ pub(super) fn same_operation_state(before: &Value, after: &Value) -> bool {
 
 impl QyzzLink {
     pub(super) async fn operate(&self, services: &Services, game: &Value, kind: u64, tiles: &[u64]) -> Result<(), String> {
+        self.request(services, game, json!({"type":"operation", "operation":kind, "tiles":tiles})).await
+    }
+
+    pub(super) async fn request(&self, services: &Services, game: &Value, packet: Value) -> Result<(), String> {
         let sender = self.sender.lock().unwrap().clone().ok_or("qyzz-disconnected")?;
         let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
         let mut current = services.game_state();
@@ -40,8 +44,9 @@ impl QyzzLink {
         loop {
             if tokio::time::Instant::now() >= deadline { return Err("qyzz-operation-timeout".into()); }
             let (reply, receive) = oneshot::channel();
-            let packet = json!({"type":"operation", "run_id":current["qyzz_run_id"],
-                "version":current["qyzz_version"], "operation":kind, "tiles":tiles});
+            let mut packet = packet.clone();
+            packet["run_id"] = current["qyzz_run_id"].clone();
+            packet["version"] = current["qyzz_version"].clone();
             sender.try_send(Operation { packet, reply }).map_err(|_| "qyzz-busy")?;
             let result = tokio::time::timeout_at(deadline, receive).await
                 .map_err(|_| "qyzz-operation-timeout".to_owned())?
@@ -205,6 +210,69 @@ mod tests {
         }
         drop(services);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn amulet_hotkeys_use_the_local_bridge_and_preserve_errors() {
+        const CHILD_ROOT: &str = "SHANTEN_HOTKEY_TEST_ROOT";
+        let root = match std::env::var_os(CHILD_ROOT) {
+            Some(root) => PathBuf::from(root),
+            None => {
+                let root = std::env::temp_dir().join(format!("lens-hotkeys-{}", std::process::id()));
+                let output = std::process::Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", "embedded::qyzz::tests::amulet_hotkeys_use_the_local_bridge_and_preserve_errors", "--nocapture"])
+                    .env(CHILD_ROOT, &root).output().unwrap();
+                assert!(output.status.success(), "{output:?}");
+                std::fs::remove_dir_all(root).unwrap();
+                return;
+            }
+        };
+        let runtime = tokio::task::spawn_blocking(move || super::super::BackendRuntime::load(root.join("configs")))
+            .await.unwrap().unwrap();
+        let state = &runtime.state;
+        state.services.publish_qyzz_state(&json!({"source":"qyzz","qyzz_run_id":"shop","qyzz_deal_id":1,
+            "qyzz_version":1,"stage":9,"deck_map":{},"hand_tiles":[],"wall_tiles":[],
+            "replacement_tiles":[],"locked_tiles":[],"dora_tiles":[],
+            "effect_list":[{"id":10,"uid":2001,"store":[]},{"id":20,"uid":2002,"store":[]},
+                {"id":10,"uid":2003,"store":[]}]})).unwrap();
+        let (sender, mut receiver) = mpsc::channel::<Operation>(4);
+        *state.qyzz.sender.lock().unwrap() = Some(sender);
+        for (request, expected) in [
+            (json!({"action":"buy_pack","goodId":0}), json!([0])),
+            (json!({"action":"select_candidate","selectedIndex":0}), json!([0])),
+            (json!({"action":"skip"}), json!([])),
+            (json!({"action":"refresh_shop"}), json!([])),
+            (json!({"action":"sell_effect","uid":2001}), json!([2001])),
+            (json!({"action":"sort_effect","sortedUid":[2003,2002,2001]}), json!([2003,2002,2001])),
+            (json!({"action":"sell_recent"}), json!([2003])),
+            (json!({"action":"sell_recent","rawId":20}), json!([2002])),
+        ] {
+            let respond = async {
+                let command = receiver.recv().await.unwrap();
+                assert_eq!(command.packet["type"], "operation");
+                assert_eq!(command.packet["amulet_action"], request["action"]);
+                assert_eq!(command.packet["args"], expected);
+                assert_eq!(command.packet["run_id"], "shop");
+                assert_eq!(command.packet["version"], 1);
+                assert!(command.packet.get("operation").is_none());
+                assert!(command.packet.get("tiles").is_none());
+                command.reply.send(Ok(())).unwrap();
+            };
+            let (result, ()) = tokio::join!(runtime.amulet_action(serde_json::from_value(request.clone()).unwrap()), respond);
+            assert!(result.ok, "{result:?}");
+            assert_eq!(result.action.as_deref(), request["action"].as_str());
+            assert!(receiver.try_recv().is_err());
+        }
+        let request = serde_json::from_value(json!({"action":"buy_pack","goodId":0})).unwrap();
+        let respond = async { receiver.recv().await.unwrap().reply.send(Err("not enough coins".into())).unwrap(); };
+        let (result, ()) = tokio::join!(runtime.amulet_action(request), respond);
+        assert!(!result.ok);
+        assert_eq!(result.reason.as_deref(), Some("not enough coins"));
+        assert!(receiver.try_recv().is_err(), "Rejected purchases must not be sent twice");
+        *state.qyzz.sender.lock().unwrap() = None;
+        let result = runtime.amulet_action(serde_json::from_value(json!({"action":"buy_pack","goodId":0})).unwrap()).await;
+        assert!(!result.ok);
+        assert_eq!(result.reason.as_deref(), Some("qyzz-disconnected"));
     }
 
     #[test]
@@ -536,13 +604,21 @@ mod tests {
         for profile_id in ["opening-profile", "profile-a"] {
             let mut book: Value = serde_json::from_str(include_str!("../../tests/fixtures/playbook.json")).unwrap();
             book["selected_profile_id"] = json!(profile_id);
+            for (index, stage) in book["profiles"][0]["stages"].as_array_mut().unwrap().iter_mut().enumerate() {
+                stage["start_level"] = json!(102 + index as u64);
+                stage["start_node"] = json!(0);
+                stage["deadline_level"] = json!(1299);
+                stage["deadline_node"] = json!(0);
+            }
+            book["profiles"][1]["cutoff_level"] = json!(1299);
+            book["profiles"][1]["cutoff_node"] = json!(0);
             let target = ["1p","1p","1p","2p","2p","2p","3p","3p","3p","4p","4p","4p","5p","5p"];
             book["profiles"][0]["stages"][0]["hands"][0]["target_groups"] = json!(target.map(|face|
                 json!({"kind":"single","rule":{"faces":[face]}})));
             state.services.patch_config(&json!({"autorun":{"playbook":book,"op_interval_ms":100}})).unwrap();
             let faces = ["1p","1p","1p","2p","2p","2p","3p","3p","3p","4p","4p","4p","5m","5p","5p","9s","8s"];
             let game = json!({"source":"qyzz","qyzz_run_id":profile_id,"qyzz_version":1,"qyzz_deal_id":1,
-                "stage":5,"level":13001,"node":3,"deck_map":faces.iter().enumerate()
+                "stage":5,"level":102,"node":0,"deck_map":faces.iter().enumerate()
                     .map(|(i, face)|((i+1).to_string(),json!(face))).collect::<serde_json::Map<_,_>>(),
                 "hand_tiles":(1..=13).collect::<Vec<_>>(),"wall_tiles":[15,16,17],"replacement_tiles":[14],
                 "locked_tiles":[],"dora_tiles":[],"effect_list":[],"ming":[],"total_change_tile_count":1,

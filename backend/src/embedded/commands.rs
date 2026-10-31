@@ -299,6 +299,7 @@ async fn request_reply(state: &State, method: &str, payload: Value) -> CommandRe
 
 async fn hotkey_reply(state: &State, request: AmuletActionRequest) -> CommandResult {
     let action = request.action.as_str();
+    let game = state.services.game_state();
     let (method, payload) = match request.action {
         AmuletAction::BuyPack => (
             ".lq.Lobby.amuletActivityOperate",
@@ -325,9 +326,8 @@ async fn hotkey_reply(state: &State, request: AmuletActionRequest) -> CommandRes
             json!({"activityId":261081,"type":8,"args":request.sorted_uid.unwrap_or_default()}),
         ),
         AmuletAction::SellRecent => {
-            let state_value = state.services.game_state();
             let raw_id = request.raw_id;
-            let uid = state_value
+            let uid = game
                 .get("effect_list")
                 .and_then(Value::as_array)
                 .and_then(|items| {
@@ -344,7 +344,15 @@ async fn hotkey_reply(state: &State, request: AmuletActionRequest) -> CommandRes
             )
         }
     };
-    let mut result = request_reply(state, method, payload).await;
+    let mut result = if game["source"] == "qyzz" {
+        match state.qyzz.request(&state.services, &game,
+            json!({"type":"operation", "amulet_action":action, "args":payload["args"]})).await {
+            Ok(()) => CommandResult { ok: true, ..Default::default() },
+            Err(reason) => failed(reason),
+        }
+    } else {
+        request_reply(state, method, payload).await
+    };
     result.action = Some(action.into());
     result
 }

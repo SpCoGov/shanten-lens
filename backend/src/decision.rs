@@ -419,9 +419,13 @@ fn configured_target(state: &Value, action: &ActionCandidate, _registry: &Value,
         if score.is_none() { "invalid_target_value" } else if selling { "sell_configured_target" } else { "select_configured_target" }))
 }
 
-fn map_position(level: &Value, node: &Value) -> Option<(u64, usize, usize)> {
+fn map_position(level: &Value, node: &Value, source: &Value) -> Option<(u64, usize, usize)> {
     let level_id = level.as_u64()?;
     let node_id = node.as_u64()?;
+    if source == "qyzz" {
+        return crate::services::playbook::QYZZ_LEVELS.iter()
+            .position(|stage| *stage == (level_id, node_id)).map(|index| (0, index, 0));
+    }
     let levels = LEVELS.as_array()?;
     let index = levels.iter().position(|level| level["level"].as_u64() == Some(level_id))?;
     let level = &levels[index];
@@ -441,9 +445,9 @@ fn remake_at_cutoff(state: &Value, _action: &ActionCandidate, _registry: &Value,
     };
     let unmet = (|| {
         let map = &state["provider_state"]["map"];
-        let current = map_position(&map["level"], &map["node"])?;
-        let deadline = if opening { map_position(&cutoff["cutoff_level"], &cutoff["cutoff_node"])? }
-            else { map_position(&cutoff["deadline_level"], &cutoff["deadline_node"])? };
+        let current = map_position(&map["level"], &map["node"], &state["source"])?;
+        let deadline = if opening { map_position(&cutoff["cutoff_level"], &cutoff["cutoff_node"], &state["source"])? }
+            else { map_position(&cutoff["deadline_level"], &cutoff["deadline_node"], &state["source"])? };
         if current.0 != deadline.0 { return None; }
         if current < deadline { return Some(false); }
         let effects = state["provider_state"]["effect"]["effectList"].as_array()?;
@@ -492,11 +496,11 @@ pub(crate) fn tactical_stage<'a>(state: &Value, profile: &'a Value) -> Result<Op
     if state["stage"] == 2 { return Ok(None); }
     let missing = "missing_tactical_stage";
     let map = state.pointer("/provider_state/map").filter(|map| map.is_object()).unwrap_or(state);
-    let current = map_position(&map["level"], &map["node"]).ok_or(missing)?;
+    let current = map_position(&map["level"], &map["node"], &state["source"]).ok_or(missing)?;
     let mut active = None;
     // shortcut: stage selection follows map starts; use runtime stage state when early transitions are implemented.
     for stage in profile["stages"].as_array().ok_or(missing)? {
-        let start = map_position(&stage["start_level"], &stage["start_node"]).ok_or(missing)?;
+        let start = map_position(&stage["start_level"], &stage["start_node"], &state["source"]).ok_or(missing)?;
         if start.0 != current.0 { return Err(missing); }
         if start <= current { active = Some(stage); }
     }

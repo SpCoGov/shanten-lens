@@ -10,6 +10,11 @@ static LEVELS: LazyLock<Vec<(u64, u64)>> = LazyLock::new(|| {
             .map(|node| (level["level"].as_u64().unwrap(), node["node"].as_u64().unwrap()))
     }).collect()
 });
+// Local IPC uses one stage per level and node 0, separate from packet map nodes.
+pub(crate) static QYZZ_LEVELS: LazyLock<Vec<(u64, u64)>> = LazyLock::new(|| {
+    let catalog: Value = serde_json::from_str(include_str!("../../../app/src/lib/qyzzStageCatalog.json")).unwrap();
+    catalog["levels"].as_array().unwrap().iter().map(|stage| (stage["id"].as_u64().unwrap(), 0)).collect()
+});
 static AMULETS: LazyLock<Value> = LazyLock::new(|| serde_json::from_str(super::registry::AMULETS).unwrap());
 static QYZZ_AMULETS: LazyLock<Value> = LazyLock::new(|| serde_json::from_str(include_str!("../../assets/qyzz_amulets.json")).unwrap());
 static BADGES: LazyLock<Value> = LazyLock::new(|| serde_json::from_str(super::registry::BADGES).unwrap());
@@ -61,10 +66,12 @@ fn validate_inner(value: &Value, allow_invalid_levels: bool) -> Result<(), Strin
         return Err("invalid selected playbook profile".into());
     }
     for profile in profiles {
+        let node = if profile["strategy"] == "opening" { &profile["cutoff_node"] } else { &profile["stages"][0]["start_node"] };
+        let levels = if node == 0 { &QYZZ_LEVELS } else { &LEVELS };
         if !name(&profile["name"]) { return Err("invalid playbook profile name".into()); }
         if profile["strategy"] == "opening" {
             if !positive_integer(&profile["end_count"]) { return Err("invalid opening target value".into()); }
-            let valid_cutoff = LEVELS.iter().any(|(level, node)| profile["cutoff_level"] == *level && profile["cutoff_node"] == *node);
+            let valid_cutoff = levels.iter().any(|(level, node)| profile["cutoff_level"] == *level && profile["cutoff_node"] == *node);
             if !allow_invalid_levels && !valid_cutoff {
                 return Err("invalid opening cutoff level".into());
             }
@@ -95,9 +102,9 @@ fn validate_inner(value: &Value, allow_invalid_levels: bool) -> Result<(), Strin
         }
         let mut previous_start = None;
         for stage in rows(&profile["stages"], 1, 32, "id")? {
-            let start = LEVELS.iter().skip(1).position(|(level, node)| stage["start_level"] == *level && stage["start_node"] == *node);
+            let start = levels.iter().skip(1).position(|(level, node)| stage["start_level"] == *level && stage["start_node"] == *node);
             if !name(&stage["name"]) || (!allow_invalid_levels && (start.is_none() || previous_start.is_some_and(|previous| start.unwrap() <= previous)
-                || !LEVELS.iter().skip(1).any(|(level, node)| stage["deadline_level"] == *level && stage["deadline_node"] == *node)))
+                || !levels.iter().skip(1).any(|(level, node)| stage["deadline_level"] == *level && stage["deadline_node"] == *node)))
                 || !stage["enter_early_if_unreachable"].is_boolean() {
                 return Err("invalid playbook stage levels or order".into());
             }
@@ -214,4 +221,36 @@ mod tests {
         book["profiles"][0]["stages"][1]["start_node"] = json!(2);
         assert!(validate(&book).is_err());
     }
+    #[test]
+    fn native_stage_catalog_drives_validation_and_tactical_boundaries() {
+        assert_eq!(QYZZ_LEVELS.len(), 314);
+        assert_eq!(QYZZ_LEVELS.first(), Some(&(101, 0)));
+        assert_eq!(QYZZ_LEVELS.last(), Some(&(1299, 0)));
+        let mut book: Value = serde_json::from_str(include_str!("../../tests/fixtures/playbook.json")).unwrap();
+        for (index, stage) in book["profiles"][0]["stages"].as_array_mut().unwrap().iter_mut().enumerate() {
+            stage["start_level"] = json!(if index == 0 {102} else {201});
+            stage["start_node"] = json!(0);
+            stage["deadline_level"] = json!(1299);
+            stage["deadline_node"] = json!(0);
+        }
+        book["profiles"][1]["cutoff_level"] = json!(1299);
+        book["profiles"][1]["cutoff_node"] = json!(0);
+        assert!(validate(&book).is_ok());
+        let profile = &book["profiles"][0];
+        for (level, expected) in [(101, None), (102, Some("stage-0")), (103, Some("stage-0")), (201, Some("stage-1")), (1299, Some("stage-1"))] {
+            let state = json!({"source":"qyzz","stage":5,"level":level,"node":0});
+            assert_eq!(crate::decision::tactical_stage(&state, profile).unwrap().and_then(|stage| stage["id"].as_str()), expected);
+        }
+        for state in [json!({"source":"qyzz","stage":5,"level":13001,"node":3}),
+            json!({"source":"packet","stage":5,"level":102,"node":0})] {
+            assert!(crate::decision::tactical_stage(&state, profile).is_err(), "mixed stage source: {state}");
+        }
+        book["profiles"][1]["cutoff_level"] = json!(1300);
+        assert!(validate(&book).is_err());
+        book["profiles"][1]["cutoff_level"] = json!(1299);
+        book["profiles"][0]["stages"][1]["start_level"] = json!(13001);
+        book["profiles"][0]["stages"][1]["start_node"] = json!(3);
+        assert!(validate(&book).is_err());
+    }
+
 }

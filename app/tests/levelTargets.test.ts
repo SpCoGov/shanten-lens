@@ -32,6 +32,21 @@ assert.deepEqual(getOrderedLevelTargets("qyzz"), qyzz.levels.map(stage => ({labe
 assert.equal(formatLevelIdToLabel(1001, "qyzz", 3), "Ex1");
 assert.equal(parseLevelLabelToId("Ex1", "qyzz"), 1001);
 assert.equal(getFutureLevelTargets("qyzz", 101, 99)[0].level, 102);
+assert.equal(qyzz.levels.length, 314);
+assert.equal(new Set(qyzz.levels.map(stage => stage.id)).size, 314);
+for (const [index, stage] of qyzz.levels.entries()) {
+    assert.equal(stage.next_id, qyzz.levels[index + 1]?.id ?? 0, `Native stage successor at ${stage.name}`);
+    assert.equal(formatLevelIdToLabel(stage.id, "qyzz"), stage.name);
+    assert.equal(parseLevelLabelToId(stage.name, "qyzz"), stage.id);
+    assert.equal(typeof stage.target_points, "string");
+    assert.notEqual(parseTargetPointValue(stage.target_points), null, `Exact native target for ${stage.name}`);
+}
+assert.equal(getFutureLevelTargets("qyzz", 1199)[0].level, 1200);
+assert.equal(getFutureLevelTargets("qyzz", 1298)[0].label, "Ex299");
+assert.deepEqual(getFutureLevelTargets("qyzz", 1299), []);
+assert.equal(getOrderedLevelTargets("qyzz").slice(-1)[0]?.target, "9.999e+19605");
+assert.equal(parseTargetPointValue("9.999e+19605"), 9999n * 10n ** 19604n);
+assert.equal(parseTargetPointValue("1e20001"), null, "Untrusted score exponents remain bounded.");
 
 const rules = [resolveAmuletRule({id: 999999, uid: 1, volume: 1, tags: [], store: ["0"]}, {
     activeOnWin: true, effectTarget: "none", growthAfterRound: false, growthFormula: "data + 1",
