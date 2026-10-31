@@ -201,6 +201,7 @@ pub(super) fn apply_fetch_state(target: &mut Map<String, Value>, response: &Valu
     clear_noncombat_target(target);
     update_boss_buff(target);
     rebuild_pool_sections(target, round, false);
+    sync_wall_sections(target, round);
     sync_consumed_replacements(target);
 }
 
@@ -317,7 +318,26 @@ fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
             }
         }
     }
+    for desktop in item["effectedHooks"].as_array().into_iter().flatten()
+        .filter_map(|hook| hook.pointer("/result/modifyChangeDesktop")) {
+        sync_wall_sections(target, desktop);
+    }
+    sync_wall_sections(target, changes.get("round").unwrap_or(&Value::Null));
     sync_consumed_replacements(target);
+}
+
+fn sync_wall_sections(target: &mut Map<String, Value>, round: &Value) {
+    // The server can reorder the desktop without changing the original pool.
+    if let Some(desktop) = round.get("desktop").filter(|value| value["dirty"] != false)
+        .map(unwrapped).filter(Value::is_array) {
+        target.insert("wall_tiles".into(), desktop);
+    }
+    let blocked = ints_from_state(target, "locked_tiles").into_iter()
+        .chain(ints_from_state(target, "used_desktop_tiles")).collect::<std::collections::HashSet<_>>();
+    let mut wall = ints_from_state(target, "wall_tiles").into_iter()
+        .filter(|id| !blocked.contains(id)).collect::<Vec<_>>();
+    trim_wall(target, &mut wall);
+    target.insert("wall_tiles".into(), json!(wall));
 }
 
 fn sync_consumed_replacements(target: &mut Map<String, Value>) {
@@ -718,6 +738,70 @@ fn update_boss_buff(target: &mut Map<String, Value>) {
 #[cfg(test)]
 mod pool_tests {
     use super::*;
+
+    #[test]
+    fn windstopper_wall_updates_match_the_captured_draw_and_refresh() {
+        let trace: Value = serde_json::from_str(include_str!("../../tests/fixtures/windstopper-opening.json")).unwrap();
+        let mut state = empty_game_state().as_object().unwrap().clone();
+        for event in trace["opening"]["events"].as_array().unwrap() { apply_event_state(&mut state, event); }
+        let desktop = &trace["opening"]["events"][2]["effectedHooks"][0]["result"]["modifyChangeDesktop"]["desktop"];
+        assert_eq!(state["wall_tiles"], *desktop, "the lock/reorder delta has no replacement pool");
+        assert_eq!(state["wall_tiles"].as_array().unwrap().len(), 31);
+        assert_eq!(state["wall_tiles"][0], 37);
+        assert_eq!(state["replacement_tiles"].as_array().unwrap().len(), 49);
+        let all: Vec<_> = ["hand_tiles","wall_tiles","replacement_tiles","dora_tiles","locked_tiles"].iter()
+            .flat_map(|key| ints_from_state(&state,key)).collect();
+        assert_eq!(all.len(),108);
+        assert_eq!(all.iter().collect::<std::collections::HashSet<_>>().len(),108);
+        for exchange in trace["exchanges"].as_array().unwrap() {
+            for event in exchange["response"]["events"].as_array().unwrap() { apply_event_state(&mut state, event); }
+            assert_eq!(state["wall_tiles"], *desktop, "exchanging must not restore the original wall");
+        }
+        let before_draw = ints_from_state(&state, "wall_tiles");
+        for event in trace["finish"]["events"].as_array().unwrap() { apply_event_state(&mut state, event); }
+        assert_eq!(state["hand_tiles"].as_array().unwrap().last(), Some(&json!(before_draw[0])));
+        assert_eq!(state["wall_tiles"], json!(&before_draw[1..]));
+        assert_eq!(state["desktop_remain"], 30);
+        let expected = state["wall_tiles"].clone();
+        let mut round = trace["opening"]["events"][1]["valueChanges"]["round"].as_object().unwrap()
+            .iter().map(|(key,value)| (key.clone(),unwrapped(value))).collect::<Map<_,_>>();
+        for (source,dest) in [("hand_tiles","hands"),("locked_tiles","lockedTile"),("switch_used_tiles","used"),
+            ("desktop_remain","desktopRemain"),("change_tile_count","changeTileCount"),("next_operation","nextOperation")] {
+            round.insert(dest.into(),state[source].clone());
+        }
+        round.insert("desktop".into(),expected.clone());
+        for _ in 0..2 {
+            apply_fetch_state(&mut state, &json!({"game":{"state":{"current":6,"interrupt":0},"round":round}}));
+            assert_eq!(state["wall_tiles"], expected, "refresh must preserve the authoritative desktop");
+        }
+    }
+
+    #[test]
+    fn wall_deltas_filter_locked_tiles_and_honor_authoritative_hook_order() {
+        let trace: Value = serde_json::from_str(include_str!("../../tests/fixtures/windstopper-opening.json")).unwrap();
+        let mut state = empty_game_state().as_object().unwrap().clone();
+        for event in trace["opening"]["events"].as_array().unwrap() {
+            let mut event = event.clone();
+            event.as_object_mut().unwrap().remove("effectedHooks");
+            apply_event_state(&mut state, &event);
+        }
+        let mut desktop = trace["opening"]["events"][2]["effectedHooks"][0]["result"]["modifyChangeDesktop"]["desktop"].as_array().unwrap().clone();
+        assert_eq!(state["wall_tiles"], json!(desktop), "lock-only deltas also prune the wall");
+        desktop.reverse();
+        apply_event_state(&mut state, &json!({"type":5,"valueChanges":{"round":{}},"effectedHooks":[
+            {"id":99999,"result":{"modifyChangeDesktop":{"desktop":desktop}}}]}));
+        assert_eq!(state["wall_tiles"], json!(desktop), "use the returned order without an effect whitelist");
+        apply_event_state(&mut state, &json!({"type":5,"valueChanges":{"round":{"desktop":{"dirty":false,"value":[]}}}}));
+        assert_eq!(state["wall_tiles"], json!(desktop), "an unchanged desktop patch must be ignored");
+        apply_event_state(&mut state, &json!({"type":5,"valueChanges":{"round":{
+            "usedDesktop":{"dirty":true,"value":[desktop[0]]},"desktopRemain":{"dirty":true,"value":30}}}}));
+        assert_eq!(state["wall_tiles"], json!(&desktop[1..]), "consumed-tile deltas also prune the wall");
+        let keep = desktop[3..].to_vec();
+        apply_fetch_state(&mut state, &json!({"game":{"round":{"desktop":keep,"desktopRemain":keep.len()}}}));
+        assert_eq!(state["wall_tiles"], json!(keep), "a desktop snapshot need not resend the pool");
+        apply_fetch_state(&mut state, &json!({"game":{"round":{"desktop":[],"desktopRemain":0}}}));
+        assert_eq!(state["wall_tiles"], json!([]), "an empty server wall clears previous tiles");
+    }
 
     #[test]
     fn mini_dragon_opening_partitions_match_revealed_tiles_after_events_and_fetch() {

@@ -2,6 +2,77 @@ use super::switch::{plan_is_current, switch_command};
 use super::*;
 
 #[tokio::test]
+async fn windstopper_finish_switch_accepts_the_captured_draw_and_allows_tsumo() {
+    use crate::{pipeline::{Direction, Packet}, protocol::{LiqiCodec, MessageType}};
+    use hudsucker::tokio_tungstenite::tungstenite::Message;
+
+    const CHILD_ROOT: &str = "SHANTEN_WINDSTOPPER_TEST_ROOT";
+    let root = match std::env::var_os(CHILD_ROOT) {
+        Some(root) => PathBuf::from(root),
+        None => {
+            let root = std::env::temp_dir().join(format!("lens-windstopper-{}",std::process::id()));
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact","embedded::audit_tests::windstopper_finish_switch_accepts_the_captured_draw_and_allows_tsumo","--nocapture"])
+                .env(CHILD_ROOT,&root).output().unwrap();
+            assert!(output.status.success(),"{output:?}");
+            std::fs::remove_dir_all(root).unwrap();
+            return;
+        }
+    };
+    let runtime = tokio::task::spawn_blocking(move || BackendRuntime::load(root.join("configs"))).await.unwrap().unwrap();
+    let state = &runtime.state;
+    let (processor,mut outgoing,_) = state.proxy.register_direct("test",state.module_registry.clone()).await;
+    let flow = processor.lock().unwrap().flow_id;
+    let trace: Value = serde_json::from_str(include_str!("../../tests/fixtures/windstopper-opening.json")).unwrap();
+    for data in std::iter::once(trace["opening"].clone()).chain(trace["exchanges"].as_array().unwrap().iter()
+        .map(|exchange| exchange["response"].clone())) {
+        state.services.update_game_state_from_flow(&Packet {
+            direction:Direction::Inbound,packet_type:"Res".into(),id:Some(1),
+            method:".lq.Lobby.amuletActivityOperate".into(),data,
+        },flow);
+    }
+    let game = state.services.game_state();
+    assert_eq!(game["wall_tiles"][0],37);
+    // Replay in autoplay's fuse-bypass context without starting another executor.
+    state.services.set_autorun_active(true);
+    let target = trace["finish"]["events"][2]["valueChanges"]["round"]["hands"]["value"].clone();
+    let plan = json!({"status":"plan","plan_id":"windstopper-test","generation":*state.switch_generation.borrow(),
+        "session_id":game["session_id"],"state_revision":game["revision"],"initial_hand":game["hand_tiles"],
+        "switch_discards":[],"custom_steps":[{"kind":"draw","tiles":[37]}],"target_physical_ids":target});
+    *state.switch_plan.write().await = Some(plan.clone());
+    let mut codec = LiqiCodec::new();
+    let reply = async {
+        let Message::Binary(frame) = tokio::time::timeout(Duration::from_secs(3),outgoing.recv()).await.unwrap().unwrap()
+            else { panic!("expected finish exchange request") };
+        let packet = codec.parse(&frame).unwrap();
+        assert_eq!(packet.method.as_ref(),".lq.Lobby.amuletActivityOperate");
+        assert_eq!(packet.data["type"],3);
+        let reply = codec.build(MessageType::Response,packet.id,&packet.method,&trace["finish"]).unwrap();
+        processor.lock().unwrap().process(&reply,Direction::Inbound).unwrap();
+    };
+    let (result,()) = tokio::join!(super::switch::execute_custom_switch_plan(state,&plan),reply);
+    assert_eq!(result,Ok(()),"the acknowledged draw must match without disabling execution checks");
+    assert!(outgoing.try_recv().is_err(),"finishing exchanges must not be retried");
+    let current = state.services.game_state();
+    assert_eq!(current["hand_tiles"],target);
+    assert_eq!(current["wall_tiles"].as_array().unwrap().len(),30);
+    let reply = async {
+        let Message::Binary(frame) = tokio::time::timeout(Duration::from_secs(3),outgoing.recv()).await.unwrap().unwrap()
+            else { panic!("expected tsumo request") };
+        let packet = codec.parse(&frame).unwrap();
+        assert_eq!(packet.method.as_ref(),".lq.Lobby.amuletActivityGameOperate");
+        assert_eq!(packet.data["type"],8);
+        let reply = codec.build(MessageType::Response,packet.id,&packet.method,&json!({})).unwrap();
+        processor.lock().unwrap().process(&reply,Direction::Inbound).unwrap();
+    };
+    let (result,()) = tokio::join!(super::switch::send_game_operation(state,&plan,&current,8,&[]),reply);
+    assert_eq!(result,Ok(()));
+    assert!(outgoing.try_recv().is_err());
+    state.services.set_autorun_active(false);
+    state.proxy.unregister_direct();
+}
+
+#[tokio::test]
 async fn debug_cannot_replace_live_plan_and_execution_checks_identity_and_session() {
     const CHILD_ROOT: &str = "SHANTEN_SWITCH_TEST_ROOT";
     let root = match std::env::var_os(CHILD_ROOT) {
