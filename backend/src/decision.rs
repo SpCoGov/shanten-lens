@@ -230,12 +230,12 @@ pub fn evaluate(state: &Value, actions: &ActionReport, registry: &Value, playboo
         }
     }
     if state["stage"] == 9 && !selecting {
-        shop_pack_priorities(state, &packs, &actions, &mut scores);
+        shop_pack_priorities(state, &packs, &actions, &mut scores, playbook);
     }
     DecisionReport { actions: scores }
 }
 
-fn shop_pack_priorities(state: &Value, packs: &[&ActionCandidate], actions: &[&ActionCandidate], scores: &mut [ActionScore]) {
+fn shop_pack_priorities(state: &Value, packs: &[&ActionCandidate], actions: &[&ActionCandidate], scores: &mut [ActionScore], playbook: &Value) {
     let available: Vec<_> = actions.iter().enumerate().filter(|(index, action)| action.kind == "buy_pack"
         && matches!(action.params["goods_id"].as_u64(), Some(101..=103 | 111..=113))
         && scores[*index].total.is_some() && scores[*index].rules.iter().all(|rule| rule.score.is_some()))
@@ -278,10 +278,24 @@ fn shop_pack_priorities(state: &Value, packs: &[&ActionCandidate], actions: &[&A
     }
     let best_pack = available.iter().filter_map(|(index, _)| scores[*index].total).reduce(f64::max);
     if let Some(best_pack) = best_pack {
-        for (action, score) in actions.iter().zip(scores) {
+        for (action, score) in actions.iter().zip(scores.iter_mut()) {
             if action.kind == "sell_effect" && badge_id(&action.params["effect"]) == Some(600070)
                 && score.total.is_some_and(|total| total >= best_pack) {
                 adjust(score, best_pack - 1.0, "preserve_guidance_for_packs");
+            }
+        }
+        if let Some(profile) = s4_opening_profile(state, playbook).filter(|_| context["effect"]["effectList"].as_array()
+            .is_some_and(|effects| effects.iter().any(|effect| badge_id(effect) == Some(600150)))) {
+            let Some(targets) = profile["targets"].as_array() else { return; };
+            for (action, score) in actions.iter().zip(scores.iter_mut()) {
+                let id = action.params["effect"]["id"].as_u64();
+                // Keep target bases and every card with a retention penalty out of cleanup.
+                if action.kind == "sell_effect" && id.is_some()
+                    && !targets.iter().any(|target| target["kind"] == "amulet" && target["id"].as_u64() == id.map(|id| id / 10))
+                    && score.rules.iter().all(|rule| rule.score.is_some_and(|value| value >= 0.0))
+                    && score.total.is_some_and(|total| total > 0.0 && total <= best_pack) {
+                    adjust(score, best_pack + 1.0, "friendship_cleanup_before_packs");
+                }
             }
         }
     }
@@ -813,21 +827,14 @@ fn friendship(state: &Value, action: &ActionCandidate, registry: &Value, playboo
     };
     let Some(mut score) = change() else { return Some((None, "missing_friendship_data")); };
     if score == 0.0 { return None; }
-    let mut reason = "friendship";
-    if score < 0.0 && action.kind == "sell_effect" && badge_id(&action.params["effect"]) == Some(600150) && state["stage"] == 9 {
-        let packs: Vec<_> = crate::action_provider::evaluate(state).actions.into_iter()
-            .filter(|action| action.kind == "buy_pack" && matches!(action.params["goods_id"].as_u64(), Some(101..=103 | 111..=113)))
-            .collect();
-        let price = amulet_price(state, action, registry, playbook).and_then(|(score, _)| score).unwrap_or(0.0) as u128;
-        let funds_pack = !packs.iter().any(|pack| pack.availability == Availability::Available)
-            && packs.iter().any(|pack| pack.cost_resource == "coin" && pack.reasons.len() == 1
-                && pack.reasons[0].code == "insufficient_coin"
-                && pack.cost.as_deref().and_then(|cost| cost.parse::<u128>().ok()).is_some_and(|cost|
-                    crate::action_provider::compare_amount(&state["provider_state"]["game"]["coin"], cost.saturating_sub(price))
-                        .is_some_and(|order| !order.is_lt())));
-        if funds_pack { score *= 0.25; reason = "friendship_funds_pack"; }
+    if score < 0.0 && action.kind == "sell_effect" && badge_id(&action.params["effect"]) == Some(600150) {
+        let price = amulet_price(state, action, registry, playbook).and_then(|(score, _)| score).unwrap_or(0.0);
+        let bonus = sell_bonus(state, action, registry, playbook).and_then(|(score, _)| score).unwrap_or(0.0);
+        // Sale proceeds alone must not outweigh keeping the first one or two friends.
+        score -= price + bonus;
+        return Some((Some(score), "friendship_retained_sale"));
     }
-    Some((Some(score), reason))
+    Some((Some(score), "friendship"))
 }
 
 fn pack_value(state: &Value, action: &ActionCandidate, _registry: &Value, _playbook: &Value) -> Option<(Option<f64>, &'static str)> {
