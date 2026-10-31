@@ -388,7 +388,7 @@ pub(super) fn rebuild_pool_sections(
                     .and_then(Value::as_u64)
                     .unwrap_or(0)
                     == 0));
-    let opening = if use_current_hand {
+    let opening = if initial_event || use_current_hand {
         hand.clone()
     } else if let Some(first) = dora_hint.first().and_then(Value::as_u64) {
         ids.iter()
@@ -410,6 +410,13 @@ pub(super) fn rebuild_pool_sections(
     } else {
         hand.clone()
     };
+    // Pre-deal replacements can return an opening tile before the first indicator in the raw pool.
+    let opening = if hand.len() == 13 && opening.len() != 13
+        && target.get("change_tile_count").and_then(Value::as_u64) == Some(0)
+        && ints_from_state(target, "switch_used_tiles").is_empty()
+    {
+        hand.clone()
+    } else { opening };
     target.insert("opening_hand_tiles".into(), json!(opening));
     let excluded = opening
         .into_iter()
@@ -711,6 +718,39 @@ fn update_boss_buff(target: &mut Map<String, Value>) {
 #[cfg(test)]
 mod pool_tests {
     use super::*;
+
+    #[test]
+    fn mini_dragon_opening_partitions_match_revealed_tiles_after_events_and_fetch() {
+        let trace: Value = serde_json::from_str(include_str!("../../tests/fixtures/mini-dragon-opening.json")).unwrap();
+        for id in [3590, 3591] {
+            let mut state = empty_game_state().as_object().unwrap().clone();
+            let game = json!({"state":{"current":5,"interrupt":0},"map":{"level":13001,"node":4},
+                "effect":{"effectList":[{"id":id,"uid":17,"volume":1}]},"round":trace["round"]});
+            apply_event_state(&mut state, &json!({"type":4,"state":game["state"],"valueChanges":{
+                "map":game["map"],"effect":game["effect"],"round":game["round"]}}));
+            for fetch in [false, true, true] {
+                if fetch { apply_fetch_state(&mut state, &json!({"game":game})); }
+                assert_eq!(state["opening_hand_tiles"], trace["round"]["hands"]);
+                for (key, expected) in [("dora_tiles","dora"),("wall_tiles","wall"),("replacement_tiles","replacement")] {
+                    assert_eq!(state[key], trace["expected"][expected], "{id}, fetch={fetch}, {key}");
+                }
+                let all: Vec<_> = ["hand_tiles","dora_tiles","wall_tiles","replacement_tiles"].iter()
+                    .flat_map(|key| ints_from_state(&state,key)).collect();
+                assert_eq!(all.len(),108);
+                assert_eq!(all.iter().collect::<std::collections::HashSet<_>>().len(),108);
+                let wall = ints_from_state(&state,"wall_tiles");
+                for tile in trace["round"]["showDesktopTiles"].as_array().unwrap() {
+                    assert_eq!(wall[35-tile["pos"].as_u64().unwrap() as usize],tile["id"].as_u64().unwrap());
+                }
+            }
+            let target = json!(vec![json!({"rule":{}});14]);
+            let plan = crate::recommendations::custom_switch_plan(&Value::Object(state.clone()),&target,36,false,&mut |_| {},&|| false);
+            assert_eq!(plan["status"],"plan","the captured opening must be searchable: {plan}");
+            state.get_mut("wall_tiles").unwrap()[0] = state["hand_tiles"][0].clone();
+            let invalid = crate::recommendations::custom_switch_plan(&Value::Object(state),&target,36,false,&mut |_| {},&|| false);
+            assert_eq!(invalid["reason"],"invalid-search-tiles","unexplained duplicates must still be rejected");
+        }
+    }
 
     #[test]
     fn hand_changing_effect_preserves_consumed_tiles_across_delta_and_fetch() {

@@ -92,8 +92,13 @@ fn action_error(result: crate::ipc::CommandResult) -> String {
     } else { result.reason.or(result.reason_key).unwrap_or_else(|| "action_provider.execution.send_failed".into()) }
 }
 
-pub(super) async fn remake_after_search_limit(state: &State, generation: u64, profile: &Value, plan: &Value, game: &Value) -> Result<bool, String> {
-    if profile["strategy"] != "opening" || plan["reason"] != "custom-search-limit" { return Ok(false); }
+pub(super) async fn remake_after_search_failure(state: &State, generation: u64, profile: &Value, plan: &Value, game: &Value) -> Result<bool, String> {
+    if profile["strategy"] != "opening" { return Ok(false); }
+    let (reason, progress_reason) = match plan["reason"].as_str() {
+        Some("custom-search-limit") => ("custom-search-limit", "round.search_limit_remake"),
+        Some("invalid-search-tiles") => ("invalid-search-tiles", "round.invalid_tiles_remake"),
+        _ => return Ok(false),
+    };
     if !state.automation.round_is_current(generation) || snapshot_key(&state.services.game_state()) != snapshot_key(game) {
         return Ok(true);
     }
@@ -102,7 +107,7 @@ pub(super) async fn remake_after_search_limit(state: &State, generation: u64, pr
         .ok_or("action_provider.execution.unavailable")?;
     let mut updates = state.events.subscribe();
     if !state.automation.begin_action(generation, "remake") { return Ok(true); }
-    state.automation.set_round_decision(generation, json!({"status":"waiting","strategy":"opening","reason":"round.search_limit_remake"}));
+    state.automation.set_round_decision(generation, json!({"status":"waiting","strategy":"opening","reason":progress_reason}));
     let result = state.action_executor.execute(&state.services, &state.proxy,
         crate::action_executor::ActionExecutionRequest {
             action_id: action["id"].as_str().ok_or("action_provider.execution.unavailable")?.into(),
@@ -115,7 +120,7 @@ pub(super) async fn remake_after_search_limit(state: &State, generation: u64, pr
             && snapshot_key(&state.services.game_state()) != snapshot_key(game) { return Ok(true); }
         return Err(action_error(result));
     }
-    if result.ok { state.automation.record_remake(generation, game, "custom-search-limit"); }
+    if result.ok { state.automation.record_remake(generation, game, reason); }
     let sent_at = Instant::now();
     while state.automation.round_is_current(generation) && snapshot_key(&state.services.game_state()) == snapshot_key(game) {
         if sent_at.elapsed() >= Duration::from_secs(15) { return Err("autoplay.state_update_timeout".into()); }
@@ -242,7 +247,7 @@ async fn run(state: State, generation: u64, profile: Value) {
             if snapshot_key(&state.services.game_state()) != snapshot_key(&game) { continue; }
             if *state.switch_generation.borrow() != switch_generation { continue; }
             if plan["status"] != "plan" {
-                match remake_after_search_limit(&state, generation, &profile, &plan, &game).await {
+                match remake_after_search_failure(&state, generation, &profile, &plan, &game).await {
                     Ok(true) => continue,
                     Ok(false) => {},
                     Err(reason) => { state.automation.fail(generation, &reason); return; },
