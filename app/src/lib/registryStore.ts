@@ -18,6 +18,7 @@ export type RegistryPayload = {
 };
 
 type State = {
+    source?: GameStateData["source"];
     amulets: Amulet[];
     badges: Badge[];
     amuletById: Map<number, Amulet>;
@@ -53,7 +54,7 @@ function buildMaps(next: RegistryPayload): State {
     const badgeById  = new Map<number, Badge>();
     for (const a of amulets) amuletById.set(a.id, a);
     for (const b of badges)  badgeById.set(b.id, b);
-    return { amulets, badges, amuletById, badgeById };
+    return { source: next.source, amulets, badges, amuletById, badgeById };
 }
 
 function saveToLS(next: RegistryPayload) {

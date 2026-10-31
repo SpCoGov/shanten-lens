@@ -1,5 +1,7 @@
 import {newTargetGroup, targetKind, targetSize, validTargetGroups, type TargetGroup, type TargetPreset} from "./customTarget";
 import {getGameLevels} from "./gameStages";
+import type {GameStateData} from "./gamestate";
+import qyzzStages from "./qyzzStageCatalog.json";
 import type {Amulet, Badge} from "./registryStore";
 import type {TargetItem} from "./autoRunnerStore";
 
@@ -49,6 +51,16 @@ export const openingLevels = getGameLevels().flatMap(level => level.nodes.filter
     .map(node => ({level: level.level, node: node.node, label: node.label})));
 export const strategyLevels = openingLevels.slice(1);
 
+const qyzzOpeningLevels = qyzzStages.levels.map(stage => ({level: stage.id, node: 0, label: stage.name}));
+
+export function getOpeningLevels(source?: GameStateData["source"]) {
+    return source === "qyzz" ? qyzzOpeningLevels : openingLevels;
+}
+
+export function getStrategyLevels(source?: GameStateData["source"]) {
+    return source === "qyzz" ? qyzzOpeningLevels.slice(1) : strategyLevels;
+}
+
 export function newStrategyLoadout(name: string): StrategyLoadout {
     return {id: crypto.randomUUID(), name, amulets: [], entry_order: [], win_order: []};
 }
@@ -88,12 +100,15 @@ export function validateAutoPlayConfig(value: unknown, amulets?: Map<number, Amu
     const list = (v: unknown, min: number, max: number): v is any[] => Array.isArray(v) && v.length >= min && v.length <= max;
     const unique = (items: any[], field: string) => items.every(item => object(item) && text(item[field]))
         && new Set(items.map(item => item[field])).size === items.length;
-    const levelIndex = (level: unknown, node: unknown) => strategyLevels.findIndex(item => item.level === level && item.node === node);
     const positiveInteger = (v: unknown) => Number.isSafeInteger(v) && Number(v) > 0;
     if (!object(value) || value.version !== 1 || !list(value.profiles, 0, 32) || !unique(value.profiles, "id")
         || typeof value.selected_profile_id !== "string"
         || (value.profiles.length ? !value.profiles.some(p => p.id === value.selected_profile_id) : value.selected_profile_id !== "")) return "format";
     for (const profile of value.profiles) {
+        const node = profile.strategy === "opening" ? profile.cutoff_node : profile.stages?.[0]?.start_node;
+        const source = node === 0 ? "qyzz" : "packet";
+        const openingLevels = getOpeningLevels(source), strategyLevels = getStrategyLevels(source);
+        const levelIndex = (level: unknown, node: unknown) => strategyLevels.findIndex(item => item.level === level && item.node === node);
         if (!text(profile.name)) return "profile";
         if (profile.strategy === "opening") {
             if (!positiveInteger(profile.end_count)) return "goal_value";

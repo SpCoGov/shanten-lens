@@ -340,8 +340,8 @@ export function parseTargetPointValue(value: string | number | bigint): bigint |
 }
 
 function scaleDecimal(text: string, exponent: number): bigint | null {
-    // ponytail: 10,000 digits covers game values; reject unbounded user exponents.
-    if (!Number.isSafeInteger(exponent) || Math.abs(exponent) > 10_000) return null;
+    // Native Ex299 needs exponent 19,605; keep untrusted target input bounded.
+    if (!Number.isSafeInteger(exponent) || Math.abs(exponent) > 20_000) return null;
     const [whole, fraction = ""] = text.split(".");
     const digits = BigInt(whole + fraction);
     const shift = exponent + SCALE_DECIMALS - fraction.length;

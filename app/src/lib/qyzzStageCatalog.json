@@ -2732,6 +2732,1272 @@
       "name": "Ex199",
       "target_points": "9.999e+5155",
       "base_reward": 10,
+      "next_id": 1200,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1200,
+      "level_group": 210,
+      "name": "Ex200",
+      "target_points": "9.999e+5250",
+      "base_reward": 10,
+      "next_id": 1201,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1201,
+      "level_group": 211,
+      "name": "Ex201",
+      "target_points": "9.999e+5346",
+      "base_reward": 10,
+      "next_id": 1202,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1202,
+      "level_group": 212,
+      "name": "Ex202",
+      "target_points": "9.999e+5443",
+      "base_reward": 10,
+      "next_id": 1203,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1203,
+      "level_group": 213,
+      "name": "Ex203",
+      "target_points": "9.999e+5541",
+      "base_reward": 10,
+      "next_id": 1204,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1204,
+      "level_group": 214,
+      "name": "Ex204",
+      "target_points": "9.999e+5640",
+      "base_reward": 10,
+      "next_id": 1205,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1205,
+      "level_group": 215,
+      "name": "Ex205",
+      "target_points": "9.999e+5740",
+      "base_reward": 10,
+      "next_id": 1206,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1206,
+      "level_group": 216,
+      "name": "Ex206",
+      "target_points": "9.999e+5841",
+      "base_reward": 10,
+      "next_id": 1207,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1207,
+      "level_group": 217,
+      "name": "Ex207",
+      "target_points": "9.999e+5943",
+      "base_reward": 10,
+      "next_id": 1208,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1208,
+      "level_group": 218,
+      "name": "Ex208",
+      "target_points": "9.999e+6046",
+      "base_reward": 10,
+      "next_id": 1209,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1209,
+      "level_group": 219,
+      "name": "Ex209",
+      "target_points": "9.999e+6150",
+      "base_reward": 10,
+      "next_id": 1210,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1210,
+      "level_group": 220,
+      "name": "Ex210",
+      "target_points": "9.999e+6255",
+      "base_reward": 10,
+      "next_id": 1211,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1211,
+      "level_group": 221,
+      "name": "Ex211",
+      "target_points": "9.999e+6361",
+      "base_reward": 10,
+      "next_id": 1212,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1212,
+      "level_group": 222,
+      "name": "Ex212",
+      "target_points": "9.999e+6468",
+      "base_reward": 10,
+      "next_id": 1213,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1213,
+      "level_group": 223,
+      "name": "Ex213",
+      "target_points": "9.999e+6576",
+      "base_reward": 10,
+      "next_id": 1214,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1214,
+      "level_group": 224,
+      "name": "Ex214",
+      "target_points": "9.999e+6685",
+      "base_reward": 10,
+      "next_id": 1215,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1215,
+      "level_group": 225,
+      "name": "Ex215",
+      "target_points": "9.999e+6795",
+      "base_reward": 10,
+      "next_id": 1216,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1216,
+      "level_group": 226,
+      "name": "Ex216",
+      "target_points": "9.999e+6906",
+      "base_reward": 10,
+      "next_id": 1217,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1217,
+      "level_group": 227,
+      "name": "Ex217",
+      "target_points": "9.999e+7018",
+      "base_reward": 10,
+      "next_id": 1218,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1218,
+      "level_group": 228,
+      "name": "Ex218",
+      "target_points": "9.999e+7131",
+      "base_reward": 10,
+      "next_id": 1219,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1219,
+      "level_group": 229,
+      "name": "Ex219",
+      "target_points": "9.999e+7245",
+      "base_reward": 10,
+      "next_id": 1220,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1220,
+      "level_group": 230,
+      "name": "Ex220",
+      "target_points": "9.999e+7360",
+      "base_reward": 10,
+      "next_id": 1221,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1221,
+      "level_group": 231,
+      "name": "Ex221",
+      "target_points": "9.999e+7476",
+      "base_reward": 10,
+      "next_id": 1222,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1222,
+      "level_group": 232,
+      "name": "Ex222",
+      "target_points": "9.999e+7593",
+      "base_reward": 10,
+      "next_id": 1223,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1223,
+      "level_group": 233,
+      "name": "Ex223",
+      "target_points": "9.999e+7711",
+      "base_reward": 10,
+      "next_id": 1224,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1224,
+      "level_group": 234,
+      "name": "Ex224",
+      "target_points": "9.999e+7830",
+      "base_reward": 10,
+      "next_id": 1225,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1225,
+      "level_group": 235,
+      "name": "Ex225",
+      "target_points": "9.999e+7950",
+      "base_reward": 10,
+      "next_id": 1226,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1226,
+      "level_group": 236,
+      "name": "Ex226",
+      "target_points": "9.999e+8071",
+      "base_reward": 10,
+      "next_id": 1227,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1227,
+      "level_group": 237,
+      "name": "Ex227",
+      "target_points": "9.999e+8193",
+      "base_reward": 10,
+      "next_id": 1228,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1228,
+      "level_group": 238,
+      "name": "Ex228",
+      "target_points": "9.999e+8316",
+      "base_reward": 10,
+      "next_id": 1229,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1229,
+      "level_group": 239,
+      "name": "Ex229",
+      "target_points": "9.999e+8440",
+      "base_reward": 10,
+      "next_id": 1230,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1230,
+      "level_group": 240,
+      "name": "Ex230",
+      "target_points": "9.999e+8565",
+      "base_reward": 10,
+      "next_id": 1231,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1231,
+      "level_group": 241,
+      "name": "Ex231",
+      "target_points": "9.999e+8691",
+      "base_reward": 10,
+      "next_id": 1232,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1232,
+      "level_group": 242,
+      "name": "Ex232",
+      "target_points": "9.999e+8818",
+      "base_reward": 10,
+      "next_id": 1233,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1233,
+      "level_group": 243,
+      "name": "Ex233",
+      "target_points": "9.999e+8946",
+      "base_reward": 10,
+      "next_id": 1234,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1234,
+      "level_group": 244,
+      "name": "Ex234",
+      "target_points": "9.999e+9075",
+      "base_reward": 10,
+      "next_id": 1235,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1235,
+      "level_group": 245,
+      "name": "Ex235",
+      "target_points": "9.999e+9205",
+      "base_reward": 10,
+      "next_id": 1236,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1236,
+      "level_group": 246,
+      "name": "Ex236",
+      "target_points": "9.999e+9336",
+      "base_reward": 10,
+      "next_id": 1237,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1237,
+      "level_group": 247,
+      "name": "Ex237",
+      "target_points": "9.999e+9468",
+      "base_reward": 10,
+      "next_id": 1238,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1238,
+      "level_group": 248,
+      "name": "Ex238",
+      "target_points": "9.999e+9601",
+      "base_reward": 10,
+      "next_id": 1239,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1239,
+      "level_group": 249,
+      "name": "Ex239",
+      "target_points": "9.999e+9735",
+      "base_reward": 10,
+      "next_id": 1240,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1240,
+      "level_group": 250,
+      "name": "Ex240",
+      "target_points": "9.999e+9870",
+      "base_reward": 10,
+      "next_id": 1241,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1241,
+      "level_group": 251,
+      "name": "Ex241",
+      "target_points": "9.999e+10006",
+      "base_reward": 10,
+      "next_id": 1242,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1242,
+      "level_group": 252,
+      "name": "Ex242",
+      "target_points": "9.999e+10143",
+      "base_reward": 10,
+      "next_id": 1243,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1243,
+      "level_group": 253,
+      "name": "Ex243",
+      "target_points": "9.999e+10281",
+      "base_reward": 10,
+      "next_id": 1244,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1244,
+      "level_group": 254,
+      "name": "Ex244",
+      "target_points": "9.999e+10420",
+      "base_reward": 10,
+      "next_id": 1245,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1245,
+      "level_group": 255,
+      "name": "Ex245",
+      "target_points": "9.999e+10560",
+      "base_reward": 10,
+      "next_id": 1246,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1246,
+      "level_group": 256,
+      "name": "Ex246",
+      "target_points": "9.999e+10701",
+      "base_reward": 10,
+      "next_id": 1247,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1247,
+      "level_group": 257,
+      "name": "Ex247",
+      "target_points": "9.999e+10843",
+      "base_reward": 10,
+      "next_id": 1248,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1248,
+      "level_group": 258,
+      "name": "Ex248",
+      "target_points": "9.999e+10986",
+      "base_reward": 10,
+      "next_id": 1249,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1249,
+      "level_group": 259,
+      "name": "Ex249",
+      "target_points": "9.999e+11130",
+      "base_reward": 10,
+      "next_id": 1250,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1250,
+      "level_group": 260,
+      "name": "Ex250",
+      "target_points": "9.999e+11275",
+      "base_reward": 10,
+      "next_id": 1251,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1251,
+      "level_group": 261,
+      "name": "Ex251",
+      "target_points": "9.999e+11421",
+      "base_reward": 10,
+      "next_id": 1252,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1252,
+      "level_group": 262,
+      "name": "Ex252",
+      "target_points": "9.999e+11568",
+      "base_reward": 10,
+      "next_id": 1253,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1253,
+      "level_group": 263,
+      "name": "Ex253",
+      "target_points": "9.999e+11716",
+      "base_reward": 10,
+      "next_id": 1254,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1254,
+      "level_group": 264,
+      "name": "Ex254",
+      "target_points": "9.999e+11865",
+      "base_reward": 10,
+      "next_id": 1255,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1255,
+      "level_group": 265,
+      "name": "Ex255",
+      "target_points": "9.999e+12015",
+      "base_reward": 10,
+      "next_id": 1256,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1256,
+      "level_group": 266,
+      "name": "Ex256",
+      "target_points": "9.999e+12166",
+      "base_reward": 10,
+      "next_id": 1257,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1257,
+      "level_group": 267,
+      "name": "Ex257",
+      "target_points": "9.999e+12318",
+      "base_reward": 10,
+      "next_id": 1258,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1258,
+      "level_group": 268,
+      "name": "Ex258",
+      "target_points": "9.999e+12471",
+      "base_reward": 10,
+      "next_id": 1259,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1259,
+      "level_group": 269,
+      "name": "Ex259",
+      "target_points": "9.999e+12625",
+      "base_reward": 10,
+      "next_id": 1260,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1260,
+      "level_group": 270,
+      "name": "Ex260",
+      "target_points": "9.999e+12780",
+      "base_reward": 10,
+      "next_id": 1261,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1261,
+      "level_group": 271,
+      "name": "Ex261",
+      "target_points": "9.999e+12936",
+      "base_reward": 10,
+      "next_id": 1262,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1262,
+      "level_group": 272,
+      "name": "Ex262",
+      "target_points": "9.999e+13093",
+      "base_reward": 10,
+      "next_id": 1263,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1263,
+      "level_group": 273,
+      "name": "Ex263",
+      "target_points": "9.999e+13251",
+      "base_reward": 10,
+      "next_id": 1264,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1264,
+      "level_group": 274,
+      "name": "Ex264",
+      "target_points": "9.999e+13410",
+      "base_reward": 10,
+      "next_id": 1265,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1265,
+      "level_group": 275,
+      "name": "Ex265",
+      "target_points": "9.999e+13570",
+      "base_reward": 10,
+      "next_id": 1266,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1266,
+      "level_group": 276,
+      "name": "Ex266",
+      "target_points": "9.999e+13731",
+      "base_reward": 10,
+      "next_id": 1267,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1267,
+      "level_group": 277,
+      "name": "Ex267",
+      "target_points": "9.999e+13893",
+      "base_reward": 10,
+      "next_id": 1268,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1268,
+      "level_group": 278,
+      "name": "Ex268",
+      "target_points": "9.999e+14056",
+      "base_reward": 10,
+      "next_id": 1269,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1269,
+      "level_group": 279,
+      "name": "Ex269",
+      "target_points": "9.999e+14220",
+      "base_reward": 10,
+      "next_id": 1270,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1270,
+      "level_group": 280,
+      "name": "Ex270",
+      "target_points": "9.999e+14385",
+      "base_reward": 10,
+      "next_id": 1271,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1271,
+      "level_group": 281,
+      "name": "Ex271",
+      "target_points": "9.999e+14551",
+      "base_reward": 10,
+      "next_id": 1272,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1272,
+      "level_group": 282,
+      "name": "Ex272",
+      "target_points": "9.999e+14718",
+      "base_reward": 10,
+      "next_id": 1273,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1273,
+      "level_group": 283,
+      "name": "Ex273",
+      "target_points": "9.999e+14886",
+      "base_reward": 10,
+      "next_id": 1274,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1274,
+      "level_group": 284,
+      "name": "Ex274",
+      "target_points": "9.999e+15055",
+      "base_reward": 10,
+      "next_id": 1275,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1275,
+      "level_group": 285,
+      "name": "Ex275",
+      "target_points": "9.999e+15225",
+      "base_reward": 10,
+      "next_id": 1276,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1276,
+      "level_group": 286,
+      "name": "Ex276",
+      "target_points": "9.999e+15396",
+      "base_reward": 10,
+      "next_id": 1277,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1277,
+      "level_group": 287,
+      "name": "Ex277",
+      "target_points": "9.999e+15568",
+      "base_reward": 10,
+      "next_id": 1278,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1278,
+      "level_group": 288,
+      "name": "Ex278",
+      "target_points": "9.999e+15741",
+      "base_reward": 10,
+      "next_id": 1279,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1279,
+      "level_group": 289,
+      "name": "Ex279",
+      "target_points": "9.999e+15915",
+      "base_reward": 10,
+      "next_id": 1280,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1280,
+      "level_group": 290,
+      "name": "Ex280",
+      "target_points": "9.999e+16090",
+      "base_reward": 10,
+      "next_id": 1281,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1281,
+      "level_group": 291,
+      "name": "Ex281",
+      "target_points": "9.999e+16266",
+      "base_reward": 10,
+      "next_id": 1282,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1282,
+      "level_group": 292,
+      "name": "Ex282",
+      "target_points": "9.999e+16443",
+      "base_reward": 10,
+      "next_id": 1283,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1283,
+      "level_group": 293,
+      "name": "Ex283",
+      "target_points": "9.999e+16621",
+      "base_reward": 10,
+      "next_id": 1284,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1284,
+      "level_group": 294,
+      "name": "Ex284",
+      "target_points": "9.999e+16800",
+      "base_reward": 10,
+      "next_id": 1285,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1285,
+      "level_group": 295,
+      "name": "Ex285",
+      "target_points": "9.999e+16980",
+      "base_reward": 10,
+      "next_id": 1286,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1286,
+      "level_group": 296,
+      "name": "Ex286",
+      "target_points": "9.999e+17161",
+      "base_reward": 10,
+      "next_id": 1287,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1287,
+      "level_group": 297,
+      "name": "Ex287",
+      "target_points": "9.999e+17343",
+      "base_reward": 10,
+      "next_id": 1288,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1288,
+      "level_group": 298,
+      "name": "Ex288",
+      "target_points": "9.999e+17526",
+      "base_reward": 10,
+      "next_id": 1289,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1289,
+      "level_group": 299,
+      "name": "Ex289",
+      "target_points": "9.999e+17710",
+      "base_reward": 10,
+      "next_id": 1290,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1290,
+      "level_group": 300,
+      "name": "Ex290",
+      "target_points": "9.999e+17895",
+      "base_reward": 10,
+      "next_id": 1291,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1291,
+      "level_group": 301,
+      "name": "Ex291",
+      "target_points": "9.999e+18081",
+      "base_reward": 10,
+      "next_id": 1292,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1292,
+      "level_group": 302,
+      "name": "Ex292",
+      "target_points": "9.999e+18268",
+      "base_reward": 10,
+      "next_id": 1293,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1293,
+      "level_group": 303,
+      "name": "Ex293",
+      "target_points": "9.999e+18456",
+      "base_reward": 10,
+      "next_id": 1294,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1294,
+      "level_group": 304,
+      "name": "Ex294",
+      "target_points": "9.999e+18645",
+      "base_reward": 10,
+      "next_id": 1295,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1295,
+      "level_group": 305,
+      "name": "Ex295",
+      "target_points": "9.999e+18835",
+      "base_reward": 10,
+      "next_id": 1296,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1296,
+      "level_group": 306,
+      "name": "Ex296",
+      "target_points": "9.999e+19026",
+      "base_reward": 10,
+      "next_id": 1297,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1297,
+      "level_group": 307,
+      "name": "Ex297",
+      "target_points": "9.999e+19218",
+      "base_reward": 10,
+      "next_id": 1298,
+      "pool_id": 25081103,
+      "guaranteed_goods": 102,
+      "reward_packs": [
+        103
+      ],
+      "boss": true
+    },
+    {
+      "id": 1298,
+      "level_group": 308,
+      "name": "Ex298",
+      "target_points": "9.999e+19411",
+      "base_reward": 10,
+      "next_id": 1299,
+      "pool_id": 25081103,
+      "guaranteed_goods": 103,
+      "reward_packs": [],
+      "boss": true
+    },
+    {
+      "id": 1299,
+      "level_group": 309,
+      "name": "Ex299",
+      "target_points": "9.999e+19605",
+      "base_reward": 10,
       "next_id": 0,
       "pool_id": 25081103,
       "guaranteed_goods": 0,
