@@ -327,9 +327,10 @@ fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
 }
 
 fn sync_wall_sections(target: &mut Map<String, Value>, round: &Value) {
-    // The server can reorder the desktop without changing the original pool.
+    // Fetch may omit desktop contents while tiles remain; keep the pool reconstruction in that case.
     if let Some(desktop) = round.get("desktop").filter(|value| value["dirty"] != false)
-        .map(unwrapped).filter(Value::is_array) {
+        .map(unwrapped).filter(|value| value.as_array().is_some_and(|tiles| !tiles.is_empty()
+            || target.get("desktop_remain").and_then(Value::as_u64) == Some(0))) {
         target.insert("wall_tiles".into(), desktop);
     }
     let blocked = ints_from_state(target, "locked_tiles").into_iter()
@@ -740,6 +741,26 @@ mod pool_tests {
     use super::*;
 
     #[test]
+    fn empty_desktop_fetch_retains_reconstructed_wall_after_restart() {
+        let trace: Value = serde_json::from_str(include_str!("../../tests/fixtures/empty-desktop-fetch.json")).unwrap();
+        for _ in 0..2 {
+            let mut state = empty_game_state().as_object().unwrap().clone();
+            for _ in 0..2 {
+                apply_fetch_state(&mut state, &trace["response"]);
+                assert_eq!(state["desktop_remain"],33);
+                assert_eq!(state["wall_tiles"],trace["expected_wall"],"empty desktop is omitted data while 33 tiles remain");
+                let wall = ints_from_state(&state,"wall_tiles");
+                assert_eq!(wall.len(),33);
+                assert_eq!(wall[0],64);
+                let all = wall.into_iter().chain(ints_from_state(&state,"locked_tiles")).collect::<Vec<_>>();
+                for tile in trace["response"]["data"]["game"]["round"]["showDesktopTiles"].as_array().unwrap() {
+                    assert_eq!(all[35-tile["pos"].as_u64().unwrap() as usize],tile["id"].as_u64().unwrap());
+                }
+            }
+        }
+    }
+
+    #[test]
     fn windstopper_wall_updates_match_the_captured_draw_and_refresh() {
         let trace: Value = serde_json::from_str(include_str!("../../tests/fixtures/windstopper-opening.json")).unwrap();
         let mut state = empty_game_state().as_object().unwrap().clone();
@@ -791,6 +812,11 @@ mod pool_tests {
         apply_event_state(&mut state, &json!({"type":5,"valueChanges":{"round":{}},"effectedHooks":[
             {"id":99999,"result":{"modifyChangeDesktop":{"desktop":desktop}}}]}));
         assert_eq!(state["wall_tiles"], json!(desktop), "use the returned order without an effect whitelist");
+        for event in [json!({"type":5,"valueChanges":{"round":{"desktop":{"dirty":true,"value":[]}}}}),
+            json!({"type":5,"valueChanges":{"round":{}},"effectedHooks":[{"result":{"modifyChangeDesktop":{"desktop":[]}}}]})] {
+            apply_event_state(&mut state, &event);
+            assert_eq!(state["wall_tiles"],json!(desktop),"empty placeholder must not erase a known reordered wall");
+        }
         apply_event_state(&mut state, &json!({"type":5,"valueChanges":{"round":{"desktop":{"dirty":false,"value":[]}}}}));
         assert_eq!(state["wall_tiles"], json!(desktop), "an unchanged desktop patch must be ignored");
         apply_event_state(&mut state, &json!({"type":5,"valueChanges":{"round":{
