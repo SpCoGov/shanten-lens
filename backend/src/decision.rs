@@ -80,6 +80,10 @@ const RULES: &[Rule] = &[Rule {
     action_kind: None,
     evaluate: guidance,
 }, Rule {
+    id: "friendship",
+    action_kind: None,
+    evaluate: friendship,
+}, Rule {
     id: "happiness",
     action_kind: None,
     evaluate: happiness,
@@ -216,9 +220,10 @@ pub fn evaluate(state: &Value, actions: &ActionReport, registry: &Value, playboo
         .map(|(_, score)| score.total.unwrap_or(0.0)).reduce(f64::max);
     if let Some(best) = best {
         for (_, score) in actions.iter().zip(&mut scores).filter(|(action, _)| action.kind == "skip") {
+            let no_gain = best == 0.0 && s4_opening_profile(state, playbook).is_some();
             score.rules.push(RuleScore {
-                rule_id: "skip_candidates".into(), score: Some(-best),
-                reason: ActionReason { code: "skip_candidates".into(), values: json!({}) },
+                rule_id: "skip_candidates".into(), score: Some(if no_gain { 1.0 } else { -best }),
+                reason: ActionReason { code: if no_gain { "opening_skip_no_gain" } else { "skip_candidates" }.into(), values: json!({}) },
             });
             let total: f64 = score.rules.iter().filter_map(|rule| rule.score).sum();
             score.total = (total.is_finite() && total.abs() <= MAX_EXACT_SCORE as f64).then_some(total);
@@ -593,8 +598,9 @@ fn gamble_outcomes(state: &Value, action: &ActionCandidate, _registry: &Value, _
     Some((Some(score), if skipped { "partial_gamble_data" } else { "gamble_outcomes" }))
 }
 
-fn imp_gain(state: &Value, action: &ActionCandidate, _registry: &Value, _playbook: &Value) -> Option<(Option<f64>, &'static str)> {
+fn imp_gain(state: &Value, action: &ActionCandidate, _registry: &Value, playbook: &Value) -> Option<(Option<f64>, &'static str)> {
     let context = &state["provider_state"];
+    let opening = s4_opening_profile(state, playbook).is_some();
     // shortcut: use confirmed immediate triggers; extend random-pool/removal chains once settlement is verified.
     let acquired = match action.kind.as_str() {
         "select_candidate" | "buy_effect" => action.params["effect"]["id"].as_u64(),
@@ -603,7 +609,7 @@ fn imp_gain(state: &Value, action: &ActionCandidate, _registry: &Value, _playboo
         _ => None,
     };
     let acquisition = acquired.is_some_and(|id| ACTION_RULES["effects"][id.to_string()]["rarity"] == 5
-        || matches!(id, 3490 | 3491 | 4040 | 4041));
+        || matches!(id, 3490 | 3491 | 4040 | 4041) || (opening && matches!(id, 3010 | 3011)));
     let trade = action.kind == "trade" && context["nodeEvent"]["tradeItems"].as_array().is_some_and(|items|
         items.iter().any(|item| ACTION_RULES["trade_types"][item["id"].to_string()] == 4));
     let gamble = action.kind == "gamble" && context["nodeEvent"]["gambleSelections"].as_array().is_some_and(|selections|
@@ -627,23 +633,35 @@ fn imp_gain(state: &Value, action: &ActionCandidate, _registry: &Value, _playboo
     }
 
     let capacity = || -> Option<bool> {
-        let owned = context["effect"]["effectList"].as_array()?;
+        let mut owned = context["effect"]["effectList"].as_array()?.clone();
+        if opening && action.kind == "trade" {
+            let uids = action.params["uids"].as_array()?;
+            if uids.iter().any(|uid| uid.as_u64().is_none() || !owned.iter().any(|effect| &effect["uid"] == uid)) { return None; }
+            owned.retain(|effect| !uids.contains(&effect["uid"]));
+        }
         let maximum = context["effect"].get("maxEffectVolume").unwrap_or(&context["game"]["maxEffectVolume"]).as_u64()?;
         let mut used = owned.iter().try_fold(0u64, |used, effect|
             used.checked_add(crate::action_provider::volume(effect)?))?;
-        if action.kind == "select_candidate" {
-            let candidate = &action.params["effect"];
+        let candidate = if action.kind == "select_candidate" || (opening && action.kind == "buy_effect") {
+            Some(action.params["effect"].clone())
+        } else if opening && action.kind == "trade" && context["nodeEvent"]["tradeReward"]["type"] == 1 {
+            Some(json!({"id":context["nodeEvent"]["tradeReward"]["effectId"],"badgeId":context["nodeEvent"]["tradeReward"]["badgeId"]}))
+        } else { None };
+        if let Some(candidate) = candidate {
             if owned.iter().any(|effect| !effect["id"].as_u64().is_some_and(|id| id > 0)) { return None; }
-            if crate::action_provider::completes_effect_group(candidate, owned) { return None; }
-            if let Some(replaced) = crate::action_provider::replaced_effect(candidate, owned) {
+            if crate::action_provider::completes_effect_group(&candidate, &owned) { return None; }
+            if let Some(replaced) = crate::action_provider::replaced_effect(&candidate, &owned) {
                 used = used.checked_sub(crate::action_provider::volume(replaced)?)?;
             }
-            used = used.checked_add(crate::action_provider::volume(candidate)?)?;
+            used = used.checked_add(crate::action_provider::volume(&candidate)?)?;
         }
         Some(used >= maximum)
     };
     Some(match capacity() {
+        Some(_) if opening && (trade || acquired.is_some_and(|id| ACTION_RULES["effects"][id.to_string()]["rarity"] == 5)) =>
+            (Some(-60.0), "opening_imp_gain"),
         Some(true) => (Some(0.0), "imp_capacity_full"),
+        Some(false) if opening => (Some(-60.0), "opening_imp_gain"),
         Some(false) => (Some(-15.0), "imp_gain"),
         None => (None, "missing_imp_capacity"),
     })
@@ -740,6 +758,72 @@ fn guidance_count(state: &Value) -> Option<usize> {
     state["provider_state"]["effect"]["effectList"].as_array()
         .and_then(|effects| effects.iter().try_fold(0usize, |count, effect|
             Some(count + usize::from(badge_id(effect)? == 600070))))
+}
+
+fn s4_opening_profile<'a>(state: &Value, playbook: &'a Value) -> Option<&'a Value> {
+    if state["source"] != "packet" { return None; }
+    let level = LEVELS.as_array()?.iter().find(|level| level["level"] == state["provider_state"]["map"]["level"])?;
+    if !matches!(level["activity_id"].as_u64(), Some(260511 | 261081)) { return None; }
+    playbook["profiles"].as_array()?.iter().find(|profile|
+        profile["id"] == playbook["selected_profile_id"] && profile["strategy"] == "opening")
+}
+
+fn friendship_value(owned: &[Value], profile: &Value) -> Option<f64> {
+    let count = owned.iter().try_fold(0usize, |count, effect|
+        Some(count + usize::from(badge_id(effect)? == 600150)))?;
+    if count == 0 { return Some(0.0); }
+    if owned.iter().any(|effect| effect["id"].as_u64().is_none_or(|id| id == 0)) { return None; }
+    let useful = owned.iter().any(|effect| badge_id(effect) == Some(600070))
+        || profile["targets"].as_array()?.iter().any(|target| {
+            target["kind"] == "amulet" && target["plus"] == true
+                && target["id"].as_u64().is_some_and(|id|
+                    owned.iter().any(|effect| effect["id"].as_u64() == id.checked_mul(10))
+                    && !owned.iter().any(|effect| effect["id"].as_u64() == id.checked_mul(10).and_then(|id| id.checked_add(1))
+                        && target["badge"].as_u64().is_none_or(|badge| badge_id(effect) == Some(badge))))
+        });
+    // Keep one seed until guidance or an unfinished PLUS target makes a second friend useful.
+    Some(if useful { if count == 1 { 24.0 } else { 42.0 } } else { 12.0 })
+}
+
+fn friendship(state: &Value, action: &ActionCandidate, registry: &Value, playbook: &Value) -> Option<(Option<f64>, &'static str)> {
+    if !matches!(action.kind.as_str(), "select_candidate" | "sell_effect") { return None; }
+    let profile = s4_opening_profile(state, playbook)?;
+    let change = || -> Option<f64> {
+        let owned = state["provider_state"]["effect"]["effectList"].as_array()?;
+        let before = friendship_value(owned, profile)?;
+        let mut after = owned.clone();
+        if action.kind == "sell_effect" {
+            let uid = action.params["uid"].as_u64()?;
+            let index = after.iter().position(|effect| effect["uid"].as_u64() == Some(uid))?;
+            after.remove(index);
+        } else {
+            let mut candidate = action.params["effect"].clone();
+            if crate::action_provider::completes_effect_group(&candidate, owned) { return None; }
+            if let Some(replaced) = crate::action_provider::replaced_effect(&candidate, owned) {
+                after.remove(owned.iter().position(|effect| effect == replaced)?);
+                candidate["id"] = ACTION_RULES["effects"][candidate["id"].to_string()]["upgrade"].clone();
+            }
+            after.push(candidate);
+        }
+        Some(friendship_value(&after, profile)? - before)
+    };
+    let Some(mut score) = change() else { return Some((None, "missing_friendship_data")); };
+    if score == 0.0 { return None; }
+    let mut reason = "friendship";
+    if score < 0.0 && action.kind == "sell_effect" && badge_id(&action.params["effect"]) == Some(600150) && state["stage"] == 9 {
+        let packs: Vec<_> = crate::action_provider::evaluate(state).actions.into_iter()
+            .filter(|action| action.kind == "buy_pack" && matches!(action.params["goods_id"].as_u64(), Some(101..=103 | 111..=113)))
+            .collect();
+        let price = amulet_price(state, action, registry, playbook).and_then(|(score, _)| score).unwrap_or(0.0) as u128;
+        let funds_pack = !packs.iter().any(|pack| pack.availability == Availability::Available)
+            && packs.iter().any(|pack| pack.cost_resource == "coin" && pack.reasons.len() == 1
+                && pack.reasons[0].code == "insufficient_coin"
+                && pack.cost.as_deref().and_then(|cost| cost.parse::<u128>().ok()).is_some_and(|cost|
+                    crate::action_provider::compare_amount(&state["provider_state"]["game"]["coin"], cost.saturating_sub(price))
+                        .is_some_and(|order| !order.is_lt())));
+        if funds_pack { score *= 0.25; reason = "friendship_funds_pack"; }
+    }
+    Some((Some(score), reason))
 }
 
 fn pack_value(state: &Value, action: &ActionCandidate, _registry: &Value, _playbook: &Value) -> Option<(Option<f64>, &'static str)> {
