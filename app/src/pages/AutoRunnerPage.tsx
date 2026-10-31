@@ -165,6 +165,7 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
         if (reason === "cutoff_no_shop_options") return t("autorun.remake_reason_cutoff_no_shop_options");
         if (reason === "cutoff_cannot_afford") return t("autorun.remake_reason_cutoff_cannot_afford");
         if (reason === "custom-search-limit") return t("autorun.remake_reason_search_limit");
+        if (reason === "invalid-search-tiles") return t("autorun.remake_reason_invalid_tiles");
         if (reason === "remake_at_cutoff") return t("autorun.remake_reason_cutoff");
         if (reason === "decision") return t("autorun.remake_reason_decision");
         return reason || "-";

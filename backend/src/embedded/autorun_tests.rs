@@ -197,12 +197,13 @@ async fn autoplay_executes_top_action_waits_for_state_and_stops_on_goal_or_error
     let limit = json!({"status":"impossible","reason":"custom-search-limit"});
     for (profile, plan) in [
         (json!({"strategy":"full"}), limit.clone()),
+        (json!({"strategy":"full"}), json!({"reason":"invalid-search-tiles"})),
         (profile.clone(), json!({"reason":"custom-not-reachable"})),
     ] {
-        assert!(!super::round::remake_after_search_limit(state, generation, &profile, &plan, &game).await.unwrap());
+        assert!(!super::round::remake_after_search_failure(state, generation, &profile, &plan, &game).await.unwrap());
         assert!(outgoing.try_recv().is_err());
     }
-    let recovery = super::round::remake_after_search_limit(state, generation, &profile, &limit, &game);
+    let recovery = super::round::remake_after_search_failure(state, generation, &profile, &limit, &game);
     let reply = async {
         let Message::Binary(frame) = tokio::time::timeout(Duration::from_secs(4), outgoing.recv()).await.unwrap().unwrap()
             else { panic!("expected remake request") };
@@ -236,7 +237,7 @@ async fn autoplay_executes_top_action_waits_for_state_and_stops_on_goal_or_error
     processor.lock().unwrap().process(&reply, Direction::Inbound).unwrap();
     assert_eq!(state.automation.autorun_status()["runs"], 2);
     state.automation.stop_autorun();
-    assert!(super::round::remake_after_search_limit(state, generation, &profile, &limit, &game).await.unwrap());
+    assert!(super::round::remake_after_search_failure(state, generation, &profile, &limit, &game).await.unwrap());
     assert!(outgoing.try_recv().is_err(), "a stopped run must not remake");
 
     publish(json!({"state":{"current":5,"interrupt":0},"map":{"level":13002,"node":4},
@@ -289,5 +290,75 @@ async fn autoplay_executes_top_action_waits_for_state_and_stops_on_goal_or_error
         while state.automation.autorun_status()["running"] == true { tokio::task::yield_now().await; }
     }).await.unwrap();
     assert_eq!(state.automation.autorun_status()["remake_records"].as_array().unwrap().len(), 2, "failed remakes must not create history entries");
+    state.proxy.unregister_direct();
+}
+
+#[tokio::test]
+async fn invalid_search_tiles_remakes_and_continues_for_any_amulet() {
+    const CHILD_ROOT: &str = "SHANTEN_INVALID_SEARCH_TEST_ROOT";
+    let root = match std::env::var_os(CHILD_ROOT) {
+        Some(root) => PathBuf::from(root),
+        None => {
+            let root = std::env::temp_dir().join(format!("lens-invalid-search-{}",std::process::id()));
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact","embedded::autorun_tests::invalid_search_tiles_remakes_and_continues_for_any_amulet","--nocapture"])
+                .env(CHILD_ROOT,&root).output().unwrap();
+            assert!(output.status.success(),"{output:?}");
+            std::fs::remove_dir_all(root).unwrap();
+            return;
+        }
+    };
+    let runtime = tokio::task::spawn_blocking(move || BackendRuntime::load(root.join("configs"))).await.unwrap().unwrap();
+    let state = &runtime.state;
+    let mut book: Value = serde_json::from_str(include_str!("../../tests/fixtures/playbook.json")).unwrap();
+    book["selected_profile_id"] = json!("opening-profile");
+    state.services.patch_config(&json!({"autorun":{"playbook":book,"op_interval_ms":100}})).unwrap();
+    let (processor,mut outgoing,_) = state.proxy.register_direct("test",state.module_registry.clone()).await;
+    let flow = processor.lock().unwrap().flow_id;
+    let trace: Value = serde_json::from_str(include_str!("../../tests/fixtures/mini-dragon-opening.json")).unwrap();
+    let mut codec = LiqiCodec::new();
+    for id in [3590,3730,620] {
+        let mut round = trace["round"].clone();
+        // Model another effect leaving duplicate physical tiles after opening normalization.
+        round["pool"][30] = round["pool"][29].clone();
+        state.services.update_game_state_from_flow(&Packet {
+            direction:Direction::Inbound,packet_type:"Res".into(),id:Some(1),method:".lq.Lobby.fetchAmuletActivityData".into(),
+            data:json!({"game":{"state":{"current":5,"interrupt":0},"map":{"level":13001,"node":4},
+                "effect":{"effectList":[{"id":id,"uid":17,"volume":1}]},"round":round}}),
+        },flow);
+        let mut updates = state.events.subscribe();
+        assert!(runtime.autorun(AutorunAction::Start,true).await.ok);
+        let (generation,profile) = state.automation.round_context().unwrap();
+        let game = state.services.game_state();
+        let Message::Binary(frame) = tokio::time::timeout(Duration::from_secs(15),outgoing.recv()).await.unwrap().unwrap()
+            else { panic!("expected invalid search to remake") };
+        let packet = codec.parse(&frame).unwrap();
+        assert_eq!(packet.method.as_ref(),".lq.Lobby.amuletActivityGiveup");
+        assert!(tokio::time::timeout(Duration::from_millis(250),outgoing.recv()).await.is_err(),"do not repeat a pending remake");
+        let reply = codec.build(MessageType::Response,packet.id,&packet.method,&json!({})).unwrap();
+        processor.lock().unwrap().process(&reply,Direction::Inbound).unwrap();
+        let Message::Binary(frame) = tokio::time::timeout(Duration::from_secs(4),outgoing.recv()).await.unwrap().unwrap()
+            else { panic!("expected the next opening run to start") };
+        let packet = codec.parse(&frame).unwrap();
+        assert_eq!(packet.method.as_ref(),".lq.Lobby.amuletActivityStartGame");
+        let reply = codec.build(MessageType::Response,packet.id,&packet.method,&json!({})).unwrap();
+        processor.lock().unwrap().process(&reply,Direction::Inbound).unwrap();
+        let status = state.automation.autorun_status();
+        assert_eq!(status["running"],true);
+        assert_eq!(status["last_error"],"");
+        assert_eq!(status["email_status"],"");
+        let record = status["remake_records"].as_array().unwrap().last().unwrap();
+        assert_eq!(record["reason"],"invalid-search-tiles");
+        assert_eq!(record["effect_list"][0]["id"],id);
+        state.automation.stop_autorun();
+        assert!(super::round::remake_after_search_failure(state,generation,&profile,
+            &json!({"reason":"invalid-search-tiles"}),&game).await.unwrap());
+        assert!(outgoing.try_recv().is_err(),"a stopped run must not send another remake");
+        let mut recovered = false;
+        while let Ok(event) = updates.try_recv() {
+            if event["type"] == "autorun_status" && event["data"]["round_decision"]["reason"] == "round.invalid_tiles_remake" { recovered = true; }
+        }
+        assert!(recovered);
+    }
     state.proxy.unregister_direct();
 }
