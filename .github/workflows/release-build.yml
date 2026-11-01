@@ -34,7 +34,7 @@ jobs:
               app/src-tauri/target/release/bundle/nsis/*.sig
               app/src-tauri/target/release/bundle/portable/*.zip
           - name: macOS DMG (Apple Silicon)
-            os: macos-14
+            os: macos-15
             macos_arch: arm64
             artifact_name: shanten-lens-macos-arm64-dmg
             artifact_path: app/src-tauri/target/release/bundle/dmg/*.dmg
