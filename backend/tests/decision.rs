@@ -2355,7 +2355,7 @@ fn s4_opening_fixture() -> (Value, Value, Value) {
 }
 
 #[test]
-fn s4_opening_friends_keep_two_and_value_selection_and_sale_symmetrically() {
+fn s4_opening_friends_keep_two_without_sale_proceeds_overriding_retention() {
     let (mut state, book, registry) = s4_opening_fixture();
     for count in 0..=3 {
         let mut owned = vec![json!({"id":1300,"uid":1,"badgeId":600070})];
@@ -2372,9 +2372,9 @@ fn s4_opening_friends_keep_two_and_value_selection_and_sale_symmetrically() {
             let sale = actions.actions.iter().find(|action| action.kind == "sell_effect" && action.params["uid"] == 2).unwrap();
             let score = report.actions.iter().find(|score| score.action_id == sale.id).unwrap();
             assert_eq!(score.rules.iter().find(|rule| rule.rule_id == "friendship").and_then(|rule| rule.score),
-                [None,Some(-24.0),Some(-18.0),None][count]);
+                [None,Some(-32.0),Some(-26.0),None][count]);
             let followup = score.rules.iter().find(|rule| rule.rule_id == "sale_followup").and_then(|rule| rule.score).unwrap_or(0.0);
-            assert_eq!(score.total, Some([0.0,-16.0,-10.0,8.0][count] + followup));
+            assert_eq!(score.total, Some([0.0,-24.0,-18.0,8.0][count] + followup));
             // With no pending replacement, spare slots do not cause the first two friends to be sold.
             let mut shop = state.clone();
             shop["stage"] = json!(9);
@@ -2383,7 +2383,7 @@ fn s4_opening_friends_keep_two_and_value_selection_and_sale_symmetrically() {
             let shop_report = decision::evaluate(&shop, &shop_actions, &registry, &book);
             let sale = shop_actions.actions.iter().find(|action| action.kind == "sell_effect" && action.params["uid"] == 2).unwrap();
             assert_eq!(shop_report.actions.iter().find(|score| score.action_id == sale.id).unwrap().total,
-                Some([0.0,-16.0,-10.0,8.0][count]));
+                Some([0.0,-24.0,-18.0,8.0][count]));
         }
     }
 }
@@ -2437,24 +2437,138 @@ fn s4_opening_friendship_counts_merge_losses_once() {
 }
 
 #[test]
-fn s4_opening_friends_can_fund_a_pack_without_selling_them_prematurely() {
+fn s4_opening_retains_friends_even_when_selling_would_fund_a_pack() {
     let (mut state, book, registry) = s4_opening_fixture();
     state["stage"] = json!(9);
     state["provider_state"]["effect"]["effectList"] = json!([
         {"id":1300,"uid":1,"badgeId":600070},{"id":1050,"uid":2,"badgeId":600150}]);
-    state["provider_state"]["shop"]["goods"] = json!([{"id":1,"goodsId":101,"sold":false,"price":5}]);
-    for (coin,sold,expected,reason) in [(2,false,-6.0,"friendship_funds_pack"),
-        (0,false,-24.0,"friendship"),(5,false,-24.0,"friendship"),(2,true,-24.0,"friendship")] {
+    for (coin,price,refresh,sold) in [(7,10,8,false),(4,5,5,false),(2,5,1,false),
+        (0,5,1,false),(5,5,1,false),(2,5,1,true)] {
+        state["provider_state"]["shop"]["goods"] = json!([{"id":1,"goodsId":101,"sold":sold,"price":price}]);
+        state["provider_state"]["shop"]["refreshPrice"] = json!(refresh);
         state["provider_state"]["game"]["coin"] = json!(coin);
-        state["provider_state"]["shop"]["goods"][0]["sold"] = json!(sold);
         let actions = shanten_backend::action_provider::evaluate(&state);
         let report = decision::evaluate(&state, &actions, &registry, &book);
         let sale = actions.actions.iter().find(|action| action.kind == "sell_effect" && action.params["uid"] == 2).unwrap();
         let score = report.actions.iter().find(|score| score.action_id == sale.id).unwrap();
         let rule = score.rules.iter().find(|rule| rule.rule_id == "friendship").unwrap();
-        assert_eq!(rule.score, Some(expected));
-        assert_eq!(rule.reason.code, reason);
-        assert_eq!(score.total, Some(8.0+expected));
+        assert_eq!(rule.score, Some(-32.0));
+        assert_eq!(rule.reason.code, "friendship_retained_sale");
+        assert_eq!(score.total, Some(-24.0));
+        let best = report.actions.iter().max_by(|a,b| a.total.unwrap().total_cmp(&b.total.unwrap())).unwrap();
+        assert_ne!(best.action_id, sale.id);
+    }
+}
+
+#[test]
+fn s4_opening_retains_a_friend_seed_even_on_an_expensive_carrier() {
+    let (mut state, book, mut registry) = s4_opening_fixture();
+    state["stage"] = json!(9);
+    state["provider_state"]["effect"]["effectList"] = json!([{"id":1050,"uid":1,"badgeId":600150}]);
+    for price in [3,12,50] {
+        registry["amulets"] = json!([{"id":105,"sell_price":price}]);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        let sale = actions.actions.iter().find(|action| action.kind == "sell_effect").unwrap();
+        assert_eq!(report.actions.iter().find(|score| score.action_id == sale.id).unwrap().total, Some(-12.0));
+    }
+    registry["amulets"] = json!([]);
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    let sale = actions.actions.iter().find(|action| action.kind == "sell_effect").unwrap();
+    let score = report.actions.iter().find(|score| score.action_id == sale.id).unwrap();
+    assert_eq!(score.total, Some(-12.0), "missing sale price must not erase known retention");
+    assert!(score.rules.iter().any(|rule| rule.reason.code == "missing_amulet_price" && rule.score.is_none()));
+}
+
+#[test]
+fn s4_opening_cleans_disposable_cards_with_friends_before_opening_packs() {
+    let (mut state, book, registry) = s4_opening_fixture();
+    state["stage"] = json!(9);
+    state["provider_state"]["game"]["coin"] = json!(103);
+    state["provider_state"]["shop"]["goods"] = json!([
+        {"id":1,"goodsId":101,"sold":false,"price":5},
+        {"id":2,"goodsId":102,"sold":false,"price":10},
+        {"id":3,"goodsId":103,"sold":false,"price":15}]);
+    for friends in [1,2] {
+        let mut owned = vec![json!({"id":1300,"uid":1,"badgeId":600070}),
+            json!({"id":1050,"uid":2,"badgeId":600150}),
+            json!({"id":1120,"uid":4,"badgeId":0}),json!({"id":1010,"uid":5,"badgeId":0})];
+        if friends == 2 { owned.push(json!({"id":1020,"uid":3,"badgeId":600150})); }
+        state["provider_state"]["effect"]["effectList"] = json!(owned);
+        for remaining in [2,1,0] {
+            let actions = shanten_backend::action_provider::evaluate(&state);
+            let report = decision::evaluate(&state, &actions, &registry, &book);
+            let best = report.actions.iter().max_by(|a,b| a.total.unwrap().total_cmp(&b.total.unwrap())).unwrap();
+            let action = actions.actions.iter().find(|action| action.id == best.action_id).unwrap();
+            if remaining == 0 {
+                assert_eq!(action.kind, "buy_pack");
+                assert_eq!(action.params["goods_id"],101,"normal pack order resumes after cleanup");
+            } else {
+                assert_eq!(action.kind, "sell_effect");
+                assert!(matches!(action.params["uid"].as_u64(), Some(4 | 5)));
+                assert!(best.rules.iter().any(|rule| rule.rule_id == "friendship_cleanup_before_packs"));
+                state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap()
+                    .retain(|effect| effect["uid"] != action.params["uid"]);
+            }
+        }
+    }
+}
+
+#[test]
+fn s4_opening_cleanup_preserves_targets_bases_and_retention_rules() {
+    let (mut state, book, registry) = s4_opening_fixture();
+    state["stage"] = json!(9);
+    state["provider_state"]["game"]["coin"] = json!(103);
+    state["provider_state"]["shop"]["goods"] = json!([{"id":1,"goodsId":101,"sold":false,"price":5}]);
+    state["provider_state"]["effect"]["effectList"] = json!([
+        {"id":1300,"uid":1,"badgeId":600070},{"id":1050,"uid":2,"badgeId":600150},
+        {"id":1690,"uid":3,"badgeId":0},{"id":1691,"uid":4,"badgeId":0},
+        {"id":2240,"uid":5,"badgeId":0},{"id":620,"uid":6,"badgeId":0},
+        {"id":1120,"uid":7,"badgeId":0}]);
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    for action in actions.actions.iter().filter(|action| action.kind == "sell_effect") {
+        let score = report.actions.iter().find(|score| score.action_id == action.id).unwrap();
+        assert_eq!(score.rules.iter().any(|rule| rule.rule_id == "friendship_cleanup_before_packs"), action.params["uid"] == 7);
+    }
+    // Unknown sale data must not be promoted ahead of a known pack.
+    let mut registry = registry.clone();
+    registry["amulets"].as_array_mut().unwrap().retain(|amulet| amulet["id"] != 112);
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    let sale = actions.actions.iter().find(|action| action.kind == "sell_effect" && action.params["uid"] == 7).unwrap();
+    assert!(report.actions.iter().find(|score| score.action_id == sale.id).unwrap().rules.iter()
+        .all(|rule| rule.rule_id != "friendship_cleanup_before_packs"));
+}
+
+#[test]
+fn s4_opening_cleanup_requires_a_friend_an_available_pack_and_the_selected_s4_opening_profile() {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    state["stage"] = json!(9);
+    state["provider_state"]["game"]["coin"] = json!(103);
+    state["provider_state"]["shop"]["goods"] = json!([{"id":1,"goodsId":101,"sold":false,"price":5}]);
+    for (source,level,strategy,selected,friend,sold,active) in [
+        ("packet",13001,"opening","opening",true,false,true),
+        ("packet",11001,"opening","opening",true,false,true),
+        ("packet",501,"opening","opening",true,false,false),
+        ("qyzz",13001,"opening","opening",true,false,false),
+        ("packet",13001,"full","opening",true,false,false),
+        ("packet",13001,"opening","other",true,false,false),
+        ("packet",13001,"opening","opening",false,false,false),
+        ("packet",13001,"opening","opening",true,true,false),
+    ] {
+        state["source"] = json!(source);
+        state["provider_state"]["map"]["level"] = json!(level);
+        book["profiles"][0]["strategy"] = json!(strategy);
+        book["selected_profile_id"] = json!(selected);
+        state["provider_state"]["shop"]["goods"][0]["sold"] = json!(sold);
+        state["provider_state"]["effect"]["effectList"] = json!([
+            {"id":1300,"uid":1,"badgeId":600070},{"id":1050,"uid":2,"badgeId":if friend {600150} else {0}},
+            {"id":1120,"uid":3,"badgeId":0}]);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        assert_eq!(report.actions.iter().any(|score| score.rules.iter()
+            .any(|rule| rule.rule_id == "friendship_cleanup_before_packs")), active,"{state}");
     }
 }
 
@@ -2539,7 +2653,8 @@ fn s4_opening_rules_do_not_affect_other_sources_seasons_or_profiles() {
     for locale in [include_str!("../../app/src/locales/zh-CN.json"),include_str!("../../app/src/locales/ja-JP.json")] {
         let locale: Value = serde_json::from_str(locale).unwrap();
         assert!(locale["action_provider"]["scoring"]["rules"]["friendship"].is_string());
-        for reason in ["friendship","friendship_funds_pack","missing_friendship_data","opening_imp_gain","opening_skip_no_gain"] {
+        assert!(locale["action_provider"]["scoring"]["rules"]["friendship_cleanup_before_packs"].is_string());
+        for reason in ["friendship","friendship_retained_sale","friendship_cleanup_before_packs","missing_friendship_data","opening_imp_gain","opening_skip_no_gain"] {
             assert!(locale["action_provider"]["scoring"]["reasons"][reason].is_string());
         }
     }

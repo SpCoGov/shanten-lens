@@ -310,6 +310,38 @@ fn real_protobuf_event_response_updates_game_state_end_to_end() {
 }
 
 #[test]
+fn empty_desktop_fetch_reveals_full_wall_in_client_response() {
+    let base = temp_root("empty-desktop");
+    let (events, _) = broadcast::channel(16);
+    let services = Arc::new(Services::load(base.join("configs"),events).unwrap());
+    services.patch_config(&json!({"game":{"public_all":true}})).unwrap();
+    let config = PipelineConfig { schema:1, modules:vec![crate::pipeline::ModuleConfig {
+        id:"game_state".into(),enabled:true,options:Value::Null,
+    }] };
+    let mut processor = FlowProcessor::with_services(config,services.clone());
+    let trace: Value = serde_json::from_str(include_str!("../../tests/fixtures/empty-desktop-fetch.json")).unwrap();
+    let method = ".lq.Lobby.fetchAmuletActivityData";
+    let request = processor.build_request(37,method,&json!({"activityId":261081})).unwrap();
+    processor.process(&request,Direction::Outbound).unwrap();
+    let response = processor.codec.build(MessageType::Response,Some(37),method,&trace["response"]).unwrap();
+    let FrameOutcome::Forward(frame) = processor.process(&response,Direction::Inbound).unwrap()
+        else { panic!("expected forwarded game snapshot") };
+    let mut client = LiqiCodec::new();
+    client.parse(&request).unwrap();
+    let decoded = client.parse(&frame).unwrap();
+    assert_eq!(services.game_state()["wall_tiles"],trace["expected_wall"]);
+    let shown = decoded.data["data"]["game"]["round"]["showDesktopTiles"].as_array().unwrap();
+    let expected = trace["expected_wall"].as_array().unwrap().iter()
+        .chain(trace["response"]["data"]["game"]["round"]["lockedTile"].as_array().unwrap()).collect::<Vec<_>>();
+    assert_eq!(shown.len(),36,"client must receive all 33 drawable tiles and 3 locked tiles");
+    for (index,tile) in shown.iter().enumerate() {
+        assert_eq!(&tile["id"],expected[index]);
+        assert_eq!(tile["pos"],35-index);
+    }
+    fs::remove_dir_all(base).unwrap();
+}
+
+#[test]
 fn unselected_packet_source_forwards_without_running_modules() {
     struct UnexpectedModule;
     impl PacketModule for UnexpectedModule {
