@@ -5,6 +5,7 @@ mod audit_tests;
 mod autorun_tests;
 mod commands;
 mod direct;
+mod diagnostics;
 pub use direct::DirectStatus;
 mod plugins;
 mod qyzz;

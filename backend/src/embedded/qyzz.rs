@@ -69,6 +69,13 @@ fn discovery_path(os: &str, env: impl Fn(&str) -> Option<std::ffi::OsString>) ->
     Some(root.join("Qyzz/shanten-lens.json"))
 }
 
+pub(super) fn diagnostic_status() -> Value {
+    match discovery() {
+        Some((port, _)) => json!({"discovery_valid":true,"protocol":1,"port":port}),
+        None => json!({"discovery_valid":false}),
+    }
+}
+
 fn discovery() -> Option<(u16, String)> {
     let path = discovery_path(std::env::consts::OS, |name| std::env::var_os(name))?;
     #[cfg(test)]

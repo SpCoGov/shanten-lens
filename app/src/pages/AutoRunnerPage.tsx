@@ -398,7 +398,7 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
             {controlError && <p className="notice error" role="alert">{controlError}</p>}
             {status.last_error && <p className="notice error">{t("autorun.hint_last_error", {text: t(status.last_error, {defaultValue: status.last_error})})}</p>}
             {working && <p className="hint">{t("autoplay.fuse_suspended")}</p>}
-            {status.email_status && <p className={status.email_status === "failed" ? "notice error" : "hint"} role="status">
+            {status.email_status && <p className={`${styles.emailStatus} ${status.email_status === "failed" ? "notice error" : "hint"}`} role="status">
                 <span className="ms" aria-hidden="true">{status.email_status === "failed" ? "error" : "mail"}</span>{t(`autoplay.email_${status.email_status}`, {error: status.email_error ?? ""})}
             </p>}
             <div className={styles.metrics}>

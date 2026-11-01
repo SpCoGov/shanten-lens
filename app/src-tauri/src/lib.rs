@@ -477,6 +477,22 @@ fn backend_open_config_dir(state: State<'_, IpcBackendState>) -> Result<(), Stri
 
 #[tauri::command]
 #[specta::specta]
+async fn backend_export_diagnostics(
+    include_game_data: bool,
+    frontend: Value,
+    state: State<'_, IpcBackendState>,
+) -> Result<String, String> {
+    state.0.export_diagnostics(include_game_data, frontend).await
+}
+
+#[tauri::command]
+#[specta::specta]
+fn backend_record_frontend_error(error: Value, state: State<'_, IpcBackendState>) -> Result<(), String> {
+    state.0.record_frontend_error(error)
+}
+
+#[tauri::command]
+#[specta::specta]
 fn backend_open_log_dir(state: State<'_, IpcBackendState>) -> Result<(), String> {
     state.0.open_log_dir()
 }
@@ -774,6 +790,8 @@ fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
             backend_switch,
             backend_open_config_dir,
             backend_open_log_dir,
+            backend_export_diagnostics,
+            backend_record_frontend_error,
             backend_open_record_dir,
             backend_open_plugin_dir,
         ])
@@ -879,6 +897,8 @@ pub fn run() {
             backend_switch,
             backend_open_config_dir,
             backend_open_log_dir,
+            backend_export_diagnostics,
+            backend_record_frontend_error,
             backend_open_record_dir,
             backend_open_plugin_dir
         ]))
