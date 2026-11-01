@@ -193,6 +193,29 @@
     opacity: .56;
 }
 
+.diagnostics {
+    display: grid;
+    justify-items: start;
+    gap: 12px;
+}
+
+.diagnosticOption {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.diagnosticOption input {
+    flex-shrink: 0;
+    margin: 4px 0 0;
+}
+
+.exportResult {
+    overflow-wrap: anywhere;
+}
+
 .spinning {
     animation: aboutSpin .9s linear infinite;
 }

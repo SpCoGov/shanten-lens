@@ -21,6 +21,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 reqwest = { version = "0.13", features = ["blocking", "json", "query"] }
 semver = "1"
+regex = "1"
 sha2 = "0.10"
 hmac = "0.12"
 md-5 = "0.10"

@@ -785,6 +785,13 @@
     "selectToPreview": "プレビューするお守りを選択してください。"
   },
   "about": {
+    "diagnostics_title": "診断設定",
+    "diagnostics_description": "バージョンと実行環境、今回・前回の起動ログ、クラッシュ記録、接続とポートの状態、機密情報を除いた設定、プラグイン、最近の操作概要を ZIP に保存し、保存先フォルダーを開きます。パスワード、Token、メール認証情報などは伏せられます。設定の復元には使用できません。",
+    "diagnostics_include_game": "ゲーム状態と最近のパケット内容を含める（最大 1000 件、対局情報を含む場合があります）",
+    "diagnostics_export": "診断設定をエクスポート",
+    "diagnostics_exporting": "エクスポート中…",
+    "diagnostics_exported": "保存先：{{path}}",
+    "diagnostics_failed": "エクスポートに失敗しました：{{error}}",
     "logo_alt": "向聴レンズのロゴ",
     "show_usage_notice": "使用上の注意を表示",
     "check_update": "更新を確認",

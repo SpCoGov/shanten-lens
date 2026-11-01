@@ -785,6 +785,13 @@
     "selectToPreview": "请选择护身符以预览。"
   },
   "about": {
+    "diagnostics_title": "诊断配置",
+    "diagnostics_description": "导出 ZIP，包含版本环境、当前及上次启动日志、崩溃记录、连接与端口状态、脱敏配置、插件及最近操作摘要。自动隐藏密码、Token、邮件授权码等敏感信息；保存后打开所在文件夹。诊断包不能用于还原配置。",
+    "diagnostics_include_game": "包含游戏状态与最近封包内容（最多 1000 条，可能含对局信息）",
+    "diagnostics_export": "导出诊断配置",
+    "diagnostics_exporting": "正在导出…",
+    "diagnostics_exported": "已保存到：{{path}}",
+    "diagnostics_failed": "导出失败：{{error}}",
     "logo_alt": "向听镜标志",
     "show_usage_notice": "查看使用须知",
     "check_update": "检查更新",

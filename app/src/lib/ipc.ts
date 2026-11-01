@@ -145,6 +145,7 @@ export function subscribeBackendEvent<K extends keyof BackendEventMap>(
 }
 
 export const getSnapshot = commands.backendSnapshot;
+export const exportDiagnostics = commands.backendExportDiagnostics;
 export const executeAction = commands.backendExecuteAction;
 export const getDataSources = commands.backendDataSources;
 export const selectDataSource = commands.backendSelectDataSource;

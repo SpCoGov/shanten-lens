@@ -167,6 +167,12 @@ async backendOpenConfigDir() : Promise<null> {
 async backendOpenLogDir() : Promise<null> {
     return await TAURI_INVOKE("backend_open_log_dir");
 },
+async backendExportDiagnostics(includeGameData: boolean, frontend: JsonValue) : Promise<string> {
+    return await TAURI_INVOKE("backend_export_diagnostics", { includeGameData, frontend });
+},
+async backendRecordFrontendError(error: JsonValue) : Promise<null> {
+    return await TAURI_INVOKE("backend_record_frontend_error", { error });
+},
 async backendOpenRecordDir() : Promise<null> {
     return await TAURI_INVOKE("backend_open_record_dir");
 },

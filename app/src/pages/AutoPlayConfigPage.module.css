@@ -136,6 +136,8 @@
 .stateIcon { display: grid; place-items: center; flex: 0 0 42px; height: 42px; border-radius: 12px; background: var(--input-bg); color: var(--muted); }
 .stateIcon.running { background: var(--badge-ok-bg); color: var(--badge-ok-fg); }
 .confirmation { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px; margin-top: 16px; border: 1px solid var(--notice-border); border-radius: 8px; background: var(--notice-bg); color: var(--notice-fg); font-size: 13px; }
+.emailStatus { display: flex; align-items: center; gap: 6px; }
+.emailStatus > :global(.ms) { flex-shrink: 0; }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding-block: 20px; }
 .metrics > div { display: grid; gap: 10px; border-right: 1px solid var(--border); }
 .metrics > div:last-child { border: 0; }

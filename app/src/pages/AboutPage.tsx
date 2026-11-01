@@ -8,6 +8,8 @@ import Modal from "../components/Modal";
 import Tile from "../components/Tile";
 import {APP_VERSION} from "../lib/version";
 import type {UpdateInfo} from "../lib/updateCheck";
+import {exportDiagnostics} from "../lib/ipc";
+import {collectFrontendDiagnostics} from "../lib/diagnostics";
 
 const TILE_GROUPS: Array<{ titleKey: string; tiles: string[] }> = [
     {titleKey: "about.tile_groups.manzu", tiles: ["0m", "1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m"]},
@@ -45,6 +47,24 @@ export default function AboutPage({
 }) {
     const {t} = useTranslation();
     const [openTileGallery, setOpenTileGallery] = React.useState(false);
+    const [includeGameData, setIncludeGameData] = React.useState(false);
+    const [exporting, setExporting] = React.useState(false);
+    const [exportPath, setExportPath] = React.useState("");
+    const [exportError, setExportError] = React.useState("");
+
+    async function handleExportDiagnostics() {
+        if (exporting) return;
+        setExporting(true);
+        setExportPath("");
+        setExportError("");
+        try {
+            setExportPath(await exportDiagnostics(includeGameData, collectFrontendDiagnostics()));
+        } catch (error) {
+            setExportError(String(error));
+        } finally {
+            setExporting(false);
+        }
+    }
 
     const amulet225: EffectItem = {id: 2250, uid: 0, volume: 1, store: [], tags: []};
     const amulet218: EffectItem = {id: 2180, uid: 0, volume: 1, store: [], tags: []};
@@ -118,6 +138,23 @@ Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
                     {checkingUpdate ? t("about.check_update_loading") : t("about.check_update")}
                 </button>
             </div>
+
+            <section className={`${styles.infoCard} ${styles.diagnostics}`} aria-labelledby="diagnostic-export-title">
+                <h2 id="diagnostic-export-title">{t("about.diagnostics_title")}</h2>
+                <p>{t("about.diagnostics_description")}</p>
+                <label className={styles.diagnosticOption}>
+                    <input type="checkbox" checked={includeGameData} disabled={exporting}
+                           onChange={(event) => setIncludeGameData(event.target.checked)}/>
+                    {t("about.diagnostics_include_game")}
+                </label>
+                <button type="button" className={styles.primaryAction} onClick={() => void handleExportDiagnostics()}
+                        disabled={exporting} aria-busy={exporting}>
+                    <span className={`ms ${exporting ? styles.spinning : ""}`} aria-hidden="true">{exporting ? "sync" : "download"}</span>
+                    {t(exporting ? "about.diagnostics_exporting" : "about.diagnostics_export")}
+                </button>
+                {exportPath ? <p role="status" className={styles.exportResult}>{t("about.diagnostics_exported", {path: exportPath})}</p> : null}
+                {exportError ? <p role="alert" className="notice error">{t("about.diagnostics_failed", {error: exportError})}</p> : null}
+            </section>
 
             <Modal
                 open={openTileGallery}

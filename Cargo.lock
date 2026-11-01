@@ -4397,6 +4397,7 @@ dependencies = [
  "prost-build",
  "prost-reflect",
  "protoc-bin-vendored",
+ "regex",
  "reqwest",
  "semver",
  "serde",

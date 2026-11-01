@@ -129,37 +129,31 @@ export class AppErrorBoundary extends React.Component<React.PropsWithChildren, A
         window.removeEventListener("unhandledrejection", this.handleUnhandledRejection);
     }
 
+    private captureError = (error: CapturedError) => {
+        if (isTauri()) void invoke("backend_record_frontend_error", {error}).catch(() => {});
+        this.setState({error});
+    };
+
     componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-        this.setState({
-            error: toCapturedError(
-                error,
-                "render",
-                t("app.error_boundary.render_title"),
-                errorInfo.componentStack ?? undefined
-            ),
-        });
+        this.captureError(toCapturedError(error, "render", t("app.error_boundary.render_title"), errorInfo.componentStack ?? undefined));
     }
 
     showStartupError = (error: unknown) => {
-        this.setState({
-            error: toCapturedError(error, "startup", t("app.error_boundary.startup_title")),
-        });
+        this.captureError(toCapturedError(error, "startup", t("app.error_boundary.startup_title")));
     };
 
     private showBackendError = (report: string) => {
-        this.setState({error: toCapturedError(report, "backend", t("app.error_boundary.backend_title"))});
+        this.captureError(toCapturedError(report, "backend", t("app.error_boundary.backend_title")));
     };
 
     private handleRuntimeError = (event: ErrorEvent) => {
-        this.setState((state) => state.error?.source === "backend" ? null : ({
-            error: toCapturedError(event.error ?? event.message, "runtime", t("app.error_boundary.runtime_title")),
-        }));
+        if (this.state.error?.source === "backend") return;
+        this.captureError(toCapturedError(event.error ?? event.message, "runtime", t("app.error_boundary.runtime_title")));
     };
 
     private handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-        this.setState((state) => state.error?.source === "backend" ? null : ({
-            error: toCapturedError(event.reason, "promise", t("app.error_boundary.promise_title")),
-        }));
+        if (this.state.error?.source === "backend") return;
+        this.captureError(toCapturedError(event.reason, "promise", t("app.error_boundary.promise_title")));
     };
 
     private reload = () => {

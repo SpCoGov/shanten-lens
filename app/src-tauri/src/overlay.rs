@@ -204,50 +204,13 @@ mod imp {
                     thread::sleep(SEARCH_INTERVAL);
                     continue;
                 };
-                update_status(&status, true, Some(game.pid));
-
-                match client_area(game.hwnd) {
-                    Some(area) => {
-                        let is_interactive = interactive.load(Ordering::SeqCst);
-                        configure_overlay_clickthrough(hud_hwnd, !is_interactive);
-                        let regions = panel_regions
-                            .lock()
-                            .map(|regions| regions.clone())
-                            .unwrap_or_default();
-                        let visible_region = build_visible_region(
-                            game.hwnd,
-                            hud_hwnd,
-                            area,
-                            is_interactive,
-                            &regions,
-                        );
-                        let Some(visible_region) = visible_region else {
-                            hide(hud_hwnd);
-                            update_status(&status, true, None);
-                            thread::sleep(ACTIVE_TRACK_INTERVAL);
-                            continue;
-                        };
-
-                        apply_window_region(hud_hwnd, visible_region);
-
-                        let z_after = z_order_insert_after(game.hwnd, hud_hwnd);
-                        unsafe {
-                            let _ = SetWindowPos(
-                                hud_hwnd,
-                                Some(z_after),
-                                area.x,
-                                area.y,
-                                area.width,
-                                area.height,
-                                SWP_NOACTIVATE | SWP_SHOWWINDOW,
-                            );
-                        }
-                    }
-                    None => {
-                        hide(hud_hwnd);
-                        current_game = None;
-                        update_status(&status, true, None);
-                    }
+                let is_interactive = interactive.load(Ordering::SeqCst);
+                let regions = panel_regions
+                    .lock()
+                    .map(|regions| regions.clone())
+                    .unwrap_or_default();
+                if !track_overlay_target(hud_hwnd, game, &status, is_interactive, &regions) {
+                    current_game = None;
                 }
 
                 thread::sleep(ACTIVE_TRACK_INTERVAL);
@@ -255,6 +218,43 @@ mod imp {
 
             hide(hud_hwnd);
         });
+    }
+
+    // A covered HUD is hidden, but its game window remains a valid tracking target.
+    fn track_overlay_target(
+        hud_hwnd: HWND,
+        game: WindowCandidate,
+        status: &Arc<Mutex<OverlayStatus>>,
+        interactive: bool,
+        panel_regions: &[PanelRegion],
+    ) -> bool {
+        update_status(status, true, Some(game.pid));
+        let Some(area) = client_area(game.hwnd) else {
+            hide(hud_hwnd);
+            update_status(status, true, None);
+            return false;
+        };
+        configure_overlay_clickthrough(hud_hwnd, !interactive);
+        let Some(visible_region) = build_visible_region(
+            game.hwnd, hud_hwnd, area, interactive, panel_regions,
+        ) else {
+            hide(hud_hwnd);
+            return true;
+        };
+        apply_window_region(hud_hwnd, visible_region);
+        let z_after = z_order_insert_after(game.hwnd, hud_hwnd);
+        unsafe {
+            let _ = SetWindowPos(
+                hud_hwnd,
+                Some(z_after),
+                area.x,
+                area.y,
+                area.width,
+                area.height,
+                SWP_NOACTIVATE | SWP_SHOWWINDOW,
+            );
+        }
+        true
     }
 
     const BACKGROUND_IDLE_INTERVAL: Duration = Duration::from_millis(250);
@@ -607,6 +607,75 @@ mod imp {
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        #[test]
+        fn occluded_hud_keeps_game_pid_and_recovers_when_uncovered() {
+            use windows::core::w;
+            use windows::Win32::UI::WindowsAndMessaging::{
+                CreateWindowExW, DestroyWindow, WS_POPUP,
+            };
+
+            struct TestWindow(HWND);
+            impl TestWindow {
+                fn new() -> Self {
+                    // Keep test windows off screen and non-activating; do not disturb the real game.
+                    Self(unsafe {
+                        CreateWindowExW(
+                            WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+                            w!("STATIC"), w!("Shanten HUD regression test"), WS_POPUP,
+                            -30000, -30000, 640, 480, None, None, None, None,
+                        ).unwrap()
+                    })
+                }
+                fn show(&self, x: i32, y: i32, width: i32, height: i32) {
+                    unsafe {
+                        SetWindowPos(self.0, Some(HWND_TOP), x, y, width, height,
+                            SWP_NOACTIVATE | SWP_SHOWWINDOW).unwrap();
+                    }
+                }
+            }
+            impl Drop for TestWindow {
+                fn drop(&mut self) { unsafe { let _ = DestroyWindow(self.0); } }
+            }
+
+            let game = TestWindow::new();
+            let hud = TestWindow::new();
+            let cover = TestWindow::new();
+            game.show(-30000, -30000, 640, 480);
+            let target = WindowCandidate {hwnd: game.0, pid: std::process::id()};
+            let status = Arc::new(Mutex::new(OverlayStatus {
+                enabled: true, supported: true, found: false, pid: None,
+            }));
+            let area = client_area(game.0).unwrap();
+            let panel = PanelRegion {x:0, y:300, width:640, height:180};
+            for interactive in [false, true] {
+                assert!(track_overlay_target(hud.0, target, &status, interactive, &[panel]));
+                assert!(unsafe { IsWindowVisible(hud.0) }.as_bool());
+                // Interactive mode clips to HUD panels, which can be covered while the rest of the game is visible.
+                let cover_y = if interactive {area.y + panel.y} else {area.y};
+                let cover_height = if interactive {panel.height} else {area.height};
+                cover.show(area.x, cover_y, area.width, cover_height);
+                assert!(is_live_overlay_target(game.0));
+                assert!(build_visible_region(game.0, hud.0, area, interactive, &[panel]).is_none());
+                assert!(track_overlay_target(hud.0, target, &status, interactive, &[panel]));
+                assert!(!unsafe { IsWindowVisible(hud.0) }.as_bool());
+                {
+                    let current = status.lock().unwrap();
+                    assert!(current.found);
+                    assert_eq!(current.pid, Some(target.pid));
+                }
+                hide(cover.0);
+                assert!(track_overlay_target(hud.0, target, &status, interactive, &[panel]));
+                assert!(unsafe { IsWindowVisible(hud.0) }.as_bool());
+                assert_eq!(status.lock().unwrap().pid, Some(target.pid));
+            }
+            drop(game);
+            assert!(!track_overlay_target(hud.0, target, &status, false, &[]));
+            assert!(!unsafe { IsWindowVisible(hud.0) }.as_bool());
+            let current = status.lock().unwrap();
+            assert!(!current.found);
+            assert_eq!(current.pid, None);
+        }
 
         #[test]
         fn game_processes_match_case_insensitively_and_follow_the_selected_source() {
