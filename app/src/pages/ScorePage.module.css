@@ -49,6 +49,16 @@
 .stageName { font-size: 19px; }
 .metricLabel { color: var(--muted); font-size: 12px; }
 
+.scientificNumber {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    opacity: .75;
+}
+
 .stageMetrics {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

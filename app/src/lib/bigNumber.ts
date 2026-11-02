@@ -137,6 +137,18 @@ function formatFixed(value: bigint, exponent: number, decimals: number): string 
     return `${text.slice(0, -decimals)}.${text.slice(-decimals)}`;
 }
 
+export function formatScientificScaledNumber(value: bigint, scaleDecimals: number, decimals = 2): string {
+    const negative = value < 0n;
+    const abs = negative ? -value : value;
+    let exponent = abs.toString().length - 1;
+    let mantissa = formatFixed(abs, exponent, decimals);
+    if (mantissa.startsWith("10")) {
+        exponent += 1;
+        mantissa = formatFixed(abs, exponent, decimals);
+    }
+    return `${negative ? "-" : ""}${mantissa}e${abs === 0n ? 0 : exponent - scaleDecimals}`;
+}
+
 function formatScaledFixed(value: bigint, exponent: number, decimals: number): string {
     const scale = 10n ** BigInt(exponent);
     let quotient = (value * (10n ** BigInt(decimals))) / scale;
