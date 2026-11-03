@@ -203,6 +203,7 @@ pub(super) fn apply_fetch_state(target: &mut Map<String, Value>, response: &Valu
     rebuild_pool_sections(target, round, false);
     sync_wall_sections(target, round);
     sync_consumed_replacements(target);
+    remember_drawn_tile(target, None);
 }
 
 fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
@@ -210,6 +211,7 @@ fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
         .get("result")
         .and_then(|value| value.get("newGameResult"))
     {
+        target.insert("last_drawn_tile".into(), Value::Null);
         apply_fetch_state(target, &json!({"data":{"game":game}}));
     }
     crate::action_provider::update(target, item);
@@ -324,6 +326,7 @@ fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
     }
     sync_wall_sections(target, changes.get("round").unwrap_or(&Value::Null));
     sync_consumed_replacements(target);
+    remember_drawn_tile(target, item.get("type").and_then(Value::as_u64));
 }
 
 fn sync_wall_sections(target: &mut Map<String, Value>, round: &Value) {
@@ -563,6 +566,17 @@ fn trim_wall(target: &Map<String, Value>, wall: &mut Vec<u64>) {
     }
 }
 
+fn remember_drawn_tile(target: &mut Map<String, Value>, event_type: Option<u64>) {
+    let hand = ints_from_state(target, "hand_tiles");
+    let drawn = match event_type {
+        Some(10) => hand.last().copied(),
+        Some(1 | 5 | 13) => None,
+        _ => target.get("last_drawn_tile").and_then(Value::as_u64),
+    }.filter(|id| hand.len() % 3 == 2 && hand.contains(id)
+        && target.get("deck_map").and_then(|deck| deck.get(id.to_string())).and_then(Value::as_str) != Some("bd"));
+    target.insert("last_drawn_tile".into(), json!(drawn));
+}
+
 fn remove_drawn_tile_from_wall(target: &mut Map<String, Value>) {
     let Some(drawn) = target
         .get("hand_tiles")
@@ -739,6 +753,30 @@ fn update_boss_buff(target: &mut Map<String, Value>) {
 #[cfg(test)]
 mod pool_tests {
     use super::*;
+
+    #[test]
+    fn actual_self_draw_survives_exchanges_and_clears_after_discard_or_redeal() {
+        let mut target = empty_game_state().as_object().unwrap().clone();
+        target.insert("hand_tiles".into(), json!((1..=14).collect::<Vec<_>>()));
+        remember_drawn_tile(&mut target, Some(10));
+        assert_eq!(target["last_drawn_tile"], 14);
+        target.insert("hand_tiles".into(), json!((2..=15).collect::<Vec<_>>()));
+        remember_drawn_tile(&mut target, Some(4));
+        assert_eq!(target["last_drawn_tile"], 14);
+        remember_drawn_tile(&mut target, None);
+        assert_eq!(target["last_drawn_tile"], 14);
+        target.insert("hand_tiles".into(), json!((2..=14).collect::<Vec<_>>()));
+        remember_drawn_tile(&mut target, Some(11));
+        assert_eq!(target["last_drawn_tile"], Value::Null);
+        target.insert("hand_tiles".into(), json!((2..=15).collect::<Vec<_>>()));
+        remember_drawn_tile(&mut target, Some(10));
+        assert_eq!(target["last_drawn_tile"], 15);
+        remember_drawn_tile(&mut target, Some(13));
+        assert_eq!(target["last_drawn_tile"], Value::Null);
+        target.insert("last_drawn_tile".into(), json!(1));
+        remember_drawn_tile(&mut target, Some(4));
+        assert_eq!(target["last_drawn_tile"], Value::Null);
+    }
 
     #[test]
     fn empty_desktop_fetch_retains_reconstructed_wall_after_restart() {

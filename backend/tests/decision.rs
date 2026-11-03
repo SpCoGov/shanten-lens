@@ -682,7 +682,7 @@ fn every_available_amulet_sale_receives_five_points_once() {
 
 #[test]
 fn preferred_amulets_and_their_plus_variants_stack_both_retention_penalties_without_a_better_choice() {
-    for id in [620,621,720,721,1460,1461,3560,3561] {
+    for id in [620,621,3560,3561] {
         let actions = candidate("sell_effect", json!(id), Availability::Available);
         let report = evaluate(&json!({}), &actions);
         assert_eq!(report.actions[0].total, Some(-15.0), "effect {id}");
@@ -698,11 +698,13 @@ fn preferred_amulets_and_their_plus_variants_stack_both_retention_penalties_with
             assert!(evaluate(&json!({}), &actions).actions.is_empty());
         }
     }
-    for id in [json!(3020), json!(62), json!(629), json!(3562), json!("620"), json!(-620), Value::Null] {
+    for id in [json!(720), json!(721), json!(1460), json!(1461),
+        json!(3020), json!(62), json!(629), json!(3562), json!("620"), json!(-620), Value::Null] {
         let actions = candidate("sell_effect", id, Availability::Available);
         let report = evaluate(&json!({}), &actions);
         assert_eq!(report.actions[0].total, Some(5.0));
-        assert!(report.actions[0].rules.iter().all(|rule| rule.rule_id != "retain_amulet"));
+        assert!(report.actions[0].rules.iter().all(|rule|
+            !matches!(rule.rule_id.as_str(), "retain_amulet" | "retain_amulet_spare_capacity")));
     }
 }
 
@@ -2718,5 +2720,71 @@ fn s4_opening_prefers_skipping_zero_value_candidates_instead_of_filling_spare_sl
         assert_eq!(report.actions[0].total,Some(0.0));
         let skip = actions.actions.iter().find(|action| action.kind == "skip").unwrap();
         assert_eq!(report.actions.iter().find(|score| score.action_id == skip.id).unwrap().total,Some(expected));
+    }
+}
+
+
+#[test]
+fn opening_badge_target_scores_stop_at_the_retention_limit() {
+    for required in [1, 2] {
+        let mut book = json!({"selected_profile_id":"opening","profiles":[{"id":"opening","strategy":"opening",
+            "targets":[{"kind":"badge","id":600010,"value":3}]}]});
+        if required != 1 { book["profiles"][0]["targets"][0]["count"] = json!(required); }
+        for count in 0..=3 {
+            let owned: Vec<_> = (0..count).map(|uid| json!({"id":90,"uid":uid,"badgeId":600010})).collect();
+            let state = json!({"provider_state":{"effect":{"effectList":owned}}});
+            for (kind, expected) in [("select_candidate", if count < required { 297.0 } else { 0.0 }),
+                ("sell_effect", if count <= required { 5.0 - 297.0 } else { 5.0 })] {
+                if count == 0 && kind == "sell_effect" { continue; }
+                let mut actions = candidate(kind, json!(3020), Availability::Available);
+                actions.actions[0].params["effect"]["badgeId"] = json!(600010);
+                let report = decision::evaluate(&state, &actions, &json!({"amulets":[{"id":302,"sell_price":0,"plus_sell_price":0}]}), &book);
+                assert_eq!(report.actions[0].total, Some(expected), "{kind}: {count}/{required}");
+            }
+        }
+    }
+}
+
+#[test]
+fn opening_badge_retention_limits_preserve_same_seal_replacements() {
+    let book = json!({"selected_profile_id":"opening","profiles":[{"id":"opening","strategy":"opening",
+        "targets":[{"kind":"badge","id":600010,"count":2}]}]});
+    for count in 1..=3 {
+        let mut owned = vec![json!({"id":90,"uid":1,"badgeId":600010})];
+        owned.extend((1..count).map(|uid| json!({"id":3020,"uid":uid + 1,"badgeId":600010})));
+        let state = json!({"provider_state":{"effect":{"effectList":owned}}});
+        for (badge, expected) in [(600010, 0.0), (0, if count <= 2 { -99.0 } else { 0.0 })] {
+            let mut actions = candidate("select_candidate", json!(90), Availability::Available);
+            actions.actions[0].params["effect"]["badgeId"] = json!(badge);
+            let report = decision::evaluate(&state, &actions, &json!({"amulets":[{"id":9,"sell_price":0,"plus_sell_price":0}]}), &book);
+            assert_eq!(report.actions[0].total, Some(expected), "{count} seals, replacement seal {badge}");
+        }
+    }
+}
+
+#[test]
+fn opening_cutoff_waits_for_the_badge_retention_count() {
+    let book = json!({"selected_profile_id":"opening","profiles":[{"id":"opening","strategy":"opening",
+        "end_count":3,"cutoff_level":13002,"cutoff_node":4,
+        "targets":[{"kind":"badge","id":600010,"value":3,"count":2}]}]});
+    for count in 0..=3 {
+        let owned: Vec<_> = (0..count).map(|uid| json!({"id":90,"uid":uid,"badge":{"id":600010}})).collect();
+        let state = json!({"source":"packet","stage":3,"provider_state":{
+            "map":{"level":13002,"node":4},"effect":{"effectList":owned}}});
+        let report = decision::evaluate(&state, &candidate("remake", json!(0), Availability::Available), &json!({}), &book);
+        assert_eq!(report.actions[0].rules.iter().any(|rule| rule.rule_id == "remake_at_cutoff"), count < 2);
+    }
+}
+
+#[test]
+fn opening_badge_target_limits_keep_unknown_inventory_scores_unknown() {
+    let book = json!({"selected_profile_id":"opening","profiles":[{"id":"opening","strategy":"opening",
+        "targets":[{"kind":"badge","id":600010,"count":2}]}]});
+    let mut actions = candidate("select_candidate", json!(3020), Availability::Available);
+    actions.actions[0].params["effect"]["badgeId"] = json!(600010);
+    for owned in [Value::Null, json!({}), json!([{"badgeId":"invalid"}])] {
+        let state = json!({"provider_state":{"effect":{"effectList":owned}}});
+        let report = decision::evaluate(&state, &actions, &json!({}), &book);
+        assert_eq!(report.actions[0].rules.iter().find(|rule| rule.rule_id == "configured_target").unwrap().score, None);
     }
 }

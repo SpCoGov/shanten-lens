@@ -17,6 +17,7 @@ export interface GameStateData {
     map_nodes?: MapNodeItem[];
     deck_map: Record<string, string>;
     hand_tiles: number[];
+    last_drawn_tile?: number | null;
     dora_tiles: number[];
     tian_dora_tiles?: string[];
     ming?: MingItem[];
@@ -45,11 +46,13 @@ export interface GameStateData {
 
 export function buildDebugSnapshotFromState(state: GameStateData) {
     return {
+        source: state.source ?? null,
         stage: state.stage,
         deck_map: state.deck_map || {},
         dora_tiles: state.dora_tiles ?? [],
         tian_dora_tiles: state.tian_dora_tiles ?? [],
         hand_tiles: Array.isArray(state.hand_tiles) ? state.hand_tiles : [],
+        ...(state.last_drawn_tile === undefined ? {} : {last_drawn_tile: state.last_drawn_tile}),
         ming: Array.isArray(state.ming) ? state.ming : [],
         replacement_tiles: Array.isArray(state.replacement_tiles) ? state.replacement_tiles : [],
         wall_tiles: Array.isArray(state.wall_tiles) ? state.wall_tiles : [],

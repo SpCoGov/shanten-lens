@@ -39,6 +39,10 @@ struct Group {
     suit_group: String,
     #[serde(default)]
     distinct_group: String,
+    #[serde(default)]
+    require_draw: bool,
+    #[serde(default)]
+    require_joker: bool,
     rule: Rule,
 }
 
@@ -234,8 +238,26 @@ impl Search<'_> {
         values
     }
 
+    fn winning_tile(&self) -> Option<u64> {
+        if self.prefix > 0 {
+            self.entries.iter().find(|e| e.source == "wall" && e.index + 1 == self.prefix).map(|e| e.id)
+        } else {
+            let hand = self.state["hand_tiles"].as_array()?;
+            let drawn = self.state.get("last_drawn_tile").map_or_else(|| hand.last()?.as_u64(), Value::as_u64);
+            drawn.filter(|id| hand.len() % 3 == 2 && hand.iter().any(|tile| tile.as_u64() == Some(*id))
+                && self.entries.iter().any(|e| e.id == *id && e.face != "bd"))
+        }
+    }
+
     fn group_matches(&self, g: usize, tiles: &[usize], selected: &[Vec<usize>], joker_as: Option<u8>) -> bool {
         let group = &self.groups[g];
+        if group.require_draw && !self.winning_tile().is_some_and(|id| tiles.iter().any(|&i| self.entries[i].id == id)) {
+            return false;
+        }
+        if group.require_joker && self.entries.iter().any(|e| e.face == "bd")
+            && !tiles.iter().any(|&i| self.entries[i].face == "bd") {
+            return false;
+        }
         if joker_as.is_none() && group.suit_group.trim().is_empty() && group.distinct_group.trim().is_empty() {
             return true;
         }
@@ -379,6 +401,7 @@ impl Search<'_> {
             })).collect::<Vec<_>>();
             let plan = json!({"status":"plan","mode":"custom-target","search_algorithm":"custom_target",
                 "draws_needed":draws,"target_physical_ids":target,"resolved_groups":resolved,"custom_steps":steps,
+                "winning_tile_id":self.groups.iter().any(|g| g.require_draw).then(|| self.winning_tile()).flatten(),
                 "target_physical_faces":target.iter().map(|&id|face(&deck(self.state),id).to_owned()).collect::<Vec<_>>(),
                 "switch_discards":discards,"switch_in":incoming,"initial_hand":hand,
                 "target_groups":self.groups,"search_nodes":self.nodes});
@@ -603,6 +626,9 @@ fn parse_groups(target: &Value) -> Option<Vec<Group>> {
     if groups.is_empty()
         || groups.len() > 14
         || groups.iter().filter(|g| g.is_quad()).count() > 4
+        || groups.iter().filter(|g| g.require_draw).count() > 1
+        || groups.iter().filter(|g| g.require_joker).count() > 1
+        || groups.iter().any(|g| g.kind() == Kind::Single && g.require_draw && g.require_joker)
         || groups
             .iter()
             .map(|g| if g.is_quad() { 3 } else { g.kind().size() })
@@ -805,6 +831,7 @@ fn search_internal(
                         (e.source != "wall" || e.index < prefix)
                             && (e.source != "meld" || g.is_quad())
                             && (!g.is_quad() || e.face != "bd")
+                            && (e.face != "bd" || !groups.iter().any(|group| group.require_joker) || g.require_joker)
                             && g.rule.matches(face(&deck, e.id), &dora, &soul)
                     })
                     .map(|(i, _)| i)
@@ -876,6 +903,101 @@ mod tests {
     }
     fn run(state: &Value, target: &Value) -> Value {
         search(state, target, 36, false, &mut |_| {}, &|| false)
+    }
+
+    #[test]
+    fn required_draw_uses_the_physical_last_wall_tile_and_can_wait_for_a_later_copy() {
+        let faces = ["1m","2m","3m","4m","5m","6m","7m","8m","9m","2p","3p","4p","1m","1m"];
+        let mut target = exact(&faces);
+        target[0]["require_draw"] = json!(true);
+        let s = state(&faces[..13], &[], &["1m"], 0);
+        let plan = run(&s, &target);
+        assert_eq!(plan["status"], "plan", "{plan}");
+        assert_eq!(plan["resolved_groups"][0]["tiles"][0]["id"], 14);
+        assert_eq!(plan["winning_tile_id"], 14);
+        replay(&s, &plan);
+
+        let mut hand = faces.to_vec(); hand.remove(11);
+        let s = state(&hand, &[], &["4p","1m"], 0);
+        let plan = run(&s, &target);
+        assert_eq!(plan["status"], "plan", "{plan}");
+        assert_eq!(plan["draws_needed"], 2);
+        assert_eq!(plan["resolved_groups"][0]["tiles"][0]["id"], 15);
+        replay(&s, &plan);
+
+        let mut complete = state(&faces, &[], &[], 0);
+        let plan = run(&complete, &target);
+        assert_eq!(plan["draws_needed"], 0);
+        assert_eq!(plan["resolved_groups"][0]["tiles"][0]["id"], 14);
+        assert!(matches_target(&complete, &target));
+        complete["hand_tiles"].as_array_mut().unwrap().swap(1,13);
+        assert!(!matches_target(&complete, &target));
+        complete["last_drawn_tile"] = json!(13);
+        assert!(matches_target(&complete, &target));
+        assert_eq!(run(&complete, &target)["winning_tile_id"], 13);
+        complete["last_drawn_tile"] = Value::Null;
+        assert!(!matches_target(&complete, &target));
+    }
+
+    #[test]
+    fn exchange_inputs_do_not_become_the_required_self_draw() {
+        let faces = ["1m","2m","3m","4m","5m","6m","7m","8m","9m","2p","3p","1m","1m","4p"];
+        let mut hand = faces; hand[0] = "7z";
+        let mut target = exact(&faces);
+        target[0]["require_draw"] = json!(true);
+        let s = state(&hand, &["1m"], &[], 1);
+        assert_ne!(run(&s, &target)["status"], "plan");
+        target[0]["require_draw"] = json!(false);
+        assert_eq!(run(&s, &target)["status"], "plan");
+    }
+
+    #[test]
+    fn joker_and_draw_can_share_a_pair_and_missing_jokers_are_ignored() {
+        let hand = ["bd","2m","3m","4m","2p","3p","4p","2s","3s","4s","5z","5z","5z"];
+        let target = json!([
+            {"kind":"pair","require_draw":true,"require_joker":true,"rule":{"faces":["1m"]}},
+            {"kind":"sequence","rule":{"faces":["2m","3m","4m"]}},
+            {"kind":"sequence","rule":{"faces":["2p","3p","4p"]}},
+            {"kind":"sequence","rule":{"faces":["2s","3s","4s"]}},
+            {"kind":"triplet","rule":{"faces":["5z"]}}
+        ]);
+        let s = state(&hand, &[], &["1m"], 0);
+        let plan = run(&s, &target);
+        assert_eq!(plan["status"], "plan", "{plan}");
+        let tiles = plan["resolved_groups"][0]["tiles"].as_array().unwrap();
+        assert!(tiles.iter().any(|tile| tile["id"] == 1 && tile["face"] == "bd"));
+        assert!(tiles.iter().any(|tile| tile["id"] == 14));
+        replay(&s, &plan);
+        let mut complete = s.clone();
+        complete["hand_tiles"].as_array_mut().unwrap().push(json!(14));
+        complete["wall_tiles"] = json!([]);
+        assert!(matches_target(&complete, &target));
+        complete["hand_tiles"].as_array_mut().unwrap().swap(0,13);
+        assert!(!matches_target(&complete, &target));
+        let mut ordinary = s.clone(); ordinary["deck_map"]["1"] = json!("1m");
+        let plan = run(&ordinary, &target);
+        assert_eq!(plan["status"], "plan", "{plan}");
+        replay(&ordinary, &plan);
+    }
+
+    #[test]
+    fn group_requirements_reject_duplicate_owners_and_single_tile_conflicts() {
+        let mut target = exact(&["1m";14]);
+        for key in ["require_draw", "require_joker"] {
+            target[0][key] = json!(true);
+            target[1][key] = json!(true);
+            assert!(!valid_target(&target));
+            target[0].as_object_mut().unwrap().remove(key);
+            target[1].as_object_mut().unwrap().remove(key);
+        }
+        target[0]["require_draw"] = json!(true);
+        target[0]["require_joker"] = json!(true);
+        assert!(!valid_target(&target));
+        target[0]["require_joker"] = json!(false);
+        target[1]["require_joker"] = json!(true);
+        assert!(valid_target(&target));
+        target[1]["require_joker"] = json!("yes");
+        assert!(!valid_target(&target));
     }
 
     #[test]

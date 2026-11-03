@@ -17,6 +17,8 @@ try {
     assert.equal(defaults.exclude_invalid_shapes, false);
     const groups = Array.from({length: 14}, newTargetGroup);
     groups[0].rule.faces = ["3m"];
+    groups[0].require_draw = true;
+    groups[1].require_joker = true;
     saved.set(CUSTOM_SWITCH_TARGET_KEY, JSON.stringify(groups));
     saved.set(CUSTOM_SWITCH_WALL_LIMIT_KEY, "0");
     saved.set(CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY, "1");

@@ -47,7 +47,6 @@ export default function AboutPage({
 }) {
     const {t} = useTranslation();
     const [openTileGallery, setOpenTileGallery] = React.useState(false);
-    const [includeGameData, setIncludeGameData] = React.useState(false);
     const [exporting, setExporting] = React.useState(false);
     const [exportPath, setExportPath] = React.useState("");
     const [exportError, setExportError] = React.useState("");
@@ -58,7 +57,7 @@ export default function AboutPage({
         setExportPath("");
         setExportError("");
         try {
-            setExportPath(await exportDiagnostics(includeGameData, collectFrontendDiagnostics()));
+            setExportPath(await exportDiagnostics(true, collectFrontendDiagnostics()));
         } catch (error) {
             setExportError(String(error));
         } finally {
@@ -133,28 +132,19 @@ Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
 
             <div className={styles.actions}>
                 <button className={styles.secondaryAction} onClick={onShowUsageNotice}>{t("about.show_usage_notice")}</button>
+                <button type="button" className={styles.secondaryAction} onClick={() => void handleExportDiagnostics()}
+                        disabled={exporting} aria-busy={exporting}>
+                    <span className={`ms ${exporting ? styles.spinning : ""}`} aria-hidden="true">{exporting ? "sync" : "download"}</span>
+                    {t(exporting ? "about.diagnostics_exporting" : "about.diagnostics_export")}
+                </button>
                 <button className={styles.primaryAction} onClick={onCheckUpdate} disabled={checkingUpdate}>
                     {checkingUpdate ? <span className={`ms ${styles.spinning}`} aria-hidden="true">sync</span> : null}
                     {checkingUpdate ? t("about.check_update_loading") : t("about.check_update")}
                 </button>
             </div>
 
-            <section className={`${styles.infoCard} ${styles.diagnostics}`} aria-labelledby="diagnostic-export-title">
-                <h2 id="diagnostic-export-title">{t("about.diagnostics_title")}</h2>
-                <p>{t("about.diagnostics_description")}</p>
-                <label className={styles.diagnosticOption}>
-                    <input type="checkbox" checked={includeGameData} disabled={exporting}
-                           onChange={(event) => setIncludeGameData(event.target.checked)}/>
-                    {t("about.diagnostics_include_game")}
-                </label>
-                <button type="button" className={styles.primaryAction} onClick={() => void handleExportDiagnostics()}
-                        disabled={exporting} aria-busy={exporting}>
-                    <span className={`ms ${exporting ? styles.spinning : ""}`} aria-hidden="true">{exporting ? "sync" : "download"}</span>
-                    {t(exporting ? "about.diagnostics_exporting" : "about.diagnostics_export")}
-                </button>
-                {exportPath ? <p role="status" className={styles.exportResult}>{t("about.diagnostics_exported", {path: exportPath})}</p> : null}
-                {exportError ? <p role="alert" className="notice error">{t("about.diagnostics_failed", {error: exportError})}</p> : null}
-            </section>
+            {exportPath ? <p role="status" className={styles.exportResult}>{t("about.diagnostics_exported", {path: exportPath})}</p> : null}
+            {exportError ? <p role="alert" className="notice error">{t("about.diagnostics_failed", {error: exportError})}</p> : null}
 
             <Modal
                 open={openTileGallery}

@@ -118,6 +118,7 @@
 
 .actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
@@ -188,28 +189,10 @@
     background: var(--hover-bg);
 }
 
-.primaryAction:disabled {
+.primaryAction:disabled,
+.secondaryAction:disabled {
     cursor: not-allowed;
     opacity: .56;
-}
-
-.diagnostics {
-    display: grid;
-    justify-items: start;
-    gap: 12px;
-}
-
-.diagnosticOption {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    font-size: 13px;
-    line-height: 1.6;
-}
-
-.diagnosticOption input {
-    flex-shrink: 0;
-    margin: 4px 0 0;
 }
 
 .exportResult {

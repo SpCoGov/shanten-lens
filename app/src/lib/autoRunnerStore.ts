@@ -1,7 +1,7 @@
 import {useSyncExternalStore} from "react";
 import {emptyAutoPlayConfig, type AutoPlayConfig, type PlayProfile} from "./autoPlayConfig";
 
-export type TargetBadge = { kind: "badge"; id: number; value?: number };
+export type TargetBadge = { kind: "badge"; id: number; value?: number; count?: number };
 export type TargetAmulet = { kind: "amulet"; id: number; plus?: boolean; badge?: number | null; value?: number };
 export type TargetItem = TargetBadge | TargetAmulet;
 

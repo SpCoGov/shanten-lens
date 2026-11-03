@@ -74,7 +74,6 @@
 .filters legend { padding: 0; margin-bottom: 8px; font-size: 12px; font-weight: 600; }
 .segmented { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 9px; background: var(--input-bg); }
 .segmented button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 5px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; }
-.segmented small { font-size: 10px; font-weight: 400; }
 .segmented button[aria-pressed="true"] { color: var(--custom-target-accent); background: var(--panel-bg); border-color: var(--custom-target-border); font-weight: 600; }
 .linkFields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .linkFields > div { display: grid; grid-template-columns: 6em minmax(0, 1fr); align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
@@ -94,7 +93,8 @@
 .linkHint { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
 .palette { display: flex; flex-direction: column; gap: 6px; }
 .paletteRow { display: flex; align-items: center; gap: 7px; }
-.paletteRow > span { flex: 0 0 25px; color: var(--muted); font-size: 11px; }
+.palette .suitButton { flex: 0 0 32px; align-self: stretch; min-height: 32px; color: var(--muted); font-size: 11px; }
+.palette .suitButton[aria-pressed="true"] { color: var(--custom-target-accent); }
 .paletteRow > div { display: flex; flex-wrap: wrap; gap: 3px; }
 .palette button { display: grid; place-items: center; padding: 2px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-bg); cursor: pointer; }
 .palette button:hover { border-color: var(--color-ring); }
@@ -102,6 +102,7 @@
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chips button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 32px; padding: 5px 13px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); background: var(--panel-bg); cursor: pointer; font-size: 12px; }
 .chips button:hover { border-color: var(--color-ring); }
+.chips button:disabled { opacity: .5; cursor: not-allowed; }
 .chips button[aria-pressed="true"] { color: var(--custom-target-accent); background: var(--custom-target-tint); border-color: var(--color-ring); }
 .chips button[data-property="red"] { --color-ring: var(--custom-target-red); --custom-target-accent: var(--custom-target-red); --custom-target-tint: var(--custom-target-red-tint); color: var(--custom-target-red); }
 .chips button[data-property="soul"] { --color-ring: var(--custom-target-soul); --custom-target-accent: var(--custom-target-soul-text); --custom-target-tint: var(--custom-target-soul-tint); color: var(--custom-target-soul-text); }
@@ -145,7 +146,7 @@
 @container (max-width: 960px) {
     .editor { grid-template-columns: 1fr; }
     .filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-    .segmented, .filters > fieldset:nth-of-type(-n+2) { grid-column: 1 / -1; }
+    .segmented, .filters > fieldset:nth-of-type(-n+3) { grid-column: 1 / -1; }
 }
 @container (max-width: 580px) {
     .hero :global(.switch-guide-heading) { grid-template-columns: 1fr; }

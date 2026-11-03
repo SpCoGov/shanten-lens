@@ -434,7 +434,10 @@ fn achieved_count(state: &Value, profile: &Value) -> u64 {
         .unwrap_or(&[]);
     targets
         .iter()
-        .filter(|target| effects.iter().any(|item| matches(item, target)))
+        .filter(|target| if target["kind"] == "badge" {
+            crate::services::playbook::badge_target_count(target).is_some_and(|required|
+                effects.iter().filter(|item| matches(item, target)).count() as u64 >= required)
+        } else { effects.iter().any(|item| matches(item, target)) })
         .map(|target| target.get("value").and_then(Value::as_u64).unwrap_or(1))
         .sum()
 }
@@ -537,6 +540,23 @@ mod tests {
         drop(automation);
         drop(services);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn opening_badge_targets_require_the_retained_count_and_award_value_once() {
+        let mut profile = json!({"targets":[{"kind":"badge","id":600010,"value":3,"count":2}]});
+        for nested in [false, true] {
+            for count in 0..=3 {
+                let effects: Vec<_> = (0..count).map(|uid| if nested {
+                    json!({"id":90,"uid":uid,"badge":{"id":600010}})
+                } else { json!({"id":90,"uid":uid,"badgeId":600010}) }).collect();
+                assert_eq!(achieved_count(&json!({"effect_list":effects}), &profile), if count >= 2 { 3 } else { 0 });
+            }
+        }
+        profile["targets"][0].as_object_mut().unwrap().remove("count");
+        assert_eq!(achieved_count(&json!({"effect_list":[{"id":90,"badgeId":600010}]}), &profile), 3);
+        profile["targets"][0]["count"] = json!(2);
+        assert_eq!(achieved_count(&json!({"effect_list":[{"id":90,"badgeId":600010},{"id":91,"badgeId":600020}]}), &profile), 0);
     }
 
     #[test]
