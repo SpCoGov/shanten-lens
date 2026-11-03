@@ -119,7 +119,8 @@ export function validateAutoPlayConfig(value: unknown, amulets?: Map<number, Amu
                 if (target.kind === "amulet") {
                     if ((amulets && !amulets.has(target.id)) || (target.plus !== undefined && typeof target.plus !== "boolean")
                         || (target.badge != null && (!positiveInteger(target.badge) || (badges && !badges.has(target.badge))))) return "targets";
-                } else if (target.kind !== "badge" || (badges && !badges.has(target.id))) return "targets";
+                } else if (target.kind !== "badge" || (badges && !badges.has(target.id))
+                    || (target.count !== undefined && !positiveInteger(target.count))) return "targets";
             }
             continue;
         }

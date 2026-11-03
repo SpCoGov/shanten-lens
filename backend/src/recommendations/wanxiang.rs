@@ -222,7 +222,8 @@ fn coin_rewards(state: &Value, entries: &[Entry], objective: CoinObjective) -> H
     }, &[]);
     entries.iter().map(|entry| {
         let reward = souzu::tile(&entry.face).map_or(0, |tile| {
-            let red = matches!(face(&deck, entry.id), "0m" | "0p" | "0s");
+            let red = souzu::bonus_tile_enabled(state, tile)
+                && matches!(face(&deck, entry.id), "0m" | "0p" | "0s");
             let hits = dora[tile as usize];
             let soul = usize::from(soul[tile as usize]);
             match objective {
@@ -486,8 +487,9 @@ pub(super) fn search(
         .iter()
         .filter(|entry| {
             // Red fives are preferred by physical ID, not every normal five of that suit.
-            (preferences.prefer_dora && matches!(face(&deck, entry.id), "0m" | "0p" | "0s"))
-                || souzu::tile(&entry.face).is_some_and(|tile| preferred_faces[tile as usize])
+            souzu::tile(&entry.face).is_some_and(|tile| souzu::bonus_tile_enabled(state, tile)
+                && ((preferences.prefer_dora && matches!(face(&deck, entry.id), "0m" | "0p" | "0s"))
+                    || preferred_faces[tile as usize]))
         })
         .map(|entry| entry.id)
         .collect();
@@ -614,6 +616,75 @@ mod tests {
         }
         for limit in [0,37,usize::MAX] {
             assert_eq!(search(&snapshot, limit, &[], &preferences, &mut |_| {}, &||false)["reason"], "wanxiang-wall-limit");
+        }
+    }
+
+    #[test]
+    fn qyzz_suit_debuffs_remove_all_three_coin_bonus_attributes() {
+        let mut snapshot = json!({"source":"qyzz",
+            "deck_map":{"1":"0p","2":"5p","3":"0s","4":"5s","5":"1m","6":"9m","7":"1z","1000":"bd",
+                "101":"4p","102":"4p","103":"4s","104":"9m","105":"1m"},
+            "hand_tiles":[1,2,3,4,5,6,7,1000],"dora_tiles":[101,102,103,104,105],
+            "tian_dora_tiles":["0p","5p","0s","1m","1z"]});
+        let entries = pool(&snapshot, 0);
+        for (buff, disabled) in [(904, [5,6]), (905, [1,2]), (906, [3,4])] {
+            snapshot["boss_buff"] = json!([buff]);
+            let heaven = coin_rewards(&snapshot, &entries, CoinObjective::HeavenlyBlessing);
+            let pearl = coin_rewards(&snapshot, &entries, CoinObjective::ShiningPearl);
+            for (id, heavenly, shining) in [(1,8,5),(2,6,5),(3,6,0),(4,4,0),(5,4,0),(6,2,0),(7,2,0),(1000,0,0)] {
+                let enabled = !disabled.contains(&id);
+                assert_eq!(heaven[&id], if enabled {heavenly} else {0}, "buff {buff}, tile {id}");
+                assert_eq!(pearl[&id], if enabled {shining} else {0}, "buff {buff}, tile {id}");
+            }
+        }
+    }
+
+    #[test]
+    fn qyzz_optimal_meld_preferences_ignore_disabled_bonus_tiles() {
+        let mut snapshot = state(
+            &["1m","1m","1m","1s","2s","3s","1z","1z","1z","4p","5p","0p"],
+            &["6p"],
+        );
+        snapshot["source"] = json!("qyzz");
+        snapshot["deck_map"]["101"] = json!("4p");
+        let ordinary = plan(&snapshot, &SearchPreferences::default(), &[]);
+        assert_eq!(ordinary["status"], "plan");
+        for bonus in ["red","dora","soul"] {
+            snapshot["dora_tiles"] = if bonus == "dora" {json!([101])} else {json!([])};
+            snapshot["tian_dora_tiles"] = if bonus == "soul" {json!(["0p"])} else {json!([])};
+            let preferences = SearchPreferences {prefer_dora:bonus != "soul",prefer_soul:bonus == "soul",..Default::default()};
+            snapshot["boss_buff"] = json!([]);
+            assert_eq!(plan(&snapshot, &preferences, &[])["preferred_meld_count"], 1, "{bonus}");
+            snapshot["boss_buff"] = json!([905]);
+            let blocked = plan(&snapshot, &preferences, &[]);
+            assert_eq!(blocked["status"], "plan");
+            assert_eq!(blocked["preferred_meld_count"], 0, "{bonus}: {blocked}");
+            assert_eq!(blocked["plan_signature"], ordinary["plan_signature"], "{bonus}");
+        }
+    }
+
+    #[test]
+    fn qyzz_coin_search_does_not_pursue_suppressed_bonuses() {
+        let mut snapshot = state(
+            &["1m","1m","1m","1s","2s","3s","1z","1z","1z","4p","5p","8p"],
+            &["6p"],
+        );
+        snapshot["source"] = json!("qyzz");
+        snapshot["deck_map"]["14"] = json!("5p");
+        snapshot["deck_map"]["15"] = json!("0p");
+        snapshot["deck_map"]["101"] = json!("4p");
+        snapshot["wall_tiles"] = json!([14,15]);
+        snapshot["dora_tiles"] = json!([101]);
+        snapshot["tian_dora_tiles"] = json!(["5p"]);
+        for objective in [CoinObjective::HeavenlyBlessing,CoinObjective::ShiningPearl] {
+            let preferences = SearchPreferences {coin_objective:Some(objective),..Default::default()};
+            snapshot["boss_buff"] = json!([]);
+            assert!(plan(&snapshot, &preferences, &[])["total_coin_reward"].as_u64().unwrap() > 0);
+            snapshot["boss_buff"] = json!([905]);
+            let blocked = plan(&snapshot, &preferences, &[]);
+            assert_eq!(blocked["status"], "plan", "{blocked}");
+            assert_eq!(blocked["coin_reward"], 0);
+            assert_eq!(blocked["total_coin_reward"], 0);
         }
     }
 

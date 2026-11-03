@@ -285,6 +285,14 @@ impl Search<'_> {
     }
 }
 
+// Qyzz suit debuffs remove bonus identities without changing the physical tile face.
+pub(super) fn bonus_tile_enabled(state: &Value, tile: Tile) -> bool {
+    state["source"] != "qyzz" || !state["boss_buff"].as_array().is_some_and(|buffs| {
+        buffs.iter().any(|buff| matches!((buff.as_u64(), tile / 9),
+            (Some(904), 0) | (Some(905), 1) | (Some(906), 2)))
+    })
+}
+
 // Match the game's indicator mapping used by app/src/lib/tileHighlights.ts.
 pub(super) fn dora_counts(state: &Value) -> [usize; 34] {
     let mut counts = [0; 34];
@@ -300,7 +308,7 @@ pub(super) fn dora_counts(state: &Value) -> [usize; 34] {
             33 => 27,
             _ => t + 1,
         };
-        counts[next as usize] += 1;
+        if bonus_tile_enabled(state, next) { counts[next as usize] += 1; }
     }
     counts
 }
@@ -314,7 +322,8 @@ pub(super) fn preferred_tiles(
     if preferences.prefer_dora {
         for id in available_ids {
             if let Some(raw @ ("0m" | "0p" | "0s")) = state["deck_map"][id.to_string()].as_str() {
-                preferred[tile(raw).unwrap() as usize] = true;
+                let tile = tile(raw).unwrap();
+                preferred[tile as usize] = bonus_tile_enabled(state, tile);
             }
         }
         for (tile, count) in dora_counts(state).into_iter().enumerate() {
@@ -324,7 +333,7 @@ pub(super) fn preferred_tiles(
     if preferences.prefer_soul {
         for face in state["tian_dora_tiles"].as_array().into_iter().flatten() {
             if let Some(t) = face.as_str().and_then(tile) {
-                preferred[t as usize] = true;
+                preferred[t as usize] |= bonus_tile_enabled(state, t);
             }
         }
     }
@@ -1011,6 +1020,38 @@ mod three_quad_tests {
         }
         json!({"deck_map":deck,"hand_tiles":(1..=13).collect::<Vec<u64>>(),"wall_tiles":(14..14+wall.len() as u64).collect::<Vec<_>>(),"replacement_tiles":[],"change_tile_count":0,"total_change_tile_count":0})
     }
+    #[test]
+    fn qyzz_suit_debuffs_disable_bonus_attributes_only_for_the_affected_suit() {
+        let mut snapshot = json!({"source":"qyzz",
+            "deck_map":{"1":"0m","2":"0p","3":"0s","101":"4m","102":"4p","103":"4s","104":"1z"},
+            "dora_tiles":[101,102,103,104],"tian_dora_tiles":["0m","5p","0s","2z"]});
+        for (buff, disabled) in [(904, "5m"), (905, "5p"), (906, "5s")] {
+            snapshot["boss_buff"] = json!([buff, 901]);
+            let counts = dora_counts(&snapshot);
+            for (prefer_dora, prefer_soul) in [(true,false),(false,true),(true,true)] {
+                let preferences = SearchPreferences {prefer_dora,prefer_soul,..Default::default()};
+                let bonus = preferred_tiles(&snapshot, &preferences, &[1,2,3]);
+                for face in ["5m","5p","5s","2z"] {
+                    let tile = tile(face).unwrap() as usize;
+                    assert_eq!(counts[tile], usize::from(face != disabled), "buff {buff}, {face}");
+                    assert_eq!(bonus[tile], face != disabled, "buff {buff}, {face}");
+                }
+            }
+        }
+        snapshot["boss_buff"] = json!([904,905,906]);
+        let preferences = SearchPreferences {prefer_dora:true,prefer_soul:true,..Default::default()};
+        for source in [json!("packet"), Value::Null] {
+            snapshot["source"] = source;
+            let bonus = preferred_tiles(&snapshot, &preferences, &[1,2,3]);
+            for face in ["5m","5p","5s","2z"] {
+                let tile = tile(face).unwrap() as usize;
+                assert_eq!(dora_counts(&snapshot)[tile], 1);
+                assert!(bonus[tile]);
+            }
+        }
+        assert_eq!(snapshot["deck_map"]["2"], "0p");
+    }
+
     #[test]
     fn three_quads_accepts_all_wait_suits_and_honors() {
         for (tail, wall, expected) in [

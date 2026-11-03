@@ -40,6 +40,7 @@ import {
 import {pushToast, useGlobalToast} from "./lib/toast";
 import {AutoRunnerStatus, setAutoStatus, useAutoRunner} from "./lib/autoRunnerStore";
 import GoodsBar from "./components/GoodsBar";
+import {activeBuyPackHotkeys, selectAmuletPack, type BuyPackMode, type BuyPackStrategy} from "./lib/amuletPackHotkeys";
 import CandidateBar from "./components/CandidateBar";
 import "./fonts/material-symbols.css";
 import {getCurrentWindow} from "@tauri-apps/api/window";
@@ -91,6 +92,8 @@ type SouzuSwitchExecutionState = {
 type AmuletHotkeySettings = {
     enabled: boolean;
     buyPack: string[];
+    buyPackMode: BuyPackMode;
+    buyPackStrategy: BuyPackStrategy;
     selectCandidate: string[];
     skipCandidate: string;
     sellRecent: string;
@@ -102,6 +105,8 @@ const AMULET_HOTKEY_STORAGE_KEY = "sl-amulet-hotkeys";
 const DEFAULT_AMULET_HOTKEYS: AmuletHotkeySettings = {
     enabled: false,
     buyPack: ["q", "w", "e", "r", "t"],
+    buyPackMode: "multiple",
+    buyPackStrategy: "low_to_high",
     selectCandidate: ["1", "2", "3"],
     skipCandidate: "4",
     sellRecent: "`",
@@ -197,6 +202,9 @@ function readAmuletHotkeySettings(): AmuletHotkeySettings {
         const parsed = JSON.parse(raw) as Partial<AmuletHotkeySettings>;
         return {
             enabled: Boolean(parsed.enabled),
+            buyPackMode: parsed.buyPackMode === "single" ? "single" : "multiple",
+            buyPackStrategy: parsed.buyPackStrategy === "high_to_low" || parsed.buyPackStrategy === "legendary_only"
+                ? parsed.buyPackStrategy : "low_to_high",
             buyPack: Array.isArray(parsed.buyPack) && parsed.buyPack.length === 5
                 ? parsed.buyPack.map((k, i) => normalizeHotkeyKey(k) || DEFAULT_AMULET_HOTKEYS.buyPack[i])
                 : DEFAULT_AMULET_HOTKEYS.buyPack,
@@ -236,7 +244,7 @@ function displayHotkey(value: string): string {
 
 function collectAmuletHotkeyEntries(settings: AmuletHotkeySettings): Array<{id: string; key: string}> {
     return [
-        ...settings.buyPack.map((key, index) => ({id: `buyPack:${index}`, key: normalizeHotkeyKey(key)})),
+        ...activeBuyPackHotkeys(settings).map((key, index) => ({id: `buyPack:${index}`, key: normalizeHotkeyKey(key)})),
         ...settings.selectCandidate.map((key, index) => ({id: `selectCandidate:${index}`, key: normalizeHotkeyKey(key)})),
         {id: "skipCandidate", key: normalizeHotkeyKey(settings.skipCandidate)},
         {id: "sellRecent", key: normalizeHotkeyKey(settings.sellRecent)},
@@ -1784,6 +1792,10 @@ export default function App() {
         void sendAmuletHotkeyAction({action: "sort_effect", sortedUid});
     }, [sendAmuletHotkeyAction]);
 
+    const singleBuyPack = React.useMemo(() => stage === 9 && candidates.length === 0
+        ? selectAmuletPack(goods, coin, amuletHotkeys.buyPackStrategy, latestGameState?.action_report)
+        : undefined, [stage, candidates.length, goods, coin, amuletHotkeys.buyPackStrategy, latestGameState?.action_report]);
+
     const handleAmuletHotkey = React.useCallback((event: KeyboardEvent) => {
         if (hotkeyEditorOpen || sellConfirmTarget || usageNotice || activeTutorial) return;
         if (!amuletHotkeys.enabled || !canUseAmuletHotkeys) return;
@@ -1795,9 +1807,13 @@ export default function App() {
         const safeCoin = Number.isFinite(currentCoin) ? currentCoin : 0;
 
         if (stage === 9) {
-            const buyIndex = amuletHotkeys.buyPack.findIndex((item) => normalizeHotkeyKey(item) === key);
+            const buyIndex = activeBuyPackHotkeys(amuletHotkeys).findIndex((item) => normalizeHotkeyKey(item) === key);
             if (buyIndex >= 0) {
                 event.preventDefault();
+                if (amuletHotkeys.buyPackMode === "single") {
+                    if (singleBuyPack) void sendAmuletHotkeyAction({action: "buy_pack", goodId: singleBuyPack.id});
+                    return;
+                }
                 const good = (goods ?? []).slice(0, 5)[buyIndex];
                 if (!good || good.sold) {
                     pushToast(t("amulet_hotkeys.no_pack_slot", {slot: buyIndex + 1}), "info", 1200);
@@ -1864,6 +1880,7 @@ export default function App() {
         selectCandidateByIndex,
         sendAmuletHotkeyAction,
         skipCandidateManually,
+        singleBuyPack,
         stage,
         t,
         usageNotice,
@@ -2048,7 +2065,11 @@ export default function App() {
                                             <GoodsBar
                                                 items={goods}
                                                 scale={0.85}
-                                                hotkeyLabels={amuletHotkeys.enabled ? amuletHotkeys.buyPack.map(displayHotkey) : undefined}
+                                                hotkeyLabels={amuletHotkeys.enabled
+                                                    ? amuletHotkeys.buyPackMode === "single"
+                                                        ? goods.map((good) => good === singleBuyPack ? displayHotkey(amuletHotkeys.buyPack[0]) : "")
+                                                        : amuletHotkeys.buyPack.map(displayHotkey)
+                                                    : undefined}
                                             />
                                         </div>
                                     )}
@@ -2353,10 +2374,47 @@ export default function App() {
 
                         <div className="hotkey-editor-grid">
                             <div className="hotkey-editor-group">
-                                <div className="hotkey-editor-group-title">{t("amulet_hotkeys.group_buy")}</div>
-                                {amuletHotkeys.buyPack.map((key, index) => (
+                                <div className="hotkey-editor-group-heading">
+                                    <div className="hotkey-editor-group-title">{t("amulet_hotkeys.group_buy")}</div>
+                                    <div className="hotkey-editor-buy-mode" role="radiogroup" aria-label={t("amulet_hotkeys.buy_mode")}>
+                                        <label>
+                                            <input
+                                                type="radio"
+                                                name="buy-pack-mode"
+                                                checked={amuletHotkeys.buyPackMode === "single"}
+                                                onChange={() => setAmuletHotkeys((current) => ({...current, buyPackMode: "single"}))}
+                                            />
+                                            <span>{t("amulet_hotkeys.buy_mode_single")}</span>
+                                        </label>
+                                        <label>
+                                            <input
+                                                type="radio"
+                                                name="buy-pack-mode"
+                                                checked={amuletHotkeys.buyPackMode === "multiple"}
+                                                onChange={() => setAmuletHotkeys((current) => ({...current, buyPackMode: "multiple"}))}
+                                            />
+                                            <span>{t("amulet_hotkeys.buy_mode_multiple")}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                {amuletHotkeys.buyPackMode === "single" && (
+                                    <label className="hotkey-editor-strategy">
+                                        <span>{t("amulet_hotkeys.buy_strategy")}</span>
+                                        <select
+                                            value={amuletHotkeys.buyPackStrategy}
+                                            onChange={(event) => setAmuletHotkeys((current) => ({...current, buyPackStrategy: event.target.value as BuyPackStrategy}))}
+                                        >
+                                            <option value="low_to_high">{t("amulet_hotkeys.buy_strategy_low_to_high")}</option>
+                                            <option value="high_to_low">{t("amulet_hotkeys.buy_strategy_high_to_low")}</option>
+                                            <option value="legendary_only">{t("amulet_hotkeys.buy_strategy_legendary_only")}</option>
+                                        </select>
+                                    </label>
+                                )}
+                                {activeBuyPackHotkeys(amuletHotkeys).map((key, index) => (
                                     <label className={`hotkey-editor-row ${amuletHotkeyInputClass(`buyPack:${index}`)}`} key={`buy-${index}`}>
-                                        <span>{t("amulet_hotkeys.pack_slot", {slot: index + 1})}</span>
+                                        <span>{amuletHotkeys.buyPackMode === "single"
+                                            ? t("amulet_hotkeys.buy_key")
+                                            : t("amulet_hotkeys.pack_slot", {slot: index + 1})}</span>
                                         <input
                                             className={amuletHotkeyInputClass(`buyPack:${index}`)}
                                             value={displayHotkey(key)}
@@ -2366,6 +2424,9 @@ export default function App() {
                                         />
                                     </label>
                                 ))}
+                                {amuletHotkeys.buyPackMode === "single" && amuletHotkeys.buyPackStrategy === "legendary_only" && (
+                                    <p className="hotkey-editor-hint">{t("amulet_hotkeys.legendary_only_hint")}</p>
+                                )}
                             </div>
 
                             <div className="hotkey-editor-group">

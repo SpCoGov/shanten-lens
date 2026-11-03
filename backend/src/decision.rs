@@ -350,7 +350,7 @@ fn remake_penalty(_state: &Value, _action: &ActionCandidate, _registry: &Value, 
 }
 
 fn retain_amulet(_state: &Value, action: &ActionCandidate, _registry: &Value, _playbook: &Value) -> Option<(Option<f64>, &'static str)> {
-    matches!(action.params["effect"]["id"].as_u64(), Some(620 | 621 | 720 | 721 | 1460 | 1461 | 3560 | 3561))
+    matches!(action.params["effect"]["id"].as_u64(), Some(620 | 621 | 3560 | 3561))
         .then_some((Some(-10.0), "retain_amulet"))
 }
 
@@ -410,6 +410,19 @@ fn configured_target(state: &Value, action: &ActionCandidate, _registry: &Value,
             Some("badge") => badge.is_some_and(|id| id > 0 && target["id"].as_u64() == Some(id)),
             _ => false,
         }).try_fold(0u64, |sum, target| {
+            if target["kind"] == "badge" {
+                let required = crate::services::playbook::badge_target_count(target)?;
+                let owned = state["provider_state"]["effect"]["effectList"].as_array()?;
+                let count = owned.iter().try_fold(0u64, |count, item|
+                    Some(count + u64::from(badge_id(item)? == badge?)))?;
+                // Score acquisition after removing a consumed copy; replacement_losses scores that copy separately.
+                let replaced = upgrading && crate::action_provider::replaced_effect(effect, owned)
+                    .is_some_and(|item| badge_id(item) == badge);
+                let count = count.saturating_sub(u64::from(replaced));
+                if if action.kind == "sell_effect" { count > required } else { count >= required } {
+                    return Some(sum);
+                }
+            }
             let value = match target.get("value") { None => 1, Some(value) => value.as_u64()? };
             if value == 0 { return None; }
             sum.checked_add(value)
@@ -476,7 +489,8 @@ fn remake_at_cutoff(state: &Value, _action: &ActionCandidate, _registry: &Value,
             let value = profile["targets"].as_array()?.iter().try_fold(0u64, |sum, target| {
                 let hit = match target["kind"].as_str()? {
                     "amulet" => effects.iter().any(|effect| matches(effect, target)),
-                    "badge" => effects.iter().any(|effect| badge_id(effect) == target["id"].as_u64()),
+                    "badge" => effects.iter().filter(|effect| badge_id(effect) == target["id"].as_u64()).count() as u64
+                        >= crate::services::playbook::badge_target_count(target)?,
                     _ => return None,
                 };
                 let value = target.get("value").map_or(Some(1), Value::as_u64).filter(|value| *value > 0)?;

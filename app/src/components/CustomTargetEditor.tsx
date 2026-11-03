@@ -2,7 +2,7 @@ import React from "react";
 import {useTranslation} from "react-i18next";
 import Tile from "./Tile";
 import type {GameStateData} from "../lib/gamestate";
-import {newTargetGroup, targetSize, targetKind, targetGroupSize, TARGET_KINDS, applyTargetRule, type TargetGroup, type TargetRule, type TargetKind} from "../lib/customTarget";
+import {newTargetGroup, targetSize, targetKind, targetGroupSize, TARGET_KINDS, applyTargetRule, setTargetGroupRequirement, setTargetGroupKind, type TargetGroup, type TargetRule, type TargetKind} from "../lib/customTarget";
 import styles from "../pages/CustomSwitchPage.module.css";
 
 const SUITS = ["m", "p", "s", "z"];
@@ -39,9 +39,7 @@ export default function CustomTargetEditor({groups, onChange, currentState}: {
         if (active) changeGroups(applyTargetRule(groups, selected, patch));
     }
     function changeKind(kind: TargetKind) {
-        changeGroups(groups.map((group, index) => selected.includes(index)
-            ? {...group, kind, quad: kind === "quad", rule: {...group.rule, joker: kind === "quad" ? "exclude" : "allow"}}
-            : group));
+        changeGroups(setTargetGroupKind(groups, selected, kind));
     }
     function changeLink(key: "suit_group" | "distinct_group", value: string) {
         changeGroups(groups.map((group, index) => selected.includes(index) ? {...group, [key]: value} : group));
@@ -61,7 +59,8 @@ export default function CustomTargetEditor({groups, onChange, currentState}: {
         return [rule.faces.join(" "), rule.suits.map(suit => t(suit === "z" ? "about.tile_groups.honors" : `tile.suits.${suit}`)).join("/"),
             rule.ranks.join("/"), ...(["red", "dora", "soul"] as const).filter(key => rule[key]).map(key => t(`custom_target.${key}`)),
             group.suit_group?.trim() ? t("custom_target.suit_link_label", {name: linkName(group.suit_group.trim())}) : "",
-            group.distinct_group?.trim() ? t("custom_target.distinct_link_label", {name: linkName(group.distinct_group.trim())}) : ""]
+            group.distinct_group?.trim() ? t("custom_target.distinct_link_label", {name: linkName(group.distinct_group.trim())}) : "",
+            group.require_draw ? t("custom_target.require_draw") : "", group.require_joker ? t("custom_target.require_joker") : ""]
             .filter(Boolean).join(" · ") || t("custom_target.any");
     }
     function groupLabel(group: Pick<TargetGroup, "quad" | "kind">, index: number) {
@@ -165,9 +164,17 @@ export default function CustomTargetEditor({groups, onChange, currentState}: {
                         {TARGET_KINDS.map(kind => <button key={kind} type="button" aria-pressed={selected.every(index => targetKind(groups[index]) === kind)}
                             onClick={() => {if (selected.some(index => targetKind(groups[index]) !== kind)) changeKind(kind);}}>
                             <span className="ms" aria-hidden="true">{kind === "single" ? "crop_square" : kind === "pair" ? "filter_2" : kind === "quad" ? "filter_4" : "view_week"}</span>{t(`custom_target.kind_${kind}`)}
-                            <small>{t(kind === "quad" ? "custom_target.quad_count" : "custom_target.kind_count", {count: kind === "single" ? 1 : kind === "pair" ? 2 : 3})}</small>
                         </button>)}
                     </div>
+                    <fieldset><legend>{t("custom_target.required_tiles")}</legend>
+                        <div className={styles.chips}>
+                            {(["require_draw", "require_joker"] as const).map(key => <button key={key} type="button"
+                                aria-pressed={!!active[key]} disabled={selected.length !== 1}
+                                onClick={() => changeGroups(setTargetGroupRequirement(groups, selected[0], key, !active[key]))}>
+                                <span className="ms" aria-hidden="true">{active[key] ? "check_circle" : "add_circle_outline"}</span>{t(`custom_target.${key}`)}
+                            </button>)}
+                        </div>
+                    </fieldset>
                     <fieldset><legend>{t("custom_target.group_links")}</legend>
                         <div className={styles.linkFields}>
                             {(["suit_group", "distinct_group"] as const).map(key => <div key={key} role="group" aria-labelledby={`custom-target-${key}`}>
@@ -189,24 +196,23 @@ export default function CustomTargetEditor({groups, onChange, currentState}: {
                         </div>
                     </fieldset>
                     <fieldset><legend>{t("custom_target.faces")}</legend>
-                        <div className={styles.palette}>{SUITS.map(suit => <div className={styles.paletteRow} key={suit}>
-                            <span>{t(suit === "z" ? "about.tile_groups.honors" : `tile.suits.${suit}`)}</span>
-                            <div>{Array.from({length: suit === "z" ? 7 : 10}, (_, i) => `${i < 9 || suit === "z" ? i + 1 : 0}${suit}`).map(face => {
-                                const pressed = selected.every(index => groups[index].rule.faces.includes(face));
-                                return <button type="button" key={face} aria-label={t("custom_target.select_face", {face})}
-                                    aria-pressed={pressed} onClick={() => changeRule(rule => ({faces: toggle(rule.faces, face, !pressed)}))}>
-                                    <Tile tile={face} width={27} height={37} shadow={false}/>
-                                </button>;
-                            })}</div>
-                        </div>)}</div>
-                    </fieldset>
-                    <fieldset><legend>{t("custom_target.suits")}</legend><div className={styles.chips}>
-                        {SUITS.map(suit => {
+                        <div className={styles.palette}>{SUITS.map(suit => {
                             const pressed = selected.every(index => groups[index].rule.suits.includes(suit));
-                            return <button type="button" key={suit} aria-pressed={pressed}
-                                onClick={() => changeRule(rule => ({suits: toggle(rule.suits, suit, !pressed)}))}><span className="ms" aria-hidden="true">style</span>{t(suit === "z" ? "about.tile_groups.honors" : `tile.suits.${suit}`)}</button>;
-                        })}
-                    </div></fieldset>
+                            const name = t(suit === "z" ? "about.tile_groups.honors" : `tile.suits.${suit}`);
+                            return <div className={styles.paletteRow} key={suit}>
+                                <button type="button" className={styles.suitButton} aria-pressed={pressed}
+                                    aria-label={t("custom_target.select_suit", {suit: name})} title={t("custom_target.select_suit", {suit: name})}
+                                    onClick={() => changeRule(rule => ({suits: toggle(rule.suits, suit, !pressed)}))}>{name}</button>
+                                <div>{Array.from({length: suit === "z" ? 7 : 10}, (_, i) => `${i < 9 || suit === "z" ? i + 1 : 0}${suit}`).map(face => {
+                                    const pressed = selected.every(index => groups[index].rule.faces.includes(face));
+                                    return <button type="button" key={face} aria-label={t("custom_target.select_face", {face})}
+                                        aria-pressed={pressed} onClick={() => changeRule(rule => ({faces: toggle(rule.faces, face, !pressed)}))}>
+                                        <Tile tile={face} width={27} height={37} shadow={false}/>
+                                    </button>;
+                                })}</div>
+                            </div>;
+                        })}</div>
+                    </fieldset>
                     <fieldset><legend>{t("custom_target.ranks")}</legend><div className={`${styles.chips} ${styles.ranks}`}>
                         {Array.from({length: 9}, (_, i) => i + 1).map(rank => {
                             const pressed = selected.every(index => groups[index].rule.ranks.includes(rank));

@@ -31,7 +31,7 @@ export default function AmuletBar({
                                       items,
                                       scale = 0.55,
                                       fillHeight = false,
-                                      max = 8,
+                                      max,
                                       onItemClick,
                                       showPrice,
                                       onReorder,

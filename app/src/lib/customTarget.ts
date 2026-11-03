@@ -9,7 +9,7 @@ export type TargetRule = {
 };
 export const TARGET_KINDS = ["single", "pair", "sequence", "triplet", "meld", "quad"] as const;
 export type TargetKind = typeof TARGET_KINDS[number];
-export type TargetGroup = {quad: boolean; kind?: TargetKind; suit_group?: string; distinct_group?: string; rule: TargetRule};
+export type TargetGroup = {quad: boolean; kind?: TargetKind; suit_group?: string; distinct_group?: string; require_draw?: boolean; require_joker?: boolean; rule: TargetRule};
 export type TargetPreset = {
     format: "shanten-lens.custom-target";
     version: 1;
@@ -55,6 +55,22 @@ export function applyTargetRule(groups: TargetGroup[], selected: number[], patch
     });
 }
 
+export function setTargetGroupRequirement(groups: TargetGroup[], index: number, key: "require_draw" | "require_joker", enabled: boolean): TargetGroup[] {
+    if (!groups[index]) return groups;
+    const other = key === "require_draw" ? "require_joker" : "require_draw";
+    return groups.map((group, i) => i === index
+        ? {...group, [key]: enabled, ...(enabled && targetKind(group) === "single" ? {[other]: false} : {})}
+        : enabled && group[key] ? {...group, [key]: false} : group);
+}
+
+export function setTargetGroupKind(groups: TargetGroup[], selected: number[], kind: TargetKind): TargetGroup[] {
+    return groups.map((group, index) => selected.includes(index)
+        ? {...group, kind, quad: kind === "quad",
+            ...(kind === "single" && group.require_draw ? {require_joker: false} : {}),
+            rule: {...group.rule, joker: kind === "quad" ? "exclude" as const : "allow" as const}}
+        : group);
+}
+
 export function restoreTargetGroups(value: unknown): TargetGroup[] {
     if (!validTargetGroups(value)) return Array.from({length: 14}, newTargetGroup);
     // Old per-slot joker preferences must not override the fixed joker in the actual hand.
@@ -97,6 +113,8 @@ export function compactTargetPreset(preset: TargetPreset) {
             return {...(kind !== "single" ? {kind} : {}),
                 ...(group.suit_group?.trim() ? {suit_group: group.suit_group.trim()} : {}),
                 ...(group.distinct_group?.trim() ? {distinct_group: group.distinct_group.trim()} : {}),
+                ...(group.require_draw ? {require_draw: true} : {}),
+                ...(group.require_joker ? {require_joker: true} : {}),
                 ...(Object.keys(rule).length ? {rule} : {})};
         }),
         ...(preset.wall_limit !== 36 ? {wall_limit: preset.wall_limit} : {}),
@@ -104,11 +122,15 @@ export function compactTargetPreset(preset: TargetPreset) {
 }
 
 export function validTargetGroups(value: unknown): value is TargetGroup[] {
-    if (!Array.isArray(value) || value.length > 14) return false;
+    if (!Array.isArray(value) || value.length > 14
+        || value.filter(group => group?.require_draw === true).length > 1
+        || value.filter(group => group?.require_joker === true).length > 1) return false;
     return value.every(group => {
         const rule = group?.rule;
         return typeof group?.quad === "boolean" && rule
             && (group.kind === undefined || TARGET_KINDS.includes(group.kind))
+            && [group.require_draw, group.require_joker].every(flag => flag === undefined || typeof flag === "boolean")
+            && !(targetKind(group) === "single" && group.require_draw && group.require_joker)
             && (!group.quad || group.kind === undefined || group.kind === "single" || group.kind === "quad")
             && [group.suit_group, group.distinct_group].every(link => link === undefined || (typeof link === "string" && link.length <= 32))
             && Array.isArray(rule.faces) && rule.faces.length <= 37 && rule.faces.every((v: unknown) => typeof v === "string" && /^(?:[0-9][mps]|[1-7]z)$/.test(v))

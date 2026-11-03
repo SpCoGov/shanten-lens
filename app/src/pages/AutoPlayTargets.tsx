@@ -15,7 +15,8 @@ export default function AutoPlayTargets({targets, onChange}: {targets: TargetIte
     function applyTarget(target: TargetItem) {
         if (!editor || !onChange) return;
         const next = [...targets];
-        next[editor.index] = {...target, value: editing?.value ?? 1};
+        next[editor.index] = {...target, value: editing?.value ?? 1,
+            ...(target.kind === "badge" ? {count: editing?.kind === "badge" ? editing.count ?? 1 : 1} : {})};
         onChange(next); setEditor(null);
     }
     return <>
@@ -31,13 +32,20 @@ export default function AutoPlayTargets({targets, onChange}: {targets: TargetIte
                     ? target.badge == null ? t("autorun.target_any_badge") : badgeById.get(target.badge)?.name
                     : t("autorun.target_badge_label")}</span></div>
                 <div className={styles.targetControls}>
-                    {onChange ? <><label>{t("autorun.target_value_label")}<input className="form-input" type="number" min={1} step={1} max={Number.MAX_SAFE_INTEGER}
-                        aria-label={t("autoplay.target_value_for", {name})} value={target.value ?? 1}
-                        onChange={event => onChange(targets.map((item, i) => i === index ? {...item, value: Number(event.target.value)} : item))}/></label>
+                    {onChange ? <>
+                        <div className={styles.targetFields}>
+                            <label>{t("autorun.target_value_label")}<input className="form-input" type="number" min={1} step={1} max={Number.MAX_SAFE_INTEGER}
+                                aria-label={t("autoplay.target_value_for", {name})} value={target.value ?? 1}
+                                onChange={event => onChange(targets.map((item, i) => i === index ? {...item, value: Number(event.target.value)} : item))}/></label>
+                            {target.kind === "badge" && <label title={t("autoplay.badge_keep_count_hint")}>{t("autoplay.badge_keep_count")}<input className="form-input" type="number" min={1} step={1} max={Number.MAX_SAFE_INTEGER}
+                                aria-label={t("autoplay.badge_keep_count_for", {name})} value={target.count ?? 1}
+                                onChange={event => onChange(targets.map((item, i) => i === index ? {...item, count: Number(event.target.value)} : item))}/></label>}
+                        </div>
                         <div className={styles.targetButtons}>
                             <button className="nav-btn" title={t("autoplay.edit")} aria-label={t("autoplay.edit")} onClick={() => setEditor({kind: target.kind, index})}><span className="ms" aria-hidden="true">edit</span></button>
                             <button className="nav-btn is-danger" title={t("autoplay.remove")} aria-label={t("autoplay.remove")} onClick={() => onChange(targets.filter((_, i) => i !== index))}><span className="ms" aria-hidden="true">delete</span></button>
-                        </div></> : <span className={styles.targetWeight}>{t("autorun.target_value_label")} <b>{target.value ?? 1}</b></span>}
+                        </div></> : <><span className={styles.targetWeight}>{t("autorun.target_value_label")} <b>{target.value ?? 1}</b></span>
+                            {target.kind === "badge" && <span className={styles.targetWeight} title={t("autoplay.badge_keep_count_hint")}>{t("autoplay.badge_keep_count")} <b>{target.count ?? 1}</b></span>}</>}
                 </div>
             </article>;
         })}</div>

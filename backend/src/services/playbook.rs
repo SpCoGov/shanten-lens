@@ -44,6 +44,11 @@ fn positive_integer(value: &Value) -> bool {
     value.as_u64().is_some_and(|n| (1..=9_007_199_254_740_991).contains(&n))
 }
 
+pub(crate) fn badge_target_count(target: &Value) -> Option<u64> {
+    target.get("count").map_or(Some(1), Value::as_u64)
+        .filter(|count| (1..=9_007_199_254_740_991).contains(count))
+}
+
 fn known_badge(id: &Value) -> bool {
     positive_integer(id) && BADGES["items"].as_array().unwrap().iter().any(|b| b["id"] == *id)
 }
@@ -84,7 +89,7 @@ fn validate_inner(value: &Value, allow_invalid_levels: bool) -> Result<(), Strin
                     Some("amulet") => known_amulet(&target["id"], false)
                         && target.get("plus").is_none_or(Value::is_boolean)
                         && (target["badge"].is_null() || known_badge(&target["badge"])),
-                    Some("badge") => known_badge(&target["id"]),
+                    Some("badge") => known_badge(&target["id"]) && badge_target_count(target).is_some(),
                     _ => false,
                 };
                 if !valid { return Err("invalid opening amulet or badge target".into()); }
@@ -145,7 +150,8 @@ mod tests {
 
     #[test]
     fn playbook_rejects_invalid_openings_orders_deadlines_and_hands() {
-        let valid: Value = serde_json::from_str(include_str!("../../tests/fixtures/playbook.json")).unwrap();
+        let mut valid: Value = serde_json::from_str(include_str!("../../tests/fixtures/playbook.json")).unwrap();
+        valid["profiles"][1]["targets"][1]["count"] = json!(1);
         assert!(validate(&valid).is_ok());
         for (pointer, replacement) in [
             ("/version", json!(2)),
@@ -176,6 +182,12 @@ mod tests {
             ("/profiles/1/targets/0/value", Value::Null),
             ("/profiles/1/targets/0/plus", json!(1)),
             ("/profiles/1/targets/0/badge", json!(999999)),
+            ("/profiles/1/targets/1/count", json!(0)),
+            ("/profiles/1/targets/1/count", json!(-1)),
+            ("/profiles/1/targets/1/count", json!(1.5)),
+            ("/profiles/1/targets/1/count", json!("2")),
+            ("/profiles/1/targets/1/count", Value::Null),
+            ("/profiles/1/targets/1/count", json!(9_007_199_254_740_992u64)),
             ("/profiles/1/targets/1/id", json!(999999)),
             ("/profiles/1/targets/1/kind", json!("unknown")),
             ("/profiles/1/cutoff_level", json!(999)),
@@ -191,6 +203,18 @@ mod tests {
             if !pointer.ends_with("_level") && !pointer.ends_with("_node") {
                 assert!(validate_for_editing(&invalid).is_err(), "editing bypassed validation of {pointer}");
             }
+        }
+    }
+
+    #[test]
+    fn opening_badge_count_defaults_to_one_and_survives_serialization() {
+        let mut book: Value = serde_json::from_str(include_str!("../../tests/fixtures/playbook.json")).unwrap();
+        assert_eq!(badge_target_count(&book["profiles"][1]["targets"][1]), Some(1));
+        for count in [1, 2, 9_007_199_254_740_991u64] {
+            book["profiles"][1]["targets"][1]["count"] = json!(count);
+            assert!(validate(&book).is_ok());
+            let loaded: Value = serde_json::from_slice(&serde_json::to_vec(&book).unwrap()).unwrap();
+            assert_eq!(badge_target_count(&loaded["profiles"][1]["targets"][1]), Some(count));
         }
     }
 

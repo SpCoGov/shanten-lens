@@ -151,6 +151,7 @@ pub struct GameStateData {
     map_nodes: Option<Vec<Value>>,
     deck_map: HashMap<String, String>,
     hand_tiles: Vec<u64>,
+    last_drawn_tile: Option<u64>,
     dora_tiles: Vec<u64>,
     tian_dora_tiles: Option<Vec<Value>>,
     ming: Option<Vec<Value>>,

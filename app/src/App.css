@@ -888,6 +888,7 @@ input, textarea, select, code, pre, .selectable {
 
 .hotkey-editor-group {
     display: grid;
+    min-width: 0;
     gap: 8px;
     align-content: start;
 }
@@ -897,6 +898,50 @@ input, textarea, select, code, pre, .selectable {
     font-size: 12px;
     font-weight: 700;
     text-transform: uppercase;
+}
+
+.hotkey-editor-group-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.hotkey-editor-buy-mode {
+    display: inline-flex;
+    gap: 8px;
+}
+
+.hotkey-editor-buy-mode label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.hotkey-editor-buy-mode input {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+}
+
+.hotkey-editor-strategy {
+    display: grid;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.hotkey-editor-strategy select {
+    min-width: 0;
+}
+
+.hotkey-editor-hint {
+    margin: 0;
+    color: var(--muted-fg);
+    font-size: 12px;
+    line-height: 1.5;
 }
 
 .hotkey-editor-row {
@@ -1211,9 +1256,15 @@ input, textarea, select, code, pre, .selectable {
     color: var(--state-down);
 }
 
-@media (max-width: 760px) {
+@media (max-width: 640px) {
     .hotkey-editor-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 420px) {
+    .hotkey-editor-grid {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 

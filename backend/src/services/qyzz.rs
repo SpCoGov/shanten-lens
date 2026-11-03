@@ -22,6 +22,11 @@ fn validate(snapshot: &Value) -> Result<(), String> {
             return Err("qyzz-invalid-tile-id".into());
         }
     }
+    if snapshot.get("last_drawn_tile").is_some_and(|drawn| !drawn.is_null()
+        && drawn.as_u64().is_none_or(|id| !snapshot["hand_tiles"].as_array().unwrap().contains(&Value::from(id))
+            || deck[&id.to_string()] == "bd")) {
+        return Err("qyzz-invalid-drawn-tile".into());
+    }
     let effects = snapshot["effect_list"].as_array().ok_or("qyzz-missing-effects")?;
     if effects.len() > 10 || effects.iter().any(|effect| {
         effect["id"].as_u64().is_none() || effect["uid"].as_u64().is_none()
@@ -40,6 +45,25 @@ fn valid_tile(face: &str) -> bool {
     }
 }
 
+fn last_drawn_tile(snapshot: &Value, previous: Option<&Value>) -> Option<u64> {
+    let hand = snapshot["hand_tiles"].as_array()?;
+    if hand.len() % 3 != 2 { return None; }
+    let previous = previous.filter(|old| old["qyzz_run_id"] == snapshot["qyzz_run_id"]
+        && old["qyzz_deal_id"] == snapshot["qyzz_deal_id"]);
+    let drawn = if let Some(explicit) = snapshot.get("last_drawn_tile") { explicit.as_u64() } else {
+        let previous = previous?;
+        let added: Vec<_> = hand.iter().filter(|id|
+            previous["wall_tiles"].as_array().is_some_and(|wall| wall.contains(id))
+            && previous["hand_tiles"].as_array().is_some_and(|old_hand| !old_hand.contains(id))).collect();
+        match added.as_slice() {
+            [id] => id.as_u64(),
+            [] => previous["last_drawn_tile"].as_u64(),
+            _ => None,
+        }
+    };
+    drawn.filter(|id| hand.contains(&Value::from(*id)) && snapshot["deck_map"][id.to_string()] != "bd")
+}
+
 impl Services {
     pub fn publish_qyzz_state(&self, snapshot: &Value) -> Result<(), String> {
         validate(snapshot)?;
@@ -48,7 +72,12 @@ impl Services {
             if previous["qyzz_run_id"] == snapshot["qyzz_run_id"] && previous["qyzz_deal_id"] == snapshot["qyzz_deal_id"]
                 && snapshot["qyzz_version"].as_u64() < previous["qyzz_version"].as_u64() { return Ok(()); }
         }
-        sources.qyzz = Some(snapshot.clone());
+        let drawn = last_drawn_tile(snapshot, sources.qyzz.as_ref());
+        let mut snapshot = snapshot.clone();
+        if let Some(object) = snapshot.as_object_mut().filter(|object| !object.is_empty()) {
+            object.insert("last_drawn_tile".into(), Value::from(drawn));
+        }
+        sources.qyzz = Some(snapshot);
         self.publish_selected_source(&mut sources, Some(crate::ipc::DataSource::Qyzz));
         Ok(())
     }
@@ -62,6 +91,28 @@ impl Services {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_draw_tracking_distinguishes_wall_draws_from_exchanges() {
+        let initial = json!({"qyzz_run_id":"run","qyzz_deal_id":1,
+            "hand_tiles":(1..=13).collect::<Vec<_>>(),"wall_tiles":[14,15]});
+        let mut drawn = initial.clone();
+        drawn["hand_tiles"] = json!((1..=14).collect::<Vec<_>>());
+        drawn["wall_tiles"] = json!([15]);
+        assert_eq!(last_drawn_tile(&drawn, Some(&initial)), Some(14));
+        assert_eq!(last_drawn_tile(&drawn, None), None);
+        drawn["last_drawn_tile"] = json!(14);
+        let mut exchanged = drawn.clone();
+        exchanged.as_object_mut().unwrap().remove("last_drawn_tile");
+        exchanged["hand_tiles"] = json!((2..=14).chain([99]).collect::<Vec<_>>());
+        assert_eq!(last_drawn_tile(&exchanged, Some(&drawn)), Some(14));
+        exchanged["hand_tiles"] = json!((2..=13).chain([99]).collect::<Vec<_>>());
+        assert_eq!(last_drawn_tile(&exchanged, Some(&drawn)), None);
+        exchanged["hand_tiles"].as_array_mut().unwrap().push(json!(15));
+        assert_eq!(last_drawn_tile(&exchanged, Some(&drawn)), Some(15));
+        exchanged["qyzz_deal_id"] = json!(2);
+        assert_eq!(last_drawn_tile(&exchanged, Some(&drawn)), None);
+    }
 
     #[test]
     fn validates_bridge_tile_ids_and_growth() {

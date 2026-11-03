@@ -134,3 +134,19 @@ native.profiles[0].stages[1].start_level = 13001;
 native.profiles[0].stages[1].start_node = 3;
 assert.equal(validateAutoPlayConfig(native), "levels", "A tactical profile cannot mix native and packet level references.");
 console.log("Autoplay configuration checks passed.");
+
+
+const badgeCountBook = structuredClone(valid);
+for (const count of [1, 2, Number.MAX_SAFE_INTEGER]) {
+    badgeCountBook.profiles[1].targets = [{kind: "badge", id: 600010, count}];
+    assert.equal(validateAutoPlayConfig(badgeCountBook), null);
+    const saved = JSON.parse(JSON.stringify(badgeCountBook));
+    assert.equal(saved.profiles[1].targets[0].count, count);
+}
+for (const count of [0, -1, 1.5, "2", null, NaN, Number.MAX_SAFE_INTEGER + 1]) {
+    Object.assign(badgeCountBook.profiles[1].targets[0], {count});
+    assert.equal(validateAutoPlayConfig(badgeCountBook), "targets");
+}
+badgeCountBook.profiles[1].targets = [{kind: "badge", id: 600010}];
+assert.equal(validateAutoPlayConfig(badgeCountBook), null, "Older badge targets keep the default count of one.");
+console.log("Badge target count validation checks passed.");
