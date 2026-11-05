@@ -611,10 +611,12 @@ export default function ScorePage({
                             <div>
                                 <span className={styles.metricLabel}>{t("score.base_score")}</span>
                                 <strong>{formatFixed2(currentResult.baseScore)}</strong>
+                                <small className={styles.scientificNumber}>{formatScientificPoint(currentResult.baseScore)}</small>
                             </div>
                             <div>
                                 <span className={styles.metricLabel}>{t("score.final_score")}</span>
                                 <strong>{formatFixed2(currentResult.finalScore)}</strong>
+                                <small className={styles.scientificNumber}>{formatScientificPoint(currentResult.finalScore)}</small>
                             </div>
                             <div>
                                 <span className={styles.metricLabel}>{t("score.final_fan")}</span>

@@ -22,6 +22,7 @@ export default function GoodsCard({
     const H0 = 220;
     const W = Math.round(W0 * scale);
     const H = Math.round(H0 * scale);
+    const compact = scale < 0.55;
 
     const img = GOODS_IMG[item.goodsId] ?? GOODS_IMG[101];
     const title = t("good_card.tooltip", {
@@ -62,17 +63,17 @@ export default function GoodsCard({
             <div
                 style={{
                     position: "absolute",
-                    left: 8,
-                    bottom: 8,
-                    padding: "4px 8px",
+                    left: compact ? 3 : 8,
+                    bottom: compact ? 3 : 8,
+                    padding: compact ? "2px 4px" : "4px 8px",
                     borderRadius: 999,
                     background: "var(--glass-bg)",
                     border: "1px solid var(--border)",
-                    fontSize: Math.max(12, Math.round(13 * scale)),
+                    fontSize: compact ? 11 : Math.max(12, Math.round(13 * scale)),
                     fontWeight: 700,
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: 6,
+                    gap: compact ? 3 : 6,
                     boxShadow: "var(--shadow-sm)",
                     backdropFilter: "saturate(120%) blur(2px)",
                 }}
@@ -95,15 +96,16 @@ export default function GoodsCard({
                 >
                     <div
                         style={{
-                            padding: "6px 12px",
+                            padding: compact ? "3px 4px" : "6px 12px",
                             borderRadius: 8,
                             background: "var(--sold-pill-bg)",
                             color: "var(--on-strong)",
                             fontWeight: 800,
-                            letterSpacing: "0.1em",
+                            letterSpacing: compact ? 0 : "0.1em",
                             border: "1px solid var(--sold-pill-border)",
                             boxShadow: "var(--shadow-md)",
-                            fontSize: Math.max(12, Math.round(14 * scale)),
+                            fontSize: compact ? 11 : Math.max(12, Math.round(14 * scale)),
+                            whiteSpace: "nowrap",
                         }}
                     >
                         {t("good_card.sold")}

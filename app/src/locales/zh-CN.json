@@ -36,6 +36,7 @@
         "preserve_guidance_for_packs": "开包前保留指引",
         "gold_pack_bonus": "金卡包奖励",
         "configured_target": "配置目标价值",
+        "opening_target_base": "目标 PLUS 本体暂留",
         "remake_at_cutoff": "截止关卡未达标",
         "remake_penalty": "重开扣分",
         "skip_candidates": "跳过候选代价"
@@ -73,6 +74,10 @@
         "skip_candidates": "跳过操作减去当前可选护身符中的最高总评分，并与其他规则累加",
         "select_configured_target": "选择目标加 99 × 目标价值；开局配置累计命中的护身符与独立印章目标价值，全流程当前阶段的所有方案命中计 1，重复不叠加",
         "sell_configured_target": "卖出目标扣 99 × 目标价值，价值与选择时的计算方式相同",
+        "select_target_base": "仅限雀魂原版 S4 刷开局：尚未获得配置要求的 PLUS 成品时，首张同类本体加 20 分，先保留供后续同名卡按目标印章要求合并；不计为目标达标，莱恩沿用原规则",
+        "retain_target_base": "仅限雀魂原版 S4 刷开局：出售唯一一张尚需合成目标 PLUS 的本体，扣除 20 分保留价值并抵消售价及固定出售奖励；不为卖掉后重新拿未达标同名卡增加腾位收益，完整目标仍可正常比较腾位收益",
+        "target_base_wrong_upgrade": "已保留同类本体，但按新候选的印章合并或取得新候选后仍无法形成配置要求的 PLUS 目标，扣 99 分；不额外囤积未达标同类卡，莱恩沿用原规则",
+        "missing_target_base_data": "持有护身符、印章或出售价值数据不足，无法计算目标 PLUS 本体的暂留价值",
         "invalid_target_value": "目标价值、印章保留数量或当前护身符数据无效，或超出精确评分范围",
         "remake_at_cutoff": "已达到或超过配置的截止关卡：开局目标总价值未达标，或全流程当前战术阶段没有一套护身符方案达标时，重开加 99999 分",
         "missing_cutoff_data": "截止关卡、当前关卡或持有护身符数据缺失、无效，暂不计算重开加分",

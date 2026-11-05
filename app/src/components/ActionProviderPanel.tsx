@@ -4,7 +4,7 @@ import type {ActionCandidate, ActionReason, Availability, JsonValue} from "../bi
 import type {GameStateData} from "../lib/gamestate";
 import {useRegistry} from "../lib/registryStore";
 import {formatLevelIdToLabel} from "../lib/levelFormat";
-import {executeAction} from "../lib/ipc";
+import type {ActionExecution} from "../lib/useActionExecution";
 import {actionScoreTotal, compareActionScores} from "../lib/actionScores";
 import Modal from "./Modal";
 import styles from "./ActionProviderPanel.module.css";
@@ -21,7 +21,7 @@ const icons: Record<string, string> = {
     start_game: "play_arrow", remake: "restart_alt",
 };
 
-export default function ActionProviderPanel({state}: {state: GameStateData | null}) {
+export default function ActionProviderPanel({state, execution}: {state: GameStateData | null; execution: ActionExecution}) {
     const {t, i18n} = useTranslation();
     const {amuletById, badgeById} = useRegistry();
     const [filter, setFilter] = React.useState<"all" | Availability>("all");
@@ -31,31 +31,7 @@ export default function ActionProviderPanel({state}: {state: GameStateData | nul
         setDetailsOpen(false);
         detailsButton.current?.focus();
     }, []);
-    const executing = React.useRef(false);
-    const [pending, setPending] = React.useState<string | null>(null);
-    const [submitted, setSubmitted] = React.useState<string | null>(null);
-    const [feedback, setFeedback] = React.useState<{error: boolean; text: string} | null>(null);
-    const stamp = `${state?.session_id}:${state?.revision}`;
-    const waiting = submitted === stamp;
-    const execute = async (action: ActionCandidate) => {
-        if (executing.current || waiting || action.availability !== "available" || state?.session_id == null || state.revision == null) return;
-        executing.current = true;
-        setPending(action.id);
-        setFeedback(null);
-        try {
-            const result = await executeAction({action_id: action.id, session_id: state.session_id, revision: state.revision});
-            if (result.ok || result.msg_id != null || result.reason_key === "action_provider.execution.uncertain" || result.reason_key === "action_provider.execution.awaiting_state") setSubmitted(stamp);
-            setFeedback({error: !result.ok, text: result.ok
-                ? t("action_provider.execution.success", {action: t(`action_provider.actions.${action.kind}`)})
-                : t(result.reason_key || "action_provider.execution.send_failed", {...result.reason_values})});
-        } catch {
-            setSubmitted(stamp);
-            setFeedback({error: true, text: t("action_provider.execution.uncertain")});
-        } finally {
-            executing.current = false;
-            setPending(null);
-        }
-    };
+    const {pending, waiting, disabled, feedback, execute} = execution;
     const report = state?.action_report;
     const scores = new Map((state?.decision_report?.actions ?? []).map(score => [score.action_id, score]));
     const byScore = (a: ActionCandidate, b: ActionCandidate) => compareActionScores(a, b, scores);
@@ -121,7 +97,7 @@ export default function ActionProviderPanel({state}: {state: GameStateData | nul
     };
     const rows = (items: ActionCandidate[]) => items.map(action => <li key={action.id}>
         {action.availability === "available" ? <button type="button" className={`${styles.row} ${styles.action}`}
-            disabled={pending !== null || waiting || state?.session_id == null || state.revision == null}
+            disabled={disabled}
             aria-busy={pending === action.id} onClick={() => void execute(action)}>
             {rowContent(action)}
         </button> : <div className={styles.row}>{rowContent(action)}</div>}

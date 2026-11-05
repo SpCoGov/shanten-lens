@@ -108,6 +108,10 @@ const RULES: &[Rule] = &[Rule {
     action_kind: None,
     evaluate: configured_target,
 }, Rule {
+    id: "opening_target_base",
+    action_kind: None,
+    evaluate: opening_target_base,
+}, Rule {
     id: "remake_at_cutoff",
     action_kind: Some("remake"),
     evaluate: remake_at_cutoff,
@@ -310,6 +314,8 @@ fn sale_followup(state: &Value, sale: &ActionCandidate, registry: &Value, playbo
     let index = matches.next()?.0;
     if matches.next().is_some() || owned[index]["id"] != sale.params["effect"]["id"] { return None; }
     owned.remove(index);
+    let preserving_base = opening_target_base(state, sale, registry, playbook)
+        .is_some_and(|(_, reason)| reason == "retain_target_base");
     // shortcut: compare one sale and one choice; extend only when modeling longer sale chains.
     let best_choice = |state: &Value| -> Option<f64> {
         let mut choices = crate::action_provider::evaluate(state);
@@ -323,6 +329,13 @@ fn sale_followup(state: &Value, sale: &ActionCandidate, registry: &Value, playbo
         for action in choices.actions.iter().filter(|action| action.kind == "select_candidate" && action.availability == Availability::Available) {
             let score = scores.actions.iter().find(|score| score.action_id == action.id)?;
             if score.rules.iter().any(|rule| rule.score.is_none()) { return None; }
+            // Selling a base just to take another unfinished copy is not progress toward its target.
+            if preserving_base && action.params["effect"]["id"].as_u64().map(|id| id / 10)
+                == sale.params["effect"]["id"].as_u64().map(|id| id / 10)
+                && score.rules.iter().any(|rule| rule.reason.code == "select_target_base")
+                && !score.rules.iter().any(|rule| rule.rule_id == "configured_target" && rule.score.is_some_and(|score| score > 0.0)) {
+                continue;
+            }
             let total = score.total?;
             best = Some(best.map_or(total, |best| best.max(total)));
         }
@@ -798,6 +811,44 @@ fn s4_opening_profile<'a>(state: &Value, playbook: &'a Value) -> Option<&'a Valu
     if !matches!(level["activity_id"].as_u64(), Some(260511 | 261081)) { return None; }
     playbook["profiles"].as_array()?.iter().find(|profile|
         profile["id"] == playbook["selected_profile_id"] && profile["strategy"] == "opening")
+}
+
+fn opening_target_base(state: &Value, action: &ActionCandidate, registry: &Value, playbook: &Value) -> Option<(Option<f64>, &'static str)> {
+    if !matches!(action.kind.as_str(), "select_candidate" | "sell_effect") { return None; }
+    let effect = &action.params["effect"];
+    let id = effect["id"].as_u64().filter(|id| *id > 0)?;
+    let family = id / 10;
+    if family == 224 { return None; }
+    let profile = s4_opening_profile(state, playbook)?;
+    let targets: Vec<_> = profile["targets"].as_array()?.iter().filter(|target|
+        target["kind"] == "amulet" && target["id"].as_u64() == Some(family) && target["plus"] == true).collect();
+    if targets.is_empty() { return None; }
+    let base = family.checked_mul(10)?;
+    let upgrade = ACTION_RULES["effects"][base.to_string()]["upgrade"].as_u64().filter(|upgrade| *upgrade == base + 1)?;
+    if id != base && id != upgrade { return None; }
+    let Some(owned) = state["provider_state"]["effect"]["effectList"].as_array().filter(|owned|
+        owned.iter().all(|effect| effect["id"].as_u64().is_some_and(|id| id > 0) && badge_id(effect).is_some())) else {
+        return Some((None, "missing_target_base_data"));
+    };
+    let matches = |effect: &Value| effect["id"].as_u64() == Some(upgrade) && targets.iter()
+        .any(|target| target["badge"].as_u64().is_none_or(|badge| badge_id(effect) == Some(badge)));
+    if owned.iter().any(matches) { return None; }
+    let count = owned.iter().filter(|effect| effect["id"].as_u64().is_some_and(|id| id == base || id == upgrade)).count();
+    if action.kind == "sell_effect" {
+        if count != 1 { return None; }
+        let price = amulet_price(state, action, registry, playbook).map_or(Some(0.0), |(score, _)| score);
+        let bonus = sell_bonus(state, action, registry, playbook).map_or(Some(0.0), |(score, _)| score);
+        let score = price.zip(bonus).map(|(price, bonus)| -(20.0 + price + bonus))
+            .filter(|score| score.abs() <= MAX_EXACT_SCORE as f64);
+        return Some((score, if score.is_some() { "retain_target_base" } else { "missing_target_base_data" }));
+    }
+    if badge_id(effect).is_none() { return Some((None, "missing_target_base_data")); }
+    if crate::action_provider::completes_effect_group(effect, owned) { return Some((None, "unknown_replacement_group")); }
+    let mut result = effect.clone();
+    if crate::action_provider::replaced_effect(effect, owned).is_some() { result["id"] = json!(upgrade); }
+    if matches(&result) { return None; }
+    Some((Some(if count == 0 { 20.0 } else { -99.0 }),
+        if count == 0 { "select_target_base" } else { "target_base_wrong_upgrade" }))
 }
 
 fn friendship_value(owned: &[Value], profile: &Value) -> Option<f64> {
