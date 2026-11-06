@@ -96,7 +96,10 @@ impl ProxyControl {
                 message = outgoing.recv() => {
                     let message = message.ok_or("direct-connection-closed")?;
                     tokio::time::timeout(REQUEST_TIMEOUT, socket.send(message)).await
-                        .map_err(|_| "direct-send-timeout")?.map_err(|_| "direct-send-failed")?;
+                        .map_err(|_| "direct-send-timeout")?.map_err(|error| {
+                            warn!(target: "shanten_backend::websocket", %error, error_debug = ?error, "Direct WebSocket send failed");
+                            "direct-send-failed"
+                        })?;
                 }
                 // Inbound injections have already passed through the pipeline; there is no game client to forward them to.
                 message = local.recv() => { message.ok_or("direct-connection-closed")?; }
@@ -104,10 +107,17 @@ impl ProxyControl {
                     Some(Ok(Message::Binary(bytes))) => self.process_direct_frame(&processor, &mut socket, bytes.to_vec()).await?,
                     Some(Ok(Message::Ping(bytes))) => {
                         tokio::time::timeout(REQUEST_TIMEOUT, socket.send(Message::Pong(bytes))).await
-                            .map_err(|_| "direct-send-timeout")?.map_err(|_| "direct-send-failed")?;
+                            .map_err(|_| "direct-send-timeout")?.map_err(|error| {
+                                warn!(target: "shanten_backend::websocket", %error, error_debug = ?error, "Direct WebSocket pong send failed");
+                                "direct-send-failed"
+                            })?;
                     }
                     Some(Ok(Message::Close(_))) | None => return Err("direct-connection-closed".into()),
-                    Some(Err(_)) => return Err("direct-receive-failed".into()),
+                    Some(Err(error)) => {
+                        let flow_id = processor.lock().unwrap().flow_id;
+                        warn!(target: "shanten_backend::websocket", flow_id, %error, error_debug = ?error, "Direct WebSocket receive failed");
+                        return Err("direct-receive-failed".into());
+                    }
                     _ => {}
                 }
             }
@@ -142,7 +152,10 @@ impl ProxyControl {
                 )
                 .await
                 .map_err(|_| "direct-send-timeout")?
-                .map_err(|_| "direct-send-failed")?;
+                .map_err(|error| {
+                    warn!(target: "shanten_backend::websocket", %error, error_debug = ?error, "Direct injected WebSocket send failed");
+                    "direct-send-failed"
+                })?;
             }
         }
         Ok(())
@@ -238,6 +251,58 @@ mod tests {
         publish_stage(&mut mitm, 5);
         assert_eq!(services.game_state()["stage"], 5);
         drop((direct, mitm, proxy, services));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn direct_socket_logs_original_receive_error_and_keeps_error_code() {
+        use tracing::instrument::WithSubscriber;
+
+        let (root, services, proxy, registry) = setup();
+        let log_path = root.join("receive-error.log");
+        let subscriber = tracing_subscriber::fmt()
+            .without_time()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::WARN)
+            .with_writer(Arc::new(std::fs::File::create(&log_path).unwrap()))
+            .finish();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("ws://{}/gateway", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move {
+            let socket = accept_async(listener.accept().await.unwrap().0)
+                .await
+                .unwrap();
+            // Drop TCP without a WebSocket close frame to reproduce a receive failure.
+            drop(socket);
+        });
+        let (socket, _) = connect_async_tls_with_config(&endpoint, None, false, None)
+            .await
+            .unwrap();
+        let (processor, outgoing, local) = proxy.register_direct(&endpoint, registry).await;
+        let flow_id = processor.lock().unwrap().flow_id;
+        let result = tokio::time::timeout(
+            Duration::from_secs(2),
+            proxy
+                .run_direct_socket(socket, processor, outgoing, local, vec![])
+                .with_subscriber(subscriber),
+        )
+        .await
+        .unwrap();
+        assert_eq!(result, Err("direct-receive-failed".into()));
+        let logs = std::fs::read_to_string(&log_path).unwrap();
+        assert!(logs.contains("Direct WebSocket receive failed"), "{logs}");
+        assert!(
+            logs.contains("Connection reset without closing handshake"),
+            "{logs}"
+        );
+        assert!(
+            logs.contains("Protocol(ResetWithoutClosingHandshake)"),
+            "{logs}"
+        );
+        assert!(logs.contains(&format!("flow_id={flow_id}")), "{logs}");
+        server.await.unwrap();
+        proxy.unregister_direct();
+        drop((proxy, services));
         std::fs::remove_dir_all(root).unwrap();
     }
 

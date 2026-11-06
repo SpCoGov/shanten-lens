@@ -681,8 +681,12 @@ mod tests {
         ));
         let logs = root.join("logs");
         fs::create_dir_all(&logs).unwrap();
+        let websocket_error = json!({"level":"WARN","target":"shanten_backend::websocket",
+            "message":"Direct WebSocket receive failed","fields":{"flow_id":7,
+                "error":"WebSocket protocol error: Connection reset without closing handshake",
+                "error_debug":"Protocol(ResetWithoutClosingHandshake)"}});
         for timestamp in [1, 2, 3] {
-            fs::write(logs.join(format!("shanten-lens-{timestamp}.log")), b"{\"message\":\"password=hidden-value\",\"fields\":{\"content\":\"private-body\"}}\ninvalid-line\n").unwrap();
+            fs::write(logs.join(format!("shanten-lens-{timestamp}.log")), format!("{{\"message\":\"password=hidden-value\",\"fields\":{{\"content\":\"private-body\"}}}}\ninvalid-line\n{websocket_error}\n")).unwrap();
         }
         fs::write(
             logs.join("shanten-lens-packets-99.log"),
@@ -699,7 +703,7 @@ mod tests {
         let path = write_archive(
             &root.join("export"),
             &logs,
-            json!({"config":{"pass":"hidden-value"},"backend_logs":[],"packets":packets}),
+            json!({"config":{"pass":"hidden-value"},"backend_logs":[websocket_error.clone()],"packets":packets}),
             Redactor::new(&json!({"pass":"hidden-value"})),
             true,
         )
@@ -715,6 +719,21 @@ mod tests {
         assert!(names.contains(&"logs/shanten-lens-3.log".into()));
         assert!(names.contains(&"logs/shanten-lens-2.log".into()));
         assert!(!names.contains(&"logs/shanten-lens-1.log".into()));
+        for name in ["logs/backend-recent.jsonl", "logs/shanten-lens-3.log"] {
+            let mut contents = String::new();
+            zip.by_name(name)
+                .unwrap()
+                .read_to_string(&mut contents)
+                .unwrap();
+            let entries: Vec<Value> = contents
+                .lines()
+                .map(|line| serde_json::from_str(line).unwrap())
+                .collect();
+            assert!(
+                entries.contains(&websocket_error),
+                "missing original WebSocket error in {name}"
+            );
+        }
         for secret in [
             "hidden-value",
             "private-body",

@@ -1,4 +1,38 @@
 {
+  "magic_vine": {
+    "loading": "ローカルログからバックグラウンドで統計を復元中…",
+    "title": "魔藤の統計",
+    "open": "魔藤の直近100対局の統計を表示",
+    "history_title": "魔藤 · 直近100対局",
+    "game": "対局",
+    "pack_obtained": "パックから選択",
+    "shop_obtained": "神秘ショップ購入",
+    "regeneration_obtained": "再生で獲得",
+    "other_obtained": "その他の獲得",
+    "obtained": "獲得合計",
+    "per_round": "魔藤育成期の平均",
+    "score_triggers": "加点回数",
+    "expansion_extra": "膨張による追加加点",
+    "shops_purchases": "神秘ショップ総数 / 魔藤購入",
+    "finished": "終了",
+    "playing": "進行中",
+    "incomplete": "ログが不完全なため観測分のみ集計",
+    "partial_label": "不完全な記録",
+    "empty": "Ex5・21枚・日時の条件を満たす終了済み対局はありません。",
+    "load_failed": "魔藤の統計を読み込めませんでした",
+    "highest_score": "現在の最高基礎スコア",
+    "farming_average": "育成期の平均",
+    "farming_counts": "{{count}} ステージ · {{obtained}} 枚獲得",
+    "farming_state": "育成段階：{{state}}",
+    "states": {
+      "unformed": "未成立",
+      "observing": "獲得を確認中",
+      "active": "育成中",
+      "stopping": "終了を確認中",
+      "ended": "終了",
+      "interrupted": "ログ欠落・再確認待ち"
+    }
+  },
   "action_provider": {
     "scoring": {
       "total": "合計評価 {{score}}",

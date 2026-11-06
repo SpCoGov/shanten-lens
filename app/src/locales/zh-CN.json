@@ -1,4 +1,38 @@
 {
+  "magic_vine": {
+    "loading": "正在后台从本地日志回填统计…",
+    "title": "魔藤统计",
+    "open": "查看魔藤最近 100 局统计",
+    "history_title": "魔藤 · 最近 100 局",
+    "game": "对局",
+    "pack_obtained": "卡包开出并拿到",
+    "shop_obtained": "神秘商店购买",
+    "regeneration_obtained": "再生获得",
+    "other_obtained": "其他获得",
+    "obtained": "合计获得",
+    "per_round": "刷藤期每关平均",
+    "score_triggers": "加分次数",
+    "expansion_extra": "膨胀额外加分",
+    "shops_purchases": "神秘商店总数 / 购买魔藤",
+    "finished": "已结束",
+    "playing": "进行中",
+    "incomplete": "日志不完整，仅统计已观测事件",
+    "partial_label": "记录不完整",
+    "empty": "暂无符合 Ex5、21 张及时间条件的已结束对局。",
+    "load_failed": "魔藤统计读取失败",
+    "highest_score": "当前最高牌基础分",
+    "farming_average": "刷藤期平均",
+    "farming_counts": "{{count}} 关 · 获得 {{obtained}} 张",
+    "farming_state": "刷藤阶段：{{state}}",
+    "states": {
+      "unformed": "尚未确认成型",
+      "observing": "观察稳定产出",
+      "active": "刷藤中",
+      "stopping": "观察是否结束",
+      "ended": "已结束",
+      "interrupted": "日志缺口，等待重新确认"
+    }
+  },
   "action_provider": {
     "scoring": {
       "total": "总评分 {{score}}",

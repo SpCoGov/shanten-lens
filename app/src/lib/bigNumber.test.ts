@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {formatScientificScaledNumber} from "./bigNumber";
+import {formatScientificScaledNumber, formatNumberWithScientificThreshold, shouldShowScientificNumber} from "./bigNumber";
 
 const gamePoint = 3976400n * 10n ** 35n;
 assert.equal(formatScientificScaledNumber(gamePoint, 2, 6), "3.976400e39");
@@ -16,3 +16,16 @@ assert.equal(formatScientificScaledNumber(-9999n, 2), "-1.00e2");
 assert.equal(formatScientificScaledNumber(999999999999999999999n, 2, 6), "1.000000e19");
 assert.equal(formatScientificScaledNumber(123456749999999999999n, 0, 6), "1.234567e20");
 assert.equal(formatScientificScaledNumber(10n ** 19607n, 2), "1.00e19605");
+
+assert.equal(shouldShowScientificNumber(11500n, 2), false);
+assert.equal(shouldShowScientificNumber(9999999n, 2), false);
+assert.equal(shouldShowScientificNumber(10000000n, 2), true);
+assert.equal(shouldShowScientificNumber(-10000000n, 2), true);
+assert.equal(formatNumberWithScientificThreshold(11500n, 2), "115");
+assert.equal(formatNumberWithScientificThreshold(12345n, 2), "123.45");
+assert.equal(formatNumberWithScientificThreshold(9999999n, 2), "99999.99");
+assert.equal(formatNumberWithScientificThreshold(10000000n, 2), "1.00e5");
+assert.equal(formatNumberWithScientificThreshold(35000000n, 2, 6), "3.500000e5");
+assert.equal(formatNumberWithScientificThreshold(2051124400n, 2), "2.05e7");
+assert.equal(formatNumberWithScientificThreshold(-10000000n, 2), "-1.00e5");
+assert.equal(formatNumberWithScientificThreshold(10n ** 202n, 2), "1.00e200");

@@ -329,6 +329,12 @@ fn backend_get_packet_log(state: State<'_, IpcBackendState>) -> PacketLogSnapsho
 
 #[tauri::command]
 #[specta::specta]
+fn backend_get_magic_vine_stats(state: State<'_, IpcBackendState>) -> shanten_backend::services::MagicVineStats {
+    state.0.magic_vine_stats()
+}
+
+#[tauri::command]
+#[specta::specta]
 fn backend_get_packet_recording(state: State<'_, IpcBackendState>) -> PacketRecordingStatus {
     state.0.packet_recording_status()
 }
@@ -772,6 +778,7 @@ fn ipc_builder() -> tauri_specta::Builder<tauri::Wry> {
             backend_update_plugin,
             backend_set_packet_pipeline,
             backend_get_packet_log,
+            backend_get_magic_vine_stats,
             backend_get_packet_recording,
             backend_set_packet_recording,
             backend_replay_packet,
@@ -879,6 +886,7 @@ pub fn run() {
             backend_update_plugin,
             backend_set_packet_pipeline,
             backend_get_packet_log,
+            backend_get_magic_vine_stats,
             backend_get_packet_recording,
             backend_set_packet_recording,
             backend_replay_packet,
