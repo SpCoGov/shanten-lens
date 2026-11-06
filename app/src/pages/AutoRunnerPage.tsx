@@ -2,6 +2,8 @@ import React from "react";
 import type {GameStateData} from "../lib/gamestate";
 import ActionProviderPanel from "../components/ActionProviderPanel";
 import RoundDecisionPanel from "../components/RoundDecisionPanel";
+import AutoRunnerInventory from "../components/AutoRunnerInventory";
+import {useActionExecution} from "../lib/useActionExecution";
 import "../styles/theme.css";
 import * as backendIpc from "../lib/ipc";
 import {
@@ -49,6 +51,7 @@ export default function AutoRunnerPage({currentState}: {currentState: GameStateD
 
 function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | null}) {
     const {t} = useTranslation();
+    const actionExecution = useActionExecution(currentState);
     const {config, status} = useAutoRunner();
     const selectedProfile = config.playbook.profiles.find(profile => profile.id === config.playbook.selected_profile_id);
     const goalMet = status.current_step === "goal_met";
@@ -411,8 +414,9 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
                 {profile && <span>{t("autoplay.running_profile", {name: profile.name})}</span>}</div>
         </section>
 
+        <AutoRunnerInventory state={currentState} execution={actionExecution}/>
         <RoundDecisionPanel decision={status.active_profile?.id === profile?.id ? status.round_decision : undefined} running={working} profile={profile}/>
-        <ActionProviderPanel state={currentState}/>
+        <ActionProviderPanel state={currentState} execution={actionExecution}/>
 
         {openingProfile ? <section className={`panel ${styles.progressPanel}`}>
             <div className={styles.goalProgress}>

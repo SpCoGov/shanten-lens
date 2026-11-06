@@ -2357,6 +2357,204 @@ fn s4_opening_fixture() -> (Value, Value, Value) {
 }
 
 #[test]
+fn s4_opening_target_base_replays_the_missed_multicolor_knight_pack() {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    book["profiles"][0]["targets"] = json!([{"kind":"amulet","id":356,"plus":true,"badge":600070,"value":1}]);
+    state["provider_state"]["effect"]["effectList"] = json!([
+        {"id":620,"uid":1,"badgeId":0},{"id":3090,"uid":3,"badgeId":600070},
+        {"id":160,"uid":5,"badgeId":600150},{"id":1050,"uid":7,"badgeId":600070}]);
+    state["provider_state"]["effect"]["packCandidates"] = json!([
+        {"id":1610,"badgeId":0},{"id":3560,"badgeId":0},{"id":3510,"badgeId":0}]);
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    let scores: Vec<_> = actions.actions.iter().filter(|action| action.kind == "select_candidate")
+        .map(|action| report.actions.iter().find(|score| score.action_id == action.id).unwrap()).collect();
+    assert_eq!(scores.iter().map(|score| score.total).collect::<Vec<_>>(), [Some(9.0),Some(29.0),Some(9.0)]);
+    assert!(scores[1].rules.iter().any(|rule| rule.reason.code == "select_target_base" && rule.score == Some(20.0)));
+    assert!(scores[1].rules.iter().all(|rule| rule.rule_id != "configured_target"));
+    let best = report.actions.iter().max_by(|a,b| a.total.unwrap().total_cmp(&b.total.unwrap())).unwrap();
+    assert_eq!(best.action_id, scores[1].action_id);
+}
+
+#[test]
+fn s4_opening_target_bases_are_retained_and_raise_existing_friendship_value() {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    for family in [169,356,375] {
+        book["profiles"][0]["targets"] = json!([{"kind":"amulet","id":family,"plus":true,"badge":600070}]);
+        state["provider_state"]["effect"]["effectList"] = json!([{"id":1050,"uid":1,"badgeId":600150}]);
+        state["provider_state"]["effect"]["packCandidates"] = json!([{"id":family*10,"badgeId":0}]);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        let score = &report.actions[0];
+        assert_eq!(score.rules.iter().find(|rule| rule.rule_id == "opening_target_base").unwrap().score, Some(20.0));
+        assert_eq!(score.rules.iter().find(|rule| rule.rule_id == "friendship").unwrap().score, Some(12.0));
+        state["stage"] = json!(9);
+        state["provider_state"]["effect"]["packCandidates"] = json!([]);
+        state["provider_state"]["effect"]["effectList"] = json!([{"id":family*10,"uid":2,"badgeId":0}]);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        let sale = actions.actions.iter().find(|action| action.kind == "sell_effect").unwrap();
+        let score = report.actions.iter().find(|score| score.action_id == sale.id).unwrap();
+        assert!(score.rules.iter().any(|rule| rule.reason.code == "retain_target_base"));
+        assert!(score.total.unwrap() <= -20.0, "{family}: {score:?}");
+        state["stage"] = json!(16);
+    }
+}
+
+#[test]
+fn s4_opening_target_base_upgrades_require_the_new_candidates_target_seal() {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    for (family,seal) in [(356,600070),(169,600150),(375,600160)] {
+        book["profiles"][0]["targets"] = json!([{"kind":"amulet","id":family,"plus":true,"badge":seal}]);
+        for old_id in [family*10,family*10+1] {
+            for nested in [false,true] {
+                // Even an old copy with the right seal cannot pass its seal to an unsuitable new copy.
+                state["provider_state"]["effect"]["effectList"] = json!([{"id":old_id,"uid":1,"badgeId":if old_id%10==0 {seal} else {0}}]);
+                for candidate_seal in [0,600110,seal] {
+                    let effect = if nested { json!({"id":family*10,"badge":{"id":candidate_seal}}) }
+                        else { json!({"id":family*10,"badgeId":candidate_seal}) };
+                    state["provider_state"]["effect"]["packCandidates"] = json!([effect]);
+                    let actions = shanten_backend::action_provider::evaluate(&state);
+                    let report = decision::evaluate(&state, &actions, &registry, &book);
+                    let select = &report.actions[0];
+                    if candidate_seal == seal {
+                        assert!(select.rules.iter().any(|rule| rule.rule_id == "configured_target" && rule.score == Some(99.0)));
+                        assert!(select.rules.iter().all(|rule| rule.rule_id != "opening_target_base"));
+                        let best = report.actions.iter().max_by(|a,b| a.total.unwrap().total_cmp(&b.total.unwrap())).unwrap();
+                        assert_eq!(best.action_id, select.action_id, "{family}, {old_id}, {seal}");
+                    } else {
+                        assert!(select.rules.iter().any(|rule| rule.reason.code == "target_base_wrong_upgrade" && rule.score == Some(-99.0)));
+                        assert!(select.total.unwrap() < 0.0);
+                        let skip = actions.actions.iter().find(|action| action.kind == "skip").unwrap();
+                        let best = report.actions.iter().max_by(|a,b| a.total.unwrap().total_cmp(&b.total.unwrap())).unwrap();
+                        assert_eq!(best.action_id, skip.id, "{family}, {old_id}, {candidate_seal}: {report:?}");
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn s4_opening_target_base_cannot_be_sold_just_to_reacquire_an_unfinished_copy() {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    book["profiles"][0]["targets"] = json!([{"kind":"amulet","id":169,"plus":true,"badge":600070}]);
+    state["provider_state"]["effect"]["effectList"] = json!([{"id":1690,"uid":1,"badgeId":0}]);
+    for seal in [0,600050,600110,600150] {
+        state["provider_state"]["effect"]["packCandidates"] = json!([
+            {"id":1690,"badgeId":seal},{"id":90,"badgeId":0}]);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        let sale = actions.actions.iter().find(|action| action.kind == "sell_effect").unwrap();
+        let score = report.actions.iter().find(|score| score.action_id == sale.id).unwrap();
+        assert!(score.rules.iter().all(|rule| rule.rule_id != "sale_followup"), "{seal}: {score:?}");
+        assert_eq!(score.total, Some(-20.0));
+        let best = report.actions.iter().max_by(|a,b| a.total.unwrap().total_cmp(&b.total.unwrap())).unwrap();
+        let chosen = actions.actions.iter().find(|action| action.id == best.action_id).unwrap();
+        assert_eq!(chosen.params["effect"]["id"], 90);
+    }
+    // A real completed goal may still justify freeing a slot by selling a temporary base.
+    book["profiles"][0]["targets"].as_array_mut().unwrap().push(json!({"kind":"amulet","id":375,"plus":false}));
+    state["provider_state"]["effect"]["effectList"][0]["volume"] = json!(8);
+    state["provider_state"]["effect"]["packCandidates"] = json!([{"id":3750,"badgeId":0}]);
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state, &actions, &registry, &book);
+    let sale = actions.actions.iter().find(|action| action.kind == "sell_effect").unwrap();
+    let best = report.actions.iter().max_by(|a,b| a.total.unwrap().total_cmp(&b.total.unwrap())).unwrap();
+    assert_eq!(best.action_id, sale.id);
+    assert!(best.total.unwrap() > 0.0);
+}
+
+#[test]
+fn s4_opening_target_bases_only_keep_one_copy_and_do_not_count_as_completion() {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    book["profiles"][0]["targets"] = json!([{"kind":"amulet","id":169,"plus":true,"badge":600070}]);
+    book["profiles"][0]["end_count"] = json!(1);
+    state["stage"] = json!(9);
+    for owned in [json!([{"id":1690,"uid":1,"badgeId":0},{"id":1690,"uid":2,"badgeId":0}]),
+        json!([{"id":1690,"uid":1,"badgeId":0},{"id":1691,"uid":2,"badgeId":600070}])] {
+        state["provider_state"]["effect"]["effectList"] = owned;
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        assert!(report.actions.iter().flat_map(|score| &score.rules).all(|rule| rule.rule_id != "opening_target_base"));
+    }
+    book["profiles"][0]["cutoff_level"] = json!(13001);
+    book["profiles"][0]["cutoff_node"] = json!(1);
+    for (id,met) in [(1690,false),(1691,true)] {
+        state["provider_state"]["effect"]["effectList"] = json!([{"id":id,"uid":1,"badgeId":600070}]);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        let remake = report.actions.iter().find(|score| score.action_id == "remake:{}").unwrap();
+        assert_eq!(remake.rules.iter().any(|rule| rule.rule_id == "remake_at_cutoff"), !met);
+    }
+}
+
+#[test]
+fn opening_target_base_rules_are_scoped_and_leave_ryan_and_normal_targets_unchanged() {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    for (source,level,strategy,selected,active) in [("packet",13001,"opening","opening",true),
+        ("packet",11001,"opening","opening",true),("qyzz",13001,"opening","opening",false),
+        ("packet",501,"opening","opening",false),("packet",13001,"full","opening",false),
+        ("packet",13001,"opening","other",false)] {
+        state["source"] = json!(source);
+        state["provider_state"]["map"]["level"] = json!(level);
+        book["selected_profile_id"] = json!(selected);
+        book["profiles"][0]["strategy"] = json!(strategy);
+        book["profiles"][0]["targets"] = json!([{"kind":"amulet","id":169,"plus":true,"badge":600070}]);
+        let mut actions = candidate("select_candidate",json!(1690),Availability::Available);
+        actions.actions[0].params["effect"]["badgeId"] = json!(0);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        assert_eq!(report.actions[0].rules.iter().any(|rule| rule.rule_id == "opening_target_base"), active);
+    }
+    state["source"] = json!("packet");
+    state["provider_state"]["map"]["level"] = json!(13001);
+    book["selected_profile_id"] = json!("opening");
+    book["profiles"][0]["strategy"] = json!("opening");
+    for (family,plus) in [(224,true),(169,false)] {
+        book["profiles"][0]["targets"] = json!([{"kind":"amulet","id":family,"plus":plus,"badge":600070}]);
+        for owned in [json!([]),json!([{"id":family*10,"uid":1,"badgeId":0}])] {
+            state["provider_state"]["effect"]["effectList"] = owned;
+            let mut actions = candidate("select_candidate",json!(family*10),Availability::Available);
+            actions.actions[0].params["effect"]["badgeId"] = json!(0);
+            let report = decision::evaluate(&state, &actions, &registry, &book);
+            assert!(report.actions[0].rules.iter().all(|rule| rule.rule_id != "opening_target_base"));
+            if family == 224 {
+                assert_eq!(report.actions[0].rules.iter().find(|rule| rule.rule_id == "ryan_without_plus").unwrap().score, Some(50.0));
+            }
+        }
+    }
+    for locale in [include_str!("../../app/src/locales/zh-CN.json"),include_str!("../../app/src/locales/ja-JP.json")] {
+        let locale: Value = serde_json::from_str(locale).unwrap();
+        assert!(locale["action_provider"]["scoring"]["rules"]["opening_target_base"].is_string());
+        for reason in ["select_target_base","retain_target_base","target_base_wrong_upgrade","missing_target_base_data"] {
+            assert!(locale["action_provider"]["scoring"]["reasons"][reason].is_string());
+        }
+    }
+}
+
+#[test]
+fn s4_opening_target_bases_defer_incomplete_inventory_and_unknown_sale_values() {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    book["profiles"][0]["targets"] = json!([{"kind":"amulet","id":169,"plus":true,"badge":600070}]);
+    for owned in [Value::Null,json!([{"id":1690,"uid":1,"badge":{"id":"unknown"}}]),json!([{"id":0,"uid":1}])] {
+        state["provider_state"]["effect"]["effectList"] = owned;
+        let mut actions = candidate("select_candidate",json!(1690),Availability::Available);
+        actions.actions[0].params["effect"]["badgeId"] = json!(0);
+        let report = decision::evaluate(&state, &actions, &registry, &book);
+        let rule = report.actions[0].rules.iter().find(|rule| rule.rule_id == "opening_target_base").unwrap();
+        assert_eq!(rule.score, None);
+        assert_eq!(rule.reason.code, "missing_target_base_data");
+    }
+    state["stage"] = json!(9);
+    state["provider_state"]["effect"]["effectList"] = json!([{"id":1690,"uid":1,"badgeId":0}]);
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state, &actions, &json!({"amulets":[]}), &book);
+    let sale = actions.actions.iter().find(|action| action.kind == "sell_effect").unwrap();
+    let score = report.actions.iter().find(|score| score.action_id == sale.id).unwrap();
+    assert_eq!(score.rules.iter().find(|rule| rule.rule_id == "opening_target_base").unwrap().score, None);
+}
+
+#[test]
 fn s4_opening_friends_keep_two_without_sale_proceeds_overriding_retention() {
     let (mut state, book, registry) = s4_opening_fixture();
     for count in 0..=3 {
