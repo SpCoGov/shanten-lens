@@ -5,6 +5,7 @@ import styles from "./Modal.module.css";
 import {t} from "i18next";
 
 let openModalCount = 0;
+let restoreScrollLock: (() => void) | undefined;
 
 export default function Modal({
                                   open,
@@ -26,15 +27,27 @@ export default function Modal({
     React.useEffect(() => {
         if (!open) return;
 
+        if (openModalCount === 0) {
+            const html = document.documentElement;
+            const body = document.body;
+            const prevHtmlOverflow = html.style.overflow;
+            const prevBodyOverflow = body.style.overflow;
+            const prevGutter = html.style.scrollbarGutter;
+            // Keep the viewport width unchanged when hiding an existing scrollbar.
+            if (window.innerWidth > html.clientWidth && !getComputedStyle(html).scrollbarGutter.includes("stable")) {
+                html.style.scrollbarGutter = "stable";
+            }
+            html.style.overflow = "hidden";
+            body.style.overflow = "hidden";
+            body.classList.add("modal-open");
+            restoreScrollLock = () => {
+                html.style.overflow = prevHtmlOverflow;
+                body.style.overflow = prevBodyOverflow;
+                html.style.scrollbarGutter = prevGutter;
+                body.classList.remove("modal-open");
+            };
+        }
         openModalCount += 1;
-        const html = document.documentElement;
-        const body = document.body;
-        const prevHtmlOverflow = html.style.overflow;
-        const prevBodyOverflow = body.style.overflow;
-
-        html.style.overflow = "hidden";
-        body.style.overflow = "hidden";
-        body.classList.add("modal-open");
 
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape") onClose();
@@ -45,9 +58,8 @@ export default function Modal({
             window.removeEventListener("keydown", onKeyDown);
             openModalCount = Math.max(0, openModalCount - 1);
             if (openModalCount === 0) {
-                html.style.overflow = prevHtmlOverflow;
-                body.style.overflow = prevBodyOverflow;
-                body.classList.remove("modal-open");
+                restoreScrollLock?.();
+                restoreScrollLock = undefined;
             }
         };
     }, [open, onClose]);
@@ -57,6 +69,10 @@ export default function Modal({
         <div
             className={styles.overlay}
             onClick={onClose}
+            // Portal events still bubble through React ancestors, including draggable tiles.
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
             onWheelCapture={(e) => {
                 if (e.target === e.currentTarget) {
                     e.preventDefault();

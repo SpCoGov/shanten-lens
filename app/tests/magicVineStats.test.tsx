@@ -48,6 +48,7 @@ export async function runMagicVineStatsTests() {
         await act(async () => {button.click();});
         const dialog = document.querySelector('[role="dialog"]')!;
         const row = dialog.querySelector("tbody tr")!;
+        assert(dialog.querySelector("thead")?.textContent?.includes("神秘商店购买"),"direct vine purchases must explicitly be labelled as mysterious shop purchases");
         assert(dialog && dialog.querySelector(".modal-header")?.textContent?.includes(zh.magic_vine.states.ended) && !dialog.querySelector(".modal-body > p") && row.textContent?.includes("110") && row.textContent.includes("120") && row.textContent.includes("38 / 8") && !row.textContent.includes("1166"),"dialog must put the phase in its header, omit explanatory paragraphs and retain the statistics");
         assert(row.textContent?.includes("+1"),"expansion extra triggers must be separately labelled");
         assert(!dialog.querySelector("tfoot"),"history must not include an aggregate total row");
@@ -57,7 +58,7 @@ export async function runMagicVineStatsTests() {
         await act(async () => {root.render(<></>);});
         await act(async () => {root.render(<LevelRecordPanel level={13001} items={[]}/>);});
         assert(!container.querySelector("button") && !container.querySelector('[data-testid="magic-vine-highest-score"]'),"a new game without vines must hide the component even when old history exists");
-        return "Magic vine UI checks passed (8 assertions, mock IPC only).";
+        return "Magic vine UI checks passed (9 assertions, mock IPC only).";
     } finally {
         await act(async () => {root.unmount();});
         container.remove();
