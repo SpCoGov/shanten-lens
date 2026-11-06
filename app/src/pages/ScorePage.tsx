@@ -6,7 +6,7 @@ import AmuletCard from "../components/AmuletCard";
 import {getAllRegisteredAmuletRules} from "../lib/amuletRuleRegistry";
 import type {EffectItem, GameStateData, MapNodeItem} from "../lib/gamestate";
 import {useRegistry} from "../lib/registryStore";
-import {formatScientificScaledNumber} from "../lib/bigNumber";
+import {formatNumberWithScientificThreshold, shouldShowScientificNumber} from "../lib/bigNumber";
 import {
     calculateCurrentPoint,
     cloneResolvedRules,
@@ -77,7 +77,13 @@ function getRuleKey(item: EffectItem) {
 }
 
 function formatScientificPoint(value: bigint, decimals = 2): string {
-    return formatScientificScaledNumber(value, SCALE_DECIMALS, decimals);
+    return formatNumberWithScientificThreshold(value, SCALE_DECIMALS, decimals);
+}
+
+function ScientificPoint({value, decimals = 2}: {value: bigint; decimals?: number}) {
+    return shouldShowScientificNumber(value, SCALE_DECIMALS)
+        ? <small className={styles.scientificNumber}>{formatScientificPoint(value, decimals)}</small>
+        : null;
 }
 
 function formatTargetText(target: NonNullable<FutureProjection["target"]>, format = formatFixed2): string {
@@ -567,12 +573,12 @@ export default function ScorePage({
                             <div>
                                 <span className={styles.metricLabel}>{t("score.actual_point")}</span>
                                 <strong>{currentIsBattle ? formatFixed2(actualPoint) : "-"}</strong>
-                                {currentIsBattle ? <small className={styles.scientificNumber}>{formatScientificPoint(actualPoint, 6)}</small> : null}
+                                {currentIsBattle ? <ScientificPoint value={actualPoint} decimals={6}/> : null}
                             </div>
                             <div>
                                 <span className={styles.metricLabel}>{t("score.current_target")}</span>
                                 <strong>{currentIsBattle ? formatFixed2(actualTarget) : t("score.non_combat")}</strong>
-                                {currentIsBattle ? <small className={styles.scientificNumber}>{formatScientificPoint(actualTarget, 6)}</small> : null}
+                                {currentIsBattle ? <ScientificPoint value={actualTarget} decimals={6}/> : null}
                             </div>
                             <div>
                                 <span className={styles.metricLabel}>{t("score.current_target_result")}</span>
@@ -611,17 +617,17 @@ export default function ScorePage({
                             <div>
                                 <span className={styles.metricLabel}>{t("score.base_score")}</span>
                                 <strong>{formatFixed2(currentResult.baseScore)}</strong>
-                                <small className={styles.scientificNumber}>{formatScientificPoint(currentResult.baseScore)}</small>
+                                <ScientificPoint value={currentResult.baseScore}/>
                             </div>
                             <div>
                                 <span className={styles.metricLabel}>{t("score.final_score")}</span>
                                 <strong>{formatFixed2(currentResult.finalScore)}</strong>
-                                <small className={styles.scientificNumber}>{formatScientificPoint(currentResult.finalScore)}</small>
+                                <ScientificPoint value={currentResult.finalScore}/>
                             </div>
                             <div>
                                 <span className={styles.metricLabel}>{t("score.final_fan")}</span>
                                 <strong>{formatFixed2(currentResult.finalFan)}</strong>
-                                <small className={styles.scientificNumber}>{formatScientificPoint(currentResult.finalFan)}</small>
+                                <ScientificPoint value={currentResult.finalFan}/>
                             </div>
                         </div>
 
@@ -629,12 +635,12 @@ export default function ScorePage({
                             <div className={styles.resultCard}>
                                 <span>{t("score.final_point")}</span>
                                 <strong>{formatFixed2(currentResult.finalPoint)}</strong>
-                                <small className={styles.scientificNumber}>{formatScientificPoint(currentResult.finalPoint)}</small>
+                                <ScientificPoint value={currentResult.finalPoint}/>
                             </div>
                             <div className={`${styles.resultCard} ${styles.totalResult}`}>
                                 <span>{t("score.total_point")}</span>
                                 <strong>{formatFixed2(totalCurrentPoint)}</strong>
-                                <small className={styles.scientificNumber}>{formatScientificPoint(totalCurrentPoint)}</small>
+                                <ScientificPoint value={totalCurrentPoint}/>
                             </div>
                         </div>
                     </div>
@@ -804,15 +810,15 @@ export default function ScorePage({
                                                                     <div className="future-projection-metrics">
                                                                         <div className="future-projection-metric">
                                                                             <span className="future-projection-label">{t("score.projected_point")}</span>
-                                                                            <span>{formatFixed2(projection.point)}<small className={styles.scientificNumber}>{formatScientificPoint(projection.point)}</small></span>
+                                                                            <span>{formatFixed2(projection.point)}<ScientificPoint value={projection.point}/></span>
                                                                         </div>
                                                                         <div className="future-projection-metric">
                                                                             <span className="future-projection-label">{t("score.projected_total_point")}</span>
-                                                                            <span>{formatFixed2(projection.totalPoint)}<small className={styles.scientificNumber}>{formatScientificPoint(projection.totalPoint)}</small></span>
+                                                                            <span>{formatFixed2(projection.totalPoint)}<ScientificPoint value={projection.totalPoint}/></span>
                                                                         </div>
                                                                         <div className="future-projection-metric">
                                                                             <span className="future-projection-label">{t("score.projected_score")} / {t("score.projected_fan")}</span>
-                                                                            <span>{formatFixed2(projection.score)} / {formatFixed2(projection.fan)}<small className={styles.scientificNumber}>{formatScientificPoint(projection.score)} / {formatScientificPoint(projection.fan)}</small></span>
+                                                                            <span>{formatFixed2(projection.score)} / {formatFixed2(projection.fan)}{(shouldShowScientificNumber(projection.score, SCALE_DECIMALS) || shouldShowScientificNumber(projection.fan, SCALE_DECIMALS)) && <small className={styles.scientificNumber}>{formatScientificPoint(projection.score)} / {formatScientificPoint(projection.fan)}</small>}</span>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -821,7 +827,7 @@ export default function ScorePage({
                                                                 <span className="badge">
                                                                     <span>
                                                                         {t("score.future_target_label")}: {projection.target == null ? t("score.future_target_placeholder") : formatTargetText(projection.target)}
-                                                                        {projection.target != null ? <small className={styles.scientificNumber}>{formatTargetText(projection.target, formatScientificPoint)}</small> : null}
+                                                                        {projection.target != null && (shouldShowScientificNumber(projection.target.min, SCALE_DECIMALS) || shouldShowScientificNumber(projection.target.max, SCALE_DECIMALS)) ? <small className={styles.scientificNumber}>{formatTargetText(projection.target, formatScientificPoint)}</small> : null}
                                                                     </span>
                                                                 </span>
                                                                 <span className={`badge ${projection.reached == null ? "" : projection.reached ? "ok" : "down"}`}>
@@ -859,15 +865,15 @@ export default function ScorePage({
                                             <div className="future-projection-metrics">
                                                 <div className="future-projection-metric">
                                                     <span className="future-projection-label">{t("score.projected_point")}</span>
-                                                    <span>{formatFixed2(projection.point)}<small className={styles.scientificNumber}>{formatScientificPoint(projection.point)}</small></span>
+                                                    <span>{formatFixed2(projection.point)}<ScientificPoint value={projection.point}/></span>
                                                 </div>
                                                 <div className="future-projection-metric">
                                                     <span className="future-projection-label">{t("score.projected_total_point")}</span>
-                                                    <span>{formatFixed2(projection.totalPoint)}<small className={styles.scientificNumber}>{formatScientificPoint(projection.totalPoint)}</small></span>
+                                                    <span>{formatFixed2(projection.totalPoint)}<ScientificPoint value={projection.totalPoint}/></span>
                                                 </div>
                                                 <div className="future-projection-metric">
                                                     <span className="future-projection-label">{t("score.projected_score")} / {t("score.projected_fan")}</span>
-                                                    <span>{formatFixed2(projection.score)} / {formatFixed2(projection.fan)}<small className={styles.scientificNumber}>{formatScientificPoint(projection.score)} / {formatScientificPoint(projection.fan)}</small></span>
+                                                    <span>{formatFixed2(projection.score)} / {formatFixed2(projection.fan)}{(shouldShowScientificNumber(projection.score, SCALE_DECIMALS) || shouldShowScientificNumber(projection.fan, SCALE_DECIMALS)) && <small className={styles.scientificNumber}>{formatScientificPoint(projection.score)} / {formatScientificPoint(projection.fan)}</small>}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -876,7 +882,7 @@ export default function ScorePage({
                                         <span className="badge">
                                             <span>
                                                 {t("score.future_target_label")}: {projection.target == null ? t("score.future_target_placeholder") : formatTargetText(projection.target)}
-                                                {projection.target != null ? <small className={styles.scientificNumber}>{formatTargetText(projection.target, formatScientificPoint)}</small> : null}
+                                                {projection.target != null && (shouldShowScientificNumber(projection.target.min, SCALE_DECIMALS) || shouldShowScientificNumber(projection.target.max, SCALE_DECIMALS)) ? <small className={styles.scientificNumber}>{formatTargetText(projection.target, formatScientificPoint)}</small> : null}
                                             </span>
                                         </span>
                                         <span className={`badge ${projection.reached == null ? "" : projection.reached ? "ok" : "down"}`}>
@@ -990,7 +996,7 @@ export default function ScorePage({
                                                                 }}
                                                                 title={formatFixed2(entry.score)}
                                                             >
-                                                                {formatFixed2(entry.score)}
+                                                                {formatScientificPoint(entry.score)}
                                                             </div>
                                                             {markerLabel ? (
                                                                 <div
@@ -1191,19 +1197,19 @@ export default function ScorePage({
                         <div className="rows">
                             <div className="row">
                                 <label>{t("score.projected_point")}</label>
-                                <div className="badge"><span>{formatFixed2(selectedFutureProjection.point)}<small className={styles.scientificNumber}>{formatScientificPoint(selectedFutureProjection.point)}</small></span></div>
+                                <div className="badge"><span>{formatFixed2(selectedFutureProjection.point)}<ScientificPoint value={selectedFutureProjection.point}/></span></div>
                             </div>
                             <div className="row">
                                 <label>{t("score.projected_total_point")}</label>
-                                <div className="badge"><span>{formatFixed2(selectedFutureProjection.totalPoint)}<small className={styles.scientificNumber}>{formatScientificPoint(selectedFutureProjection.totalPoint)}</small></span></div>
+                                <div className="badge"><span>{formatFixed2(selectedFutureProjection.totalPoint)}<ScientificPoint value={selectedFutureProjection.totalPoint}/></span></div>
                             </div>
                             <div className="row">
                                 <label>{t("score.projected_score")}</label>
-                                <div className="badge"><span>{formatFixed2(selectedFutureProjection.score)}<small className={styles.scientificNumber}>{formatScientificPoint(selectedFutureProjection.score)}</small></span></div>
+                                <div className="badge"><span>{formatFixed2(selectedFutureProjection.score)}<ScientificPoint value={selectedFutureProjection.score}/></span></div>
                             </div>
                             <div className="row">
                                 <label>{t("score.projected_fan")}</label>
-                                <div className="badge"><span>{formatFixed2(selectedFutureProjection.fan)}<small className={styles.scientificNumber}>{formatScientificPoint(selectedFutureProjection.fan)}</small></span></div>
+                                <div className="badge"><span>{formatFixed2(selectedFutureProjection.fan)}<ScientificPoint value={selectedFutureProjection.fan}/></span></div>
                             </div>
                         </div>
 

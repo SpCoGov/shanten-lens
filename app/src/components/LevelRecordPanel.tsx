@@ -5,6 +5,7 @@ import {compareNumericStrings, formatLargeScaledNumber} from "../lib/bigNumber";
 import {parseFixed2} from "../lib/scoreEngine";
 import {useRegistry} from "../lib/registryStore";
 import {formatLevelIdToLabel} from "../lib/levelFormat";
+import MagicVineStats from "./MagicVineStats";
 
 const LEVEL_RECORDS_STORAGE_KEY = "sl-level-metric-records-v1";
 const AVG_SOUZU_SCORE_METRIC_KEY = "avg_souzu_score";
@@ -266,19 +267,22 @@ export default function LevelRecordPanel({
     source,
     node,
     items,
+    tileScoreMap,
+    amulets,
 }: {
     level: number;
     source?: GameStateData["source"];
     node?: number;
     items: LevelRecordItem[];
+    tileScoreMap?: Record<string, string>;
+    amulets?: EffectItem[];
 }) {
     const {t} = useTranslation();
     const registry = useRegistry();
-    if (items.length === 0) return null;
 
     return (
         <aside className="home-record-panel">
-            <div className="home-record-kicker">{t("level_records.level_label", {level: formatLevelIdToLabel(level, source, node)})}</div>
+            {items.length > 0 && <div className="home-record-kicker">{t("level_records.level_label", {level: formatLevelIdToLabel(level, source, node)})}</div>}
             <div className="home-record-list">
                 {items.map((item) => {
                     const amulet = item.amuletRegId != null ? registry.amuletById.get(item.amuletRegId) : null;
@@ -286,7 +290,7 @@ export default function LevelRecordPanel({
                     const showBest = item.state === "below";
                     const stateClass = item.state === "meetsBest" ? "is-up" : "is-down";
                     return (
-                        <div key={item.key} className={`home-record-row ${stateClass}`}>
+                        <React.Fragment key={item.key}><div className={`home-record-row ${stateClass}`}>
                             {iconPath ? (
                                 <img
                                     className="home-record-icon"
@@ -309,9 +313,10 @@ export default function LevelRecordPanel({
                                     </div>
                                 ) : null}
                             </div>
-                        </div>
+                        </div>{item.key === HAITEI_FAN_METRIC_KEY && <MagicVineStats tileScoreMap={tileScoreMap} amulets={amulets}/>}</React.Fragment>
                     );
                 })}
+                {!items.some(item => item.key === HAITEI_FAN_METRIC_KEY) && <MagicVineStats tileScoreMap={tileScoreMap} amulets={amulets}/>}
             </div>
         </aside>
     );

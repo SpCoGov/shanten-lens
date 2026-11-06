@@ -26,6 +26,7 @@ import ReplacementPanel from "./components/ReplacementPanel";
 import ReplacementStats from "./components/ReplacementStats";
 import AdvisorPanel from "./components/AdvisorPanel";
 import LevelRecordPanel, {useLevelRecordItems} from "./components/LevelRecordPanel";
+import MagicVineStats from "./components/MagicVineStats";
 import AmuletBar from "./components/AmuletBar";
 import {setAppLanguage} from "./lib/i18n";
 import {
@@ -1971,17 +1972,17 @@ export default function App() {
                                                         recordsAvailable={hasLevelRecords}
                                                     />
                                                     {effectiveHomeSideMode === "advisor" ? (
-                                                        <AdvisorPanel
+                                                        <><AdvisorPanel
                                                             suuAnkou={planSuuAnkou}
                                                             chiitoi={planChiitoi}
                                                             resolveFace={(id) => deckMap.get(id) ?? null}
-                                                        />
+                                                        /><MagicVineStats tileScoreMap={latestGameState?.tile_score_map} amulets={latestGameState?.effect_list}/></>
                                                     ) : (
-                                                        <LevelRecordPanel level={level} source={latestGameState?.source} node={latestGameState?.node} items={levelRecordItems}/>
+                                                        <LevelRecordPanel level={level} source={latestGameState?.source} node={latestGameState?.node} items={levelRecordItems} tileScoreMap={latestGameState?.tile_score_map} amulets={latestGameState?.effect_list}/>
                                                     )}
                                                 </>
                                             ) : (
-                                                <LevelRecordPanel level={level} source={latestGameState?.source} node={latestGameState?.node} items={levelRecordItems}/>
+                                                <LevelRecordPanel level={level} source={latestGameState?.source} node={latestGameState?.node} items={levelRecordItems} tileScoreMap={latestGameState?.tile_score_map} amulets={latestGameState?.effect_list}/>
                                             )}
                                         </div>
                                     ),

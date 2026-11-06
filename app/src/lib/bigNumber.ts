@@ -149,6 +149,17 @@ export function formatScientificScaledNumber(value: bigint, scaleDecimals: numbe
     return `${negative ? "-" : ""}${mantissa}e${abs === 0n ? 0 : exponent - scaleDecimals}`;
 }
 
+export function shouldShowScientificNumber(value: bigint, scaleDecimals: number): boolean {
+    const abs = value < 0n ? -value : value;
+    return abs >= 10n ** BigInt(scaleDecimals + 5);
+}
+
+export function formatNumberWithScientificThreshold(value: bigint, scaleDecimals: number, decimals = 2): string {
+    return shouldShowScientificNumber(value, scaleDecimals)
+        ? formatScientificScaledNumber(value, scaleDecimals, decimals)
+        : formatLargeScaledNumber(value, scaleDecimals);
+}
+
 function formatScaledFixed(value: bigint, exponent: number, decimals: number): string {
     const scale = 10n ** BigInt(exponent);
     let quotient = (value * (10n ** BigInt(decimals))) / scale;

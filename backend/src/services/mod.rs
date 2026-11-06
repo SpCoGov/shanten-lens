@@ -2,6 +2,8 @@
 mod config;
 pub(crate) mod playbook;
 mod game_state;
+mod magic_vine;
+pub use magic_vine::{FarmingPeriod, MagicVineGame, MagicVineStats};
 mod packets;
 mod registry;
 mod qyzz;
@@ -36,6 +38,7 @@ pub struct Services {
     config: Arc<Mutex<Value>>,
     locale: Arc<Mutex<String>>,
     game_state: Arc<Mutex<Value>>,
+    magic_vine: Arc<Mutex<magic_vine::MagicVineStore>>,
     data_sources: Arc<Mutex<data_sources::DataSources>>,
     direct_accounts: Arc<Mutex<direct_accounts::DirectAccounts>>,
     packet_log: Arc<Mutex<VecDeque<PacketLogItem>>>,
@@ -67,6 +70,7 @@ impl Services {
         let data_dir = root.parent().unwrap_or(&root).join("data");
         let direct_accounts = direct_accounts::DirectAccounts::load(&data_dir.join("direct-accounts.json"))?;
         let log_dir = root.parent().unwrap_or(&root).join("logs");
+        let magic_vine = magic_vine::MagicVineStore::read(&data_dir.join("magic-vine-stats.json"));
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let packet_log_file =
             JsonLineLog::create(log_dir.join(format!("shanten-lens-packets-{timestamp}.log")))?;
@@ -74,11 +78,12 @@ impl Services {
             "amulets": registry_items(&data_dir.join("amulets.json"), AMULETS, "amulets"),
             "badges": registry_items(&data_dir.join("badges.json"), BADGES, "badges"),
         });
-        Ok(Self {
+        let services = Self {
             root,
             config: Arc::new(Mutex::new(config)),
             locale: Arc::new(Mutex::new("zh-CN".into())),
             game_state: Arc::new(Mutex::new(empty_game_state())),
+            magic_vine: Arc::new(Mutex::new(magic_vine)),
             data_sources: Arc::new(Mutex::new(data_sources::DataSources::default())),
             direct_accounts: Arc::new(Mutex::new(direct_accounts)),
             packet_log: Arc::new(Mutex::new(VecDeque::new())),
@@ -90,7 +95,9 @@ impl Services {
             autorun_active: Arc::new(AtomicBool::new(false)),
             events,
             proxy_status: Arc::new(Mutex::new(crate::ipc::ProxyStatus::default())),
-        })
+        };
+        services.import_magic_vine();
+        Ok(services)
     }
 
     pub fn proxy_status(&self) -> crate::ipc::ProxyStatus {

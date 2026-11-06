@@ -119,6 +119,7 @@ impl Services {
             ts_ms: now_ms(),
         };
         self.packet_log_file.write(&value);
+        self.record_magic_vine(&value);
         let mut packets = self.packet_log.lock().unwrap();
         if packets.len() == 1_000 {
             packets.pop_front();

@@ -12,6 +12,10 @@ use serde_json::{json, Value};
 use std::time::Duration;
 
 impl BackendRuntime {
+    pub fn magic_vine_stats(&self) -> crate::services::MagicVineStats {
+        self.state.services.magic_vine_stats()
+    }
+
     pub async fn execute_action(&self, request: crate::action_executor::ActionExecutionRequest) -> CommandResult {
         self.state.action_executor.execute(&self.state.services, &self.state.proxy, request).await
     }

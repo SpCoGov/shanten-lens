@@ -113,6 +113,9 @@ async backendSetPacketPipeline(config: PipelineConfig) : Promise<CommandResult> 
 async backendGetPacketLog() : Promise<PacketLogSnapshot> {
     return await TAURI_INVOKE("backend_get_packet_log");
 },
+async backendGetMagicVineStats() : Promise<MagicVineStats> {
+    return await TAURI_INVOKE("backend_get_magic_vine_stats");
+},
 async backendGetPacketRecording() : Promise<PacketRecordingStatus> {
     return await TAURI_INVOKE("backend_get_packet_recording");
 },
@@ -212,6 +215,7 @@ export type DirectAccountSummary = { id: string; label: string; region: string; 
 export type DirectStatus = { state: string; account_id: string | null; route: string | null; last_heartbeat_ms: number | null; error: string | null; capture_account_id: string | null }
 export type Direction = "outbound" | "inbound"
 export type EmailNotifyConfig = { enabled: boolean; host: string; port: number; ssl: boolean; from: string; pass: string; to: string }
+export type FarmingPeriod = { start_level: number; start_node: number; end_level: number; end_node: number; rounds: number; obtained: number; score_triggers: number }
 export type FlowDumpItem = { id: number; peer_key: string; client: string; server: string; websocket: boolean; toServer: boolean; toClient: boolean; is_preferred: boolean; activity: number; business_activity: number }
 export type FlowDumpResult = { ok: boolean; count: number; flows: FlowDumpItem[] }
 export type FuseConfig = { guard_skip_contains: FuseGuardItems; enable_skip_guard: boolean | null; enable_shop_force_pick: boolean | null; enable_ting_ready_skip_guard: boolean | null; enable_prestart_kavi_guard: boolean | null; conduction_min_count: number | null; enable_anti_steal_eat: boolean | null; enable_missing_hand_tile_guard: boolean | null; enable_kavi_plus_buffer_guard: boolean | null; enable_hanabi_win_guard: boolean | null; enable_exit_coin_guard: boolean | null; enable_exit_life_guard: boolean | null }
@@ -219,6 +223,8 @@ export type FuseGuardItems = { amulets: number[]; badges: number[] }
 export type GameStateData = { action_report: ActionReport | null; decision_report: DecisionReport | null; source: DataSource | null; qyzz_connected: boolean | null; session_id: number | null; revision: number | null; flow_id: number | null; stage: number; coin: string; point: string | null; target_point: string | null; level: number | null; node: number | null; map_nodes: JsonValue[] | null; deck_map: Partial<{ [key in string]: string }>; hand_tiles: number[]; last_drawn_tile: number | null; dora_tiles: number[]; tian_dora_tiles: JsonValue[] | null; ming: JsonValue[] | null; replacement_tiles: number[]; wall_tiles: number[]; ended: boolean | null; desktop_remain: number; locked_tiles: number[]; switch_used_tiles: number[]; effect_list: JsonValue[] | null; goods: JsonValue[] | null; refresh_price: string | null; candidate_effect_list: JsonValue[] | null; boss_buff: number[] | null; shop_buff_list: Partial<{ [key in string]: number }> | null; change_tile_count: number | null; total_change_tile_count: number | null; max_effect_volume: number | null; tile_score_map: Partial<{ [key in string]: string }> | null; fan_value_map: Partial<{ [key in string]: string }> | null; character_id: JsonValue | null; hp: JsonValue | null; max_hp: JsonValue | null; update_reason: string[] | null }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LogEntry = { ts_ms: number; level: string; target: string; file: string | null; line: number | null; message: string; fields: Partial<{ [key in string]: JsonValue }> }
+export type MagicVineGame = { started_at: number; updated_at: number; level: number; node: number; finished: boolean; incomplete: boolean; pack_obtained: number; shop_obtained: number; regeneration_obtained: number; other_obtained: number; score_triggers: number; expansion_extra_triggers: number; shops: number; packs_bought: number; rounds: number; highest_ex: number; farming_rounds: number; farming_obtained: number; farming_score_triggers: number; farming_status: string; farming_periods: FarmingPeriod[] }
+export type MagicVineStats = { current: MagicVineGame | null; history: MagicVineGame[]; loading: boolean }
 export type MarketplaceInstallBlock = "blocked" | "unsupported_api" | "app_too_old"
 export type MarketplacePackageInfo = { downloadUrl: string; sha256: string; size: number }
 export type MarketplacePluginInfo = { sourceUrl: string; marketplaceId: string; marketplaceName: string; id: string; name: string; description: string | null; version: string; apiVersion: number; minimumAppVersion: string | null; author: string | null; homepage: string | null; source: string | null; repository: string; issues: string | null; license: string | null; categories: string[]; package: MarketplacePackageInfo; releaseNotes: string | null; releaseNotesUrl: string | null; publishedAt: string; status: MarketplacePluginStatus; installBlock: MarketplaceInstallBlock | null }

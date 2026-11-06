@@ -27,6 +27,7 @@ import {
     type SwitchAction,
     type SwitchRequest,
     type TsumoLoopStatus,
+    type MagicVineStats,
 } from "../bindings";
 import {useLogStore} from "./logStore";
 import {setRegistry, type RegistryPayload} from "./registryStore";
@@ -80,6 +81,7 @@ export type {
 };
 
 export type BackendEventMap = {
+    magic_vine_stats: MagicVineStats;
     direct_connection_status: DirectStatus;
     direct_accounts_changed: null;
     direct_account_captured: {account_id: string; uid: string};
@@ -145,6 +147,7 @@ export function subscribeBackendEvent<K extends keyof BackendEventMap>(
 }
 
 export const getSnapshot = commands.backendSnapshot;
+export const getMagicVineStats = commands.backendGetMagicVineStats;
 export const exportDiagnostics = commands.backendExportDiagnostics;
 export const executeAction = commands.backendExecuteAction;
 export const getDataSources = commands.backendDataSources;
