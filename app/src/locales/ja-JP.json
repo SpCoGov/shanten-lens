@@ -1,4 +1,34 @@
 {
+  "vine": {
+    "trade_pause": "取引に魔蔓が出現したため停止しました。手動で操作してください。",
+    "mystery_pause": "神秘ショップに入ったため停止しました。手動で操作してください。",
+    "low_hp": "HPが上限の半分未満になったため停止しました。手動で回復してください。",
+    "cutoff_reached": "指定BOSSを倒しました。報酬パック未選択のまま停止しました。",
+    "ex_level": "Ex{{n}}",
+    "stops_hint": "ステージ指定時は初回和了点の条件に代わり、指定BOSSを倒して報酬パックが現れた時点で未選択のまま停止します。半分未満のHP保護は既定で有効。赤竜の戦闘中はHP半分未満の停止を無視し、戦闘後は通常の判定に戻ります。",
+    "half_hp_option": "HP半分未満で停止",
+    "on": "オン",
+    "off": "オフ",
+    "stop_default": "初回和了点不足で停止",
+    "stop_ex": "停止ステージ",
+    "refresh_hint": "人物を個別にドラッグ。隣接する価格目盛の中央にのみ吸着し、右端の ∞ は上限なしです。BonusステージはEx5・Ex10・Ex15…クリア後のショップです。常に現在の更新価格＋30星コインが必要です。",
+    "price_interval": "{{left}}–{{right}}",
+    "unlimited": "上限なし",
+    "normal_refresh": "通常ステージ",
+    "reward_refresh": "Bonusステージ",
+    "refresh_title": "ショップ更新価格の上限",
+    "protected_action": "戦略で禁止",
+    "title": "魔蔓育成",
+    "scope": "Ex1 以降",
+    "objective": "万象交換・筒子優先・魔蔓循環",
+    "need_ex16": "雀魂の Ex1 以降の接続済み・編成済み対局が必要です。",
+    "invalid_lineup": "雛田、万象、ハッカー、スカウトマン、姫川響、ワンと魚が必要です。PLUS 魔蔓や複数の魔蔓は使用できません。上記6種の中核護符には友情または導きの印が必要です。",
+    "remake_forbidden": "魔蔓育成中はリスタートできません。先に自動化を停止してください。",
+    "echo_found": "こだまの魔蔓が出現したため自動化を停止しました。手動で選択して対局を続けてください。",
+    "goal_met": "初回和了点が次ステージの必要点に足りないため魔蔓育成を停止しました。手動で対局を続けてください。",
+    "first_win": "このステージの初回和了点：{{point}}",
+    "no_safe_action": "魔蔓育成ルールに適合する操作がないため停止しました。"
+  },
   "magic_vine": {
     "loading": "ローカルログからバックグラウンドで統計を復元中…",
     "title": "魔藤の統計",
@@ -43,6 +73,9 @@
       "ignored": "この項目は 0 点として計算：{{reason}}",
       "out_of_range": "合計が評価可能な範囲を超えたため、0 点と表示します。",
       "rules": {
+        "opening_map_remake": "開始マップ条件",
+        "opening_search_remake": "指定開始手牌の探索失敗",
+
         "ryan_without_plus": "ライアンの補充",
         "coin_cost": "星コイン消費",
         "hp_loss": "体力損失",
@@ -69,13 +102,29 @@
         "pack_purchase_order": "パックをレア度順に購入",
         "preserve_guidance_for_packs": "開封前は先導の印を保持",
         "gold_pack_bonus": "金パックのボーナス",
+        "vine_target": "魔蔓育成の目標価値",
+        "vine_make_space": "魔蔓の枠を確保",
+        "vine_bonfire": "焚火の2番目を選択してHP上限を増やす",
+      "vine_pack": "魔蔓育成のパック優先度",
+        "vine_refresh_budget": "更新後に金パック2個分を確保",
+        "vine_keep_target": "現在の目標取得を優先",
+        "vine_protected": "魔蔓育成の保護",
+        "opening_character": "設定した開始キャラ",
         "configured_target": "設定した目標の価値",
+        "mystery_shop_target": "謎のショップの目標優先",
+        "mystery_shop_refresh": "謎のショップの最初の2ページ",
+        "mystery_shop_reserve": "謎のショップ用コインの確保",
+        "white_night_profit": "白夜の売却収益",
+        "white_night_priority": "白夜の売買優先",
         "opening_target_base": "目標プラスの素材保持",
         "remake_at_cutoff": "期限ステージで目標未達成",
         "remake_penalty": "やり直しの減点",
         "skip_candidates": "候補スキップの評価"
       },
       "reasons": {
+        "opening_map_mismatch": "1-1がキノコモンスターではなく、かつ1-2が神秘商店ではないため、リスタートに99999点加算",
+        "opening_search_unreachable": "1-1で開始プラン1・2の実行可能な手順が見つからず、リスタートに99999点加算",
+
         "bonfire_heal": "HP を 40% 回復：現在の HP が 60 未満なら 20 点加点、それ以外は 0 点",
         "bonfire_coin": "星コインを獲得：現在の星コインが 50 枚未満なら 20 点、それ以外は 10 点加点",
         "bonfire_amulet": "ランダムなお守りを獲得：空き枠があれば 10 点、なければ 5 点加点。星コイン獲得の加点を超えません",
@@ -106,7 +155,23 @@
         "sell_happiness": "幸福の印の売却：ショップの未売却お守りパックの星コイン費用を S として合計し、所持金不足のパックも含めます。加点は (S−10)×2 点。パックがなければ S=0 として 20 点減点",
         "missing_happiness_pack_cost": "ショップのお守りパックの価格や売却状態が不足・無効、または合計費用が精度範囲外です",
         "skip_candidates": "選択可能なお守り候補の最高合計評価をスキップの評価から差し引き、他のルールと合算します",
+        "vine_target": "魔蔓育成の目標価値",
+        "vine_make_space": "魔蔓の枠を確保",
+        "vine_bonfire": "焚火の2番目を選択してHP上限を増やす",
+      "vine_pack": "魔蔓育成のパック優先度",
+        "vine_refresh_budget": "更新後に金パック2個分を確保",
+        "vine_keep_target": "現在の目標取得を優先",
+        "vine_protected": "魔蔓育成の保護",
+        "select_opening_character": "設定した開始キャラを 99 点加点。旧序盤設定で未指定の場合はキャラクター 201 を選択します",
         "select_configured_target": "目標の選択で 99 × 目標価値を加点。序盤設定は一致したお守りと独立した印の目標価値を合算。全行程は現在の戦術段階の全構成で一致すれば 1 とし、重複は加算しません",
+        "mystery_shop_buy_target": "最初の2ページで目標購入に 99 × 目標価値を加点。プラス目標は最初の通常版を印不問で確保できます。所持済みなら新商品の印と合成後の種類を確認し、印指定の目標では、印なし・指定外のプラスに目標加点しません。達成判定は元の設定に従います",
+        "mystery_shop_keep_target": "購入可能、または目標外のお守りの売却で枠を確保すれば購入可能な目標がある場合、更新とスキップから購入加点と同じ点数を減点。他のお守りや売却の評価は既存ルールを維持します",
+        "mystery_shop_no_target": "実現可能な目標購入や白夜の利益取引がない場合、スキップを1点加点。無料の対象外商品が退出と同点で優先されることを防ぎます",
+        "mystery_shop_second_page": "サーバーの更新回数が 0、実際の費用が 1 コインの場合だけ 21 点を加点。費用を引いて正味 20 点で2ページ目を確認します",
+        "mystery_shop_refresh_limit": "最初の2ページだけを確認し、2ページ目では更新しません。3ページ目以降やページ不明の場合は退出を優先します",
+        "mystery_shop_reserve": "期限前に未訪問の謎のショップがある場合、通常ショップで消費後に25コイン以上を確保。不足する消費操作は退出より低い評価にします",
+        "white_night_profit": "売却可能な白夜の購入では実際の売却収入を加点し、購入費用を別途減点。通常は −24＋50＝26 コインの利益。目標の白夜や保持が必要な印には換金加点しません",
+        "white_night_priority": "期限前の白夜の利益操作を他の操作の最高評価より優先。購入・選択は1点、売却回収は2点上に補正。費用・売却額・目標保護の既存評価を維持し、目標達成時は即停止します",
         "sell_configured_target": "目標の売却で 99 × 目標価値を減点。価値は選択時と同じ方法で計算します",
         "select_target_base": "雀魂本家 S4 の序盤周回のみ：設定したプラスと印の目標が未完成なら、最初の同種お守りを 20 点加点して素材として保持します。達成値には数えず、ライアンは従来のルールを使います",
         "retain_target_base": "雀魂本家 S4 の序盤周回のみ：未完成の目標プラスに使う最後の同種お守りを売る場合、保持価値 20 点と売却額・固定売却ボーナスを減点します。売って別の未完成の同種を取り直すことには枠確保の加点をせず、完成する目標の枠確保は通常どおり評価します",
@@ -872,14 +937,18 @@
     }
   },
   "round": {
+    "opening_tanyao_remake": "開始プラン1・2の両方が到達できないためリスタート",
     "title": "対局意思決定",
     "status": {"waiting": "対局待ち", "searching": "探索中", "executing": "手作り中", "winning": "自動ツモ和了", "blocked": "確認待ち", "stopped": "一時停止中"},
+    "opening_tanyao_objective": "1-1は指定牌形、できるだけ筒子で和了",
+    "opening_plan_name": "開始プラン{{index}}",
     "opening_objective": "筒子の枚数 × 和了可能回数を最大化",
     "full_objective": "現在の戦術フェーズの牌形に合わせて手作り",
     "pinzu_count": "目標の筒子枚数", "score": "筒子 × 回数", "win_count": "予想和了回数", "draws_needed": "完成までのツモ数", "actual_wins": "今回のツモ和了数",
     "target_hand": "目標手牌", "target_description": "目標手牌：{{tiles}}",
     "scope_hint": "対局外では最高評価の実行可能な操作を自動実行し、対局中は手作りとツモ和了を自動実行します。",
     "search_limit_remake": "手作り検索が計算上限に達したため、やり直して序盤の周回を続けます。",
+    "search_limit_best": "計算上限に達したため、見つかった最善の手順を実行します（全体で最適かは未確定）。",
     "invalid_tiles_remake": "牌プールを安全に検索できないため、やり直して序盤の周回を続けます。",
     "stage_hint": "予定の開始ステージに従って戦術フェーズを選びます。最初のフェーズまでは開幕の目標で手作りします。前倒し切り替えは未対応です。",
     "no_round": "対局への移行を待っています。", "no_operations": "ゲームから実行可能な操作を受信するまで待機します。", "waiting_update": "操作を送信しました。ゲーム状態の更新を待っています。",
@@ -887,6 +956,21 @@
     "state_changed": "対局状態が変わったため、再判定しています。", "manual_execution": "手動の牌交換に切り替わりました。一時停止してから対局意思決定を再開してください。", "manual_tsumo": "手動のツモ和了ループが実行中です。停止してから対局意思決定を開始してください。", "stopped": "対局意思決定を一時停止しました。"
   },
   "autoplay": {
+    "error_vine": "魔蔓育成の設定が無効です。",
+    "step_vine_trade": "取引に魔蔓が出現したため停止しました。手動で操作してください。",
+    "step_vine_mystery": "神秘ショップに入ったため停止しました。手動で操作してください。",
+    "step_vine_low_hp": "HPが上限の半分未満になったため停止しました。手動で回復してください。",
+    "step_vine_cutoff": "指定BOSSを倒しました。報酬パック未選択のまま停止しました。",
+    "selection_next_run": "次回実行する設定を選択しました。実行中の自動化は開始時の設定を継続します。",
+    "selection_failed": "設定の切り替えに失敗したため元の選択に戻しました。設定が保存済みで有効か確認してください。",
+
+    "step_disconnected": "切断済み",
+    "step_stopped": "停止済み",
+
+    "tab_vine_farming": "魔蔓育成",
+    "strategy_vine_farming": "魔蔓育成",
+    "step_vine_goal": "初回和了点が次ステージの必要点に足りないため魔蔓育成を停止しました。手動で対局を続けてください。",
+    "step_vine_echo": "こだまの魔蔓が出現したため自動化を停止しました。手動で選択して対局を続けてください。",
     "step_monitoring": "現在の状態を監視中", "step_goal_met": "序盤の目標を達成", "step_completed": "今回のプレイが終了しました", "step_failed": "エラーのため停止しました",
     "state_update_timeout": "操作への応答後、状態が更新されません。重複送信を避けるため停止しました。", "worker_failed": "自動実行タスクで異常が発生し、停止しました。",
     "data_source_changed": "ゲームのデータソースが切断または変更されたため、自動実行を停止しました。",
@@ -898,7 +982,6 @@
     "runtime_settings": "実行設定", "runtime_saved": "実行設定を保存しました。", "current_targets": "現在の実行目標", "goal_progress": "目標価値の進捗", "cutoff_at": "期限 {{level}}",
     "elapsed": "経過時間", "runs": "実行回数", "best_value": "最高価値", "records": "実行履歴", "view_best": "最高記録を見る", "run_number": "{{run}} 回目", "value": "価値",
     "choose_strategy": "実行方針を選択", "strategy_opening": "序盤厳選", "strategy_full": "全行程",
-    "strategy_opening_hint": "序盤のお守りのみ厳選し、操作後の状態更新ごとに目標のお守りや印章の合計価値を確認し、達成したら直ちに一時停止します。", "strategy_full_hint": "全対局を判断器に任せます。開始時の選択、戦術段階、お守り、牌姿を設定します。",
     "goal_met": "目標を達成したため一時停止中",
     "opening_targets": "序盤の目標", "goal_value": "目標の合計価値", "cutoff_level": "期限ステージ", "target_value_for": "{{name}}の目標価値",
     "badge_keep_count": "保持数",
@@ -927,7 +1010,7 @@
     "hand_hint": "複数の牌姿を設定できます。和了可能回数が同じならリスト順で選びます。条件はカスタム交換と共通です。ここでは設定のみ保存し、探索は行いません。", "hand_name": "牌姿 {{index}} の名前", "edit_hand": "牌姿条件を編集", "apply_hand": "牌姿を適用",
     "save": "全設定を保存", "saving": "保存中…", "saved": "すべての設定を保存しました", "save_hint": "後で判断器が使う設定をローカルに保存します。", "unsaved": "未保存の変更があります。", "save_failed": "保存できませんでした。変更は画面に保持されています。再試行してください",
     "import": "設定をインポート", "export": "設定をエクスポート", "import_hint": "現在編集中の全設定を置き換えます。保存後にローカル設定へ反映されます。", "export_hint": "下の JSON をコピーして、全設定をバックアップ・共有できます。", "config_text": "設定 JSON", "apply_import": "インポートを適用",
-    "error_format": "設定形式・バージョンが無効か、選択した設定が存在しません", "error_profile": "設定名を入力してください。全行程では有効な開始キャラクターも指定してください", "error_initial": "全行程の設定で青または緑の初期お守りを選んでください",
+    "error_format": "設定形式・バージョンが無効か、選択した設定が存在しません", "error_profile": "設定名を入力し、有効な開始キャラを選択してください", "error_initial": "全行程の設定で青または緑の初期お守りを選んでください",
     "error_coin": "最初の星コイン条件は、先頭ゼロのない非負整数（最大 128 桁）で入力してください", "error_stages": "各設定には一つ以上の戦術段階が必要です。識別子は重複できません", "error_levels": "段階名と有効なステージを指定し、開始予定ステージの早い順に並べてください。同じ開始ステージは指定できません",
     "error_loadouts": "各段階に名前とお守りを含む構成が一つ以上必要です", "error_amulet": "お守りや印章が存在しないか、一致条件が無効です", "error_order": "各順序には構成の全スロットを一度ずつ含めてください", "error_hands": "各段階に名前付きの牌姿が一つ以上必要です。合計 14 枚、槓は最大 4 組にしてください"
   },
@@ -1030,7 +1113,7 @@
     "placeholder_level": "例）1-1",
     "hint_cutoff": "このステージに到達しても「目標数」を満たさない場合は、その局を終了して自動再開します。",
     "section_email_title": "メール通知",
-    "toggle_email": "実行完了・エラー時にメール通知（SMTP）を送信",
+    "toggle_email": "自動終了・達成・異常停止時にメール通知（手動停止・切断・制御切替は通知しません）",
     "label_smtp_host": "SMTP サーバー",
     "label_smtp_port": "ポート",
     "label_smtp_ssl": "SSL/TLS",
@@ -1313,6 +1396,10 @@
     "toast_open_config_fail": "開けませんでした：{{error}}"
   },
   "overlay": {
+    "preference_details": "優先：{{value}}",
+    "bonus_melds": "ドラ/魂牌面子",
+    "preset_details": "プリセット：{{name}}",
+
     "title": "HUD",
     "subtitle": "ゲーム内オーバーレイと表示内容を管理します。",
     "display_title": "表示内容",
@@ -1323,6 +1410,7 @@
     "show_blackhole": "花火ガイドを表示",
     "show_wanxiang": "万象交換を表示",
     "show_custom_switch": "カスタム交換を表示",
+    "show_current_level": "現在のステージを表示",
     "status_checking": "確認中",
     "process_found": "検出済み、PID {{pid}}",
     "process_not_found": "利用可能なゲームウィンドウが見つかりません（Jantama_MahjongSoul.exe / Qyzz.exe）",
@@ -1645,6 +1733,75 @@
     "title": "点数",
     "live_point_title": "リアルタイム点数計算",
     "current_level": "現在のステージ",
+    "dragon_boss_title": "龍 BOSS の効果",
+    "dragon_bosses": {
+      "hatchling": {
+        "name": "雛龍",
+        "effects": [
+          "1回の交換で選べる牌は最大3枚",
+          "和了するたびに星コインが5減少",
+          "クリアに必要な点数が3倍",
+          "すべての【萬子】のドラ・魂牌が無効",
+          "すべての【筒子】のドラ・魂牌が無効",
+          "すべての【索子】のドラ・魂牌が無効",
+          "2翻以上のすべての役が1翻減少",
+          "清一色・混一色・七対子が1翻に固定",
+          "最初の和了の点数が0に固定",
+          "ドラ表示牌の上限が3枚になる",
+          "ランダムなお守り1枚の効果を無効化（現在の設定では重みはすべて0）",
+          "公開牌の上限が3枚になる",
+          "待ち山の牌を3枚ロック",
+          "すべての么九牌の基礎点を1として扱う",
+          "クリア時に星コインを獲得できない",
+          "交換回数は3回まで",
+          "すべての役満・複数倍役満を5翻として扱う"
+        ]
+      },
+      "white": {
+        "name": "白龍",
+        "effects": [
+          "牌面に黒色を含む牌は基礎点を計上しない",
+          "牌面に緑色を含む牌は基礎点を計上しない",
+          "牌面に赤色を含む牌は基礎点を計上しない"
+        ]
+      },
+      "red": {
+        "name": "紅龍",
+        "effects": [
+          "体力上限が一時的に20になり、ステージ終了後に元に戻る"
+        ]
+      },
+      "ice": {
+        "name": "氷龍",
+        "effects": [
+          "ダメージを受けるたびに、追加で1ダメージを受ける"
+        ]
+      },
+      "black": {
+        "name": "黒龍",
+        "effects": [
+          "すべての牌が狂暴牌になる"
+        ]
+      },
+      "blue": {
+        "name": "青龍",
+        "effects": [
+          "すべての追加役が無効になる"
+        ]
+      },
+      "green": {
+        "name": "緑龍",
+        "effects": [
+          "ステージ終了まで体力を回復できない"
+        ]
+      },
+      "bronze": {
+        "name": "青銅龍",
+        "effects": [
+          "配牌のたびに待ち山の牌が半分になる"
+        ]
+      }
+    },
     "view_tile_scores": "牌の基礎点を見る",
     "tile_scores_title": "牌の基礎点",
     "tile_scores_hint": "ここでは game_state の tile_score_map を表示します。すべての牌の基礎点が基礎スコア計算に使われます。",
@@ -1783,7 +1940,7 @@
     "backendDisconnected": "バックエンド：未接続",
     "noGame": "ゲームが見つかりません",
     "autorunTargetCount": "自動: 現在の目標 {{current}}/{{total}}",
-    "remaining": "残り：{{count}}",
+    "level": "ステージ：{{level}}",
     "stage": "段階：{{stage}}",
     "coin": "⭐ {{coin}}",
     "bossBuff": "BossBuff: {{buffs}}",

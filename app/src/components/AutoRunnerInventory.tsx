@@ -7,7 +7,7 @@ import CandidateBar from "./CandidateBar";
 import GoodsBar from "./GoodsBar";
 import styles from "./AutoRunnerInventory.module.css";
 
-export default function AutoRunnerInventory({state, execution}: {state: GameStateData | null; execution: ActionExecution}) {
+export default function AutoRunnerInventory({state, execution, forbidRemake = false}: {state: GameStateData | null; execution: ActionExecution; forbidRemake?: boolean}) {
     const {t} = useTranslation();
     const amulets = state?.effect_list ?? [];
     const candidates = state?.candidate_effect_list ?? [];
@@ -23,9 +23,9 @@ export default function AutoRunnerInventory({state, execution}: {state: GameStat
                     <span className="ms" aria-hidden="true">flag</span>{formatLevelIdToLabel(state.level, state.source, state.node)}
                 </span> : null}
                 <button type="button" className={styles.remake}
-                    disabled={execution.disabled || remake?.availability !== "available"}
+                    disabled={forbidRemake || execution.disabled || remake?.availability !== "available"}
                     aria-busy={!!remake && execution.pending === remake.id}
-                    title={execution.waiting ? t("action_provider.execution.awaiting_state") : t("action_provider.actions.remake")}
+                    title={forbidRemake ? t("vine.remake_forbidden") : execution.waiting ? t("action_provider.execution.awaiting_state") : t("action_provider.actions.remake")}
                     onClick={() => {if (remake) void execution.execute(remake);}}>
                     <span className="ms" aria-hidden="true">{remake && execution.pending === remake.id ? "hourglass_top" : "restart_alt"}</span>
                     {t(remake && execution.pending === remake.id ? "action_provider.execution.pending" : "action_provider.actions.remake")}

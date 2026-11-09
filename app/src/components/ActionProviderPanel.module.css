@@ -50,7 +50,6 @@
 .rules li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; font-size: 13px; }
 .rules li + li { border-top: 1px solid var(--color-cutline); }
 .rules li:last-child { padding-bottom: 0; }
-.rules p { margin: 4px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
 .ruleScore { flex-shrink: 0; font-variant-numeric: tabular-nums; font-size: 16px; }
 .message { display: flex; gap: 7px; align-items: center; margin: 12px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .message :global(.ms) { font-size: 18px; flex-shrink: 0; }

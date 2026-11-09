@@ -4,6 +4,7 @@ import {pushToast} from "../lib/toast";
 import * as backendIpc from "../lib/ipc";
 import type {PlanData, SearchPreferences, TileId} from "../lib/planTypes";
 import {buildDebugSnapshotFromState, type GameStateData} from "../lib/gamestate";
+import {formatLevelIdToLabel} from "../lib/levelFormat";
 import {BlackHoleStrategyCard, searchProgressText} from "./BlackHolePage";
 import {
     readWanxiangPreferences,
@@ -225,9 +226,12 @@ export default function WanxiangSwitchPage({
                         <h1>{t("blackhole.wanxiang_title")}</h1>
                         {canOperate ? <p>{t("blackhole.wanxiang_stage_ready")}</p> : null}
                     </div>
-                    <span className={`switch-guide-status ${canOperate ? "is-ready" : ""}`}>
-                        <span aria-hidden="true"/>{t(canOperate ? "blackhole.status_ready" : "blackhole.status_waiting")}
-                    </span>
+                    <div className="switch-guide-meta">
+                        <span className="badge">{t("score.current_level")} <strong>{formatLevelIdToLabel(currentState?.level, currentState?.source, currentState?.node)}</strong></span>
+                        <span className={`switch-guide-status ${canOperate ? "is-ready" : ""}`}>
+                            <span aria-hidden="true"/>{t(canOperate ? "blackhole.status_ready" : "blackhole.status_waiting")}
+                        </span>
+                    </div>
                 </div>
 
                 <div className="switch-guide-command-bar">

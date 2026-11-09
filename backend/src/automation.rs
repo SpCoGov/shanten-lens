@@ -16,6 +16,8 @@ pub struct Automation {
     proxy: ProxyControl,
     autorun: Arc<Mutex<AutoStatus>>,
     tsumo: Arc<Mutex<TsumoStatus>>,
+    #[cfg(test)]
+    mail_outbox: Arc<Mutex<Option<Vec<(String, String)>>>>,
 }
 
 struct AutoStatus {
@@ -34,6 +36,7 @@ struct AutoStatus {
     email_status: String,
     email_error: String,
     had_live_game: bool,
+    source: Value,
     remaking: bool,
     remake_records: Vec<Value>,
     best_remake_record: Option<Value>,
@@ -69,11 +72,14 @@ impl Automation {
                 email_status: String::new(),
                 email_error: String::new(),
                 had_live_game: false,
+                source: Value::Null,
                 remaking: false,
                 remake_records: Vec::new(),
                 best_remake_record: None,
             })),
             tsumo: Arc::new(Mutex::new(TsumoStatus::default())),
+            #[cfg(test)]
+            mail_outbox: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -109,10 +115,16 @@ impl Automation {
         let config = self.services.table("autorun");
         crate::services::playbook::validate(&config["playbook"]).map_err(|_| "autoplay.invalid_config")?;
         let profile = selected_profile(&config)?.clone();
+        if profile["strategy"] == crate::vine_farming::STRATEGY {
+            let game = self.services.game_state();
+            if !crate::vine_farming::eligible(&game) { return Err("vine.need_ex16"); }
+            if !crate::vine_farming::lineup_valid(&game) { return Err("vine.invalid_lineup"); }
+        }
         let mut status = self.autorun.lock().unwrap();
         if status.running {
             return Ok(());
         }
+        self.services.set_vine_farming_active((profile["strategy"] == crate::vine_farming::STRATEGY).then(|| profile.clone()));
         status.profile = Some(profile);
         status.generation += 1;
         status.round_decision = json!({"status":"waiting","reason":"round.no_round"});
@@ -120,6 +132,7 @@ impl Automation {
         status.running = true;
         self.services.set_autorun_active(true);
         let game = self.services.game_state();
+        status.source = game["source"].clone();
         status.had_live_game = matches!(game["stage"].as_u64(), Some(1..=99)) && game["ended"] != true;
         status.remaking = false;
         status.email_status.clear();
@@ -151,26 +164,34 @@ impl Automation {
     }
 
     pub fn stop_autorun(&self) {
-        let mut status = self.autorun.lock().unwrap();
-        if !status.running { return; }
-        status.running = false;
-        self.services.set_autorun_active(false);
-        status.generation += 1;
-        status.round_decision["status"] = json!("stopped");
-        if let Some(task) = status.round_task.take() {
-            task.abort();
-        }
-        if let Some(task) = status.task.take() {
-            task.abort();
-        }
-        drop(status);
-        self.emit_autorun();
+        let generation = self.autorun.lock().unwrap().generation;
+        self.finish(generation, "stopped", "");
     }
 
     pub(crate) fn observe(&self, generation: u64, state: &Value) {
         let mut status = self.autorun.lock().unwrap();
         if !status.running || status.generation != generation { return; }
+        if let Some(source) = state.get("source") {
+            if !status.source.is_null() && source != &status.source {
+                drop(status);
+                self.stop_for_disconnect(generation, if source.is_null() {"websocket-flow-closed"} else {"autoplay.data_source_changed"});
+                return;
+            }
+            status.source = source.clone();
+        }
         let profile = status.profile.clone().unwrap();
+        if profile["strategy"] == crate::vine_farming::STRATEGY {
+            let stop = if let Some(stop) = crate::vine_farming::stop_reason(state, &profile) { Some(stop) }
+                else if state["ended"] != true && state["stage"] != 100 && !crate::vine_farming::eligible(state) { Some(("failed", "vine.need_ex16")) }
+                else if state["ended"] != true && state["stage"] != 100 && !crate::vine_farming::lineup_valid(state) { Some(("failed", "vine.invalid_lineup")) }
+                else { None };
+            if let Some((step, reason)) = stop {
+                drop(status);
+                self.finish(generation, step, reason);
+                let _ = self.services.events.send(event("ui_toast", json!({"msg_key":reason,"kind":"info","duration":15000})));
+                return;
+            }
+        }
         let achieved = achieved_count(state, &profile);
         status.best = status.best.max(achieved);
         let live = matches!(state["stage"].as_u64(), Some(1..=99)) && state["ended"] != true;
@@ -193,6 +214,7 @@ impl Automation {
     pub(crate) fn begin_action(&self, generation: u64, kind: &str) -> bool {
         let mut status = self.autorun.lock().unwrap();
         if !status.running || status.generation != generation { return false; }
+        if kind == "remake" && status.profile.as_ref().is_some_and(|p| p["strategy"] == crate::vine_farming::STRATEGY) { return false; }
         status.step = format!("action:{kind}");
         if kind == "remake" { status.remaking = true; }
         if kind == "start_game" { status.runs += 1; }
@@ -231,6 +253,10 @@ impl Automation {
         self.finish(generation, "failed", reason);
     }
 
+    pub(crate) fn stop_for_disconnect(&self, generation: u64, reason: &str) {
+        self.finish(generation, "disconnected", reason);
+    }
+
     fn finish(&self, generation: u64, step: &str, reason: &str) {
         let mut status = self.autorun.lock().unwrap();
         if !status.running || status.generation != generation { return; }
@@ -244,19 +270,20 @@ impl Automation {
         if let Some(task) = status.round_task.take() { task.abort(); }
         if let Some(task) = status.task.take() { task.abort(); }
         let mail = self.services.table("autorun")["email_notify"].clone();
+        let notify = step != "stopped" && !matches!(reason,"autoplay.data_source_changed" | "data-source-changed");
         let enabled = mail["enabled"] == true;
-        status.email_status = if enabled { "sending" } else { "disabled" }.into();
-        let outcome = match step { "failed" => "运行出错，已停止", "goal_met" => "开局目标已达成", _ => "本局已结束" };
+        status.email_status = if !notify { "" } else if enabled { "sending" } else { "disabled" }.into();
+        let outcome = match step { "failed" => "运行出错，已停止", "stopped" => "自动化已停止（手动暂停或控制切换）", "disconnected" => "连接断开或控制切换，已停止", "goal_met" => "开局目标已达成", "vine_echo" => "发现回响魔藤，请手动继续对局", "vine_goal" => "刷魔藤首胡分数不足以通过下一关，已停止", "vine_low_hp" => "血量小于一半，已暂停", "vine_cutoff" => "指定关卡BOSS已击败，奖励包尚未选择，已暂停", "vine_mystery" => "进入神秘商店，已暂停", "vine_trade" => "以物易物出现魔藤，已暂停", _ => "本局已结束" };
         let subject = format!("Shanten Lens 全自动：{outcome}");
         let body = format!("玩法：{}\n结果：{outcome}\n已运行：{} 秒\n{}",
             status.profile.as_ref().and_then(|p| p["name"].as_str()).unwrap_or(""),
             status.started.map_or(0, |start| start.elapsed().as_secs()), reason);
         drop(status);
         self.emit_autorun();
-        if enabled {
+        if notify && enabled {
             let this = self.clone();
             std::thread::spawn(move || {
-                let result = crate::mail::send(&mail, &subject, &body);
+                let result = this.send_stop_mail(&mail, &subject, &body);
                 let mut status = this.autorun.lock().unwrap();
                 if status.generation != notification_generation { return; }
                 match result {
@@ -268,6 +295,21 @@ impl Automation {
             });
         }
     }
+
+    fn send_stop_mail(&self, config: &Value, subject: &str, body: &str) -> Result<(), String> {
+        #[cfg(test)]
+        if let Some(outbox) = self.mail_outbox.lock().unwrap().as_mut() {
+            outbox.push((subject.into(), body.into()));
+            return Ok(());
+        }
+        crate::mail::send(config, subject, body)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn capture_stop_mail(&self) { *self.mail_outbox.lock().unwrap() = Some(Vec::new()); }
+
+    #[cfg(test)]
+    pub(crate) fn captured_stop_mail(&self) -> Vec<(String, String)> { self.mail_outbox.lock().unwrap().clone().unwrap_or_default() }
 
     pub(crate) fn round_context(&self) -> Option<(u64, Value)> {
         let status = self.autorun.lock().unwrap();
@@ -361,6 +403,7 @@ impl Automation {
     }
     pub fn stop_tsumo(&self) {
         let mut status = self.tsumo.lock().unwrap();
+        if !status.running { return; }
         status.running = false;
         status.generation += 1;
         if let Some(task) = status.task.take() {
@@ -495,6 +538,72 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn automatic_stops_and_unexpected_disconnects_notify_once_but_manual_controls_are_silent() {
+        let root = std::env::temp_dir().join(format!("lens-stop-mail-{}",std::process::id()));
+        let (events, _) = tokio::sync::broadcast::channel(128);
+        let services = Arc::new(Services::load(root.join("configs"), events).unwrap());
+        let book: Value = serde_json::from_str(include_str!("../tests/fixtures/playbook.json")).unwrap();
+        let mut mail=services.table("autorun")["email_notify"].clone(); mail["enabled"]=json!(true);
+        services.patch_config(&json!({"autorun":{"playbook":book,"email_notify":mail}})).unwrap();
+        let proxy = ProxyControl::new(services.clone(), Arc::new(tokio::sync::RwLock::new(crate::pipeline::PipelineConfig::default())));
+        let automation = Automation::new(services.clone(), proxy);
+        automation.capture_stop_mail();
+        for (index,step) in ["completed","goal_met","vine_goal","vine_echo","failed","vine_low_hp","vine_cutoff","vine_mystery","vine_trade"].into_iter().enumerate() {
+            automation.start_autorun().unwrap();
+            let (generation,_) = automation.round_context().unwrap();
+            if step == "stopped" { automation.stop_autorun(); }
+            else { automation.finish(generation,step,"test-stop-reason"); }
+            automation.stop_autorun(); automation.fail(generation,"duplicate");
+            tokio::time::timeout(Duration::from_secs(2),async {
+                while automation.autorun_status()["email_status"] == "sending" { tokio::task::yield_now().await; }
+            }).await.unwrap();
+            assert_eq!(automation.autorun_status()["email_status"],"sent");
+            let mails=automation.captured_stop_mail();
+            assert_eq!(mails.len(),index+1);
+            assert!(mails[index].0.contains("Shanten Lens"));
+            assert!(mails[index].1.contains("玩法："));
+            if step == "vine_goal" { assert!(mails[index].0.contains("首胡分数不足以通过下一关")); }
+        }
+        automation.start_autorun().unwrap(); automation.stop_autorun(); automation.stop_autorun();
+        assert_eq!(automation.autorun_status()["email_status"],"");
+        for reason in ["autoplay.data_source_changed","data-source-changed"] {
+            automation.start_autorun().unwrap();
+            let (generation,_) = automation.round_context().unwrap();
+            automation.fail(generation,reason);
+            assert_eq!(automation.autorun_status()["email_status"],"");
+        }
+        automation.start_autorun().unwrap();
+        let (generation,_) = automation.round_context().unwrap();
+        automation.stop_for_disconnect(generation,"socket receive error");
+        tokio::time::timeout(Duration::from_secs(2),async {
+            while automation.autorun_status()["email_status"] == "sending" {tokio::task::yield_now().await;}
+        }).await.unwrap();
+        assert_eq!(automation.autorun_status()["email_status"],"sent");
+        // A lost source can arrive before its connection error; notify only once.
+        automation.start_autorun().unwrap();
+        let (generation,_) = automation.round_context().unwrap();
+        automation.observe(generation,&json!({"source":"packet","stage":9}));
+        automation.observe(generation,&json!({"source":null,"stage":-1}));
+        assert_eq!(automation.autorun_status()["current_step"],"disconnected");
+        tokio::time::timeout(Duration::from_secs(2),async {
+            while automation.autorun_status()["email_status"] == "sending" {tokio::task::yield_now().await;}
+        }).await.unwrap();
+        assert_eq!(automation.autorun_status()["email_status"],"sent");
+        // No real tsumo loop is launched: only simulate its running flag before a manual stop.
+        automation.tsumo.lock().unwrap().running=true;
+        automation.stop_tsumo(); automation.stop_tsumo();
+        assert_eq!(automation.captured_stop_mail().len(),11);
+        mail["enabled"]=json!(false);
+        services.patch_config(&json!({"autorun":{"email_notify":mail}})).unwrap();
+        automation.start_autorun().unwrap();
+        let (generation,_) = automation.round_context().unwrap();
+        automation.finish(generation,"completed","");
+        assert_eq!(automation.autorun_status()["email_status"],"disabled");
+        assert_eq!(automation.captured_stop_mail().len(),11);
+        drop(automation);drop(services);std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
     async fn terminal_states_notify_once_restore_fuses_and_do_not_complete_remakes() {
         let root = std::env::temp_dir().join(format!("lens-autorun-lifecycle-{}-{}", std::process::id(),
             SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
@@ -536,6 +645,10 @@ mod tests {
         automation.start_autorun().unwrap();
         automation.stop_autorun();
         assert!(!services.autorun_active());
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while automation.autorun_status()["email_status"] == "sending" { tokio::task::yield_now().await; }
+        }).await.unwrap();
+        assert_eq!(automation.autorun_status()["current_step"], "stopped");
         assert_eq!(automation.autorun_status()["email_status"], "", "manual pause must not send mail");
         drop(automation);
         drop(services);

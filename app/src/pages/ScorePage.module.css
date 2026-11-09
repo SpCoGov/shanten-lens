@@ -143,6 +143,12 @@
 .resultCard strong { overflow: hidden; font-size: 22px; text-overflow: ellipsis; }
 .totalResult { border-color: color-mix(in srgb, var(--state-ok) 55%, var(--color-divider)); }
 
+.headerActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.bossList { display: grid; gap: 12px; }
+.bossGroup { padding: 14px 16px; border: 1px solid var(--color-divider); border-radius: 12px; background: var(--panel-bg); }
+.bossGroup h3 { margin: 0 0 8px; font-size: 15px; }
+.bossGroup ul { margin: 0; padding-left: 22px; font-size: 13px; line-height: 1.8; }
+
 @media (max-width: 1100px) {
     .calculationGrid { grid-template-columns: minmax(200px, .7fr) minmax(360px, 1.3fr); }
     .results { grid-column: 1 / -1; }

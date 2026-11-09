@@ -150,3 +150,35 @@ for (const count of [0, -1, 1.5, "2", null, NaN, Number.MAX_SAFE_INTEGER + 1]) {
 badgeCountBook.profiles[1].targets = [{kind: "badge", id: 600010}];
 assert.equal(validateAutoPlayConfig(badgeCountBook), null, "Older badge targets keep the default count of one.");
 console.log("Badge target count validation checks passed.");
+
+const characterBook = structuredClone(valid);
+for (const profile of characterBook.profiles) {
+    for (const id of [201,202,203,204]) {
+        profile.character_id = id;
+        assert.equal(validateAutoPlayConfig(characterBook),null);
+        assert.equal(JSON.parse(JSON.stringify(characterBook)).profiles.find((item: {id: string}) => item.id === profile.id).character_id,id);
+    }
+}
+delete characterBook.profiles[1].character_id;
+assert.equal(validateAutoPlayConfig(characterBook),null,"Old opening profiles retain the default role.");
+for (const id of [0,200,205,999,"201",null,1.5]) {
+    Object.assign(characterBook.profiles[1],{character_id:id});
+    assert.equal(validateAutoPlayConfig(characterBook),"profile");
+}
+console.log("Initial character configuration checks passed.");
+
+const vineBook = {version: 1, selected_profile_id: "vine", profiles: [{id: "vine", name: "Vine", strategy: "vine_farming"}]};
+assert.equal(validateAutoPlayConfig(vineBook), null);
+assert.deepEqual(JSON.parse(JSON.stringify(vineBook)), vineBook);
+assert.equal(validateAutoPlayConfig({...vineBook, profiles: [{...vineBook.profiles[0], strategy: "unknown"}]}), "strategy");
+console.log("Vine farming configuration checks passed.");
+
+for (const reward of [null,62,93,140,210,315,473,710,1065]) {
+    const next={...vineBook,profiles:[{...vineBook.profiles[0],reward_refresh_limit:reward,normal_refresh_limit:210,stop_ex:70,pause_half_hp:false}]};
+    assert.equal(validateAutoPlayConfig(JSON.parse(JSON.stringify(next))),null);
+}
+for (const patch of [{reward_refresh_limit:0},{reward_refresh_limit:1},{normal_refresh_limit:1598},{normal_refresh_limit:"210"},
+    {stop_ex:0},{stop_ex:71},{stop_ex:1.5},{pause_half_hp:null}]) {
+    assert.equal(validateAutoPlayConfig({...vineBook,profiles:[{...vineBook.profiles[0],...patch}]}),"vine");
+}
+console.log("Vine refresh interval, cutoff and health options round-trip checks passed.");

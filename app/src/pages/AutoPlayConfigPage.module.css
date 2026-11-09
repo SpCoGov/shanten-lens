@@ -40,12 +40,11 @@
 .profileHeading :global(.panel-title) { margin: 0; }
 .profileHeading :global(.badge) { display: inline-flex; align-items: center; gap: 4px; }
 .profileHeading :global(.ms) { font-size: 16px; }
-.strategyChoices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.strategyChoice { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--input-bg); color: var(--text); text-align: left; cursor: pointer; }
+.strategyChoices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.strategyChoice { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--input-bg); color: var(--text); text-align: center; cursor: pointer; }
 .strategyChoice:hover, .strategyChoice:focus-visible { background: var(--autoplay-selected-bg); border-color: var(--color-ring); }
 .strategyChoice > :global(.ms) { font-size: 28px; color: var(--color-ring); }
 .strategyChoice strong { font-size: 17px; }
-.strategyChoice > span:last-child { font-size: 13px; line-height: 1.7; color: var(--muted); }
 .targetBadge { width: 48px; height: 48px; object-fit: contain; }
 .targetActions { margin-top: 10px; }
 .page :global(.nav-btn), .dialog :global(.nav-btn), .pageTabs :global(.nav-btn) { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; box-sizing: border-box; font-family: inherit; line-height: 1; }
@@ -58,6 +57,13 @@
 .openingFields { display: flex; flex-wrap: wrap; gap: 20px; }
 .openingFields .field { margin-block: 12px; }
 .openingFields select { width: 180px; }
+.openingSetup { container: opening-setup / inline-size; display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.openingSetup > :first-child { flex: 0 0 328px; }
+.openingSettings { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+.openingSettings .openingFields, .openingSettings .targetActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.openingSettings .field, .openingSettings .targetActions { margin: 0; }
+.openingSettings .field input, .openingSettings .field select, .openingSettings .targetActions > button { width: 100%; }
+.openingSettings .targetActions > button { min-width: 0; white-space: normal; }
 .valueField { align-items: flex-start; }
 .valueField input { width: 120px; }
 .label { font-size: 13px; margin-bottom: 12px; }
@@ -67,10 +73,12 @@
 .initialAmulet > div:last-child { display: grid; justify-items: start; gap: 6px; }
 .initialAmulet strong { font-size: 13px; }
 .initialAmulet p { margin: 0; }
-.characters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.character { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--input-bg); color: var(--text); cursor: pointer; }
-.character img { width: 100%; max-width: 86px; height: 100px; object-fit: contain; }
-.character span { font-size: 12px; }
+.characterPicker { container: character-picker / inline-size; min-width: 0; }
+.characters { display: grid; grid-template-columns: repeat(4, minmax(0, 76px)); gap: 8px; }
+.character { box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); cursor: pointer; }
+.character img { width: 52px; height: 72px; object-fit: contain; }
+.character span { font-size: 11px; text-align: center; }
+.characterNumber { display: none; }
 .character[aria-pressed="true"], .stageButton[aria-pressed="true"], .tabs button[aria-pressed="true"], .choices button[aria-pressed="true"] { border-color: var(--color-ring); background: var(--autoplay-selected-bg); box-shadow: 0 0 0 1px var(--color-ring); }
 .stageLayout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 18px; align-items: start; }
 .stageList { display: grid; gap: 10px; position: sticky; top: 16px; }
@@ -88,8 +96,8 @@
 .loadout { display: grid; gap: 14px; }
 .amulets { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
 .amulet { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--input-bg); }
-.targetList { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
-.openingTarget { flex: 0 1 280px; min-width: 0; min-height: 96px; max-width: 100%; grid-template-rows: auto auto; gap: 6px 10px; align-items: center; padding: 10px; }
+.targetList { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); align-items: start; align-content: start; gap: 8px; }
+.openingTarget { box-sizing: border-box; width: 100%; min-width: 0; min-height: 96px; max-width: 360px; grid-template-rows: auto auto; gap: 6px 10px; align-items: center; padding: 10px; }
 .openingTarget > :first-child { grid-row: 1 / span 2; }
 .targetControls { grid-column: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .targetFields { flex: 1 1 100px; min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
@@ -156,8 +164,9 @@
 .goalProgress progress { width: 100%; height: 6px; border: 0; border-radius: 6px; overflow: hidden; accent-color: var(--color-ring); }
 .goalProgress progress::-webkit-progress-bar { background: var(--input-bg); }
 .goalProgress progress::-webkit-progress-value { background: var(--color-ring); border-radius: 6px; }
+.runCharacter { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 13px; }
+.runCharacter img { width: 100%; max-width: 160px; height: 220px; object-fit: contain; }
 .currentTargets { border-left: 1px solid var(--border); padding-left: 20px; min-width: 0; }
-.currentTargets .openingTarget { flex-basis: 230px; }
 .historyHeader { margin-bottom: 14px; }
 .historyHeader .badge { font-size: 11px; }
 .recordLayout { display: grid; grid-template-columns: minmax(240px, 32%) minmax(0, 1fr); gap: 16px; align-items: start; }
@@ -184,6 +193,23 @@
 .emailFields .field { margin: 0; }
 .emailFields input { width: 100%; }
 .emailFields input[type="checkbox"] { width: 18px; height: 18px; }
+@container opening-setup (max-width: 680px) {
+    .openingSetup > :first-child { flex-basis: 144px; }
+    .openingSettings .openingFields, .openingSettings .targetActions { gap: 8px; }
+    .openingSettings .targetActions > button { padding-inline: 6px; }
+}
+@container opening-setup (max-width: 420px) {
+    .openingSetup > :first-child { flex-basis: 76px; }
+}
+@container character-picker (max-width: 300px) {
+    .characters { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+    .character { min-height: 36px; justify-content: center; }
+    .character img, .characterName { display: none; }
+    .characterNumber { display: inline; }
+}
+@container character-picker (max-width: 100px) {
+    .characters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 1000px) {
     .workspace { grid-template-columns: minmax(0, 1fr); }
     .profileList { position: static; }
@@ -201,9 +227,9 @@
     .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
     .metrics > div:nth-child(2) { border: 0; }
     .progressPanel, .recordLayout { grid-template-columns: minmax(0, 1fr); }
+    .runCharacter { flex-direction: row; }
+    .runCharacter img { width: 64px; height: 88px; }
     .currentTargets, .recordDetail { padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--border); }
     .recordList { max-height: 260px; }
-    .openingTarget, .currentTargets .openingTarget { flex: 0 1 260px; }
     .opening, .orders, .fields, .strategyChoices { grid-template-columns: minmax(0, 1fr); }
-    .character img { height: 80px; }
 }

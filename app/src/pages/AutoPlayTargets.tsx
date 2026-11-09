@@ -7,7 +7,10 @@ import AmuletEditorModal from "../components/AmuletEditorModal";
 import BadgePickerModal from "../components/BadgePickerModal";
 import styles from "./AutoPlayConfigPage.module.css";
 
-export default function AutoPlayTargets({targets, onChange}: {targets: TargetItem[]; onChange?: (targets: TargetItem[]) => void}) {
+export default function AutoPlayTargets({targets, onChange, renderControls}: {
+    targets: TargetItem[]; onChange?: (targets: TargetItem[]) => void;
+    renderControls?: (actions: React.ReactNode) => React.ReactNode;
+}) {
     const {t} = useTranslation();
     const {amuletById, badgeById} = useRegistry();
     const [editor, setEditor] = React.useState<{kind: "amulet" | "badge"; index: number} | null>(null);
@@ -19,7 +22,12 @@ export default function AutoPlayTargets({targets, onChange}: {targets: TargetIte
             ...(target.kind === "badge" ? {count: editing?.kind === "badge" ? editing.count ?? 1 : 1} : {})};
         onChange(next); setEditor(null);
     }
+    const actions = onChange && <div className={`${styles.toolbar} ${styles.targetActions}`}>
+        <button className="nav-btn" disabled={targets.length >= 128} onClick={() => setEditor({kind: "amulet", index: targets.length})}><span className="ms" aria-hidden="true">add</span>{t("autorun.btn_add_amulet")}</button>
+        <button className="nav-btn" disabled={targets.length >= 128} onClick={() => setEditor({kind: "badge", index: targets.length})}><span className="ms" aria-hidden="true">add</span>{t("autorun.btn_add_badge")}</button>
+    </div>;
     return <>
+        {renderControls?.(actions)}
         <div className={styles.targetList}>{targets.map((target, index) => {
             const amulet = target.kind === "amulet" ? amuletById.get(target.id) : undefined;
             const name = target.kind === "amulet" ? (target.plus ? amulet?.plus_name ?? amulet?.name : amulet?.name)
@@ -50,10 +58,7 @@ export default function AutoPlayTargets({targets, onChange}: {targets: TargetIte
             </article>;
         })}</div>
         {!targets.length && <p className="hint">{t("autorun.empty_targets")}</p>}
-        {onChange && <div className={`${styles.toolbar} ${styles.targetActions}`}>
-            <button className="nav-btn" disabled={targets.length >= 128} onClick={() => setEditor({kind: "amulet", index: targets.length})}><span className="ms" aria-hidden="true">add</span>{t("autorun.btn_add_amulet")}</button>
-            <button className="nav-btn" disabled={targets.length >= 128} onClick={() => setEditor({kind: "badge", index: targets.length})}><span className="ms" aria-hidden="true">add</span>{t("autorun.btn_add_badge")}</button>
-        </div>}
+        {!renderControls && actions}
         <AmuletEditorModal open={editor?.kind === "amulet"} onClose={() => setEditor(null)} initial={editing?.kind === "amulet" ? editing : undefined}
             onConfirm={data => applyTarget({kind: "amulet", ...data})}/>
         <BadgePickerModal open={editor?.kind === "badge"} onClose={() => setEditor(null)} onSelect={id => applyTarget({kind: "badge", id})}/>

@@ -6,10 +6,12 @@ import {parseFixed2} from "../lib/scoreEngine";
 import {useRegistry} from "../lib/registryStore";
 import {formatLevelIdToLabel} from "../lib/levelFormat";
 import MagicVineStats from "./MagicVineStats";
+import {highestTileScore} from "../lib/magicVineMetrics";
 
 const LEVEL_RECORDS_STORAGE_KEY = "sl-level-metric-records-v1";
 const AVG_SOUZU_SCORE_METRIC_KEY = "avg_souzu_score";
 const MAX_SOUZU_SCORE_METRIC_KEY = "max_souzu_score";
+export const MAX_TILE_SCORE_METRIC_KEY = "max_tile_score";
 const HAITEI_FAN_METRIC_KEY = "fan_5_haitei";
 const AMULET_DATA_METRICS = [
     {regId: 229, key: "amulet_229_data0", labelKey: "level_records.amulet_229_data0"},
@@ -170,6 +172,11 @@ export function useLevelRecordItems({
 
     const currentLevelMetrics = React.useMemo<CurrentLevelMetric[]>(() => [
         {
+            key: MAX_TILE_SCORE_METRIC_KEY,
+            label: t("magic_vine.highest_score"),
+            current: highestTileScore(tileScoreMap)?.toString() ?? null,
+        },
+        {
             key: AVG_SOUZU_SCORE_METRIC_KEY,
             label: t("level_records.avg_souzu_score"),
             current: computeAverageSouzuScore(tileScoreMap),
@@ -279,12 +286,13 @@ export default function LevelRecordPanel({
 }) {
     const {t} = useTranslation();
     const registry = useRegistry();
+    const highestRecord = items.find(item => item.key === MAX_TILE_SCORE_METRIC_KEY);
 
     return (
         <aside className="home-record-panel">
             {items.length > 0 && <div className="home-record-kicker">{t("level_records.level_label", {level: formatLevelIdToLabel(level, source, node)})}</div>}
             <div className="home-record-list">
-                {items.map((item) => {
+                {items.filter(item => item.key !== MAX_TILE_SCORE_METRIC_KEY).map((item) => {
                     const amulet = item.amuletRegId != null ? registry.amuletById.get(item.amuletRegId) : null;
                     const iconPath = amulet ? `/assets/amulet/fu_${pad4(amulet.icon_id)}.png` : null;
                     const showBest = item.state === "below";
@@ -313,10 +321,10 @@ export default function LevelRecordPanel({
                                     </div>
                                 ) : null}
                             </div>
-                        </div>{item.key === HAITEI_FAN_METRIC_KEY && <MagicVineStats tileScoreMap={tileScoreMap} amulets={amulets}/>}</React.Fragment>
+                        </div>{item.key === HAITEI_FAN_METRIC_KEY && <MagicVineStats tileScoreMap={tileScoreMap} amulets={amulets} highestRecord={highestRecord}/>}</React.Fragment>
                     );
                 })}
-                {!items.some(item => item.key === HAITEI_FAN_METRIC_KEY) && <MagicVineStats tileScoreMap={tileScoreMap} amulets={amulets}/>}
+                {!items.some(item => item.key === HAITEI_FAN_METRIC_KEY) && <MagicVineStats tileScoreMap={tileScoreMap} amulets={amulets} highestRecord={highestRecord}/>}
             </div>
         </aside>
     );

@@ -3,6 +3,8 @@
 mod audit_tests;
 #[cfg(test)]
 mod autorun_tests;
+#[cfg(test)]
+mod reward_tests;
 mod commands;
 mod direct;
 mod diagnostics;
@@ -171,7 +173,8 @@ impl BackendRuntime {
                     Ok(event) if event["type"] == "direct_accounts_changed" => self.state.emit_direct_status(),
                     Ok(event) if event["type"] == "data_source_status" => {
                         if let Some((generation, _)) = self.state.automation.round_context() {
-                            self.state.automation.fail(generation, "autoplay.data_source_changed");
+                            let reason = if event["data"]["active"].is_null() {"websocket-flow-closed"} else {"autoplay.data_source_changed"};
+                            self.state.automation.stop_for_disconnect(generation, reason);
                         }
                         self.state.automation.stop_tsumo();
                         self.state.switch_generation.send_modify(|generation| *generation += 1);
@@ -193,7 +196,7 @@ impl BackendRuntime {
             let reason = proxy_result.err().map(|error| format!("{error:#}")).unwrap_or_else(|| "MITM proxy stopped".into());
             error!(target: "shanten_backend::proxy", error = %reason, "MITM proxy stopped");
             if let Some((generation, _)) = self.state.automation.round_context() {
-                self.state.automation.fail(generation, &reason);
+                self.state.automation.stop_for_disconnect(generation, &reason);
             }
             self.state.services.set_proxy_status(false, Some(reason));
         };

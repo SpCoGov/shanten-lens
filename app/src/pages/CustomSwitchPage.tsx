@@ -5,9 +5,10 @@ import {compareTileFaces} from "../components/WallStats";
 import Modal from "../components/Modal";
 import CustomTargetEditor from "../components/CustomTargetEditor";
 import type {GameStateData} from "../lib/gamestate";
+import {formatLevelIdToLabel} from "../lib/levelFormat";
 import type {PlanData} from "../lib/planTypes";
 import {targetSize, targetKind, restoreTargetGroups, parseTargetPreset, compactTargetPreset, readTargetPresets, TARGET_PRESETS_KEY, type TargetGroup, type TargetPreset} from "../lib/customTarget";
-import {readCustomSwitchOptions, CUSTOM_SWITCH_TARGET_KEY, CUSTOM_SWITCH_WALL_LIMIT_KEY, CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY} from "../lib/customSwitchSettings";
+import {readCustomSwitchOptions, rememberCustomSwitchPreset, CUSTOM_SWITCH_TARGET_KEY, CUSTOM_SWITCH_WALL_LIMIT_KEY, CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY} from "../lib/customSwitchSettings";
 import * as backendIpc from "../lib/ipc";
 import {pushToast} from "../lib/toast";
 import styles from "./CustomSwitchPage.module.css";
@@ -94,6 +95,8 @@ export default function CustomSwitchPage({currentState, data, onClear}: {
         setWallLimit(preset.wall_limit);
         setExcludeInvalidShapes(preset.exclude_invalid_shapes);
         setPresetName(preset.name);
+        rememberCustomSwitchPreset(preset.name, {search_algorithm:"custom_target",target_groups:restoreTargetGroups(preset.target_groups),
+            wall_limit:preset.wall_limit,exclude_invalid_shapes:preset.exclude_invalid_shapes});
     }
     async function exportPreset() {
         try {
@@ -132,9 +135,12 @@ export default function CustomSwitchPage({currentState, data, onClear}: {
                     <span className={`ms ${styles.heroIcon}`} aria-hidden="true">dashboard_customize</span>
                     <div><h1>{t("custom_target.title")}</h1><p>{t("custom_target.intro")}</p></div>
                 </div>
-                <span className={`switch-guide-status ${ready ? "is-ready" : ""}`}>
-                    <span aria-hidden="true"/>{t(ready ? "custom_target.ready" : "custom_target.waiting")}
-                </span>
+                <div className="switch-guide-meta">
+                    <span className="badge">{t("score.current_level")} <strong>{formatLevelIdToLabel(currentState?.level, currentState?.source, currentState?.node)}</strong></span>
+                    <span className={`switch-guide-status ${ready ? "is-ready" : ""}`}>
+                        <span aria-hidden="true"/>{t(ready ? "custom_target.ready" : "custom_target.waiting")}
+                    </span>
+                </div>
             </div>
             <div className="switch-guide-command-bar">
                 <div className="switch-guide-actions">

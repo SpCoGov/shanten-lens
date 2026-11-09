@@ -49,6 +49,7 @@ pub struct Services {
     confirmations: Arc<Mutex<std::collections::HashMap<String, mpsc::Sender<bool>>>>,
     next_confirmation: Arc<AtomicU64>,
     autorun_active: Arc<AtomicBool>,
+    vine_farming_active: Arc<Mutex<Option<Value>>>,
     pub events: broadcast::Sender<Value>,
     proxy_status: Arc<Mutex<crate::ipc::ProxyStatus>>,
 }
@@ -93,6 +94,7 @@ impl Services {
             confirmations: Arc::new(Mutex::new(std::collections::HashMap::new())),
             next_confirmation: Arc::new(AtomicU64::new(1)),
             autorun_active: Arc::new(AtomicBool::new(false)),
+            vine_farming_active: Arc::new(Mutex::new(None)),
             events,
             proxy_status: Arc::new(Mutex::new(crate::ipc::ProxyStatus::default())),
         };
@@ -110,7 +112,12 @@ impl Services {
 
     pub(crate) fn set_autorun_active(&self, active: bool) {
         self.autorun_active.store(active, Ordering::SeqCst);
+        if !active { self.set_vine_farming_active(None); }
     }
+
+    pub(crate) fn vine_farming_profile(&self) -> Option<Value> { self.vine_farming_active.lock().unwrap().clone() }
+    pub(crate) fn vine_farming_active(&self) -> bool { self.vine_farming_active.lock().unwrap().is_some() }
+    pub(crate) fn set_vine_farming_active(&self, profile: Option<Value>) { *self.vine_farming_active.lock().unwrap() = profile; }
 
     pub fn set_proxy_status(&self, running: bool, error: Option<String>) {
         let status = crate::ipc::ProxyStatus { running, error };

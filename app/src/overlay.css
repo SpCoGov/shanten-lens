@@ -48,6 +48,15 @@ body {
     grid-template-rows: auto minmax(0, 1fr);
 }
 
+.hud-current-level {
+    min-height: 0;
+    grid-template-rows: auto;
+}
+
+.hud-current-level-value {
+    font-size: inherit;
+}
+
 .hud-panel-head {
     display: flex;
     align-items: center;
@@ -74,6 +83,14 @@ body {
     line-height: 1;
     cursor: pointer;
     pointer-events: auto;
+}
+
+.hud-panel-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .hud-panel.is-collapsed {

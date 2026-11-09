@@ -26,17 +26,23 @@ fn snapshot_key(game: &Value) -> Value {
 
 fn plan_report(plan: &Value, status: &str, wins: u64) -> Value {
     json!({"status":status,"strategy":plan["round_strategy"],"stage_name":plan["stage_name"],
+        "reason":plan["reason"],
         "hand_name":plan["hand_name"],"target_faces":plan["target_physical_faces"],
         "pinzu_count":plan["pinzu_count"],"win_count":plan["win_count"],"score":plan["opening_score"],
         "draws_needed":plan["draws_needed"],"actual_wins":wins})
 }
 
 fn choose_plan(game: &Value, profile: &Value, progress: &mut dyn FnMut(Value), stopped: &dyn Fn() -> bool) -> Value {
-    let stage = if profile["strategy"] == "opening" { None } else {
-        match crate::decision::tactical_stage(game, profile) {
-            Ok(stage) => stage,
-            Err(_) => return json!({"status":"impossible","reason":"round.no_stage_data"}),
-        }
+    if profile["strategy"] == "opening" { return crate::opening::plan(game, progress, stopped); }
+    if profile["strategy"] == crate::vine_farming::STRATEGY {
+        let preferences = serde_json::from_value(json!({"preferred_suit":"p"})).unwrap();
+        let mut plan = recommendations::switch_plan_with_preferences(game, 36, &[], Some("wanxiang_four_meld_switch"), &preferences, progress, stopped);
+        plan["round_strategy"] = json!(crate::vine_farming::STRATEGY);
+        return plan;
+    }
+    let stage = match crate::decision::tactical_stage(game, profile) {
+        Ok(stage) => stage,
+        Err(_) => return json!({"status":"impossible","reason":"round.no_stage_data"}),
     };
     let Some(stage) = stage else {
         let mut plan = recommendations::opening_round_plan(game, 36, progress, stopped);
@@ -81,6 +87,13 @@ async fn wait_update(updates: &mut tokio::sync::broadcast::Receiver<Value>) {
 }
 
 async fn matches_target(game: &Value, plan: &Value) -> bool {
+    if let Some(target) = plan["continuation_tiles"].as_array().filter(|tiles| tiles.len() == 13) {
+        return game["hand_tiles"].as_array().is_some_and(|hand| target.iter().all(|tile| hand.contains(tile)));
+    }
+    if plan["round_strategy"] == crate::vine_farming::STRATEGY {
+        return plan["target_physical_ids"].as_array().is_some_and(|target| target.len() == 13
+            && game["hand_tiles"].as_array().is_some_and(|hand| hand.len() >= 13 && target.iter().all(|tile| hand.contains(tile))));
+    }
     let game = game.clone();
     let target = plan["target_groups"].clone();
     tokio::task::spawn_blocking(move || recommendations::matches_custom_target(&game, &target)).await.unwrap_or(false)
@@ -92,9 +105,21 @@ fn action_error(result: crate::ipc::CommandResult) -> String {
     } else { result.reason.or(result.reason_key).unwrap_or_else(|| "action_provider.execution.send_failed".into()) }
 }
 
+fn continuation_discard(game: &Value, plan: &Value) -> Option<u64> {
+    if !switch::operation_available(game, 1) { return None; }
+    let hand = game["hand_tiles"].as_array().filter(|hand| hand.len() == 14)?;
+    let target = if plan["round_strategy"] == crate::vine_farming::STRATEGY { &plan["target_physical_ids"] }
+        else { &plan["continuation_tiles"] };
+    let target = target.as_array().filter(|target| target.len() == 13 && target.iter().all(|tile| hand.contains(tile)))?;
+    hand.iter().find(|tile| !target.contains(tile))?.as_u64().filter(|id| *id != 1000)
+}
+
 pub(super) async fn remake_after_search_failure(state: &State, generation: u64, profile: &Value, plan: &Value, game: &Value) -> Result<bool, String> {
     if profile["strategy"] != "opening" { return Ok(false); }
+    if !crate::opening::is_first_battle(game) { return Ok(false); }
+    if game["record"]["levelHuCount"].as_u64().unwrap_or(0) > 0 { return Ok(false); }
     let (reason, progress_reason) = match plan["reason"].as_str() {
+        Some("opening-tanyao-unreachable") => ("opening-tanyao-unreachable", "round.opening_tanyao_remake"),
         Some("custom-search-limit") => ("custom-search-limit", "round.search_limit_remake"),
         Some("invalid-search-tiles") => ("invalid-search-tiles", "round.invalid_tiles_remake"),
         _ => return Ok(false),
@@ -102,6 +127,8 @@ pub(super) async fn remake_after_search_failure(state: &State, generation: u64, 
     if !state.automation.round_is_current(generation) || snapshot_key(&state.services.game_state()) != snapshot_key(game) {
         return Ok(true);
     }
+    if !state.services.mark_opening_search_failure(game, profile, reason) { return Ok(true); }
+    let game = &state.services.game_state();
     let action = game["action_report"]["global_actions"].as_array()
         .and_then(|actions| actions.iter().find(|action| action["kind"] == "remake" && action["availability"] == "available"))
         .ok_or("action_provider.execution.unavailable")?;
@@ -150,6 +177,11 @@ async fn run(state: State, generation: u64, profile: Value) {
             wins = 0;
         }
         let action = crate::decision::first_action(&game);
+        if profile["strategy"] == crate::vine_farming::STRATEGY && !in_round(&game)
+            && game["action_report"]["status"] == "ready" && action.is_none() {
+            state.automation.fail(generation, "vine.no_safe_action");
+            return;
+        }
         let priority_remake = action.as_ref().is_some_and(|action| action.kind == "remake"
             && game["decision_report"]["actions"].as_array().is_some_and(|scores| scores.iter()
                 .any(|score| score["action_id"] == action.id && score["total"].as_f64().is_some_and(|total| total > 0.0))));
@@ -217,7 +249,7 @@ async fn run(state: State, generation: u64, profile: Value) {
         };
         let ready = match &active { Some(plan) => matches_target(&game, plan).await, None => false };
         if !ready {
-            let mut report = json!({"status":"searching","strategy":if profile["strategy"] == "opening" {"opening"} else {"full"},"actual_wins":wins});
+            let mut report = json!({"status":"searching","strategy":profile["strategy"].as_str().unwrap_or("full"),"actual_wins":wins});
             state.automation.set_round_decision(generation, report.clone());
             let worker = state.clone();
             let snapshot = game.clone();
@@ -277,7 +309,12 @@ async fn run(state: State, generation: u64, profile: Value) {
             let result = tokio::select! {
                 biased;
                 _ = cancellation.changed() => Err("stopped-by-user".to_owned()),
-                result = switch::execute_custom_switch_plan(&state, &plan) => result,
+                result = async {
+                    if plan["continuation_tiles"].is_array() { Ok(()) }
+                    else if profile["strategy"] == crate::vine_farming::STRATEGY {
+                        switch::execute_switch_batches(&state, &plan, true).await
+                    } else { switch::execute_custom_switch_plan(&state, &plan).await }
+                } => result,
             };
             if let Err(reason) = result {
                 let current = state.services.game_state();
@@ -310,6 +347,15 @@ async fn run(state: State, generation: u64, profile: Value) {
             return;
         }
         if !switch::operation_available(&game, 8) {
+            if let Some(tile) = continuation_discard(&game, plan) {
+                // Blue dragon can remove the next win; retain the planned 13 tiles and draw again.
+                if let Err(reason) = switch::send_game_operation(&state, plan, &game, 1, &[tile]).await {
+                    state.automation.fail(generation, &reason);
+                    return;
+                }
+                attempted = snapshot_key(&game);
+                continue;
+            }
             let mut report = plan_report(plan, "waiting", wins);
             report["reason"] = json!("round.no_operations");
             state.automation.set_round_decision(generation, report);
@@ -323,7 +369,13 @@ async fn run(state: State, generation: u64, profile: Value) {
             state.automation.set_round_decision(generation, report);
             return; // A timeout may have applied the win; never retry a mutating request.
         }
+        if profile["strategy"] == "opening" {
+            if let Some(tiles) = crate::opening::continuation_tiles(&game) {
+                active.as_mut().unwrap()["continuation_tiles"] = json!(tiles);
+            }
+        }
         wins += 1;
+        let plan = active.as_ref().unwrap();
         let mut report = plan_report(plan, "winning", wins);
         report["reason"] = json!("round.waiting_update");
         state.automation.set_round_decision(generation, report);
@@ -336,6 +388,66 @@ async fn run(state: State, generation: u64, profile: Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn captured_five_exchange_fallback_keeps_an_executable_plan() {
+        let root = std::env::temp_dir().join(format!("lens-search-limit-{}",std::process::id()));
+        let (events, _) = tokio::sync::broadcast::channel(32);
+        let services = crate::services::Services::load(root.join("configs"), events).unwrap();
+        services.update_game_state_from_flow(&crate::pipeline::Packet {
+            direction:crate::pipeline::Direction::Inbound,packet_type:"Res".into(),id:Some(1),
+            method:".lq.Lobby.fetchAmuletActivityData".into(),data:serde_json::from_str(include_str!("../../tests/fixtures/opening-search-limit.json")).unwrap(),
+        },1);
+        let mut last = Value::Null;
+        let plan = choose_plan(&services.game_state(), &json!({"strategy":"opening"}), &mut |value| last=value, &|| false);
+        assert_eq!(plan["status"],"plan","{plan}, last progress: {last}");
+        assert!(plan["opening_score"].is_number(),"the late fixed hands must fall back to pinzu: {plan}");
+        drop(services);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn captured_post_win_hands_keep_tenpai_even_without_another_reachable_target() {
+        for raw in [include_str!("../../tests/fixtures/opening-post-win-1.json"), include_str!("../../tests/fixtures/opening-post-win-2.json")] {
+            let root = std::env::temp_dir().join(format!("lens-post-win-{}",std::process::id()));
+            let (events, _) = tokio::sync::broadcast::channel(32);
+            let services = crate::services::Services::load(root.join("configs"), events).unwrap();
+            services.update_game_state_from_flow(&crate::pipeline::Packet {
+                direction:crate::pipeline::Direction::Inbound,packet_type:"Res".into(),id:Some(1),
+                method:".lq.Lobby.fetchAmuletActivityData".into(),data:serde_json::from_str(raw).unwrap(),
+            },1);
+            let game = services.game_state();
+            assert_eq!(game["record"]["levelHuCount"], 2);
+            let plan = choose_plan(&game, &json!({"strategy":"opening"}), &mut |_| {}, &|| false);
+            assert_eq!(plan["status"], "plan", "{plan}");
+            assert!(matches_target(&game, &plan).await);
+            assert_eq!(continuation_discard(&game, &plan), game["hand_tiles"].as_array().unwrap().last().and_then(Value::as_u64));
+            drop(services);
+            std::fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn vine_farming_reuses_wanxiang_pinzu_search_and_accepts_three_pinzu_melds() {
+        for last_meld in ["4p", "4s"] {
+            let faces = ["1p","1p","1p","2p","2p","2p","3p","3p","3p",last_meld,last_meld,last_meld];
+            let mut deck: serde_json::Map<String,Value> = faces.iter().enumerate().map(|(i,f)|((i+1).to_string(),json!(f))).collect();
+            deck.insert("1000".into(),json!("bd"));
+            let game = json!({"deck_map":deck,"hand_tiles":(1..=12).chain([1000]).collect::<Vec<_>>(),
+                "replacement_tiles":[],"total_change_tile_count":2});
+            let plan = choose_plan(&game,&json!({"strategy":"vine_farming"}),&mut |_| {},&|| false);
+            assert_eq!(plan["status"],"plan","{plan}");
+            assert_eq!(plan["search_algorithm"],"wanxiang_four_meld_switch");
+            assert_eq!(plan["search_preferences"]["preferred_suit"],"p");
+            assert!(matches_target(&game,&plan).await);
+            let mut drawn = game.clone();
+            drawn["hand_tiles"].as_array_mut().unwrap().push(json!(50));
+            drawn["next_operation"] = json!([{"type":1}]);
+            assert_eq!(continuation_discard(&drawn,&plan),Some(50));
+            drawn["next_operation"] = json!([]);
+            assert_eq!(continuation_discard(&drawn,&plan),None);
+        }
+    }
 
     fn game() -> Value {
         let faces = ["1p","1p","2p","2p","3p","3p","4p","4p","5p","5p","6p","6p","7p","7p","9s"];

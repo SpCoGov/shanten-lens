@@ -5,6 +5,8 @@
 
 Shanten Lens 是一款面向《雀魂》青云之志模式的桌面辅助工具。应用会在本地解析游戏状态，提供护身符与商店信息、手牌与牌山分析、换牌指导、分数推演、自动化、熔断保护、插件扩展和调试功能。
 
+本次完整功能与修复列表见 [更新说明](./CHANGELOG.md)。
+
 <div align="center">
   <a href="https://github.com/SpCoGov/shanten-lens/stargazers"><img src="https://img.shields.io/github/stars/SpCoGov/shanten-lens?logo=github" alt="GitHub stars" /></a>
   <a href="https://github.com/SpCoGov/shanten-lens/releases"><img src="https://img.shields.io/github/v/release/SpCoGov/shanten-lens?label=release&logo=github&include_prereleases" alt="Latest release" /></a>
@@ -255,6 +257,20 @@ app/src-tauri/target/release/bundle/dmg/
 本地运行：`python -m pip install -r scripts/requirements-game-data.txt`，然后执行 `python scripts/update_game_data.py`。已有 Unity 解包目录可通过 `--from-raw <raw目录>` 离线验证；`--output-root <目录>` 用于包含现有协议和注册表的临时副本。
 
 仓库需要在 **Settings → Actions → General → Workflow permissions** 开启允许 Actions 创建 PR 的选项。工作流使用 `GITHUB_TOKEN`，自动创建的 PR 不会触发额外的 PR CI；因此这个任务先运行生成后的 Rust 后端测试，通过后才开 PR。
+
+## 刷魔藤自动化
+
+仅接管 Ex1 及之后的成型对局，切换配置不会自动启动。做牌复用万象换牌的筒子偏好，不另设搜索方案。
+
+- 正常只开金包、卖出旧普通魔藤再拿新普通魔藤，禁止合成魔藤 PLUS。成型的其他护身符保持原样，已有指引或朋友印章的多彩骑士 PLUS 不再替换。
+- 遇到膨胀魔藤，先卖多彩骑士，再卖旧魔藤，拿膨胀魔藤；出现下一张普通魔藤后，先卖膨胀魔藤再拿新魔藤。
+- 换掉膨胀魔藤后，每页商店先开蓝包恢复多彩骑士，非目标卡买入后卖出；两张普通骑士除膨胀、恶魔印章外均可用于合成 PLUS。恢复须同时满足 PLUS 和指引/朋友印章；合成后的 PLUS 若为其他印章，继续开蓝包寻找指引或朋友骑士换印章，达成后立即停止开蓝包、恢复只开金包。魔藤与骑士同时出现时优先魔藤。
+- 刷新预算使用当前刷新价格加两包金包的 30 星币，余额不足则进入下一关。默认两个人物指针都在右侧「∞ 尽情刷」，没有价格上限；分别拖动福姬（奖励商店，下方向上）和莱恩（非奖励商店，上方向下）可设置独立的截止区间。只开放 62、93、140、210、315、473、710、1065、1598 这些刻度之间的区间，指针只落在区间正中央。左端价格可刷，右端停止；任何上限下仍需满足当前价格＋30。奖励商店对应打完 Ex5、Ex10、Ex15……后的阶段9，即 Ex(5n+1) 门口，每页首包为金包。每关奖励包同样逐次按当前持有情况重新评分。
+- **本关第一次和牌分数不足以通过下一关时停止；达到或超过下一关门槛则继续。** 下一关 BOSS 尚未确定时，按关卡目录中可能 BOSS 的最高门槛判断；不以本关后续累计分数代替首胡分数。
+- 可指定 Ex1–Ex70 的停止关卡，替代首胡停止条件：打完指定 BOSS、阶段16奖励包出现时立即停止，不选择奖励。未指定时保留原首胡停止条件。
+- 半血暂停默认开启：血量严格小于当前有效上限的一半时停止（恰好半血继续），红龙战斗期间忽略半血暂停，战后恢复正常检查。可单独关闭，不自动换卡回血。
+- Ex1–Ex15 的节点：阶段11神秘商店立即暂停；阶段13篝火选择第二项（增加6血量上限）；阶段12交易默认跳过，奖励出现魔藤立即暂停；阶段14锻造和阶段15转盘跳过。
+- 候选或手持出现回响魔藤立即停止并交给玩家，不自动选取、跳过或继续开包。此模式禁止重开；自动停止和意外断线发邮件（需启用邮件通知），手动暂停、主动断开或主动切换控制不发邮件。
 
 ## 项目校验
 

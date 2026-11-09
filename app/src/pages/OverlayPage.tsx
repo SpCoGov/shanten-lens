@@ -7,11 +7,13 @@ import {
     readHudShowScoreProjection,
     readHudShowWanxiang,
     readHudShowCustomSwitch,
+    readHudShowCurrentLevel,
     writeHudEnabled,
     writeHudShowBlackhole,
     writeHudShowScoreProjection,
     writeHudShowWanxiang,
     writeHudShowCustomSwitch,
+    writeHudShowCurrentLevel,
 } from "../lib/hudSettings";
 
 type OverlayStatus = {
@@ -28,6 +30,7 @@ export default function OverlayPage() {
     const [showWanxiang, setShowWanxiang] = React.useState(() => readHudShowWanxiang());
     const [showCustomSwitch, setShowCustomSwitch] = React.useState(() => readHudShowCustomSwitch());
     const [showScoreProjection, setShowScoreProjection] = React.useState(() => readHudShowScoreProjection());
+    const [showCurrentLevel, setShowCurrentLevel] = React.useState(() => readHudShowCurrentLevel());
 
     const refresh = React.useCallback(() => {
         invoke<OverlayStatus>("get_overlay_status")
@@ -113,6 +116,13 @@ export default function OverlayPage() {
                 <p>{t("overlay.display_desc")}</p>
             </div>
             <div className="overlay-option-grid">
+                <label className="overlay-option-card">
+                    <span>{t("overlay.show_current_level")}</span>
+                    <input type="checkbox" className="config-switch" checked={showCurrentLevel} onChange={(event) => {
+                        setShowCurrentLevel(event.currentTarget.checked);
+                        writeHudShowCurrentLevel(event.currentTarget.checked);
+                    }}/>
+                </label>
                 <label className="overlay-option-card">
                     <span>{t("overlay.show_blackhole")}</span>
                     <input type="checkbox" className="config-switch" checked={showBlackhole} onChange={(event) => toggleShowBlackhole(event.currentTarget.checked)}/>

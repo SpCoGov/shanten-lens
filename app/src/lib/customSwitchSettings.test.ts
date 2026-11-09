@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {newTargetGroup} from "./customTarget";
-import {readCustomSwitchOptions, CUSTOM_SWITCH_TARGET_KEY, CUSTOM_SWITCH_WALL_LIMIT_KEY, CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY} from "./customSwitchSettings";
+import {readCustomSwitchOptions, readCustomSwitchPresetName, rememberCustomSwitchPreset, CUSTOM_SWITCH_TARGET_KEY, CUSTOM_SWITCH_WALL_LIMIT_KEY, CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY} from "./customSwitchSettings";
 import {readHudShowCustomSwitch, writeHudShowCustomSwitch} from "./hudSettings";
 
 const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
@@ -24,8 +24,15 @@ try {
     saved.set(CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY, "1");
     assert.deepEqual(readCustomSwitchOptions(), {search_algorithm: "custom_target", target_groups: groups,
         wall_limit: 0, exclude_invalid_shapes: true});
+    assert.equal(readCustomSwitchPresetName(), "", "No named source before loading a preset");
+    rememberCustomSwitchPreset("九莲宝灯-筒", readCustomSwitchOptions());
+    assert.equal(readCustomSwitchPresetName(), "九莲宝灯-筒");
+    saved.set(CUSTOM_SWITCH_WALL_LIMIT_KEY, "24");
+    assert.equal(readCustomSwitchPresetName(), "", "Edited options must not retain the loaded preset label");
+    saved.set(CUSTOM_SWITCH_WALL_LIMIT_KEY, "0");
     groups[0].rule.faces = ["5p"];
     saved.set(CUSTOM_SWITCH_TARGET_KEY, JSON.stringify(groups));
+    assert.equal(readCustomSwitchPresetName(), "", "Edited targets must not retain the loaded preset label");
     saved.set(CUSTOM_SWITCH_WALL_LIMIT_KEY, "24");
     assert.deepEqual(readCustomSwitchOptions().target_groups, groups);
     assert.equal(readCustomSwitchOptions().wall_limit, 24);

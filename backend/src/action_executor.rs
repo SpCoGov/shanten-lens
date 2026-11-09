@@ -24,6 +24,9 @@ impl ActionExecutor {
         if *last_sent == Some(stamp) { return failed("awaiting_state"); }
         let current = services.game_state();
         let action = match candidate(&current, &request) { Ok(action) => action, Err(reason) => return failed(reason) };
+        if services.vine_farming_active() && action.kind == "remake" {
+            return CommandResult { reason_key: Some("vine.remake_forbidden".into()), ..Default::default() };
+        }
         let (method, payload) = match command(&action, &current) { Ok(command) => command, Err(reason) => return failed(reason) };
         let result = proxy.request_action(method, &payload, Duration::from_secs(12), &request, &mut last_sent).await;
         let submitted = *last_sent == Some(stamp);

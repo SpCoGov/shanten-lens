@@ -402,7 +402,7 @@ pub(super) async fn send_game_operation(
     }
 }
 
-async fn execute_switch_batches(
+pub(super) async fn execute_switch_batches(
     state: &State,
     plan: &Value,
     finish_switch: bool,

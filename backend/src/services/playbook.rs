@@ -74,6 +74,13 @@ fn validate_inner(value: &Value, allow_invalid_levels: bool) -> Result<(), Strin
         let node = if profile["strategy"] == "opening" { &profile["cutoff_node"] } else { &profile["stages"][0]["start_node"] };
         let levels = if node == 0 { &QYZZ_LEVELS } else { &LEVELS };
         if !name(&profile["name"]) { return Err("invalid playbook profile name".into()); }
+        if profile.get("character_id").is_some_and(|id| !matches!(id.as_u64(), Some(201..=204))) {
+            return Err("invalid playbook opening character".into());
+        }
+        if profile["strategy"] == crate::vine_farming::STRATEGY {
+            if !crate::vine_farming::valid_options(profile) { return Err("invalid vine farming options".into()); }
+            continue;
+        }
         if profile["strategy"] == "opening" {
             if !positive_integer(&profile["end_count"]) { return Err("invalid opening target value".into()); }
             let valid_cutoff = levels.iter().any(|(level, node)| profile["cutoff_level"] == *level && profile["cutoff_node"] == *node);
@@ -147,6 +154,42 @@ fn validate_inner(value: &Value, allow_invalid_levels: bool) -> Result<(), Strin
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn vine_options_validate_on_import_and_save_without_changing_legacy_defaults() {
+        let mut book=json!({"version":1,"selected_profile_id":"vine","profiles":[{"id":"vine","name":"Vine","strategy":"vine_farming"}]});
+        assert!(validate(&book).is_ok());
+        for cap in [Value::Null,json!(62),json!(93),json!(140),json!(210),json!(315),json!(473),json!(710),json!(1065)] {
+            book["profiles"][0]["reward_refresh_limit"]=cap;
+            book["profiles"][0]["normal_refresh_limit"]=json!(210);
+            book["profiles"][0]["pause_half_hp"]=json!(true);
+            book["profiles"][0]["stop_ex"]=json!(70);
+            assert!(validate(&serde_json::from_str::<Value>(&book.to_string()).unwrap()).is_ok());
+        }
+        for (key,value) in [("reward_refresh_limit",json!(1)),("normal_refresh_limit",json!(1598)),("stop_ex",json!(71)),("pause_half_hp",Value::Null)] {
+            let mut bad=book.clone();bad["profiles"][0][key]=value;
+            assert!(validate(&bad).is_err());assert!(validate_for_editing(&bad).is_err());
+        }
+    }
+
+    #[test]
+    fn opening_character_accepts_all_initial_roles_and_keeps_legacy_profiles_valid() {
+        let mut book: Value = serde_json::from_str(include_str!("../../tests/fixtures/playbook.json")).unwrap();
+        for index in [0,1] {
+            for id in 201..=204 {
+                book["profiles"][index]["character_id"] = json!(id);
+                assert!(validate(&book).is_ok(),"profile {index}, character {id}");
+                assert_eq!(serde_json::from_str::<Value>(&book.to_string()).unwrap()["profiles"][index]["character_id"],id);
+            }
+        }
+        book["profiles"][1].as_object_mut().unwrap().remove("character_id");
+        assert!(validate(&book).is_ok(),"old opening profiles still default to character 201");
+        for id in [json!(0),json!(200),json!(205),json!(999),json!("201"),Value::Null] {
+            book["profiles"][1]["character_id"] = id.clone();
+            assert!(validate(&book).is_err(),"invalid character {id}");
+            assert!(validate_for_editing(&book).is_err(),"editing must also reject character {id}");
+        }
+    }
 
     #[test]
     fn playbook_rejects_invalid_openings_orders_deadlines_and_hands() {

@@ -22,7 +22,7 @@ import AutoPlayConfigPage from "./AutoPlayConfigPage";
 import DirectConnectionPage from "./DirectConnectionPage";
 import styles from "./AutoPlayConfigPage.module.css";
 import AutoPlayTargets from "./AutoPlayTargets";
-import {openingLevels, validateAutoPlayConfig} from "../lib/autoPlayConfig";
+import {openingLevels, validateAutoPlayConfig, vineVisiblePrices} from "../lib/autoPlayConfig";
 
 function formatDuration(ms: number): string {
     if (!ms || ms < 0) ms = 0;
@@ -42,7 +42,7 @@ export default function AutoRunnerPage({currentState}: {currentState: GameStateD
             <h2 className="title"><span className="ms" aria-hidden="true">smart_toy</span>{t("autoplay.title")}</h2>
             <nav className={styles.pageTabs} aria-label={t("autoplay.title")}>
                 {(["strategy", "monitor", "connection"] as const).map(value => <button className="nav-btn" key={value} aria-pressed={tab === value}
-                    onClick={() => setTab(value)}><span className="ms" aria-hidden="true">{{strategy: "tune", monitor: "monitoring", connection: "link"}[value]}</span>{t(value === "connection" ? "direct_connection.title" : `autoplay.tab_${value}`)}</button>)}
+                    onClick={() => setTab(value)}><span className="ms" aria-hidden="true">{{strategy:"tune",monitor:"monitoring",connection:"link"}[value]}</span>{t(value === "connection" ? "direct_connection.title" : `autoplay.tab_${value}`)}</button>)}
             </nav>
         </header>
         {tab === "strategy" ? <AutoPlayConfigPage/> : tab === "connection" ? <DirectConnectionPage/> : <AutoRunnerMonitorPage currentState={currentState}/>}
@@ -55,8 +55,8 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
     const {config, status} = useAutoRunner();
     const selectedProfile = config.playbook.profiles.find(profile => profile.id === config.playbook.selected_profile_id);
     const goalMet = status.current_step === "goal_met";
-    const finished = goalMet || status.current_step === "completed" || status.current_step === "failed";
-    const profile = status.running || finished ? status.active_profile : selectedProfile;
+    const finished = status.current_step?.startsWith("vine_") || goalMet || status.current_step === "completed" || status.current_step === "failed";
+    const profile = status.running ? status.active_profile : selectedProfile;
     const stepText = status.current_step?.startsWith("action:")
         ? t(`action_provider.actions.${status.current_step.slice(7)}`)
         : t(`autoplay.step_${status.current_step}`, {defaultValue: status.current_step ?? "—"});
@@ -76,7 +76,6 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
     const [controlError, setControlError] = React.useState("");
 
     const working = Boolean(status.running);
-
     const [, forceTick] = React.useState(0);
     React.useEffect(() => {
         if (!status.running) return;
@@ -169,6 +168,7 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
         if (reason === "cutoff_cannot_afford") return t("autorun.remake_reason_cutoff_cannot_afford");
         if (reason === "custom-search-limit") return t("autorun.remake_reason_search_limit");
         if (reason === "invalid-search-tiles") return t("autorun.remake_reason_invalid_tiles");
+        if (reason === "opening-tanyao-unreachable") return t("round.opening_tanyao_remake");
         if (reason === "remake_at_cutoff") return t("autorun.remake_reason_cutoff");
         if (reason === "decision") return t("autorun.remake_reason_decision");
         return reason || "-";
@@ -414,7 +414,7 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
                 {profile && <span>{t("autoplay.running_profile", {name: profile.name})}</span>}</div>
         </section>
 
-        <AutoRunnerInventory state={currentState} execution={actionExecution}/>
+        <AutoRunnerInventory state={currentState} execution={actionExecution} forbidRemake={status.running && profile?.strategy === "vine_farming"}/>
         <RoundDecisionPanel decision={status.active_profile?.id === profile?.id ? status.round_decision : undefined} running={working} profile={profile}/>
         <ActionProviderPanel state={currentState} execution={actionExecution}/>
 
@@ -424,14 +424,27 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
                 <div className={styles.progressValue}><strong>{achieved ?? "—"}</strong><span>/ {openingProfile.end_count}</span></div>
                 <progress max={openingProfile.end_count} value={achieved == null ? undefined : Math.max(0, achieved)} aria-label={t("autoplay.goal_progress")}/>
                 <span className="hint">{openingCutoff ? t("autoplay.cutoff_at", {level: openingCutoff.label}) : t("autoplay.error_cutoff")}</span>
+                <figure className={styles.runCharacter}>
+                    <img src={`/assets/character/character_${openingProfile.character_id ?? 201}.png`} alt={t("character_health.portrait_alt", {id: openingProfile.character_id ?? 201})}/>
+                </figure>
             </div>
             <div className={styles.currentTargets}><AutoPlayTargets targets={openingProfile.targets}/></div>
         </section> : <section className="panel">
             <h3 className="panel-title">{profile?.name ?? t("autoplay.profile")}</h3>
-            {profile && profile.strategy !== "opening" && <div className={styles.toolbar}>{profile.stages.map(stage => <span className="badge" key={stage.id}>
+            {profile && (profile.strategy === undefined || profile.strategy === "full") && <div className={styles.toolbar}>{profile.stages.map(stage => <span className="badge" key={stage.id}>
                 {stage.name} · {t("autoplay.cutoff_at", {level: formatLevelIdToLabel(stage.deadline_level, "packet", stage.deadline_node)})}
             </span>)}</div>}
-            <p className="hint">{t(profile ? "round.stage_hint" : "autoplay.select_profile")}</p>
+            {profile?.strategy === "vine_farming" && <div className={styles.toolbar}>
+                {(["reward", "normal"] as const).map(kind => {
+                    const limit = profile[`${kind}_refresh_limit`];
+                    return <span className="badge" key={kind}>{t(`vine.${kind}_refresh`)} · {limit == null ? t("vine.unlimited")
+                        : t("vine.price_interval", {left: limit, right: vineVisiblePrices[vineVisiblePrices.indexOf(limit) + 1]})}</span>;
+                })}
+                <span className="badge">{t("vine.stop_ex")} · {profile.stop_ex ? t("vine.ex_level", {n: profile.stop_ex}) : t("vine.stop_default")}</span>
+                <span className="badge">{t("vine.half_hp_option")} · {t(profile.pause_half_hp !== false ? "vine.on" : "vine.off")}</span>
+            </div>}
+            {profile?.strategy !== "vine_farming" && <p className="hint">{t(profile ? "round.stage_hint" : "autoplay.select_profile")}</p>}
+            {profile?.strategy === "vine_farming" && <p>{t("vine.first_win", {point: currentState?.first_win?.level === currentState?.level ? currentState?.first_win?.point ?? "—" : "—"})}</p>}
         </section>}
 
         <section className={`panel ${styles.historyPanel}`}>

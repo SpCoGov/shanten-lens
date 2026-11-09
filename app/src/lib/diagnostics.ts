@@ -5,7 +5,7 @@ import {useLogStore} from "./logStore";
 export const DIAGNOSTIC_SETTINGS_KEYS = [
     "sl-lang", "sl-theme", "sl-custom-theme", "sl-tile-skin",
     "sl-hud:enabled", "sl-hud:show-blackhole", "sl-hud:show-wanxiang",
-    "sl-hud:show-custom-switch", "sl-hud:show-score-projection",
+    "sl-hud:show-custom-switch", "sl-hud:show-score-projection", "sl-hud:show-current-level",
     "sl-custom-switch:target-v1", "sl-custom-switch:wall-limit", "sl-custom-switch:exclude-invalid-shapes",
     "sl-custom-switch:presets-v1", "sl-wanxiang-switch:prefer-bonus", "sl-wanxiang-switch:preferred-suit",
     "sl-wanxiang-switch:preferred-meld-type", "sl-wanxiang-switch:coin-objective",

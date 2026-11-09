@@ -39,12 +39,19 @@ export type OpeningPlayProfile = {
     id: string;
     name: string;
     strategy: "opening";
+    character_id?: number; // Older opening profiles default to character 201.
     end_count: number;
     targets: TargetItem[];
     cutoff_level: number;
     cutoff_node: number;
 };
-export type PlayProfile = FullPlayProfile | OpeningPlayProfile;
+export const vineRefreshPrices = [0,1,2,3,5,8,12,18,27,41,62,93,140,210,315,473,710,1065,1598,2397,3596,5394,8091] as const;
+export const vineVisiblePrices: readonly number[] = vineRefreshPrices.slice(10,19);
+export const vineRefreshLimits = vineVisiblePrices.slice(0,-1);
+export type VineFarmingProfile = {id: string; name: string; strategy: "vine_farming";
+    reward_refresh_limit?: number | null; normal_refresh_limit?: number | null;
+    stop_ex?: number | null; pause_half_hp?: boolean};
+export type PlayProfile = FullPlayProfile | OpeningPlayProfile | VineFarmingProfile;
 export type AutoPlayConfig = {version: 1; selected_profile_id: string; profiles: PlayProfile[]};
 export const emptyAutoPlayConfig: AutoPlayConfig = {version: 1, selected_profile_id: "", profiles: []};
 export const openingLevels = getGameLevels().flatMap(level => level.nodes.filter(node => node.type !== 1)
@@ -109,7 +116,13 @@ export function validateAutoPlayConfig(value: unknown, amulets?: Map<number, Amu
         const source = node === 0 ? "qyzz" : "packet";
         const openingLevels = getOpeningLevels(source), strategyLevels = getStrategyLevels(source);
         const levelIndex = (level: unknown, node: unknown) => strategyLevels.findIndex(item => item.level === level && item.node === node);
-        if (!text(profile.name)) return "profile";
+        if (!text(profile.name) || (profile.character_id !== undefined && ![201, 202, 203, 204].includes(profile.character_id))) return "profile";
+        if (profile.strategy === "vine_farming") {
+            if ([profile.reward_refresh_limit,profile.normal_refresh_limit].some(n => n != null && !vineRefreshLimits.includes(n))
+                || (profile.stop_ex != null && (!Number.isInteger(profile.stop_ex) || profile.stop_ex < 1 || profile.stop_ex > 70))
+                || (profile.pause_half_hp !== undefined && typeof profile.pause_half_hp !== "boolean")) return "vine";
+            continue;
+        }
         if (profile.strategy === "opening") {
             if (!positiveInteger(profile.end_count)) return "goal_value";
             if (!openingLevels.some(item => item.level === profile.cutoff_level && item.node === profile.cutoff_node)) return "cutoff";

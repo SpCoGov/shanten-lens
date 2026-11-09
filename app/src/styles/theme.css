@@ -1,4 +1,6 @@
 :root {
+    --vine-reward-color: color-mix(in srgb, #f8e060 58%, #593500);
+    --vine-normal-color: color-mix(in srgb, #78d0e8 58%, #003654);
     --color-bg: #fafafa;
     --color-text: #0f172a;
     --color-muted: #6b7280;
@@ -11,6 +13,8 @@
     --color-ring: #3b82f6;
     --accent-blue: #2563eb;
     --accent-green: #059669;
+    --home-record-up-color: #16a34a;
+    --home-record-down-color: #dc2626;
     --autoplay-selected-bg: color-mix(in srgb, var(--color-ring) 10%, var(--panel-bg));
     --autoplay-error: var(--badge-down-fg);
     --autoplay-action-bg: color-mix(in srgb, var(--color-ring) 70%, #000);
@@ -145,6 +149,8 @@
 }
 
 :root:is([data-theme="dark"], [data-theme="dark-green"], [data-theme="dark-purple"]) {
+    --vine-reward-color: #f8e060;
+    --vine-normal-color: #78d0e8;
     --custom-target-red: #f87171;
     --custom-target-soul: #facc15;
     --custom-target-soul-text: var(--custom-target-soul);
