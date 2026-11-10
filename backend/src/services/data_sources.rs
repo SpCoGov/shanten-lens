@@ -13,6 +13,23 @@ pub(super) struct DataSources {
 }
 
 impl Services {
+    pub(crate) fn mark_opening_search_failure(&self, game: &Value, profile: &Value, reason: &str) -> bool {
+        let mut sources = self.data_sources.lock().unwrap();
+        let current = self.game_state.lock().unwrap();
+        if ["source", "session_id", "revision"].iter().any(|key| current[*key] != game[*key]) { return false; }
+        drop(current);
+        let active = sources.status.active;
+        let snapshot = match active {
+            Some(DataSource::Packet) => sources.packet.as_mut(),
+            Some(DataSource::Qyzz) => sources.qyzz.as_mut(),
+            None => None,
+        };
+        let Some(snapshot) = snapshot else { return false; };
+        snapshot["opening_search_failure"] = json!({"profile_id":profile["id"],"reason":reason});
+        self.publish_selected_source(&mut sources, active);
+        true
+    }
+
     pub(super) fn refresh_decisions(&self) {
         let mut sources = self.data_sources.lock().unwrap();
         let active = sources.status.active;
@@ -135,9 +152,12 @@ impl Services {
             next["session_id"] = json!(current["session_id"].as_u64().unwrap_or(0) + u64::from(new_session));
             next["revision"] = json!(current["revision"].as_u64().unwrap_or(0) + 1);
             let actions = crate::action_provider::evaluate(&next);
+            let book = self.vine_farming_profile().map(|profile|json!({"selected_profile_id":profile["id"],"profiles":[profile]}))
+                .unwrap_or_else(|| self.table("autorun")["playbook"].clone());
             next["decision_report"] = json!(crate::decision::evaluate(&next, &actions,
-                &self.registry_for_source(active), &self.table("autorun")["playbook"]));
+                &self.registry_for_source(active), &book));
             next["action_report"] = json!(actions);
+            next["trade_reward"] = next.pointer("/provider_state/nodeEvent/tradeReward").cloned().unwrap_or(Value::Null);
             next.as_object_mut().unwrap().remove("provider_state");
             *current = next.clone();
             drop(current);
@@ -154,6 +174,30 @@ impl Services {
 mod tests {
     use super::*;
     use crate::pipeline::{Direction, Packet};
+
+    #[test]
+    fn active_vine_refresh_options_remain_frozen_until_stopped() {
+        let root=std::env::temp_dir().join(format!("lens-vine-options-{}",std::process::id()));
+        let (events,_)=tokio::sync::broadcast::channel(64);
+        let services=Services::load(root.join("configs"),events).unwrap();
+        services.set_vine_farming_active(Some(json!({"id":"frozen","strategy":"vine_farming","normal_refresh_limit":93})));
+        services.patch_config(&json!({"autorun":{"playbook":{"version":1,"selected_profile_id":"new","profiles":[
+            {"id":"new","name":"New","strategy":"vine_farming","normal_refresh_limit":null}]}}})).unwrap();
+        let mut packet=Packet {direction:Direction::Inbound,packet_type:"Res".into(),id:Some(1),
+            method:".lq.Lobby.fetchAmuletActivityData".into(),data:json!({"game":{
+                "state":{"current":9,"interrupt":0},"map":{"level":14001,"node":3},"game":{"coin":"1000"},
+                "effect":{"effectList":[],"shopBuffList":[],"maxEffectVolume":8},
+                "shop":{"goods":[],"upgradeGoods":[],"refreshPrice":140}}})};
+        services.update_game_state(&packet);
+        assert_eq!(crate::decision::first_action(&services.game_state()).unwrap().kind,"next_node");
+        assert_eq!(services.game_state()["decision_report"]["profile_id"],"frozen");
+        services.set_autorun_active(false);
+        packet.data["game"]["game"]["coin"]=json!(999);
+        services.update_game_state(&packet);
+        assert_eq!(crate::decision::first_action(&services.game_state()).unwrap().kind,"refresh_shop");
+        assert_eq!(services.game_state()["decision_report"]["profile_id"],"new");
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn conflict_requires_choice_and_keeps_both_sources_separate() {

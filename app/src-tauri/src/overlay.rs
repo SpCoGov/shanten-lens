@@ -550,6 +550,11 @@ mod imp {
             {
                 return false;
             }
+            // Click-through layered overlays (such as NVIDIA's) have transparent fullscreen bounds.
+            let transparent_overlay = (WS_EX_LAYERED.0 | WS_EX_TRANSPARENT.0) as i32;
+            if GetWindowLongW(hwnd, GWL_EXSTYLE) & transparent_overlay == transparent_overlay {
+                return false;
+            }
         }
 
         match window_rect(hwnd) {
@@ -663,6 +668,15 @@ mod imp {
                     let current = status.lock().unwrap();
                     assert!(current.found);
                     assert_eq!(current.pid, Some(target.pid));
+                }
+                unsafe {
+                    let style = GetWindowLongW(cover.0, GWL_EXSTYLE);
+                    SetWindowLongW(cover.0, GWL_EXSTYLE, style | WS_EX_LAYERED.0 as i32 | WS_EX_TRANSPARENT.0 as i32);
+                    SetLayeredWindowAttributes(cover.0, COLORREF(0), 255, LWA_ALPHA).unwrap();
+                    assert!(!is_occluding_window(cover.0), "a transparent fullscreen overlay must not hide the HUD");
+                    assert!(track_overlay_target(hud.0, target, &status, interactive, &[panel]));
+                    assert!(IsWindowVisible(hud.0).as_bool());
+                    SetWindowLongW(cover.0, GWL_EXSTYLE, style);
                 }
                 hide(cover.0);
                 assert!(track_overlay_target(hud.0, target, &status, interactive, &[panel]));

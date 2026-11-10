@@ -1,6 +1,6 @@
 import React from "react";
 import {useTranslation} from "react-i18next";
-import {useAutoRunner, patchAutoConfig, markPlaybookSaved} from "../lib/autoRunnerStore";
+import {useAutoRunner, patchAutoConfig, markPlaybookSaved, getAutoRunnerSnapshot} from "../lib/autoRunnerStore";
 import {emptyAutoPlayConfig, newStrategyHand, handFromTargetPreset, newStrategyLoadout, newTacticalStage, moveItem, removeStrategyAmulet,
     getOpeningLevels, getStrategyLevels, validateAutoPlayConfig, type AutoPlayConfig, type PlayProfile, type FullPlayProfile, type OpeningPlayProfile, type TacticalStage,
     type StrategyLoadout, type StrategyAmulet, type StrategyHand} from "../lib/autoPlayConfig";
@@ -14,10 +14,13 @@ import {pushToast} from "../lib/toast";
 import AmuletPickerModal from "../components/AmuletPickerModal";
 import AmuletEditorModal, {type EditedAmulet} from "../components/AmuletEditorModal";
 import AutoPlayTargets from "./AutoPlayTargets";
+import VineFarmingOptions from "../components/VineFarmingOptions";
 import AmuletCard from "../components/AmuletCard";
 import CustomTargetEditor from "../components/CustomTargetEditor";
 import Modal from "../components/Modal";
 import styles from "./AutoPlayConfigPage.module.css";
+
+const strategyIcons = {opening: "restart_alt", full: "route", vine_farming: "eco"} as const;
 
 function SortList({ids, onChange, children, label}: {
     ids: string[]; onChange: (ids: string[]) => void; children: (id: string, index: number) => React.ReactNode; label: string;
@@ -70,36 +73,53 @@ function cardItem(item: Pick<StrategyAmulet, "id" | "plus"> & Partial<Pick<Strat
         ...(item.badge ? {badge: {id: item.badge, uid: 0, random: 0, store: []}} : {})};
 }
 
+function CharacterPicker({value, onChange}: {value: number; onChange: (id: number) => void}) {
+    const {t} = useTranslation();
+    return <div className={styles.characterPicker}><div className={styles.label}>{t("autoplay.character")}</div><div className={styles.characters} role="group" aria-label={t("autoplay.character")}>
+        {[201, 202, 203, 204].map(id => <button type="button" className={styles.character} key={id} aria-pressed={value === id}
+            onClick={() => onChange(id)} aria-label={t("character_health.portrait_alt", {id})}>
+            <img src={`/assets/character/character_${id}.png`} alt=""/>
+            <span className={styles.characterName}>{t("character_health.portrait_alt", {id})}</span><span className={styles.characterNumber}>{id}</span>
+        </button>)}
+    </div></div>;
+}
+
 function OpeningTargets({profile, onChange, levels: openingLevels}: {
     profile: OpeningPlayProfile; onChange: (profile: OpeningPlayProfile) => void; levels: ReturnType<typeof getOpeningLevels>;
 }) {
     const {t} = useTranslation();
     const cutoff = openingLevels.find(level => level.level === profile.cutoff_level && level.node === profile.cutoff_node);
     return <section className="panel"><h3 className="panel-title">{t("autoplay.opening_targets")}</h3>
-        <div className={styles.openingFields}>
-            <label className={`${styles.field} ${styles.valueField}`}>{t("autoplay.goal_value")}<input className="form-input" type="number" min={1} step={1} max={Number.MAX_SAFE_INTEGER}
-                value={profile.end_count} onChange={event => onChange({...profile, end_count: Number(event.target.value)})}/></label>
-            <label className={styles.field}>{t("autoplay.cutoff_level")}<select className="form-input" required value={cutoff ? getLevelKey(cutoff) : ""}
-                onChange={event => {
-                    const level = openingLevels.find(level => getLevelKey(level) === event.target.value);
-                    if (level) onChange({...profile, cutoff_level: level.level, cutoff_node: level.node});
-                }}>
-                <option value="" disabled>{t("autoplay.select_level")}</option>
-                {openingLevels.map(level => <option key={getLevelKey(level)} value={getLevelKey(level)}>{level.label}</option>)}
-            </select></label>
-        </div>
-        <AutoPlayTargets targets={profile.targets} onChange={targets => onChange({...profile, targets})}/>
+        <AutoPlayTargets targets={profile.targets} onChange={targets => onChange({...profile, targets})}
+            renderControls={actions => <div className={styles.openingSetup}>
+                <CharacterPicker value={profile.character_id ?? 201} onChange={id => onChange({...profile, character_id: id})}/>
+                <div className={styles.openingSettings}>
+                    <div className={styles.openingFields}>
+                        <label className={`${styles.field} ${styles.valueField}`}>{t("autoplay.goal_value")}<input className="form-input" type="number" min={1} step={1} max={Number.MAX_SAFE_INTEGER}
+                            value={profile.end_count} onChange={event => onChange({...profile, end_count: Number(event.target.value)})}/></label>
+                        <label className={styles.field}>{t("autoplay.cutoff_level")}<select className="form-input" required value={cutoff ? getLevelKey(cutoff) : ""}
+                            onChange={event => {
+                                const level = openingLevels.find(level => getLevelKey(level) === event.target.value);
+                                if (level) onChange({...profile, cutoff_level: level.level, cutoff_node: level.node});
+                            }}>
+                            <option value="" disabled>{t("autoplay.select_level")}</option>
+                            {openingLevels.map(level => <option key={getLevelKey(level)} value={getLevelKey(level)}>{level.label}</option>)}
+                        </select></label>
+                    </div>
+                    {actions}
+                </div>
+            </div>}/>
     </section>;
 }
 
 export default function AutoPlayConfigPage() {
     const {t} = useTranslation();
-    const {config} = useAutoRunner();
+    const {config, status, playbookDirty} = useAutoRunner();
     const {amuletById, badgeById, source} = useRegistry();
     const openingLevels = getOpeningLevels(source), strategyLevels = getStrategyLevels(source);
     const book = config.playbook ?? emptyAutoPlayConfig;
     const profile = book.profiles.find(item => item.id === book.selected_profile_id);
-    const fullProfile = profile?.strategy !== "opening" ? profile : undefined;
+    const fullProfile = profile && (profile.strategy === undefined || profile.strategy === "full") ? profile : undefined;
     const [creating, setCreating] = React.useState(false);
     const [stageId, setStageId] = React.useState("");
     const [stageSection, setStageSection] = React.useState<"conditions" | "loadouts" | "hands">("conditions");
@@ -115,9 +135,30 @@ export default function AutoPlayConfigPage() {
     const [transferText, setTransferText] = React.useState("");
     const [transferError, setTransferError] = React.useState("");
     const [saving, setSaving] = React.useState(false);
+    const [selecting, setSelecting] = React.useState(false);
 
     function change(next: AutoPlayConfig) {
         patchAutoConfig({playbook: next});
+    }
+    async function selectProfile(id: string) {
+        if (selecting || id === book.selected_profile_id) return;
+        const next = {...book, selected_profile_id:id};
+        change(next); setStageId(""); setLoadoutId("");
+        if (status.running) {
+            pushToast(t("autoplay.selection_next_run"), "info");
+            return;
+        }
+        setSelecting(true);
+        try {
+            await backendIpc.updateConfig({autorun:{playbook:{selected_profile_id:id}}});
+            if (!playbookDirty) markPlaybookSaved(next);
+        } catch {
+            if (getAutoRunnerSnapshot().config.playbook === next) {
+                change(book);
+                if (!playbookDirty) markPlaybookSaved(book);
+            }
+            pushToast(t("autoplay.selection_failed"), "error", 5000);
+        } finally { setSelecting(false); }
     }
     function replaceProfile(next: PlayProfile) {
         change({...book, profiles: book.profiles.map(item => item.id === next.id ? next : item)});
@@ -131,10 +172,11 @@ export default function AutoPlayConfigPage() {
     function changeLoadout(next: StrategyLoadout) {
         if (stage && loadout) changeStage({loadouts: stage.loadouts.map(item => item.id === loadout.id ? next : item)});
     }
-    function addProfile(strategy: "opening" | "full") {
-        const common = {id: crypto.randomUUID(), name: t("autoplay.default_profile", {count: book.profiles.length + 1})};
-        const next: PlayProfile = strategy === "opening" ? {...common, strategy, end_count: 1, targets: [], cutoff_level: 0, cutoff_node: 0} : {...common, strategy,
-            character_id: 201, initial_amulet_id: 0, first_level_min_coin: "0",
+    function addProfile(strategy: "opening" | "full" | "vine_farming") {
+        const common = {id: crypto.randomUUID(), name: t("autoplay.default_profile", {count: book.profiles.length + 1}), character_id: 201};
+        const next: PlayProfile = strategy === "vine_farming" ? {id: common.id, name: common.name, strategy,
+            reward_refresh_limit:null,normal_refresh_limit:null,stop_ex:null,pause_half_hp:true} : strategy === "opening" ? {...common, strategy, end_count: 1, targets: [], cutoff_level: 0, cutoff_node: 0} : {...common, strategy,
+            initial_amulet_id: 0, first_level_min_coin: "0",
             stages: [newTacticalStage(t("autoplay.default_stage", {count: 1}), t("autoplay.default_loadout", {count: 1}), t("autoplay.default_hand", {count: 1}), strategyLevels[0])]};
         change({...book, selected_profile_id: next.id, profiles: [...book.profiles, next]});
         setCreating(false); setStageId(""); setLoadoutId("");
@@ -193,15 +235,15 @@ export default function AutoPlayConfigPage() {
     const validHand = editHand && !!editHand.name.trim() && targetSize(editHand.target_groups) === 14 && editHand.target_groups.filter(group => targetKind(group) === "quad").length <= 4;
 
     return <div className={styles.page}>
-        <fieldset className={styles.workspace} disabled={saving}>
+        <fieldset className={styles.workspace} disabled={saving || selecting}>
             <aside className={`panel ${styles.profileList}`}>
                 <div className={styles.profileHeading}><h3 className="panel-title" id="autoplay-profile-label">{t("autoplay.profile")}</h3><span className="badge">{book.profiles.length}</span></div>
                 <div className={styles.profileItems} role="group" aria-labelledby="autoplay-profile-label">
                     {book.profiles.map(item => <button className={styles.profileItem} key={item.id} aria-pressed={item.id === book.selected_profile_id}
-                        onClick={() => {change({...book, selected_profile_id: item.id}); setStageId(""); setLoadoutId("");}}>
-                        <span className="ms" aria-hidden="true">{item.strategy === "opening" ? "restart_alt" : "route"}</span>
+                        onClick={() => void selectProfile(item.id)}>
+                        <span className="ms" aria-hidden="true">{strategyIcons[item.strategy ?? "full"]}</span>
                         <span><strong>{item.name}</strong><small>{t(`autoplay.strategy_${item.strategy ?? "full"}`)} · {item.strategy === "opening"
-                            ? t("autoplay.target_count", {count: item.targets.length}) : t("autoplay.stage_count", {count: item.stages.length})}</small></span>
+                            ? t("autoplay.target_count", {count: item.targets.length}) : item.strategy === "vine_farming" ? t("vine.scope") : t("autoplay.stage_count", {count: item.stages.length})}</small></span>
                         <span className="ms" aria-hidden="true">chevron_right</span>
                     </button>)}
                     {!book.profiles.length && <p className="hint">{t("autoplay.no_profiles")}</p>}
@@ -214,7 +256,7 @@ export default function AutoPlayConfigPage() {
                     onChange={event => replaceProfile({...profile, name: event.target.value})}/></label>}
                 <div className={styles.profileActions}>
                     {profile && <>
-                    <span className={styles.strategyTag}><span className="ms" aria-hidden="true">{profile.strategy === "opening" ? "restart_alt" : "route"}</span>{t(`autoplay.strategy_${profile.strategy ?? "full"}`)}</span>
+                    <span className={styles.strategyTag}><span className="ms" aria-hidden="true">{strategyIcons[profile.strategy ?? "full"]}</span>{t(`autoplay.strategy_${profile.strategy ?? "full"}`)}</span>
                     <button className="nav-btn is-danger" title={t("autoplay.delete_profile")} aria-label={t("autoplay.delete_profile")} onClick={() => {
                         const profiles = book.profiles.filter(item => item.id !== profile.id);
                         change({...book, profiles, selected_profile_id: profiles[0]?.id ?? ""});
@@ -234,15 +276,11 @@ export default function AutoPlayConfigPage() {
             </section>
             {!profile && <div className={`panel ${styles.empty}`}><span className="ms" aria-hidden="true">route</span><p>{t("autoplay.empty")}</p></div>}
             {profile?.strategy === "opening" && <OpeningTargets levels={openingLevels} key={profile.id} profile={profile} onChange={replaceProfile}/>}
-            {profile && profile.strategy !== "opening" && <>
+            {profile?.strategy === "vine_farming" && <VineFarmingOptions key={profile.id} profile={profile} onChange={replaceProfile}/>}
+            {profile && (profile.strategy === undefined || profile.strategy === "full") && <>
                 <section className="panel"><h3 className="panel-title">{t("autoplay.opening")}</h3>
                     <div className={styles.opening}>
-                        <div><div className={styles.label}>{t("autoplay.character")}</div><div className={styles.characters}>
-                            {[201, 202, 203, 204].map(id => <button className={styles.character} key={id} aria-pressed={profile.character_id === id}
-                                onClick={() => changeProfile({character_id: id})} aria-label={t("character_health.portrait_alt", {id})}>
-                                <img src={`/assets/character/character_${id}.png`} alt=""/><span>{t("character_health.portrait_alt", {id})}</span>
-                            </button>)}
-                        </div></div>
+                        <CharacterPicker value={profile.character_id} onChange={id => changeProfile({character_id: id})}/>
                         <div className={styles.openingDetails}><div className={styles.field}><span>{t("autoplay.initial_amulet")}</span>
                             <div className={styles.initialAmulet}>
                                 {!!profile.initial_amulet_id && <AmuletCard item={cardItem({id: profile.initial_amulet_id, plus: false})} scale={0.48} onClick={() => setInitialOpen(true)}/>}
@@ -360,9 +398,9 @@ export default function AutoPlayConfigPage() {
             </div>
         </fieldset>
         <Modal open={creating} onClose={() => setCreating(false)} title={t("autoplay.choose_strategy")} width={640} className={styles.dialog}>
-            <div className={styles.strategyChoices}>{(["opening", "full"] as const).map(strategy => <button className={styles.strategyChoice} key={strategy} onClick={() => addProfile(strategy)}>
-                <span className="ms" aria-hidden="true">{strategy === "opening" ? "restart_alt" : "route"}</span>
-                <strong>{t(`autoplay.strategy_${strategy}`)}</strong><span>{t(`autoplay.strategy_${strategy}_hint`)}</span>
+            <div className={styles.strategyChoices}>{(["opening", "full", "vine_farming"] as const).map(strategy => <button className={styles.strategyChoice} key={strategy} onClick={() => addProfile(strategy)}>
+                <span className="ms" aria-hidden="true">{strategyIcons[strategy]}</span>
+                <strong>{t(`autoplay.strategy_${strategy}`)}</strong>
             </button>)}</div>
         </Modal>
         <AmuletPickerModal open={initialOpen} onClose={() => setInitialOpen(false)} allowedRarities={["BLUE", "GREEN"]}

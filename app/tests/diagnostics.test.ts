@@ -4,6 +4,7 @@ import {useLogStore} from "../src/lib/logStore";
 
 const preferences: Record<string, string> = {
     "sl-theme": "dark", "sl-lang": "ja-JP", "sl-custom-switch:wall-limit": "24",
+    "sl-hud:show-current-level": "0",
     "account-token": "must-not-export", "cached-account": "must-not-export",
 };
 Object.defineProperty(globalThis, "localStorage", {configurable: true, value: {
@@ -18,6 +19,7 @@ const result = collectFrontendDiagnostics();
 assert.equal(result.settings["sl-theme"], "dark");
 assert.equal(result.settings["sl-custom-switch:wall-limit"], "24");
 assert.equal(result.settings["sl-lang"], "ja-JP");
+assert.equal(result.settings["sl-hud:show-current-level"], "0");
 assert.equal(result.display.scale, 2);
 assert.equal(result.logs.length, 1);
 assert.equal(result.logs[0].message, "frontend failure");

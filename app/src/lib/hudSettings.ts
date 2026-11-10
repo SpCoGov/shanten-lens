@@ -3,6 +3,22 @@ export const HUD_SHOW_BLACKHOLE_KEY = "sl-hud:show-blackhole";
 export const HUD_SHOW_WANXIANG_KEY = "sl-hud:show-wanxiang";
 export const HUD_SHOW_CUSTOM_SWITCH_KEY = "sl-hud:show-custom-switch";
 export const HUD_SHOW_SCORE_PROJECTION_KEY = "sl-hud:show-score-projection";
+export const HUD_SHOW_CURRENT_LEVEL_KEY = "sl-hud:show-current-level";
+
+export function readHudShowCurrentLevel() {
+    try {
+        return localStorage.getItem(HUD_SHOW_CURRENT_LEVEL_KEY) !== "0";
+    } catch {
+        return true;
+    }
+}
+
+export function writeHudShowCurrentLevel(value: boolean) {
+    try {
+        localStorage.setItem(HUD_SHOW_CURRENT_LEVEL_KEY, value ? "1" : "0");
+    } catch {
+    }
+}
 
 export function readHudEnabled() {
     try {

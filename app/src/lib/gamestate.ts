@@ -12,6 +12,7 @@ export interface GameStateData {
     coin: string;
     point?: string;
     target_point?: string;
+    first_win?: {level: number; node: number; point: string} | null;
     level?: number;
     node?: number;
     map_nodes?: MapNodeItem[];

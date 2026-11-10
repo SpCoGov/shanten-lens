@@ -18,7 +18,9 @@
 .metrics { display: flex; flex-wrap: wrap; gap: 10px 16px; }
 .metrics > span { display: flex; flex-direction: column; gap: 3px; }
 .metrics small { font-size: 11px; color: var(--color-muted); }
-.metrics strong { font-size: 19px; font-variant-numeric: tabular-nums; color: var(--accent-green); }
+.metrics strong { font-size: 19px; font-variant-numeric: tabular-nums; color: var(--color-text); }
+.metrics [data-trend="up"] { color: var(--home-record-up-color); }
+.metrics [data-trend="down"] { color: var(--home-record-down-color); }
 .note { color: var(--color-muted); font-size: 13px; line-height: 1.6; }
 .phase { color: var(--color-muted); font-size: 13px; white-space: nowrap; }
 .tableWrap { overflow-x: auto; }

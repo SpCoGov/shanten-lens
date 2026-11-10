@@ -1682,6 +1682,63 @@ fn pack_value_requires_a_known_pack_and_inventory_and_adds_to_payment_rules() {
 }
 
 #[test]
+fn opening_map_and_failed_search_add_remake_scores_only_to_the_selected_opening_profile() {
+    let mut book = json!({"selected_profile_id":"opening","profiles":[
+        {"id":"opening","strategy":"opening","end_count":1,"cutoff_level":13010,"cutoff_node":1,"targets":[]},
+        {"id":"full","strategy":"full"}, {"id":"vine","strategy":"vine_farming"}
+    ]});
+    let actions = candidate("remake", Value::Null, Availability::Available);
+    let base = json!({"source":"packet","stage":3,"level":13001,"node":2,"effect_list":[{"id":2240}],
+        "map_nodes":[{"subType":0},{"subType":3003},{"subType":1}]});
+    for (second, third, expected) in [(3003,1,false),(3002,1,false),(3003,2,false),(3002,2,true)] {
+        let mut state = base.clone();
+        state["map_nodes"][1]["subType"] = json!(second);
+        state["map_nodes"][2]["subType"] = json!(third);
+        let report = decision::evaluate(&state, &actions, &json!({}), &book);
+        let score = &report.actions[0];
+        assert_eq!(score.total, Some(if expected {90000.0} else {-9999.0}));
+        assert_eq!(score.rules.iter().any(|rule| rule.rule_id == "opening_map_remake" && rule.score == Some(99999.0)), expected);
+    }
+    for (second, third) in [(json!(3002),Value::Null),(Value::Null,json!(2))] {
+        let mut state = base.clone();
+        state["map_nodes"][1]["subType"] = second;
+        state["map_nodes"][2]["subType"] = third;
+        let report = decision::evaluate(&state, &actions, &json!({}), &book);
+        assert!(report.actions[0].rules.iter().all(|rule| rule.rule_id != "opening_map_remake"), "missing metadata must not trigger remake");
+    }
+    for (field, value) in [("stage",json!(2)),("effect_list",json!([])),("level",json!(13002)),("map_nodes",json!([]))] {
+        let mut state = base.clone();
+        state["map_nodes"][1]["subType"] = json!(0);
+        state[field] = value;
+        let report = decision::evaluate(&state, &actions, &json!({}), &book);
+        assert!(report.actions[0].rules.iter().all(|rule| rule.rule_id != "opening_map_remake"), "{state}");
+    }
+    let mut state = base.clone();
+    state["opening_search_failure"] = json!({"profile_id":"opening","reason":"opening-tanyao-unreachable"});
+    let report = decision::evaluate(&state, &actions, &json!({}), &book);
+    assert_eq!(report.actions[0].total, Some(90000.0));
+    assert!(report.actions[0].rules.iter().any(|rule| rule.rule_id == "opening_search_remake" && rule.score == Some(99999.0)));
+    for (level, node) in [(13001,3),(13001,4),(13002,2)] {
+        let mut later = state.clone();
+        later["level"] = json!(level);
+        later["node"] = json!(node);
+        let report = decision::evaluate(&later, &actions, &json!({}), &book);
+        assert!(report.actions[0].rules.iter().all(|rule| rule.rule_id != "opening_search_remake"));
+    }
+    state["map_nodes"][1]["subType"] = json!(0);
+    for id in ["full", "vine"] {
+        book["selected_profile_id"] = json!(id);
+        let report = decision::evaluate(&state, &actions, &json!({}), &book);
+        assert!(report.actions[0].rules.iter().all(|rule| !matches!(rule.rule_id.as_str(), "opening_map_remake" | "opening_search_remake")));
+    }
+    for language in [include_str!("../../app/src/locales/zh-CN.json"), include_str!("../../app/src/locales/ja-JP.json")] {
+        let locale: Value = serde_json::from_str(language).unwrap();
+        for rule in ["opening_map_remake","opening_search_remake"] { assert!(locale["action_provider"]["scoring"]["rules"][rule].is_string()); }
+        for reason in ["opening_map_mismatch","opening_search_unreachable"] { assert!(locale["action_provider"]["scoring"]["reasons"][reason].is_string()); }
+    }
+}
+
+#[test]
 fn remake_at_cutoff_uses_selected_opening_goals_and_map_order() {
     let book = json!({"selected_profile_id":"opening","profiles":[
         {"id":"ignored","strategy":"opening","end_count":1,"cutoff_level":13001,"cutoff_node":2,"targets":[]},
@@ -1945,8 +2002,12 @@ fn target_scores_refresh_when_the_saved_profile_changes_or_reloads() {
     assert!(services.game_state()["revision"].as_u64().unwrap() > initial["revision"].as_u64().unwrap());
     check(-201.0, 20.0);
     book["selected_profile_id"] = json!("b");
-    services.patch_config(&json!({"autorun":{"playbook":book}})).unwrap();
+    services.patch_config(&json!({"autorun":{"playbook":{"selected_profile_id":"b"}}})).unwrap();
+    assert_eq!(services.table("autorun")["playbook"],book,"Selecting a profile preserves every saved profile field");
+    assert_eq!(services.game_state()["decision_report"]["profile_id"],"b");
     check(-3.0, 20.0);
+    assert!(services.patch_config(&json!({"autorun":{"playbook":{"selected_profile_id":"missing"}}})).is_err());
+    assert_eq!(services.table("autorun")["playbook"],book,"Invalid selection must not replace the saved playbook");
     book["selected_profile_id"] = json!("a");
     book["profiles"][0]["targets"][0]["value"] = json!(1);
     std::fs::write(root.join("configs/autorun.json"), serde_json::to_vec(&json!({"playbook":book})).unwrap()).unwrap();
@@ -2984,5 +3045,253 @@ fn opening_badge_target_limits_keep_unknown_inventory_scores_unknown() {
         let state = json!({"provider_state":{"effect":{"effectList":owned}}});
         let report = decision::evaluate(&state, &actions, &json!({}), &book);
         assert_eq!(report.actions[0].rules.iter().find(|rule| rule.rule_id == "configured_target").unwrap().score, None);
+    }
+}
+
+fn mystery_shop_fixture(page: u64, goods: Value) -> (Value, Value, Value) {
+    let (mut state, mut book, registry) = s4_opening_fixture();
+    state["stage"] = json!(11);
+    state["provider_state"]["state"] = json!({"current":11,"interrupt":0});
+    state["provider_state"]["map"] = json!({"level":13001,"node":3});
+    state["provider_state"]["game"]["coin"] = json!(100);
+    state["provider_state"]["nodeEvent"] = json!({"advancedShopGoods":goods,"advancedShopUpgrade":[],
+        "advancedShopRefreshCount":page,"advancedShopRefreshPrice":1});
+    book["profiles"][0]["cutoff_level"] = json!(13001);
+    book["profiles"][0]["cutoff_node"] = json!(5);
+    book["profiles"][0]["targets"] = json!([{"kind":"amulet","id":169,"plus":true,"badge":600070,"value":2}]);
+    (state, book, registry)
+}
+
+fn mystery_good(id: u64, badge: u64) -> Value {
+    json!({"id":1,"type":1,"effect":{"id":id,"badgeId":badge,"volume":1},"price":24,"sold":false})
+}
+
+fn best_shop_action(state: &Value, book: &Value, registry: &Value) -> ActionCandidate {
+    let actions = shanten_backend::action_provider::evaluate(state);
+    let report = decision::evaluate(state, &actions, registry, book);
+    let mut best = None;
+    for action in actions.actions.iter().chain(&actions.global_actions)
+        .filter(|action| action.availability == Availability::Available) {
+        let total = report.actions.iter().find(|score| score.action_id == action.id).unwrap().total.unwrap_or(0.0);
+        if best.is_none_or(|(_, score)| total > score) { best = Some((action, total)); }
+    }
+    best.unwrap().0.clone()
+}
+
+#[test]
+fn mystery_shop_targets_buy_bases_with_any_seal_and_only_upgrade_with_the_required_seal() {
+    for page in [0,1] {
+        for (id,badge,owned,bonus) in [
+            (1690,0,json!([]),true),(1690,600050,json!([]),true),
+            (1691,0,json!([]),false),(1691,600050,json!([]),false),(1691,600070,json!([]),true),
+            (1690,0,json!([{"id":1690,"uid":7,"volume":1,"badgeId":600070}]),false),
+            (1690,600050,json!([{"id":1690,"uid":7,"volume":1,"badgeId":600070}]),false),
+            (1690,600070,json!([{"id":1690,"uid":7,"volume":1,"badgeId":0}]),true),
+            (1691,600070,json!([{"id":1691,"uid":7,"volume":1,"badgeId":600070}]),false),
+        ] {
+            let (mut state, book, registry) = mystery_shop_fixture(page,json!([mystery_good(id,badge)]));
+            state["provider_state"]["effect"]["effectList"] = owned;
+            let actions = shanten_backend::action_provider::evaluate(&state);
+            let report = decision::evaluate(&state,&actions,&registry,&book);
+            let buy = actions.actions.iter().find(|action| action.kind == "buy_effect").unwrap();
+            let score = report.actions.iter().find(|score| score.action_id == buy.id).unwrap();
+            assert_eq!(score.rules.iter().find(|rule| rule.rule_id == "configured_target").and_then(|rule| rule.score),
+                bonus.then_some(198.0),"page {page}, {id}, {badge}, {state}");
+            assert_eq!(best_shop_action(&state,&book,&registry).kind == "buy_effect",bonus,
+                "page {page}, {id}, {badge}, {report:?}");
+        }
+    }
+}
+
+#[test]
+fn mystery_shop_target_bonus_and_exit_penalties_are_equal_and_other_card_scores_are_unchanged() {
+    let mut other = mystery_good(3050,0);
+    other["id"] = json!(2);
+    let (mut state,book,registry) = mystery_shop_fixture(0,json!([mystery_good(1691,600070),other]));
+    state["provider_state"]["effect"]["effectList"] = json!([
+        {"id":1050,"uid":7,"volume":1,"badgeId":0},{"id":3050,"uid":9,"volume":1,"badgeId":0}]);
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state,&actions,&registry,&book);
+    let mut inactive = book.clone();
+    inactive["selected_profile_id"] = json!("other");
+    let baseline = decision::evaluate(&state,&actions,&registry,&inactive);
+    for action in &actions.actions {
+        let score = report.actions.iter().find(|score| score.action_id == action.id).unwrap();
+        if matches!(action.kind.as_str(),"refresh_shop"|"skip") {
+            assert_eq!(score.rules.iter().find(|rule| rule.rule_id == "mystery_shop_target").unwrap().score,Some(-198.0));
+        }
+        if action.kind == "sell_effect" || (action.kind == "buy_effect" && action.params["id"] == 2) {
+            let old = baseline.actions.iter().find(|score| score.action_id == action.id).unwrap();
+            assert_eq!(serde_json::to_value(score).unwrap(),serde_json::to_value(old).unwrap());
+        }
+    }
+}
+
+#[test]
+fn mystery_shop_capacity_uses_existing_non_target_sales_without_adding_sale_weights() {
+    let (mut state,mut book,registry) = mystery_shop_fixture(1,json!([mystery_good(2310,0)]));
+    book["profiles"][0]["targets"] = json!([{"kind":"amulet","id":231,"plus":false}]);
+    state["provider_state"]["nodeEvent"]["advancedShopGoods"][0]["effect"]["volume"] = json!(2);
+    state["provider_state"]["effect"]["effectList"] = json!([
+        {"id":1050,"uid":1,"volume":1,"badgeId":0},{"id":1060,"uid":2,"volume":7,"badgeId":0}]);
+    for _ in 0..2 {
+        let chosen = best_shop_action(&state,&book,&registry);
+        if chosen.kind == "buy_effect" { break; }
+        assert_eq!(chosen.kind,"sell_effect");
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state,&actions,&registry,&book);
+        assert!(report.actions.iter().find(|score| score.action_id == chosen.id).unwrap().rules.iter()
+            .all(|rule| !rule.rule_id.starts_with("mystery_shop")));
+        state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap()
+            .retain(|effect| effect["uid"] != chosen.params["uid"]);
+    }
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"buy_effect");
+    state["provider_state"]["effect"]["effectList"] = json!([{"id":2310,"uid":3,"volume":8,"badgeId":0}]);
+    book["profiles"][0]["targets"].as_array_mut().unwrap().push(json!({"kind":"amulet","id":169,"plus":true,"badge":600070}));
+    state["provider_state"]["nodeEvent"]["advancedShopGoods"] = json!([mystery_good(1691,600070)]);
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"skip","do not sell a completed target to make room");
+}
+
+#[test]
+fn mystery_shop_refreshes_once_for_one_coin_and_respects_page_and_cutoff_boundaries() {
+    let (mut state,book,registry) = mystery_shop_fixture(0,json!([]));
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"refresh_shop");
+    for count in [1,2] {
+        state["provider_state"]["nodeEvent"]["advancedShopRefreshCount"] = json!(count);
+        assert_eq!(best_shop_action(&state,&book,&registry).kind,"skip");
+    }
+    state["provider_state"]["nodeEvent"]["advancedShopGoods"] = json!([mystery_good(1691,600070)]);
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"skip","never buy on page three");
+    state["provider_state"]["nodeEvent"]["advancedShopRefreshCount"] = json!(0);
+    state["provider_state"]["map"]["node"] = json!(5);
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"remake");
+    state["provider_state"]["map"]["node"] = json!(3);
+    state["provider_state"]["nodeEvent"]["advancedShopGoods"] = json!([]);
+    state["provider_state"]["nodeEvent"]["advancedShopRefreshPrice"] = json!(2);
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"skip");
+    state["provider_state"]["nodeEvent"]["advancedShopRefreshPrice"] = json!(1);
+    state["provider_state"]["game"]["coin"] = json!(0);
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"skip");
+    state["provider_state"]["game"]["coin"] = json!(100);
+    state["provider_state"]["nodeEvent"].as_object_mut().unwrap().remove("advancedShopRefreshCount");
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"skip");
+}
+
+#[test]
+fn mystery_shop_reserve_only_affects_spending_with_a_future_shop_before_the_cutoff() {
+    let (mut state,mut book,registry) = s4_opening_fixture();
+    state["stage"] = json!(9);
+    state["provider_state"]["map"] = json!({"level":13001,"node":2,
+        "mapNodes":[{"type":1},{"type":2},{"type":3,"subType":1},{"type":2},{"type":3,"subType":5}]});
+    state["provider_state"]["shop"]["goods"] = json!([{"id":1,"goodsId":101,"price":5,"sold":false}]);
+    state["provider_state"]["game"]["coin"] = json!(25);
+    book["profiles"][0]["cutoff_level"] = json!(13001);
+    book["profiles"][0]["cutoff_node"] = json!(5);
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"next_node");
+    state["provider_state"]["game"]["coin"] = json!(30);
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"buy_pack","spending down to exactly 25 is allowed");
+    state["provider_state"]["game"]["coin"] = json!(25);
+    for (current,shop,cutoff,expect_reserve) in [(2,1,5,true),(2,2,5,false),(3,1,5,false),(2,1,3,false)] {
+        state["provider_state"]["map"]["node"] = json!(current);
+        state["provider_state"]["map"]["mapNodes"][2]["subType"] = json!(shop);
+        book["profiles"][0]["cutoff_node"] = json!(cutoff);
+        let actions = shanten_backend::action_provider::evaluate(&state);
+        let report = decision::evaluate(&state,&actions,&registry,&book);
+        assert_eq!(report.actions.iter().flat_map(|score| &score.rules).any(|rule| rule.rule_id == "mystery_shop_reserve"),expect_reserve);
+    }
+}
+
+#[test]
+fn mystery_shop_white_night_counts_income_once_and_prioritizes_buy_then_sell_then_targets() {
+    let mut target = mystery_good(1691,600070);
+    target["id"] = json!(2);
+    let (mut state,mut book,registry) = mystery_shop_fixture(0,json!([mystery_good(1670,0),target]));
+    book["profiles"][0]["targets"][0]["value"] = json!(520);
+    assert_eq!(best_shop_action(&state,&book,&registry).params["effect"]["id"],1670);
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state,&actions,&registry,&book);
+    let white = actions.actions.iter().find(|action| action.params["effect"]["id"] == 1670).unwrap();
+    let score = report.actions.iter().find(|score| score.action_id == white.id).unwrap();
+    assert_eq!(score.rules.iter().find(|rule| rule.rule_id == "white_night_profit").unwrap().score,Some(50.0));
+    assert_eq!(score.rules.iter().filter(|rule| rule.rule_id != "white_night_priority").filter_map(|rule| rule.score).sum::<f64>(),26.0);
+    state["provider_state"]["nodeEvent"]["advancedShopGoods"][0]["sold"] = json!(true);
+    state["provider_state"]["effect"]["effectList"] = json!([{"id":1670,"uid":7,"volume":1,"badgeId":0}]);
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"sell_effect");
+    state["provider_state"]["nodeEvent"]["advancedShopGoods"][0]["sold"] = json!(false);
+    state["provider_state"]["nodeEvent"]["advancedShopGoods"][0]["effect"]["badgeId"] = json!(600050);
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"sell_effect","sell held White Night before buying another, even with a gold seal");
+    state["provider_state"]["nodeEvent"]["advancedShopGoods"][0]["sold"] = json!(true);
+    state["provider_state"]["effect"]["effectList"] = json!([]);
+    assert_eq!(best_shop_action(&state,&book,&registry).params["effect"]["id"],1691);
+    state["provider_state"]["nodeEvent"]["advancedShopGoods"][0]["sold"] = json!(false);
+    book["profiles"][0]["targets"] = json!([{"kind":"amulet","id":167,"plus":true,"badge":600070}]);
+    let report = decision::evaluate(&state,&shanten_backend::action_provider::evaluate(&state),&registry,&book);
+    assert!(report.actions.iter().flat_map(|score| &score.rules).all(|rule| rule.rule_id != "white_night_profit"));
+}
+
+#[test]
+fn mystery_shop_completed_seal_counts_do_not_reward_rebuying_the_same_seal() {
+    let (mut state,mut book,registry) = mystery_shop_fixture(0,json!([mystery_good(3050,600010)]));
+    book["profiles"][0]["targets"].as_array_mut().unwrap().push(json!({"kind":"badge","id":600010,"count":2,"value":3}));
+    state["provider_state"]["effect"]["effectList"] = json!([{"id":1050,"uid":1,"volume":1,"badgeId":600010}]);
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"buy_effect");
+    state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap()
+        .push(json!({"id":3050,"uid":2,"volume":1,"badgeId":600010}));
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let report = decision::evaluate(&state,&actions,&registry,&book);
+    assert!(report.actions.iter().flat_map(|score| &score.rules).all(|rule| rule.reason.code != "mystery_shop_keep_target"));
+    assert_eq!(best_shop_action(&state,&book,&registry).kind,"refresh_shop");
+}
+
+#[test]
+fn mystery_shop_does_not_take_an_unsealed_plus_even_if_it_is_free() {
+    for page in [0,1] {
+        let mut good = mystery_good(1691,0);
+        good["price"] = json!(0);
+        let (mut state,book,registry) = mystery_shop_fixture(page,json!([good]));
+        state["provider_state"]["game"]["coin"] = json!(0);
+        assert_eq!(best_shop_action(&state,&book,&registry).kind,"skip");
+    }
+}
+
+#[test]
+fn mystery_shop_new_scoring_rules_and_reasons_have_translations() {
+    for locale in [include_str!("../../app/src/locales/zh-CN.json"),include_str!("../../app/src/locales/ja-JP.json")] {
+        let locale: Value = serde_json::from_str(locale).unwrap();
+        for rule in ["mystery_shop_target","mystery_shop_refresh","mystery_shop_reserve","white_night_profit","white_night_priority"] {
+            assert!(locale["action_provider"]["scoring"]["rules"][rule].is_string(),"{rule}");
+        }
+        for reason in ["mystery_shop_buy_target","mystery_shop_keep_target","mystery_shop_no_target","mystery_shop_second_page", "mystery_shop_refresh_limit",
+            "mystery_shop_reserve","white_night_profit","white_night_priority"] {
+            assert!(locale["action_provider"]["scoring"]["reasons"][reason].is_string(),"{reason}");
+        }
+    }
+}
+
+#[test]
+fn opening_character_selection_honors_each_profile_and_defaults_to_201() {
+    let state = json!({"source":"packet","stage":1,"provider_state":{
+        "state":{"current":1,"interrupt":0},"map":{"level":13001,"node":1}}});
+    let actions = shanten_backend::action_provider::evaluate(&state);
+    let mut book: Value = serde_json::from_str(include_str!("fixtures/playbook.json")).unwrap();
+    for index in [0,1] {
+        book["selected_profile_id"] = book["profiles"][index]["id"].clone();
+        for id in 201..=204 {
+            book["profiles"][index]["character_id"] = json!(id);
+            let report = decision::evaluate(&state,&actions,&json!({}),&book);
+            for action in actions.actions.iter().filter(|action| action.kind == "select_character") {
+                let score = report.actions.iter().find(|score| score.action_id == action.id).unwrap();
+                assert_eq!(score.total,Some(if action.params["id"] == id {99.0} else {0.0}));
+            }
+            assert_eq!(best_shop_action(&state,&book,&json!({})).params["id"],id);
+        }
+    }
+    book["profiles"][1].as_object_mut().unwrap().remove("character_id");
+    assert_eq!(best_shop_action(&state,&book,&json!({})).params["id"],201);
+    for locale in [include_str!("../../app/src/locales/zh-CN.json"),include_str!("../../app/src/locales/ja-JP.json")] {
+        let locale: Value = serde_json::from_str(locale).unwrap();
+        assert!(locale["action_provider"]["scoring"]["rules"]["opening_character"].is_string());
+        assert!(locale["action_provider"]["scoring"]["reasons"]["select_opening_character"].is_string());
+        assert!(locale["character_health"]["portrait_alt"].is_string());
     }
 }

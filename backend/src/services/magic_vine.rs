@@ -7,7 +7,7 @@ use std::{collections::{BTreeSet, HashMap}, fs, io::{BufRead, BufReader}, path::
 mod farming;
 pub use farming::FarmingPeriod;
 
-const RULES_VERSION: u32 = 3;
+const RULES_VERSION: u32 = 4;
 // Inclusive Sydney cutoff: 2026-11-04 11:00:21 AEDT, including that entire second.
 const HISTORY_CUTOFF: u64 = 1_793_750_421_999;
 
@@ -69,6 +69,17 @@ pub(super) struct MagicVineStore {
     pending: Vec<PacketLogItem>,
     #[serde(default)]
     farming: farming::Farming,
+    #[serde(default)]
+    checkpoints: Vec<Checkpoint>,
+    #[serde(default)]
+    needs_resume_rebuild: bool,
+}
+
+#[derive(Deserialize, Serialize)]
+struct Checkpoint {
+    game: MagicVineGame,
+    context: Value,
+    farming: farming::Farming,
 }
 
 fn unwrapped(value: &Value) -> &Value { value.get("value").unwrap_or(value) }
@@ -97,14 +108,48 @@ fn positive(value: &Value) -> bool {
 }
 
 impl MagicVineStore {
+    fn remember_current(&mut self) {
+        if let Some(game) = self.stats.current.as_ref().filter(|game| game.packs_bought > 0 || game.obtained() > 0) {
+            self.checkpoints.retain(|saved| saved.game.started_at != game.started_at);
+            self.checkpoints.push(Checkpoint {game:game.clone(),context:self.context.clone(),farming:self.farming.clone()});
+            if self.checkpoints.len() > 100 { self.checkpoints.remove(0); }
+        }
+    }
+
+    fn resume(&mut self, game: &Value) {
+        if game.pointer("/state/current").and_then(Value::as_u64) == Some(100) { return; }
+        let context = snapshot_context(game);
+        // Progress alone is not an identity: require the exact nonempty inventory, including server UIDs/stores.
+        let index = self.checkpoints.iter().rposition(|saved| saved.game.packs_bought > 0
+            && !items(&context["effect"]["effectList"]).is_empty()
+            && ["map", "record", "effect"].iter().all(|key| saved.context[*key] == context[*key]));
+        if let Some(index) = index {
+            let saved = self.checkpoints.remove(index);
+            self.remember_current();
+            self.stats.history.retain(|old| old.started_at != saved.game.started_at);
+            self.stats.current = Some(saved.game);
+            self.context = saved.context;
+            self.farming = saved.farming;
+        }
+    }
+
     pub(super) fn read(path: &Path) -> Self {
-        let store: Self = fs::read(path).ok().and_then(|bytes| serde_json::from_slice(&bytes).ok()).unwrap_or_default();
+        let mut store: Self = fs::read(path).ok().and_then(|bytes| serde_json::from_slice(&bytes).ok()).unwrap_or_default();
         if store.rules_version == RULES_VERSION { store }
+        else if store.rules_version == 3 {
+            store.rules_version = RULES_VERSION;
+            store.needs_resume_rebuild = true;
+            store
+        }
         else { Self {rules_version: RULES_VERSION, ..Default::default()} }
     }
 
     pub(super) fn load(path: &Path, logs: &Path) -> Self {
         let mut store = Self::read(path);
+        let cached = if store.needs_resume_rebuild && fs::read_dir(logs).into_iter().flatten().flatten().any(|entry|
+            entry.file_name().to_string_lossy().starts_with("shanten-lens-packets-") && entry.metadata().is_ok_and(|meta| meta.len() > 0)) {
+            Some(std::mem::replace(&mut store, Self {rules_version:RULES_VERSION,..Default::default()}))
+        } else { None };
         let mut files: Vec<_> = fs::read_dir(logs).into_iter().flatten().flatten()
             .filter(|entry| entry.file_name().to_string_lossy().starts_with("shanten-lens-packets-"))
             .filter(|entry| entry.metadata().and_then(|meta| meta.modified()).ok()
@@ -120,6 +165,9 @@ impl MagicVineStore {
                 if !line.contains("amuletActivity") && !line.contains("fetchAmuletActivityData") { continue; }
                 if let Ok(packet) = serde_json::from_str::<PacketLogItem>(&line) { store.observe(&packet); }
             }
+        }
+        if store.stats.current.is_none() && store.stats.history.is_empty() {
+            if let Some(cached) = cached { return cached; }
         }
         if store.last_ts_ms != before {
             if let Err(error) = write_json(path, &store) { tracing::warn!(%error, "Could not save magic vine statistics"); }
@@ -166,6 +214,7 @@ impl MagicVineStore {
         self.last_ts_ms = packet.ts_ms;
         let data = &packet.data;
         if packet.method.ends_with("amuletActivityStartGame") {
+            self.remember_current();
             self.finish();
             self.stats.current = Some(MagicVineGame {started_at: packet.ts_ms, ..Default::default()});
         }
@@ -173,12 +222,13 @@ impl MagicVineStore {
             self.finish();
         } else if packet.method.ends_with("fetchAmuletActivityData") {
             if let Some(game) = data.pointer("/data/game").or_else(|| data.get("game")) {
+                self.resume(game);
                 if self.stats.current.is_none() && game.pointer("/state/current").and_then(Value::as_u64) == Some(100) { return false; }
                 let record = &game["record"];
                 let reset = self.stats.current.as_ref().is_some_and(|current|
-                    record["packCount"].as_u64().unwrap_or(0) < current.packs_bought
-                    || record["roundCount"].as_u64().unwrap_or(0) < current.rounds);
-                if reset { self.finish(); }
+                    record["packCount"].as_u64().is_some_and(|count| count < current.packs_bought)
+                    || record["roundCount"].as_u64().is_some_and(|count| count < current.rounds));
+                if reset { self.remember_current(); self.finish(); }
                 if self.stats.current.is_none() {
                     self.stats.current = Some(MagicVineGame {started_at: packet.ts_ms, incomplete: true, ..Default::default()});
                 }
@@ -197,7 +247,7 @@ impl MagicVineStore {
                     self.stats.current.as_mut().unwrap().shops += 1;
                 }
                 if game.pointer("/state/current").and_then(Value::as_u64) == Some(100) { self.finish(); }
-            } else { self.finish(); }
+            }
         } else {
             for event in items(&data["events"]) {
                 if self.stats.current.is_none() { continue; }
@@ -431,6 +481,62 @@ mod tests {
         assert_eq!(store.snapshot().history.len(),100);
         assert_eq!(store.snapshot().history[0].started_at,HISTORY_CUTOFF+1000+203);
         assert!(store.snapshot().history.iter().all(|game| game.obtained()>20 && game.started_at>HISTORY_CUTOFF && game.highest_ex>5));
+    }
+
+    #[test]
+    fn interrupted_login_and_placeholder_game_restore_the_same_saved_run() {
+        let mut store = MagicVineStore::default();
+        start(&mut store,1,14017);
+        operate(&mut store,2,json!({"result":{"selectPackResult":{"id":3760}},"valueChanges":{
+            "record":{"packCount":{"value":984},"roundCount":{"value":35}},
+            "effect":{"effectList":{"value":[{"id":3760,"uid":242,"badge":{"id":0}}]}}}}));
+        let saved = store.context.clone();
+        let started = store.stats.current.as_ref().unwrap().started_at;
+        store.observe(&packet(3,"fetchAmuletActivityData",json!({"data":{}})));
+        assert_eq!(store.stats.current.as_ref().unwrap().pack_obtained,1,"Empty login response must not finish the run");
+        start(&mut store,4,0);
+        assert_eq!(store.stats.current.as_ref().unwrap().pack_obtained,0);
+        let mut reloaded: MagicVineStore = serde_json::from_slice(&serde_json::to_vec(&store).unwrap()).unwrap();
+        // Same counters with different inventory must not merge two games.
+        let mut different = saved.clone(); different["effect"]["effectList"][0]["uid"] = json!(999);
+        reloaded.observe(&packet(5,"fetchAmuletActivityData",json!({"game":different})));
+        assert_ne!(reloaded.stats.current.as_ref().unwrap().started_at,started);
+        reloaded.observe(&packet(6,"fetchAmuletActivityData",json!({"game":saved})));
+        let current = reloaded.stats.current.as_ref().unwrap();
+        assert_eq!((current.started_at,current.pack_obtained,current.packs_bought),(started,1,984));
+        assert!(!current.finished);
+        assert!(!reloaded.stats.history.iter().any(|game| game.started_at == started));
+        operate(&mut reloaded,7,json!({"result":{"selectPackResult":{"id":3760}}}));
+        assert_eq!(reloaded.stats.current.as_ref().unwrap().pack_obtained,2);
+    }
+
+    #[test]
+    fn version_three_counters_survive_upgrade_when_packet_logs_are_unavailable() {
+        let root = std::env::temp_dir().join(format!("lens-vine-cache-migration-{}",std::process::id()));
+        let path = root.join("stats.json");
+        fs::create_dir_all(&root).unwrap();
+        let mut store = MagicVineStore::default();
+        store.rules_version = 3;
+        store.stats.current = Some(MagicVineGame {pack_obtained:118,..Default::default()});
+        write_json(&path,&store).unwrap();
+        let loaded = MagicVineStore::load(&path,&root.join("missing-logs"));
+        assert_eq!(loaded.stats.current.unwrap().pack_obtained,118);
+        fs::remove_file(path).unwrap(); fs::remove_dir(root).unwrap();
+    }
+
+    #[test]
+    #[ignore = "opt-in local packet logs only; never connects to a game"]
+    fn replay_resumed_local_logs() {
+        let logs = std::env::var_os("SHANTEN_VINE_REPLAY_LOGS").expect("set local logs path");
+        let root = std::env::temp_dir().join(format!("lens-vine-resume-{}",std::process::id()));
+        let path = root.join("stats.json");
+        let store = MagicVineStore::load(&path,Path::new(&logs));
+        let game = store.snapshot().current.unwrap();
+        println!("Offline replay: level={}, packs={}, obtained={}, triggers={}, farming_rounds={}",
+            game.level,game.packs_bought,game.obtained(),game.score_triggers,game.farming_rounds);
+        assert!(game.obtained() >= 118);
+        assert!(!store.stats.history.iter().any(|old| old.started_at == game.started_at));
+        fs::remove_file(path).unwrap(); fs::remove_dir(root).unwrap();
     }
 
     #[test]

@@ -87,6 +87,7 @@ impl Services {
             return;
         }
         let previous = target.clone();
+        target.remove("opening_search_failure");
         let revision = target.get("revision").and_then(Value::as_u64).unwrap_or(0);
         let session = target
             .get("session_id")
@@ -142,6 +143,9 @@ pub(super) fn apply_fetch_state(target: &mut Map<String, Value>, response: &Valu
         .and_then(|v| v.get("game"))
         .or_else(|| response.get("game"));
     let Some(game) = game else { return };
+    if game.pointer("/record/levelHuCount").and_then(Value::as_u64) == Some(0) {
+        target.remove("first_win");
+    }
     crate::action_provider::snapshot(target, game);
     target.insert("ended".into(), Value::Bool(false));
     let round = game.get("round").unwrap_or(&Value::Null);
@@ -207,10 +211,18 @@ pub(super) fn apply_fetch_state(target: &mut Map<String, Value>, response: &Valu
 }
 
 fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
+    if let Some(point) = item.pointer("/result/huResult/huFinal/point").and_then(Value::as_str) {
+        let already_recorded = target.get("first_win").is_some_and(|first|
+            first.get("level") == target.get("level") && first.get("node") == target.get("node"));
+        if !already_recorded && target.get("record").and_then(|c| c.get("levelHuCount")).and_then(Value::as_u64) == Some(0) {
+            target.insert("first_win".into(), json!({"level":target.get("level"),"node":target.get("node"),"point":point}));
+        }
+    }
     if let Some(game) = item
         .get("result")
         .and_then(|value| value.get("newGameResult"))
     {
+        target.remove("first_win");
         target.insert("last_drawn_tile".into(), Value::Null);
         apply_fetch_state(target, &json!({"data":{"game":game}}));
     }
@@ -655,9 +667,11 @@ fn merge_record(target: &mut Map<String, Value>, record: &Value) {
     let Some(source) = value.as_object() else {
         return;
     };
+    // Empty protobuf change messages carry no updates, not a replacement snapshot.
+    if source.is_empty() { return; }
     let is_patch = source
         .values()
-        .any(|item| item.get("dirty").is_some() && item.get("value").is_some());
+        .any(|item| item.get("dirty").is_some());
     if !is_patch {
         target.insert("record".into(), value);
         return;
@@ -1015,5 +1029,56 @@ mod level_tests {
             }
         }
         assert_eq!(STAGE_BATTLES.len(), count);
+    }
+}
+#[cfg(test)]
+mod first_win_tests {
+    use super::*;
+
+    #[test]
+    fn only_first_server_settlement_is_kept_and_new_game_resets_it() {
+        let mut target = empty_game_state().as_object().unwrap().clone();
+        apply_fetch_state(&mut target,&json!({"game":{"map":{"level":14016,"node":1},"record":{"levelHuCount":0}}}));
+        let win = |point: &str, count: u64| json!({"result":{"huResult":{"huFinal":{"point":point}}},
+            "valueChanges":{"record":{"levelHuCount":{"dirty":true,"value":count}}}});
+        apply_event_state(&mut target,&win("0",1));
+        assert_eq!(target["first_win"]["point"],"0","First win worth zero must still be recorded");
+        apply_event_state(&mut target,&win("1E100",2));
+        assert_eq!(target["first_win"]["point"],"0","Later wins must never replace first win");
+        apply_fetch_state(&mut target,&json!({"game":{"map":{"level":14017,"node":1},"record":{"levelHuCount":0}}}));
+        assert!(!target.contains_key("first_win"));
+        apply_event_state(&mut target,&win("1E64",1));
+        assert_eq!(target["first_win"],json!({"level":14017,"node":1,"point":"1E64"}));
+        apply_event_state(&mut target,&json!({"result":{"newGameResult":{"map":{"level":14017,"node":1},"record":{}}}}));
+        assert!(!target.contains_key("first_win"));
+    }
+
+    #[test]
+    fn real_empty_record_changes_preserve_first_win_and_counters_across_batched_hu() {
+        let mut target = empty_game_state().as_object().unwrap().clone();
+        apply_fetch_state(&mut target,&json!({"game":{"map":{"level":14045,"node":2},"record":{"levelHuCount":0,"gameHuCount":1000}}}));
+        // Real responses bracket HuResult with empty record patches (types 17, 19 and 10).
+        let empty = json!({"valueChanges":{"record":{}}});
+        let win = |point: &str, count: u64| json!({"result":{"huResult":{"huFinal":{"point":point}}},
+            "valueChanges":{"record":{"levelHuCount":{"dirty":true,"value":count}}}});
+        apply_event_state(&mut target,&empty);
+        apply_event_state(&mut target,&win("2.2303E87",1));
+        apply_event_state(&mut target,&empty);
+        apply_event_state(&mut target,&win("1E100",2));
+        apply_event_state(&mut target,&empty);
+        assert_eq!(target["first_win"]["point"],"2.2303E87");
+        assert_eq!(target["record"]["levelHuCount"],2);
+        assert_eq!(target["record"]["gameHuCount"],1000);
+        assert!(crate::vine_farming::first_win_insufficient(&Value::Object(target.clone())),"Ex45 must stop before entering Ex46");
+        apply_event_state(&mut target,&json!({"valueChanges":{"record":{"levelHuCount":{"dirty":false}}}}));
+        assert_eq!(target["record"]["levelHuCount"],2,"Unchanged fields are not a replacement snapshot either");
+    }
+
+    #[test]
+    fn joining_after_first_win_does_not_mislabel_a_later_win() {
+        let mut target = empty_game_state().as_object().unwrap().clone();
+        apply_fetch_state(&mut target,&json!({"game":{"map":{"level":14016,"node":1},"record":{"levelHuCount":1}}}));
+        apply_event_state(&mut target,&json!({"result":{"huResult":{"huFinal":{"point":"1E100"}}}}));
+        assert!(!target.contains_key("first_win"));
     }
 }

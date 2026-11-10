@@ -14,12 +14,16 @@ export default function RoundDecisionPanel({decision, running, profile}: {
     const {t, i18n} = useTranslation();
     const status = decision?.status === "blocked" ? "blocked" : running ? decision?.status ?? "waiting" : "stopped";
     const opening = decision?.strategy === "opening" || (!decision?.strategy && profile?.strategy === "opening");
+    const customOpening = profile?.strategy === "opening";
+    const pinzuFallback = customOpening && decision?.score != null;
+    const openingHandIndex = customOpening ? /^开局断幺九([12])$/.exec(decision?.hand_name ?? "")?.[1] : undefined;
+    const handName = openingHandIndex ? t("round.opening_plan_name", {index: openingHandIndex}) : decision?.hand_name;
     const reason = decision?.reason;
     const reasonKeys = reason ? [reason, `round.${reason}`, `custom_target.reason_${reason}`, `advisor.reason_${reason}`] : [];
     const reasonKey = reasonKeys.find(key => i18n.exists(key));
     const reasonText = reasonKey ? t(reasonKey) : reason;
     const metrics = [
-        ...(opening ? [["pinzu_count", decision?.pinzu_count], ["score", decision?.score]] as const : []),
+        ...(opening && (!customOpening || pinzuFallback) ? [["pinzu_count", decision?.pinzu_count], ["score", decision?.score]] as const : []),
         ["win_count", decision?.win_count],
         ["draws_needed", decision?.draws_needed],
         ["actual_wins", decision?.actual_wins],
@@ -31,8 +35,8 @@ export default function RoundDecisionPanel({decision, running, profile}: {
         </div>
         <div className={styles.summary}>
             <div className={styles.objective}>
-                <strong>{profile ? t(opening ? "round.opening_objective" : "round.full_objective") : t("autoplay.select_profile")}</strong>
-                {(decision?.stage_name || decision?.hand_name) && <span>{[decision.stage_name, decision.hand_name].filter(Boolean).join(" · ")}</span>}
+                <strong>{profile ? t(profile.strategy === "vine_farming" ? "vine.objective" : customOpening && !pinzuFallback ? "round.opening_tanyao_objective" : opening ? "round.opening_objective" : "round.full_objective") : t("autoplay.select_profile")}</strong>
+                {(decision?.stage_name || handName) && <span>{[decision?.stage_name, handName].filter(Boolean).join(" · ")}</span>}
             </div>
             {metrics.some(([, value]) => value != null) && <dl className={styles.metrics}>
                 {metrics.map(([name, value]) => value == null ? null : <div key={name}><dt>{t(`round.${name}`)}</dt><dd>{value.toLocaleString()}</dd></div>)}

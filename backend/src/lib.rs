@@ -19,6 +19,8 @@ pub mod automation;
 pub mod action_provider;
 pub mod action_executor;
 pub mod decision;
+pub(crate) mod vine_farming;
+pub(crate) mod opening;
 pub mod direct_connection;
 pub mod embedded;
 pub mod mail;

@@ -10,6 +10,7 @@ import {APP_VERSION} from "../lib/version";
 import type {UpdateInfo} from "../lib/updateCheck";
 import {exportDiagnostics} from "../lib/ipc";
 import {collectFrontendDiagnostics} from "../lib/diagnostics";
+import MagicVineStats from "../components/MagicVineStats";
 
 const TILE_GROUPS: Array<{ titleKey: string; tiles: string[] }> = [
     {titleKey: "about.tile_groups.manzu", tiles: ["0m", "1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m"]},
@@ -131,6 +132,7 @@ Distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.`}
             </div>
 
             <div className={styles.actions}>
+                <MagicVineStats variant="button" className={styles.secondaryAction}/>
                 <button className={styles.secondaryAction} onClick={onShowUsageNotice}>{t("about.show_usage_notice")}</button>
                 <button type="button" className={styles.secondaryAction} onClick={() => void handleExportDiagnostics()}
                         disabled={exporting} aria-busy={exporting}>

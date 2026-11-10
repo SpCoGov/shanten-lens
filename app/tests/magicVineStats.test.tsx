@@ -4,10 +4,12 @@ import {renderToStaticMarkup} from "react-dom/server";
 import {mockIPC, clearMocks} from "@tauri-apps/api/mocks";
 import i18n from "i18next";
 import {initReactI18next} from "react-i18next";
-import LevelRecordPanel from "../src/components/LevelRecordPanel";
+import LevelRecordPanel, {useLevelRecordItems, MAX_TILE_SCORE_METRIC_KEY} from "../src/components/LevelRecordPanel";
+import type {EffectItem} from "../src/lib/gamestate";
 import type {MagicVineGame} from "../src/bindings";
 import zh from "../src/locales/zh-CN.json";
 import MagicVineStats from "../src/components/MagicVineStats";
+import AboutPage from "../src/pages/AboutPage";
 
 export async function runMagicVineHighestRenderTests() {
     await i18n.use(initReactI18next).init({lng:"zh-CN",resources:{"zh-CN":{translation:zh}},interpolation:{escapeValue:false}});
@@ -27,7 +29,7 @@ export async function runMagicVineStatsTests() {
     const game: MagicVineGame = {started_at:1793864876106,updated_at:1793877168962,level:14021,node:1,
         finished:true,incomplete:false,pack_obtained:110,shop_obtained:8,regeneration_obtained:1,other_obtained:0,
         score_triggers:120,expansion_extra_triggers:1,shops:38,packs_bought:1166,rounds:39,highest_ex:21,farming_rounds:10,farming_obtained:50,farming_score_triggers:51,farming_status:"ended",farming_periods:[{start_level:13003,start_node:2,end_level:14005,end_node:2,rounds:10,obtained:50,score_triggers:51}]};
-    let current = game;
+    let current: MagicVineGame | null = game;
     mockIPC(command => {
         if (command === "backend_get_magic_vine_stats") return {current,history:[game],loading:false};
         if (command === "plugin:event|listen") return 1;
@@ -37,6 +39,13 @@ export async function runMagicVineStatsTests() {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
+    const recordKey="sl-level-metric-records-v1", savedRecords=localStorage.getItem(recordKey);
+    const probeAmulets: EffectItem[]=[{id:3760,uid:1,volume:1,store:[],tags:[]}];
+    const probeFans: Record<string,string>={};
+    function HighestProbe({level,scores}: {level:number;scores:Record<string,string>}) {
+        const items=useLevelRecordItems({level,tileScoreMap:scores,fanValueMap:probeFans,amulets:probeAmulets});
+        return <LevelRecordPanel level={level} items={items} tileScoreMap={scores} amulets={probeAmulets}/>;
+    }
     try {
         await act(async () => {root.render(<LevelRecordPanel level={14021} tileScoreMap={{"1m":"3976400000000000000000000000000000000000","2m":"25"}} items={[{
             key:"fan_5_haitei",label:zh.level_records.haitei_fan,current:"1",previousBest:null,best:"1",delta:null,state:"meetsBest",scale:0,
@@ -54,14 +63,44 @@ export async function runMagicVineStatsTests() {
         assert(!dialog.querySelector("tfoot"),"history must not include an aggregate total row");
         await act(async () => {dialog.querySelector<HTMLButtonElement>("button")!.click();});
         assert(!document.querySelector('[role="dialog"]'),"dialog must close");
+        current={...game,started_at:game.started_at+1,pack_obtained:105,shop_obtained:9,shops:37,farming_obtained:43};
+        await act(async () => {root.render(<></>);});
+        await act(async () => {root.render(<LevelRecordPanel level={14021} items={[]}/>);});
+        assert(Array.from(container.querySelectorAll('[data-trend]')).map(node => node.getAttribute('data-trend')).join(',')==='down,down,down,up',
+            "total, farming average and shop visits below historical best turn red while higher purchases stay green");
         current={...game,pack_obtained:0,shop_obtained:0,regeneration_obtained:0,other_obtained:0};
         await act(async () => {root.render(<></>);});
         await act(async () => {root.render(<LevelRecordPanel level={13001} items={[]}/>);});
         assert(!container.querySelector("button") && !container.querySelector('[data-testid="magic-vine-highest-score"]'),"a new game without vines must hide the component even when old history exists");
-        return "Magic vine UI checks passed (9 assertions, mock IPC only).";
+        current = null;
+        await act(async () => {root.render(<AboutPage onSecretClick={() => {}} onShowUsageNotice={() => {}}
+            onCheckUpdate={() => {}} updateAvailable={null} checkingUpdate={false}/>);});
+        const historyButton = Array.from(container.querySelectorAll("button")).find(button => button.textContent?.includes(zh.magic_vine.title));
+        assert(historyButton,"the about page must keep the history entry visible after the game ends");
+        assert(historyButton?.nextElementSibling?.textContent === zh.about.show_usage_notice,"the history entry must be immediately to the left of the usage notice");
+        assert(historyButton?.querySelector('.ms') && !container.querySelector('[data-testid="magic-vine-highest-score"]'),"the about entry must have an icon and omit homepage metrics");
+        await act(async () => {historyButton!.click();});
+        const historyDialog = document.querySelector('[role="dialog"]')!;
+        assert(historyDialog?.getAttribute("aria-label") === zh.magic_vine.history_title,"the about entry must open the shared history dialog without a current game");
+        assert(historyDialog?.querySelector("tbody tr")?.textContent?.includes("119") && historyDialog.querySelector("thead")?.textContent?.includes("神秘商店购买"),"the about dialog must use the same historical data and labels as the homepage");
+        localStorage.removeItem(recordKey);
+        const highestRow=() => container.querySelector('[data-testid="magic-vine-highest-score"]')!;
+        await act(async () => {root.render(<HighestProbe level={14069} scores={{"1m":"1e200"}}/>);});
+        assert(highestRow().classList.contains('is-up'),"first observation establishes a green per-level record");
+        const stored=JSON.parse(localStorage.getItem(recordKey)!);
+        assert(stored['14069'][MAX_TILE_SCORE_METRIC_KEY]==='1'+'0'.repeat(202),"highest base score is persisted exactly, including scale");
+        await act(async () => {root.render(<HighestProbe level={14069} scores={{"9m":"9e199"}}/>);});
+        assert(highestRow().classList.contains('is-down') && highestRow().querySelector('.home-record-meta')?.textContent?.includes('1.00e200'),"lower base scores turn red and show the previous same-level record");
+        assert(container.querySelectorAll('[data-testid="magic-vine-highest-score"]').length===1,"the new metric must not create a duplicate row");
+        await act(async () => {root.render(<HighestProbe level={14069} scores={{"1p":"1e200"}}/>);});
+        assert(highestRow().classList.contains('is-up'),"matching the record turns green");
+        await act(async () => {root.render(<HighestProbe level={14070} scores={{"1p":"9e199"}}/>);});
+        assert(highestRow().classList.contains('is-up'),"different levels do not share a comparison baseline");
+        return "Magic vine UI and per-level highest base score checks passed (mock IPC only).";
     } finally {
         await act(async () => {root.unmount();});
         container.remove();
+        if (savedRecords==null) localStorage.removeItem(recordKey);else localStorage.setItem(recordKey,savedRecords);
         clearMocks();
     }
 }

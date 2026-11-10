@@ -93,7 +93,16 @@ impl Services {
             let Some(table) = table.as_object_mut() else {
                 return Err(format!("config table {name} is invalid"));
             };
-            table.extend(values.clone());
+            let mut values = values.clone();
+            if name == "autorun" && values.get("playbook").and_then(Value::as_object)
+                .is_some_and(|book| book.len() == 1 && book.contains_key("selected_profile_id")) {
+                if self.autorun_active() { return Err("cannot switch profiles during automation".into()); }
+                // Selecting a saved profile must not overwrite unsaved profile edits in the UI.
+                let mut book = table.get("playbook").cloned().unwrap_or(Value::Null);
+                book["selected_profile_id"] = values["playbook"]["selected_profile_id"].clone();
+                values.insert("playbook".into(), book);
+            }
+            table.extend(values);
             validate_config(name, &candidate[name])?;
         }
         let mut applied = Vec::new();

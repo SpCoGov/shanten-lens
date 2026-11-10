@@ -165,6 +165,7 @@ struct Search<'a> {
     last_emit: Instant,
     nodes: usize,
     prefix: usize,
+    winning_entry: Option<usize>,
     aborted: Option<&'static str>,
     matching_melds: Option<Vec<Vec<u64>>>,
     hand_capacity: usize,
@@ -310,6 +311,13 @@ impl Search<'_> {
     ) -> Option<Value> {
         if !self.pulse() {
             return None;
+        }
+        // Earlier wall prefixes have already failed; this prefix's winning draw must be retained.
+        if let Some(draw) = self.winning_entry.filter(|draw| !used.contains(draw)) {
+            if !choices[depth..].iter().any(|choice| choice.values.iter().any(|candidate|
+                candidate.contains(&draw) && candidate.iter().all(|tile| !used.contains(tile)))) {
+                return None;
+            }
         }
         let exchange_prefix = self.exchange_prefix(used);
         if used.iter().map(|&i| &self.entries[i])
@@ -709,6 +717,9 @@ pub(super) fn opening_plan(state: &Value, wall_limit: usize,
             plan["win_count"] = json!(wins);
             plan["opening_score"] = json!(pinzu * wins);
             best = plan;
+        } else if plan["reason"] == "custom-search-limit" && best["status"] == "plan" {
+            best["reason"] = json!("round.search_limit_best");
+            return best;
         } else if plan["reason"] != "custom-not-reachable" {
             return plan;
         }
@@ -810,6 +821,7 @@ fn search_internal(
         last_emit: now,
         nodes: 0,
         prefix: 0,
+        winning_entry: None,
         aborted: None,
         matching_melds: matching.then_some(declared.clone()),
         hand_capacity: hand.len() + declared.len() * 4,
@@ -818,6 +830,7 @@ fn search_internal(
     let wall_size = entries.iter().filter(|e| e.source == "wall").count();
     for prefix in minimum_draws..=wall_size {
         search.prefix = prefix;
+        search.winning_entry = entries.iter().position(|entry| entry.source == "wall" && entry.index + 1 == prefix);
         if !search.pulse() {
             break;
         }
@@ -838,6 +851,9 @@ fn search_internal(
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
+        if search.winning_entry.is_some_and(|draw| domains.iter().all(|domain| !domain.contains(&draw))) {
+            continue;
+        }
         let slots = groups
             .iter()
             .zip(&domains)
@@ -848,7 +864,9 @@ fn search_internal(
         }
         let mut choices = Vec::new();
         for (group, domain) in domains.iter().enumerate() {
-            let mut values = search.candidates(group, domain);
+            let mut values = if let Some(previous) = choices.iter().find(|choice: &&Choices| groups[choice.group] == groups[group]) {
+                previous.values.clone()
+            } else { search.candidates(group, domain) };
             if groups[group].is_quad() && !declared.is_empty() {
                 values.retain(|candidate| {
                     let mut tiles = candidate.iter().map(|&i| entries[i].id).collect::<Vec<_>>();

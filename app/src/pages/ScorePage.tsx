@@ -2,6 +2,7 @@ import React from "react";
 import {useTranslation} from "react-i18next";
 import styles from "./ScorePage.module.css";
 import Modal from "../components/Modal";
+import DragonBossEffects from "../components/DragonBossEffects";
 import AmuletCard from "../components/AmuletCard";
 import {getAllRegisteredAmuletRules} from "../lib/amuletRuleRegistry";
 import type {EffectItem, GameStateData, MapNodeItem} from "../lib/gamestate";
@@ -557,9 +558,12 @@ export default function ScorePage({
                 <section className={`panel ${styles.scorePanel}`}>
                     <div className={styles.panelHeader}>
                         <div className="panel-title" style={{marginBottom: 0}}>{t("score.live_point_title")}</div>
-                        <button className="nav-btn" onClick={() => setShowTileScores(true)}>
-                            {t("score.view_tile_scores")}
-                        </button>
+                        <div className={styles.headerActions}>
+                            <button className="nav-btn" onClick={() => setShowTileScores(true)}>
+                                {t("score.view_tile_scores")}
+                            </button>
+                            <DragonBossEffects/>
+                        </div>
                     </div>
                     <div className={styles.stageOverview}>
                         <div className={styles.stageIdentity}>

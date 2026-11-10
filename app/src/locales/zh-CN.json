@@ -1,4 +1,34 @@
 {
+  "vine": {
+    "trade_pause": "以物易物出现魔藤，刷魔藤自动化已暂停，请手动处理。",
+    "mystery_pause": "已进入神秘商店，刷魔藤自动化已暂停，请手动处理。",
+    "low_hp": "当前血量小于上限的一半，刷魔藤自动化已暂停，请手动处理回血。",
+    "cutoff_reached": "已打完指定关卡 BOSS，奖励包尚未选择，刷魔藤自动化已暂停。",
+    "ex_level": "Ex{{n}}",
+    "stops_hint": "指定停止关卡会替代首和停止条件：打完该关 BOSS，在奖励包出现时停止，不选奖励。半血保护默认开启，红龙战斗期间忽略半血暂停，战后恢复正常检查。",
+    "half_hp_option": "半血暂停",
+    "on": "开",
+    "off": "关",
+    "stop_default": "首和不够过下关",
+    "stop_ex": "停止关卡",
+    "refresh_hint": "分别拖动两个人物指针；只吸附相邻价格正中间，右侧 ∞ 为不设限。奖励关为打完 Ex5、Ex10、Ex15……后的商店。无论是否设置上限，每次刷新都须留足当前刷新价格＋30 星币。",
+    "price_interval": "{{left}}–{{right}}",
+    "unlimited": "不设限",
+    "normal_refresh": "非奖励关",
+    "reward_refresh": "奖励关",
+    "refresh_title": "商店刷新截止价格",
+    "protected_action": "策略禁用",
+    "title": "刷魔藤",
+    "scope": "Ex1 起",
+    "objective": "万象换牌 · 筒子优先 · 魔藤循环",
+    "need_ex16": "刷魔藤仅支持已连接的雀魂 Ex1 及之后成型对局。",
+    "invalid_lineup": "刷魔藤需要雏田、万象、黑客、墨镜猫、姬川响和汪多鱼，且不能持有 PLUS 魔藤或多个魔藤。上述六张核心护身符须带朋友或指引印章。",
+    "remake_forbidden": "刷魔藤运行期间禁止重开，请先停止自动化。",
+    "echo_found": "发现回响魔藤，刷魔藤自动化已停止。请自行选择并继续对局。",
+    "goal_met": "本关首次和牌分数不足以通过下一关，刷魔藤自动化已停止，请手动继续对局。",
+    "first_win": "本关首次和牌分数：{{point}}",
+    "no_safe_action": "没有符合刷魔藤规则的可执行操作，已停止。"
+  },
   "magic_vine": {
     "loading": "正在后台从本地日志回填统计…",
     "title": "魔藤统计",
@@ -43,6 +73,9 @@
       "ignored": "此项按 0 分计：{{reason}}",
       "out_of_range": "总分超出有效评分范围，按 0 分显示。",
       "rules": {
+        "opening_map_remake": "开局地图筛选",
+        "opening_search_remake": "开局指定牌型搜索失败",
+
         "ryan_without_plus": "补齐莱恩",
         "coin_cost": "星币消耗",
         "hp_loss": "生命损失",
@@ -69,13 +102,29 @@
         "pack_purchase_order": "卡包按等级依次购买",
         "preserve_guidance_for_packs": "开包前保留指引",
         "gold_pack_bonus": "金卡包奖励",
+        "vine_target": "魔藤阶段目标价值",
+        "vine_make_space": "为魔藤腾位",
+        "vine_bonfire": "篝火选择第二项，增加血量上限",
+      "vine_pack": "魔藤阶段卡包偏好",
+        "vine_refresh_budget": "刷新后保留两个金包费用",
+        "vine_keep_target": "优先取得当前目标",
+        "vine_protected": "刷魔藤阶段保护",
+        "opening_character": "配置开局角色",
         "configured_target": "配置目标价值",
+        "mystery_shop_target": "神秘商店目标优先",
+        "mystery_shop_refresh": "神秘商店前两页",
+        "mystery_shop_reserve": "预留神秘商店星币",
+        "white_night_profit": "白夜出售收益",
+        "white_night_priority": "白夜买卖优先",
         "opening_target_base": "目标 PLUS 本体暂留",
         "remake_at_cutoff": "截止关卡未达标",
         "remake_penalty": "重开扣分",
         "skip_candidates": "跳过候选代价"
       },
       "reasons": {
+        "opening_map_mismatch": "1-1不是蘑菇怪且1-2不是神秘商店，重开加99999分",
+        "opening_search_unreachable": "1-1的开局方案1和开局方案2均未找到可执行方案，重开加99999分",
+
         "bonfire_heal": "选择恢复 40% 生命：当前生命低于 60 时加 20 分，否则加 0 分",
         "bonfire_coin": "选择获得星币：当前星币少于 50 时加 20 分，否则加 10 分",
         "bonfire_amulet": "选择获得随机护身符：有空位加 10 分，无空位加 5 分，不超过获得星币的加分",
@@ -106,7 +155,23 @@
         "sell_happiness": "卖出幸福印章：合计商店所有未售出护身符卡包的星币费用 S，包含当前买不起的卡包；加分为 (S−10)×2。没有卡包按 S=0 计算，扣 20 分",
         "missing_happiness_pack_cost": "商店护身符卡包的价格或售出状态缺失、无效，或总费用超出精确评分范围",
         "skip_candidates": "跳过操作减去当前可选护身符中的最高总评分，并与其他规则累加",
+        "vine_target": "魔藤阶段目标价值",
+        "vine_make_space": "为魔藤腾位",
+        "vine_bonfire": "篝火选择第二项，增加血量上限",
+      "vine_pack": "魔藤阶段卡包偏好",
+        "vine_refresh_budget": "刷新后保留两个金包费用",
+        "vine_keep_target": "优先取得当前目标",
+        "vine_protected": "刷魔藤阶段保护",
+        "select_opening_character": "配置指定的开局角色加 99 分；旧开局配置未指定角色时，默认选择角色 201",
         "select_configured_target": "选择目标加 99 × 目标价值；开局配置累计命中的护身符与独立印章目标价值，全流程当前阶段的所有方案命中计 1，重复不叠加",
+        "mystery_shop_buy_target": "神秘商店前两页购买目标加 99 × 目标价值；PLUS 目标可先购入首张普通本体，印章不限。已有本体时，按新卡印章和合并后的版本判断；有指定印章要求时，无印章或错误印章的 PLUS 不获得该目标奖励。达标判断仍遵守原配置",
+        "mystery_shop_keep_target": "当前页有可购买、或出售非目标卡腾位后可购买的目标时，刷新和跳过减去与购买奖励相等的分数；其他护身符及出售操作的评分保持原有规则",
+        "mystery_shop_no_target": "没有可实现的目标购买或白夜盈利交易时，跳过加 1 分，避免零费用无关商品与离开同分时被优先购买",
+        "mystery_shop_second_page": "仅服务器刷新次数为 0、实际费用为 1 星币时，加 21 分，扣除费用后净加 20 分，查看第二页",
+        "mystery_shop_refresh_limit": "只查看神秘商店前两页，第二页不再刷新；超过第二页或页数未知时优先离开",
+        "mystery_shop_reserve": "地图中尚未经过、且在截止关卡之前有神秘商店时，普通商店消费后应保留至少 25 星币；不足时将该消费评分降到离店操作以下",
+        "white_night_profit": "神秘商店购买可出售回款的白夜，将实际出售收入计入购买收益，购买费用另扣；通常为 −24＋50＝净赚 26 星币。目标白夜及需要保留的目标印章不计这笔变现收益",
+        "white_night_priority": "开局截止关卡之前，白夜盈利操作补到其他操作最高分之上：购买或选择高 1 分，出售回款高 2 分；原有费用、售价和目标保护评分保留，达标则立即停止",
         "sell_configured_target": "卖出目标扣 99 × 目标价值，价值与选择时的计算方式相同",
         "select_target_base": "仅限雀魂原版 S4 刷开局：尚未获得配置要求的 PLUS 成品时，首张同类本体加 20 分，先保留供后续同名卡按目标印章要求合并；不计为目标达标，莱恩沿用原规则",
         "retain_target_base": "仅限雀魂原版 S4 刷开局：出售唯一一张尚需合成目标 PLUS 的本体，扣除 20 分保留价值并抵消售价及固定出售奖励；不为卖掉后重新拿未达标同名卡增加腾位收益，完整目标仍可正常比较腾位收益",
@@ -872,14 +937,18 @@
     }
   },
   "round": {
+    "opening_tanyao_remake": "开局方案1和开局方案2均未成型，重新开局",
     "title": "对局决策器",
     "status": {"waiting": "等待对局", "searching": "正在求解", "executing": "正在做牌", "winning": "自动自摸", "blocked": "等待处理", "stopped": "已暂停"},
+    "opening_tanyao_objective": "1-1指定牌型，尽量和筒牌",
+    "opening_plan_name": "开局方案{{index}}",
     "opening_objective": "筒子数量 × 可和牌次数最大",
     "full_objective": "按当前战术阶段的牌型做牌",
     "pinzu_count": "目标筒子数", "score": "筒子 × 次数", "win_count": "预计可和次数", "draws_needed": "成牌需摸牌", "actual_wins": "本轮已自摸",
     "target_hand": "目标手牌", "target_description": "目标手牌：{{tiles}}",
     "scope_hint": "局外自动执行评分最高的合法操作；对局内自动做牌并自摸。",
     "search_limit_remake": "做牌搜索达到计算上限，正在重开并继续刷开局。",
+    "search_limit_best": "搜索达到计算上限，继续执行已找到的最佳方案（尚未确认全局最优）。",
     "invalid_tiles_remake": "当前牌池无法安全搜索，正在重开并继续刷开局。",
     "stage_hint": "按计划进入关卡选择战术阶段，首个阶段前按开局目标做牌。提前切换阶段尚未接入。",
     "no_round": "等待进入对局。", "no_operations": "等待游戏返回可执行操作。", "waiting_update": "操作已发送，等待游戏状态更新。",
@@ -887,6 +956,21 @@
     "state_changed": "牌局状态已变化，正在重新判断。", "manual_execution": "手动换牌已接管，请暂停后重新启动对局决策。", "manual_tsumo": "手动自摸循环正在运行，请先停止后再启动对局决策。", "stopped": "对局决策已暂停。"
   },
   "autoplay": {
+    "error_vine": "刷魔藤选项无效。",
+    "step_vine_trade": "以物易物出现魔藤，刷魔藤自动化已暂停，请手动处理。",
+    "step_vine_mystery": "已进入神秘商店，刷魔藤自动化已暂停，请手动处理。",
+    "step_vine_low_hp": "当前血量小于上限的一半，刷魔藤自动化已暂停，请手动处理回血。",
+    "step_vine_cutoff": "已打完指定关卡 BOSS，奖励包尚未选择，刷魔藤自动化已暂停。",
+    "selection_next_run": "已选择下次运行的配置；当前自动化继续使用启动时的配置。",
+    "selection_failed": "配置切换失败，已恢复原选择。请检查配置是否已保存且有效。",
+
+    "step_disconnected": "连接已断开",
+    "step_stopped": "已停止",
+
+    "tab_vine_farming": "刷魔藤",
+    "strategy_vine_farming": "刷魔藤",
+    "step_vine_goal": "本关首次和牌分数不足以通过下一关，刷魔藤自动化已停止，请手动继续对局。",
+    "step_vine_echo": "发现回响魔藤，刷魔藤自动化已停止。请自行选择并继续对局。",
     "step_monitoring": "监测当前状态", "step_goal_met": "开局目标已达成", "step_completed": "本局已结束", "step_failed": "运行出错，已停止",
     "state_update_timeout": "操作响应后长时间未收到状态更新，已停止以避免重复提交。", "worker_failed": "自动运行任务异常，已停止。",
     "data_source_changed": "游戏数据源已断开或发生变化，全自动已停止。",
@@ -898,7 +982,6 @@
     "runtime_settings": "运行设置", "runtime_saved": "运行配置已保存。", "current_targets": "当前运行目标", "goal_progress": "目标价值进度", "cutoff_at": "截止 {{level}}",
     "elapsed": "运行时长", "runs": "已运行局数", "best_value": "历史最高价值", "records": "运行记录", "view_best": "查看最高记录", "run_number": "第 {{run}} 局", "value": "价值",
     "choose_strategy": "选择运行策略", "strategy_opening": "开局", "strategy_full": "全流程",
-    "strategy_opening_hint": "只刷开局护身符，每次操作后的状态更新都会检查目标护身符或印章的总价值，达标立即暂停。", "strategy_full_hint": "整局交由决策器游玩，配置开局、战术阶段、护身符与牌型。",
     "goal_met": "目标已达成，已暂停",
     "opening_targets": "开局目标", "goal_value": "目标总价值", "cutoff_level": "截止关卡", "target_value_for": "{{name}}的目标价值",
     "badge_keep_count": "保留数量",
@@ -927,7 +1010,7 @@
     "hand_hint": "可配置多个牌型；可和牌次数相同时按列表顺序选择。牌型约束与自定义换牌共用。此处只保存选择方式，不进行搜索。", "hand_name": "牌型 {{index}} 名称", "edit_hand": "编辑牌型约束", "apply_hand": "应用牌型",
     "save": "保存全部配置", "saving": "正在保存…", "saved": "所有配置已保存", "save_hint": "配置保存到本地，供后续决策器使用。", "unsaved": "有未保存的修改。", "save_failed": "保存失败，修改仍保留在页面中，请重试",
     "import": "导入配置", "export": "导出配置", "import_hint": "导入会替换当前编辑的全部配置，保存后写入本地。", "export_hint": "复制下方 JSON 可备份或分享全部配置。", "config_text": "配置 JSON", "apply_import": "应用导入",
-    "error_format": "配置格式或版本无效，或选中的配置不存在", "error_profile": "请填写配置名称；全流程策略还需选择有效的开局角色", "error_initial": "请为全流程配置选择蓝色或绿色品质的初始护身符",
+    "error_format": "配置格式或版本无效，或选中的配置不存在", "error_profile": "请填写配置名称并选择有效的开局角色", "error_initial": "请为全流程配置选择蓝色或绿色品质的初始护身符",
     "error_coin": "首关星币门槛必须是非负整数，不含前导零，最多 128 位", "error_stages": "每个配置至少需要一个战术阶段，且阶段标识不能重复", "error_levels": "请填写阶段名称和有效关卡，并按计划进入关卡从早到晚排列，关卡不能相同",
     "error_loadouts": "每个阶段至少需要一套有名称且包含护身符的方案", "error_amulet": "护身符或印章不存在，或匹配条件无效", "error_order": "每种顺序必须包含方案中的全部槽位，且每个槽位只能出现一次", "error_hands": "每阶段至少需要一个有名称的牌型；牌型必须合计 14 张，最多包含 4 个杠"
   },
@@ -1030,7 +1113,7 @@
     "placeholder_level": "例如 1-1",
     "hint_cutoff": "若到该关卡仍未达成“目标数量”，则本局结束并自动重开。",
     "section_email_title": "邮件通知",
-    "toggle_email": "运行完成或出错时发送邮件（SMTP）",
+    "toggle_email": "自动结束、达标或异常停止时发送邮件（手动暂停、断开和切换控制不发送）",
     "label_smtp_host": "SMTP 服务器",
     "label_smtp_port": "端口",
     "label_smtp_ssl": "SSL/TLS",
@@ -1313,6 +1396,10 @@
     "toast_open_config_fail": "打开失败：{{error}}"
   },
   "overlay": {
+    "preference_details": "偏好：{{value}}",
+    "bonus_melds": "宝牌/魂牌面子",
+    "preset_details": "方案：{{name}}",
+
     "title": "HUD",
     "subtitle": "管理游戏内悬浮显示及其展示内容。",
     "display_title": "显示内容",
@@ -1323,6 +1410,7 @@
     "show_blackhole": "展示花火指导",
     "show_wanxiang": "展示万象换牌",
     "show_custom_switch": "展示自定义换牌",
+    "show_current_level": "展示当前关卡",
     "status_checking": "检查中",
     "process_found": "已找到，PID {{pid}}",
     "process_not_found": "未找到可用的游戏窗口（Jantama_MahjongSoul.exe / Qyzz.exe）",
@@ -1664,6 +1752,75 @@
     "title": "点数",
     "live_point_title": "实时点数计算",
     "current_level": "当前关卡",
+    "dragon_boss_title": "龙 BOSS 效果",
+    "dragon_bosses": {
+      "hatchling": {
+        "name": "雏龙",
+        "effects": [
+          "每次换牌时最多选择3张牌",
+          "每次和牌都会使你减少5星币",
+          "过关分数×3",
+          "所有【万子】的宝牌/魂牌失效",
+          "所有【筒子】的宝牌/魂牌失效",
+          "所有【索子】的宝牌/魂牌失效",
+          "所有2番以上的役种均减少1番",
+          "清一色、混一色及七对子固定为1番",
+          "第一次和牌分数固定为0",
+          "宝牌指示牌的上限变为3张",
+          "禁用随机1张护身符的效果（当前配置权重均为0）",
+          "公开牌的上限变为3张",
+          "锁定3张待摸牌",
+          "所有的幺九牌的基础分值计为1",
+          "过关时无法获得任何星币",
+          "换牌次数无法超过3次",
+          "所有的役满和多倍役满役种均计为5番"
+        ]
+      },
+      "white": {
+        "name": "白龙",
+        "effects": [
+          "所有牌面带有黑色的牌不计基础分数",
+          "所有牌面带有绿色的牌不计基础分数",
+          "所有牌面带有红色的牌不计基础分数"
+        ]
+      },
+      "red": {
+        "name": "红龙",
+        "effects": [
+          "生命值上限临时改为20，关卡结束后恢复"
+        ]
+      },
+      "ice": {
+        "name": "冰龙",
+        "effects": [
+          "每当你受到伤害时，再受到一次1点伤害"
+        ]
+      },
+      "black": {
+        "name": "黑龙",
+        "effects": [
+          "所有牌都是狂暴牌"
+        ]
+      },
+      "blue": {
+        "name": "蓝龙",
+        "effects": [
+          "所有新增役种不再生效"
+        ]
+      },
+      "green": {
+        "name": "绿龙",
+        "effects": [
+          "直至关卡结束前，无法恢复生命值"
+        ]
+      },
+      "bronze": {
+        "name": "青铜龙",
+        "effects": [
+          "每次发牌都会减少一半的待摸牌"
+        ]
+      }
+    },
     "view_tile_scores": "查看牌基础分",
     "tile_scores_title": "牌基础分",
     "tile_scores_hint": "这里展示 game_state 里的 tile_score_map，所有牌的基础分都会参与基础分数计算。",
@@ -1802,7 +1959,7 @@
     "backendDisconnected": "后端：未连接",
     "noGame": "未找到游戏",
     "autorunTargetCount": "自动：当前目标 {{current}}/{{total}}",
-    "remaining": "剩余：{{count}}",
+    "level": "关卡：{{level}}",
     "stage": "阶段：{{stage}}",
     "coin": "⭐ {{coin}}",
     "bossBuff": "BossBuff：{{buffs}}",

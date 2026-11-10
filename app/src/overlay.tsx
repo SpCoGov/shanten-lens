@@ -7,8 +7,8 @@ import {ensureI18nReady} from "./lib/i18n";
 import {t} from "i18next";
 import * as backendIpc from "./lib/ipc";
 import type {PlanData} from "./lib/planTypes";
-import {readWanxiangPreferences} from "./lib/wanxiangSettings";
-import {readCustomSwitchOptions, CUSTOM_SWITCH_TARGET_KEY, CUSTOM_SWITCH_WALL_LIMIT_KEY, CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY} from "./lib/customSwitchSettings";
+import {readWanxiangPreferences, WANXIANG_PREFER_BONUS_KEY, WANXIANG_PREFERRED_SUIT_KEY, WANXIANG_PREFERRED_MELD_TYPE_KEY, WANXIANG_COIN_OBJECTIVE_KEY} from "./lib/wanxiangSettings";
+import {readCustomSwitchOptions, readCustomSwitchPresetName, CUSTOM_SWITCH_PRESET_KEY, CUSTOM_SWITCH_TARGET_KEY, CUSTOM_SWITCH_WALL_LIMIT_KEY, CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY} from "./lib/customSwitchSettings";
 import {targetSize, targetKind} from "./lib/customTarget";
 import type {EffectItem, GameStateData} from "./lib/gamestate";
 import {toDeckMap} from "./lib/gamestate";
@@ -31,11 +31,13 @@ import {
     readHudShowScoreProjection,
     readHudShowWanxiang,
     readHudShowCustomSwitch,
+    readHudShowCurrentLevel,
     HUD_ENABLED_KEY,
     HUD_SHOW_BLACKHOLE_KEY,
     HUD_SHOW_SCORE_PROJECTION_KEY,
     HUD_SHOW_WANXIANG_KEY,
     HUD_SHOW_CUSTOM_SWITCH_KEY,
+    HUD_SHOW_CURRENT_LEVEL_KEY,
 } from "./lib/hudSettings";
 
 type ExecutionState = {
@@ -55,6 +57,7 @@ const BLACKHOLE_PANEL_STORAGE_KEY = "sl-hud-panel:blackhole";
 const WANXIANG_PANEL_STORAGE_KEY = "sl-hud-panel:wanxiang";
 const CUSTOM_SWITCH_PANEL_STORAGE_KEY = "sl-hud-panel:custom-switch";
 const SCORE_PROJECTION_PANEL_STORAGE_KEY = "sl-hud-panel:score-projection";
+const CURRENT_LEVEL_PANEL_STORAGE_KEY = "sl-hud-panel:current-level";
 const SCORE_FAN_STORAGE_KEY = "shanten:point-fan:v1";
 const SCORE_WIN_COUNT_STORAGE_KEY = "shanten:point-win-count:v1";
 const SCORE_RULES_STORAGE_KEY = "shanten:point-rules:v1";
@@ -88,12 +91,15 @@ function HudOverlay() {
     const [showWanxiang, setShowWanxiang] = React.useState(() => readHudShowWanxiang());
     const [showCustomSwitch, setShowCustomSwitch] = React.useState(() => readHudShowCustomSwitch());
     const [showScoreProjection, setShowScoreProjection] = React.useState(() => readHudShowScoreProjection());
+    const [showCurrentLevel, setShowCurrentLevel] = React.useState(() => readHudShowCurrentLevel());
     const [stage, setStage] = React.useState(0);
     const [gameState, setGameState] = React.useState<GameStateData | null>(null);
     const [plan, setPlan] = React.useState<PlanData | null>(null);
     const [wanxiangPlan, setWanxiangPlan] = React.useState<PlanData | null>(null);
     const [customPlan, setCustomPlan] = React.useState<PlanData | null>(null);
     const [customOptions, setCustomOptions] = React.useState(readCustomSwitchOptions);
+    const [wanxiangPreferences, setWanxiangPreferences] = React.useState(readWanxiangPreferences);
+    const [customPresetName, setCustomPresetName] = React.useState(readCustomSwitchPresetName);
     const [customBusy, setCustomBusy] = React.useState(false);
     const customSearchOptions = React.useRef<string | null>(null);
     const [execution, setExecution] = React.useState<ExecutionState | null>(null);
@@ -101,12 +107,14 @@ function HudOverlay() {
     const wanxiangPanelRef = React.useRef<HTMLDivElement | null>(null);
     const customSwitchPanelRef = React.useRef<HTMLDivElement | null>(null);
     const scoreProjectionPanelRef = React.useRef<HTMLDivElement | null>(null);
+    const currentLevelPanelRef = React.useRef<HTMLDivElement | null>(null);
     const visiblePanels = React.useCallback(() => [
         showBlackhole ? blackholePanelRef.current : null,
         showWanxiang ? wanxiangPanelRef.current : null,
         showCustomSwitch ? customSwitchPanelRef.current : null,
         showScoreProjection ? scoreProjectionPanelRef.current : null,
-    ], [showBlackhole, showScoreProjection, showWanxiang, showCustomSwitch]);
+        showCurrentLevel ? currentLevelPanelRef.current : null,
+    ], [showBlackhole, showScoreProjection, showWanxiang, showCustomSwitch, showCurrentLevel]);
 
     React.useEffect(() => {
         invoke("set_overlay_enabled", {enabled: readHudEnabled()}).catch(() => {
@@ -167,6 +175,12 @@ function HudOverlay() {
 
     React.useEffect(() => {
         const onStorage = (event: StorageEvent) => {
+            if (event.key === null || [WANXIANG_PREFER_BONUS_KEY,WANXIANG_PREFERRED_SUIT_KEY,WANXIANG_PREFERRED_MELD_TYPE_KEY,WANXIANG_COIN_OBJECTIVE_KEY].includes(event.key)) {
+                setWanxiangPreferences(readWanxiangPreferences());
+            }
+            if (event.key === null || [CUSTOM_SWITCH_PRESET_KEY,CUSTOM_SWITCH_TARGET_KEY,CUSTOM_SWITCH_WALL_LIMIT_KEY,CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY].includes(event.key)) {
+                setCustomPresetName(readCustomSwitchPresetName());
+            }
             if (event.key === HUD_ENABLED_KEY) {
                 invoke("set_overlay_enabled", {enabled: readHudEnabled()}).catch(() => {
                 });
@@ -178,6 +192,8 @@ function HudOverlay() {
                 setShowCustomSwitch(readHudShowCustomSwitch());
             } else if (event.key === HUD_SHOW_SCORE_PROJECTION_KEY) {
                 setShowScoreProjection(readHudShowScoreProjection());
+            } else if (event.key === HUD_SHOW_CURRENT_LEVEL_KEY) {
+                setShowCurrentLevel(readHudShowCurrentLevel());
             } else if (event.key === null || [CUSTOM_SWITCH_TARGET_KEY, CUSTOM_SWITCH_WALL_LIMIT_KEY, CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY].includes(event.key)) {
                 setCustomOptions(readCustomSwitchOptions());
                 setCustomPlan(null);
@@ -189,7 +205,7 @@ function HudOverlay() {
     }, []);
 
     React.useEffect(() => {
-        const interactive = showBlackhole || showWanxiang || showCustomSwitch || showScoreProjection;
+        const interactive = showBlackhole || showWanxiang || showCustomSwitch || showScoreProjection || showCurrentLevel;
         invoke("set_overlay_interactive", {interactive}).catch(() => {
         });
         reportPanelRegions(visiblePanels());
@@ -198,10 +214,10 @@ function HudOverlay() {
             });
             reportPanelRegions([]);
         };
-    }, [showBlackhole, showScoreProjection, showWanxiang, showCustomSwitch, visiblePanels]);
+    }, [showBlackhole, showScoreProjection, showWanxiang, showCustomSwitch, showCurrentLevel, visiblePanels]);
 
     React.useEffect(() => {
-        if (!showBlackhole && !showWanxiang && !showCustomSwitch && !showScoreProjection) return;
+        if (!showBlackhole && !showWanxiang && !showCustomSwitch && !showScoreProjection && !showCurrentLevel) return;
         const report = () => reportPanelRegions(visiblePanels());
         report();
         window.addEventListener("resize", report);
@@ -210,9 +226,9 @@ function HudOverlay() {
             window.removeEventListener("resize", report);
             window.clearInterval(timer);
         };
-    }, [showBlackhole, showScoreProjection, showWanxiang, showCustomSwitch, visiblePanels]);
+    }, [showBlackhole, showScoreProjection, showWanxiang, showCustomSwitch, showCurrentLevel, visiblePanels]);
 
-    if (!showBlackhole && !showWanxiang && !showCustomSwitch && !showScoreProjection) {
+    if (!showBlackhole && !showWanxiang && !showCustomSwitch && !showScoreProjection && !showCurrentLevel) {
         return <div className="hud-root" aria-hidden="true"/>;
     }
 
@@ -244,9 +260,32 @@ function HudOverlay() {
     const canOperate = stage === 4 || stage === 5;
     const hasWanxiang = hasWanxiangInState(gameState);
     const scoreProjection = getScoreProjection(gameState);
+    const preferenceParts = [
+        wanxiangPreferences.preferred_suit ? t(wanxiangPreferences.preferred_suit === "z" ? "about.tile_groups.honors" : `tile.suits.${wanxiangPreferences.preferred_suit}`) : "",
+        wanxiangPreferences.preferred_meld_type ? t(`blackhole.meld_${wanxiangPreferences.preferred_meld_type}`) : "",
+        wanxiangPreferences.prefer_dora || wanxiangPreferences.prefer_soul ? t("overlay.bonus_melds") : "",
+        wanxiangPreferences.coin_objective ? t(`blackhole.wanxiang_${wanxiangPreferences.coin_objective}`) : "",
+    ].filter(Boolean);
 
     return (
         <div className="hud-root">
+            {showCurrentLevel ? (
+                <HudPanel
+                    id="current-level"
+                    className="hud-score-projection hud-current-level"
+                    storageKey={CURRENT_LEVEL_PANEL_STORAGE_KEY}
+                    defaultBounds={defaultCurrentLevelBounds()}
+                    panelRef={currentLevelPanelRef}
+                    onBoundsChange={() => reportPanelRegions(visiblePanels())}
+                    ariaLabel={t("score.current_level")}
+                    title={t("score.current_level")}
+                    compact
+                >
+                    <strong className="hud-current-level-value" aria-live="polite">
+                        {formatLevelIdToLabel(gameState?.level, gameState?.source, gameState?.node)}
+                    </strong>
+                </HudPanel>
+            ) : null}
             {showBlackhole ? (
                 <HudPanel
                     id="blackhole"
@@ -292,7 +331,7 @@ function HudOverlay() {
                     panelRef={wanxiangPanelRef}
                     onBoundsChange={() => reportPanelRegions(visiblePanels())}
                     ariaLabel={t("overlay.wanxiang_panel")}
-                    title={t("overlay.wanxiang_panel")}
+                    title={t("overlay.wanxiang_panel") + (preferenceParts.length ? ` · ${t("overlay.preference_details",{value:preferenceParts.join(" | ")})}` : "")}
                 >
                     <div className="hud-blackhole-actions">
                         <button onClick={() => sendWanxiangAction("start")} disabled={!canOperate || !hasWanxiang || wanxiangSearching}>
@@ -337,7 +376,7 @@ function HudOverlay() {
                     panelRef={customSwitchPanelRef}
                     onBoundsChange={() => reportPanelRegions(visiblePanels())}
                     ariaLabel={t("custom_target.title")}
-                    title={t("custom_target.title")}
+                    title={t("custom_target.title") + (customPresetName ? ` · ${t("overlay.preset_details",{name:customPresetName})}` : "")}
                 >
                     <div className="hud-blackhole-actions">
                         <button onClick={() => void sendCustomAction("start")} disabled={!customReady || !customValid || customSearching || customBusy || execution?.status === "running"}>
@@ -397,6 +436,7 @@ function HudPanel({
                       ariaLabel,
                       title,
                       children,
+                      compact = false,
                   }: {
     id: string;
     className: string;
@@ -407,8 +447,12 @@ function HudPanel({
     ariaLabel: string;
     title: string;
     children: React.ReactNode;
+    compact?: boolean;
 }) {
-    const [bounds, setBounds] = React.useState<PanelBounds>(() => readPanelBounds(storageKey, defaultBounds));
+    const [bounds, setBounds] = React.useState<PanelBounds>(() => {
+        const saved = readPanelBounds(storageKey, defaultBounds);
+        return compact ? clampBounds({...saved,width:defaultBounds.width,height:defaultBounds.height,collapsed:false}, true) : saved;
+    });
     const dragRef = React.useRef<{
         mode: "move" | "resize";
         pointerId: number;
@@ -422,10 +466,10 @@ function HudPanel({
     }, [bounds, onBoundsChange]);
 
     const updateBounds = React.useCallback((next: PanelBounds) => {
-        const clamped = clampBounds(next);
+        const clamped = clampBounds(next, compact);
         setBounds(clamped);
         writePanelBounds(storageKey, clamped);
-    }, [storageKey]);
+    }, [storageKey, compact]);
 
     const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         const target = event.target as HTMLElement;
@@ -481,7 +525,7 @@ function HudPanel({
                 left: bounds.x,
                 top: bounds.y,
                 width: bounds.width,
-                height: bounds.collapsed ? undefined : bounds.height,
+                height: compact || bounds.collapsed ? undefined : bounds.height,
             }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
@@ -489,8 +533,8 @@ function HudPanel({
             onPointerCancel={onPointerUp}
         >
             <div className="hud-panel-head">
-                <span>{title}</span>
-                <button
+                <span className="hud-panel-title" title={title}>{title}{compact ? <> {children}</> : null}</span>
+                {compact ? null : <button
                     type="button"
                     className="hud-panel-collapse"
                     onClick={toggleCollapsed}
@@ -498,10 +542,10 @@ function HudPanel({
                     title={bounds.collapsed ? t("overlay.expand_panel") : t("overlay.collapse_panel")}
                 >
                     {bounds.collapsed ? "+" : "-"}
-                </button>
+                </button>}
             </div>
-            {bounds.collapsed ? null : children}
-            {bounds.collapsed ? null : <span className="hud-panel-resize" aria-hidden="true"/>}
+            {compact || bounds.collapsed ? null : children}
+            {compact || bounds.collapsed ? null : <span className="hud-panel-resize" aria-hidden="true"/>}
         </section>
     );
 }
@@ -547,9 +591,14 @@ function defaultCustomSwitchBounds(): PanelBounds {
     return {...bounds, x: 16, y: 18};
 }
 
-function clampBounds(bounds: PanelBounds): PanelBounds {
-    const width = Math.min(Math.max(bounds.width, 320), Math.max(320, window.innerWidth - 16));
-    const height = Math.min(Math.max(bounds.height, 118), Math.max(118, window.innerHeight - 16));
+function defaultCurrentLevelBounds(): PanelBounds {
+    return {x: Math.max(16, window.innerWidth - 338), y: 194, width: 320, height: 40, collapsed: false};
+}
+
+function clampBounds(bounds: PanelBounds, compact = false): PanelBounds {
+    const minWidth = 320, minHeight = compact ? 40 : 118;
+    const width = Math.min(Math.max(bounds.width, minWidth), Math.max(minWidth, window.innerWidth - 16));
+    const height = Math.min(Math.max(bounds.height, minHeight), Math.max(minHeight, window.innerHeight - 16));
     return {
         x: Math.min(Math.max(bounds.x, 0), Math.max(0, window.innerWidth - width)),
         y: Math.min(Math.max(bounds.y, 0), Math.max(0, window.innerHeight - height)),
@@ -638,7 +687,7 @@ function hasWanxiangInState(gameState: GameStateData | null) {
 
 function getScoreProjection(gameState: GameStateData | null) {
     const level = Number(gameState?.level ?? 0);
-    const currentLevel = level > 0 ? formatLevelIdToLabel(level, gameState?.source) : "-";
+    const currentLevel = level > 0 ? formatLevelIdToLabel(level, gameState?.source, gameState?.node) : "-";
     const currentPointValue = parseTargetPointValue(gameState?.point ?? "0");
     const currentPoint = currentPointValue == null ? String(gameState?.point ?? "-") : formatFixed2(currentPointValue);
     if (level <= 0 || gameState == null) {

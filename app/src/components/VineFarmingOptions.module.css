@@ -1,0 +1,37 @@
+.refresh { --track: 92px; border: 1px solid var(--border); border-radius: 12px; background: var(--input-bg); padding: 12px 14px 6px; margin: 0 0 14px; min-width: 0; }
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+.headTitle { flex: 1 1 auto; font-size: 13px; font-weight: 600; color: var(--text); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.reward { --kind: var(--vine-reward-color); color: var(--kind); }
+.normal { --kind: var(--vine-normal-color); color: var(--kind); }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; border: 1px solid color-mix(in srgb, var(--kind) 50%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--kind) 16%, transparent); color: var(--text); font-size: 12px; line-height: 1.4; white-space: nowrap; }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--kind); }
+.chip output { font-weight: 700; font-variant-numeric: tabular-nums; }
+.scroll { overflow-x: auto; overflow-y: hidden; padding: 0 28px; scrollbar-width: none; -ms-overflow-style: none; }
+.scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.axis { position: relative; height: 204px; min-width: 460px; }
+.track { position: absolute; left: 7%; right: 7%; top: calc(var(--track) - 1px); height: 2px; border-radius: 1px; background: var(--muted); opacity: .6; }
+.range { position: absolute; left: 7%; height: 4px; border-radius: 2px; background: currentColor; opacity: .75; transition: width .15s ease; }
+.range.normal { top: calc(var(--track) - 6px); }
+.range.reward { top: calc(var(--track) + 2px); }
+.tick { position: absolute; top: calc(var(--track) - 6px); display: flex; flex-direction: column; align-items: center; gap: 6px; transform: translateX(-50%); color: var(--muted); font-size: 12px; line-height: 1; font-variant-numeric: tabular-nums; pointer-events: none; }
+.tick::before { content: ""; width: 2px; height: 12px; border-radius: 1px; background: var(--muted); }
+.axisEnd { position: absolute; left: 2%; top: var(--track); width: 22px; height: 22px; transform: translate(-50%, -50%); color: var(--muted); font-size: 22px; line-height: 1; pointer-events: none; }
+.axisEnd > svg { width: 22px; height: 22px; }
+.axisEndRight { left: 98%; }
+.handle { position: absolute; top: 0; width: 64px; height: 64px; transform: translateX(-50%); padding: 0; background: transparent; border: 0; cursor: grab; touch-action: none; transition: left .15s ease; }
+.handle.reward { top: calc(var(--track) + 44px); }
+/* Dashed connector from the handle's arrow tip to the track. */
+.handle::after { content: ""; position: absolute; left: 50%; border-left: 2px dashed currentColor; transform: translateX(-1px); pointer-events: none; }
+.handle.normal::after { top: 60px; height: calc(var(--track) - 60px); }
+.handle.reward::after { bottom: 100%; height: 44px; }
+.handle:active { cursor: grabbing; }
+.handle:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 10px; }
+.handle img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; user-select: none; transition: transform .15s ease; }
+.handle:hover img, .handle:focus-visible img { transform: scale(1.08); }
+@media (prefers-reduced-motion: reduce) { .range, .handle, .handle img { transition: none; } }
+.stops { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; font-size: 13px; }
+.stopLevel, .check { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; }
+.stopLevel > span { white-space: nowrap; flex-shrink: 0; }
+.stopLevel select { width: auto; min-width: 140px; height: 36px; box-sizing: border-box; }
+.check { cursor: pointer; }

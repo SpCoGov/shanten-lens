@@ -57,7 +57,7 @@ export type AutoRunnerOperationRecord = {
 export type RoundDecisionStatus = {
     status: "waiting" | "searching" | "executing" | "winning" | "blocked" | "stopped";
     reason?: string;
-    strategy?: "opening" | "full";
+    strategy?: "opening" | "full" | "vine_farming";
     stage_name?: string;
     hand_name?: string;
     target_faces?: string[];

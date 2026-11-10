@@ -146,6 +146,7 @@ pub struct GameStateData {
     coin: String,
     point: Option<String>,
     target_point: Option<String>,
+    first_win: Option<Value>,
     level: Option<u64>,
     node: Option<u64>,
     map_nodes: Option<Vec<Value>>,

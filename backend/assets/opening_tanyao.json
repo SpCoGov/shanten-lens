@@ -1,0 +1,181 @@
+[
+  {
+    "format": "shanten-lens.custom-target",
+    "version": 1,
+    "name": "开局断幺九1",
+    "target_groups": [
+      {
+        "rule": {
+          "faces": [
+            "3p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "3p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "3p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "4p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "5p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "6p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "7p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "8p"
+          ],
+          "ranks": [
+            8
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "8p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "8p"
+          ]
+        }
+      },
+      {},
+      {
+        "kind": "meld",
+        "rule": {
+          "faces": [
+            "4s",
+            "5s",
+            "6s"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "format": "shanten-lens.custom-target",
+    "version": 1,
+    "name": "开局断幺九2",
+    "target_groups": [
+      {
+        "rule": {
+          "faces": [
+            "2p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "2p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "2p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "3p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "4p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "5p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "6p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "7p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "7p"
+          ]
+        }
+      },
+      {
+        "rule": {
+          "faces": [
+            "7p"
+          ]
+        }
+      },
+      {},
+      {
+        "kind": "meld",
+        "rule": {
+          "faces": [
+            "4s",
+            "5s",
+            "6s"
+          ]
+        }
+      }
+    ]
+  }
+]

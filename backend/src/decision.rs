@@ -21,6 +21,10 @@ pub struct ActionScore {
 #[derive(Debug, Clone, Deserialize, Serialize, Type)]
 pub struct DecisionReport {
     pub actions: Vec<ActionScore>,
+    #[serde(default)]
+    pub profile_id: Option<String>,
+    #[serde(default)]
+    pub strategy: Option<String>,
 }
 
 pub(crate) fn first_action(state: &Value) -> Option<ActionCandidate> {
@@ -29,6 +33,9 @@ pub(crate) fn first_action(state: &Value) -> Option<ActionCandidate> {
     for action in ["actions", "global_actions"].iter()
         .flat_map(|key| state["action_report"][key].as_array().into_iter().flatten()) {
         if action["availability"] != "available" { continue; }
+        if scores.and_then(|scores| scores.iter().find(|score| score["action_id"] == action["id"]))
+            .and_then(|score| score["rules"].as_array()).and_then(|rules| rules.last())
+            .is_some_and(|rule| rule["rule_id"] == "vine_protected") { continue; }
         let score = scores.and_then(|scores| scores.iter().find(|score| score["action_id"] == action["id"]))
             .and_then(|score| score["total"].as_f64()).unwrap_or(0.0);
         // Match the UI's stable descending sort, including zero for absent scores.
@@ -64,6 +71,18 @@ struct Rule {
 }
 
 const RULES: &[Rule] = &[Rule {
+    id: "opening_map_remake",
+    action_kind: Some("remake"),
+    evaluate: opening_map_remake,
+}, Rule {
+    id: "opening_search_remake",
+    action_kind: Some("remake"),
+    evaluate: opening_search_remake,
+}, Rule {
+    id: "opening_character",
+    action_kind: Some("select_character"),
+    evaluate: opening_character,
+}, Rule {
     id: "ryan_without_plus",
     action_kind: None,
     evaluate: ryan_without_plus,
@@ -143,15 +162,21 @@ const RULES: &[Rule] = &[Rule {
     id: "imp_gain",
     action_kind: None,
     evaluate: imp_gain,
+}, Rule {
+    id: "white_night_profit",
+    action_kind: Some("buy_effect"),
+    evaluate: white_night_profit,
 }];
 
 // shortcut: larger scores stay unknown; use decimal-string scores if costs exceed JS exact integers.
 const MAX_EXACT_SCORE: i64 = 9_007_199_254_740_991;
 
 pub fn evaluate(state: &Value, actions: &ActionReport, registry: &Value, playbook: &Value) -> DecisionReport {
+    let all_actions = actions;
     let selecting = actions.actions.iter().chain(&actions.global_actions).any(|action| action.kind == "select_candidate");
     let packs: Vec<_> = actions.actions.iter().chain(&actions.global_actions)
         .filter(|action| action.kind == "buy_pack"
+            && (!crate::vine_farming::selected(playbook) || crate::vine_farming::wanted_pack(state, action))
             && matches!(action.params["goods_id"].as_u64(), Some(101..=103 | 111..=113))).collect();
     let affordable_pack = if packs.iter().any(|action| action.availability == Availability::Available) {
         Some(true)
@@ -181,7 +206,8 @@ pub fn evaluate(state: &Value, actions: &ActionReport, registry: &Value, playboo
                         reason: ActionReason { code: code.into(), values: json!({}) },
                     })
                 }).collect();
-            if action.kind == "select_candidate" {
+            if action.kind == "select_candidate" || (action.kind == "buy_effect"
+                && rules.iter().any(|rule| rule.rule_id == "configured_target" && rule.score.is_some_and(|score| score > 0.0))) {
                 rules.extend(replacement_losses(state, action, registry, playbook));
             }
             let refresh_score = match (action.kind.as_str(), refresh_budget, affordable_pack) {
@@ -233,10 +259,158 @@ pub fn evaluate(state: &Value, actions: &ActionReport, registry: &Value, playboo
             score.total = (total.is_finite() && total.abs() <= MAX_EXACT_SCORE as f64).then_some(total);
         }
     }
-    if state["stage"] == 9 && !selecting {
+    if state["stage"] == 9 && !selecting && !crate::vine_farming::selected(playbook) {
         shop_pack_priorities(state, &packs, &actions, &mut scores, playbook);
     }
-    DecisionReport { actions: scores }
+    opening_shop_scores(state, all_actions, &actions, &mut scores, registry, playbook);
+    if crate::vine_farming::selected(playbook) {
+        let profile = playbook["profiles"].as_array().unwrap().iter().find(|p| p["id"] == playbook["selected_profile_id"]).unwrap();
+        crate::vine_farming::adjust(state, all_actions, &actions, &mut scores, profile);
+    }
+    let profile = playbook["profiles"].as_array().and_then(|profiles| profiles.iter().find(|p| p["id"] == playbook["selected_profile_id"]));
+    DecisionReport { actions: scores, profile_id: profile.and_then(|p| p["id"].as_str()).map(str::to_owned),
+        strategy: profile.map(|p| p["strategy"].as_str().unwrap_or("full").to_owned()) }
+}
+
+fn before_opening_cutoff<'a>(state: &Value, book: &'a Value) -> Option<&'a Value> {
+    let profile = s4_opening_profile(state, book)?;
+    let map = &state["provider_state"]["map"];
+    let current = map_position(&map["level"], &map["node"], &state["source"])?;
+    let cutoff = map_position(&profile["cutoff_level"], &profile["cutoff_node"], &state["source"])?;
+    (current.0 == cutoff.0 && current < cutoff).then_some(profile)
+}
+
+fn mystery_shop_page(state: &Value, book: &Value) -> Option<u64> {
+    if state["stage"] != 11 || state["provider_state"]["state"]["interrupt"] != 0 { return None; }
+    before_opening_cutoff(state, book)?;
+    state["provider_state"]["nodeEvent"]["advancedShopRefreshCount"].as_u64()
+}
+
+fn white_night_profit(state: &Value, action: &ActionCandidate, registry: &Value, book: &Value) -> Option<(Option<f64>, &'static str)> {
+    if !mystery_shop_page(state, book).is_some_and(|page| page <= 1)
+        || !matches!(action.params["effect"]["id"].as_u64(), Some(1670 | 1671))
+        || action.cost_resource != "coin" { return None; }
+    if before_opening_cutoff(state, book)?["targets"].as_array()?.iter()
+        .any(|target| target["kind"] == "amulet" && target["id"] == 167) { return None; }
+    let mut sale = action.clone();
+    sale.kind = "sell_effect".into();
+    if configured_target(state, &sale, registry, book).is_some_and(|(score, _)| score.is_some_and(|value| value < 0.0)) { return None; }
+    let (income, _) = amulet_price(state, &sale, registry, book)?;
+    let cost = action.cost.as_deref()?.parse::<u64>().ok()?;
+    income.filter(|income| *income > cost as f64).map(|income| (Some(income), "white_night_profit"))
+}
+
+fn add_shop_score(score: &mut ActionScore, value: f64, rule: &str, reason: &str) {
+    let value = (value.is_finite() && value.abs() <= MAX_EXACT_SCORE as f64).then_some(value);
+    score.rules.push(RuleScore { rule_id: rule.into(), score: value,
+        reason: ActionReason { code: reason.into(), values: json!({}) } });
+    let total: f64 = score.rules.iter().filter_map(|rule| rule.score).sum();
+    score.total = (total.is_finite() && total.abs() <= MAX_EXACT_SCORE as f64).then_some(total);
+}
+
+fn opening_shop_scores(state: &Value, report: &ActionReport, actions: &[&ActionCandidate], scores: &mut [ActionScore], registry: &Value, book: &Value) {
+    let Some(profile) = before_opening_cutoff(state, book) else { return; };
+    if state["stage"] == 9 {
+        let map = &state["provider_state"]["map"];
+        let reserve = map["mapNodes"].as_array().is_some_and(|nodes| nodes.iter().enumerate().any(|(index, node)| {
+            let node_id = json!(index + 1);
+            node["type"] == 3 && node["subType"] == 1 && node_id.as_u64() > map["node"].as_u64()
+                && map_position(&map["level"], &node_id, &state["source"])
+                    .zip(map_position(&profile["cutoff_level"], &profile["cutoff_node"], &state["source"]))
+                    .is_some_and(|(shop, cutoff)| shop < cutoff)
+        }));
+        if reserve {
+            let leave = actions.iter().zip(scores.iter()).find(|(action, _)| action.kind == "next_node")
+                .and_then(|(_, score)| score.total).unwrap_or(0.0);
+            for (action, score) in actions.iter().zip(scores.iter_mut()) {
+                if !matches!(action.kind.as_str(), "buy_pack" | "refresh_shop" | "shop_upgrade") || action.cost_resource != "coin" { continue; }
+                let enough = action.cost.as_deref().and_then(|cost| cost.parse::<u128>().ok())
+                    .and_then(|cost| cost.checked_add(25))
+                    .and_then(|cost| crate::action_provider::compare_amount(&state["provider_state"]["game"]["coin"], cost));
+                if enough.is_some_and(|order| order.is_lt()) {
+                    if let Some(total) = score.total.filter(|total| *total >= leave) {
+                        add_shop_score(score, leave - 1.0 - total, "mystery_shop_reserve", "mystery_shop_reserve");
+                    }
+                }
+            }
+        }
+    }
+    let page = mystery_shop_page(state, book);
+    if page.is_some_and(|page| page <= 1) {
+        let pressure = report.actions.iter().filter(|action| action.kind == "buy_effect")
+            .filter(|action| {
+                if action.availability == Availability::Available { return true; }
+                if action.availability != Availability::Unavailable || action.reasons.is_empty()
+                    || action.reasons.iter().any(|reason| reason.code != "capacity") { return false; }
+                let mut after = state.clone();
+                let Some(owned) = after["provider_state"]["effect"]["effectList"].as_array_mut() else { return false; };
+                owned.retain(|effect| !report.actions.iter().any(|sale| sale.kind == "sell_effect"
+                    && sale.availability == Availability::Available && sale.params["uid"] == effect["uid"]
+                    && !configured_target(state, sale, registry, book).is_some_and(|(score, _)| score.is_some_and(|value| value < 0.0))
+                    && !opening_target_base(state, sale, registry, book).is_some_and(|(score, _)| score.is_some_and(|value| value < 0.0))));
+                crate::action_provider::evaluate(&after).actions.iter().any(|candidate|
+                    candidate.id == action.id && candidate.availability == Availability::Available)
+            })
+            .filter_map(|action| {
+                let target = configured_target(state, action, registry, book).and_then(|(score, _)| score).unwrap_or(0.0)
+                    + replacement_losses(state, action, registry, book).iter().filter(|rule| rule.rule_id == "replacement_target")
+                        .filter_map(|rule| rule.score).sum::<f64>();
+                let profit = white_night_profit(state, action, registry, book).and_then(|(score, _)| score).unwrap_or(0.0);
+                (target + profit > 0.0).then_some(target + profit)
+            }).fold(0.0, f64::max);
+        for (action, score) in actions.iter().zip(scores.iter_mut()) {
+            if action.kind == "refresh_shop" {
+                if page == Some(0) && state["provider_state"]["nodeEvent"]["advancedShopRefreshPrice"] == 1
+                    && action.cost_resource == "coin" && action.cost.as_deref() == Some("1") {
+                    add_shop_score(score, 21.0, "mystery_shop_refresh", "mystery_shop_second_page");
+                } else {
+                    add_shop_score(score, -20.0, "mystery_shop_refresh", "mystery_shop_refresh_limit");
+                }
+            }
+            if pressure > 0.0 && matches!(action.kind.as_str(), "refresh_shop" | "skip") {
+                add_shop_score(score, -pressure, "mystery_shop_target", "mystery_shop_keep_target");
+            } else if pressure == 0.0 && action.kind == "skip" {
+                add_shop_score(score, 1.0, "mystery_shop_target", "mystery_shop_no_target");
+            }
+        }
+    } else if state["stage"] == 11 && state["provider_state"]["state"]["interrupt"] == 0 {
+        let best = actions.iter().zip(scores.iter()).filter(|(action, _)| !matches!(action.kind.as_str(), "skip" | "remake"))
+            .filter_map(|(_, score)| score.total).fold(0.0, f64::max);
+        for (_, score) in actions.iter().zip(scores.iter_mut()).filter(|(action, _)| action.kind == "skip") {
+            if let Some(total) = score.total { add_shop_score(score, best + 1.0 - total, "mystery_shop_refresh", "mystery_shop_refresh_limit"); }
+        }
+    }
+    if state["stage"] == 11 && !page.is_some_and(|page| page <= 1) { return; }
+    let white: Vec<_> = actions.iter().zip(scores.iter()).enumerate().filter_map(|(index, (action, score))| {
+        if !matches!(action.params["effect"]["id"].as_u64(), Some(1670 | 1671))
+            || !matches!(action.kind.as_str(), "select_candidate" | "sell_effect" | "buy_effect")
+            || (action.kind == "buy_effect" && !score.rules.iter().any(|rule| rule.rule_id == "white_night_profit"))
+            || profile["targets"].as_array()?.iter().any(|target| target["kind"] == "amulet" && target["id"] == 167) { return None; }
+        let mut sale = (*action).clone();
+        sale.kind = "sell_effect".into();
+        if configured_target(state, &sale, registry, book).is_some_and(|(score, _)| score.is_some_and(|value| value < 0.0))
+            || opening_target_base(state, &sale, registry, book).is_some_and(|(score, _)| score.is_some_and(|value| value < 0.0)) { return None; }
+        Some((index, action.kind == "sell_effect"))
+    }).collect();
+    if white.is_empty() { return; }
+    let best = actions.iter().zip(scores.iter()).enumerate().filter(|(index, (action, _))|
+        action.kind != "remake" && !white.iter().any(|(white, _)| white == index))
+        .filter_map(|(_, (_, score))| score.total).fold(0.0, f64::max);
+    for &(index, _) in white.iter().filter(|(_, selling)| !selling) {
+        let target = best + 1.0;
+        if let Some(total) = scores[index].total.filter(|total| *total < target) {
+            add_shop_score(&mut scores[index], target - total, "white_night_priority", "white_night_priority");
+        }
+    }
+    let best = actions.iter().zip(scores.iter()).enumerate().filter(|(index, (action, _))|
+        action.kind != "remake" && !white.iter().any(|(white, selling)| white == index && *selling))
+        .filter_map(|(_, (_, score))| score.total).fold(best, f64::max);
+    for (index, _) in white.into_iter().filter(|(_, selling)| *selling) {
+        let target = best + 2.0;
+        if let Some(total) = scores[index].total.filter(|total| *total < target) {
+            add_shop_score(&mut scores[index], target - total, "white_night_priority", "white_night_priority");
+        }
+    }
 }
 
 fn shop_pack_priorities(state: &Value, packs: &[&ActionCandidate], actions: &[&ActionCandidate], scores: &mut [ActionScore], playbook: &Value) {
@@ -403,23 +577,42 @@ fn bonfire(state: &Value, action: &ActionCandidate, _registry: &Value, _playbook
     Some((Some(score), reason))
 }
 
+fn opening_character(_state: &Value, action: &ActionCandidate, _registry: &Value, book: &Value) -> Option<(Option<f64>, &'static str)> {
+    let profile = book["profiles"].as_array()?.iter().find(|profile| profile["id"] == book["selected_profile_id"])?;
+    let id = profile.get("character_id").map_or(Some(201), Value::as_u64)?;
+    (matches!(id, 201..=204) && action.params["id"].as_u64() == Some(id))
+        .then_some((Some(99.0), "select_opening_character"))
+}
+
 fn configured_target(state: &Value, action: &ActionCandidate, _registry: &Value, book: &Value) -> Option<(Option<f64>, &'static str)> {
-    if !matches!(action.kind.as_str(), "select_candidate" | "sell_effect") { return None; }
+    let buying = action.kind == "buy_effect";
+    if !matches!(action.kind.as_str(), "select_candidate" | "sell_effect" | "buy_effect") { return None; }
+    if buying && !mystery_shop_page(state, book).is_some_and(|page| page <= 1) { return None; }
     let profile = book["profiles"].as_array()?.iter().find(|profile| profile["id"] == book["selected_profile_id"])?;
     let effect = &action.params["effect"];
     let raw_id = effect["id"].as_u64().filter(|id| *id > 0)?;
-    let upgrading = action.kind == "select_candidate" && state["provider_state"]["effect"]["effectList"].as_array()
+    let upgrading = (action.kind == "select_candidate" || buying) && state["provider_state"]["effect"]["effectList"].as_array()
         .is_some_and(|owned| !crate::action_provider::completes_effect_group(effect, owned)
             && crate::action_provider::replaced_effect(effect, owned).is_some());
     let raw_id = if upgrading { ACTION_RULES["effects"][raw_id.to_string()]["upgrade"].as_u64().unwrap_or(raw_id) }
         else { raw_id };
     let badge = badge_id(effect);
+    let exact_match = |effect: &Value, target: &Value| effect["id"].as_u64().is_some_and(|id|
+        target["id"].as_u64() == Some(id / 10) && target["plus"].as_bool().unwrap_or(false) == (id % 10 == 1)
+            && target["badge"].as_u64().is_none_or(|badge| badge_id(effect) == Some(badge)));
+    let owned = state["provider_state"]["effect"]["effectList"].as_array();
     let matches_amulet = |target: &Value| target["id"].as_u64() == Some(raw_id / 10)
         && target["plus"].as_bool().unwrap_or(false) == (raw_id % 10 == 1)
         && target["badge"].as_u64().is_none_or(|id| badge == Some(id));
     let value = if profile["strategy"] == "opening" {
         profile["targets"].as_array()?.iter().filter(|target| match target["kind"].as_str() {
-            Some("amulet") => matches_amulet(target),
+            Some("amulet") => {
+                if buying && owned.is_some_and(|owned| owned.iter().any(|effect| exact_match(effect, target))) { return false; }
+                matches_amulet(target) || (buying && !upgrading && raw_id % 10 == 0 && badge.is_some()
+                    && target["id"].as_u64() == Some(raw_id / 10) && target["plus"] == true
+                    && owned.is_some_and(|owned| !owned.iter().any(|effect|
+                        effect["id"].as_u64().map(|id| id / 10) == Some(raw_id / 10))))
+            }
             Some("badge") => badge.is_some_and(|id| id > 0 && target["id"].as_u64() == Some(id)),
             _ => false,
         }).try_fold(0u64, |sum, target| {
@@ -456,7 +649,8 @@ fn configured_target(state: &Value, action: &ActionCandidate, _registry: &Value,
     let score = value.and_then(|value| value.checked_mul(99)).filter(|score| *score <= MAX_EXACT_SCORE as u64);
     let selling = action.kind == "sell_effect";
     Some((score.map(|score| if selling { -(score as f64) } else { score as f64 }),
-        if score.is_none() { "invalid_target_value" } else if selling { "sell_configured_target" } else { "select_configured_target" }))
+        if score.is_none() { "invalid_target_value" } else if selling { "sell_configured_target" }
+        else if buying { "mystery_shop_buy_target" } else { "select_configured_target" }))
 }
 
 fn map_position(level: &Value, node: &Value, source: &Value) -> Option<(u64, usize, usize)> {
@@ -471,6 +665,18 @@ fn map_position(level: &Value, node: &Value, source: &Value) -> Option<(u64, usi
     let level = &levels[index];
     Some((level["activity_id"].as_u64()?, index,
         level["nodes"].as_array()?.iter().position(|node| node["node"].as_u64() == Some(node_id))?))
+}
+
+fn opening_map_remake(state: &Value, _action: &ActionCandidate, _registry: &Value, book: &Value) -> Option<(Option<f64>, &'static str)> {
+    book["profiles"].as_array()?.iter().find(|p| p["id"] == book["selected_profile_id"] && p["strategy"] == "opening")?;
+    (crate::opening::map_mismatch(state) == Some(true)).then_some((Some(99999.0), "opening_map_mismatch"))
+}
+
+fn opening_search_remake(state: &Value, _action: &ActionCandidate, _registry: &Value, book: &Value) -> Option<(Option<f64>, &'static str)> {
+    if !crate::opening::is_first_battle(state) || state["record"]["levelHuCount"].as_u64().unwrap_or(0) > 0 { return None; }
+    let profile = book["profiles"].as_array()?.iter().find(|p| p["id"] == book["selected_profile_id"] && p["strategy"] == "opening")?;
+    (state["opening_search_failure"]["profile_id"] == profile["id"])
+        .then_some((Some(99999.0), "opening_search_unreachable"))
 }
 
 fn remake_at_cutoff(state: &Value, _action: &ActionCandidate, _registry: &Value, book: &Value) -> Option<(Option<f64>, &'static str)> {
@@ -534,6 +740,7 @@ fn remake_at_cutoff(state: &Value, _action: &ActionCandidate, _registry: &Value,
 }
 
 pub(crate) fn tactical_stage<'a>(state: &Value, profile: &'a Value) -> Result<Option<&'a Value>, &'static str> {
+    if profile["strategy"] == crate::vine_farming::STRATEGY { return Ok(None); }
     if state["stage"] == 2 { return Ok(None); }
     let missing = "missing_tactical_stage";
     let map = state.pointer("/provider_state/map").filter(|map| map.is_object()).unwrap_or(state);

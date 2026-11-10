@@ -34,6 +34,8 @@ export default function ActionProviderPanel({state, execution}: {state: GameStat
     const {pending, waiting, disabled, feedback, execute} = execution;
     const report = state?.action_report;
     const scores = new Map((state?.decision_report?.actions ?? []).map(score => [score.action_id, score]));
+    const policyBlocked = (action: ActionCandidate) => scores.get(action.id)?.rules.at(-1)?.rule_id === "vine_protected";
+    const farmingScores = [...scores.values()].some(score => score.rules.some(rule => rule.rule_id.startsWith("vine_")));
     const byScore = (a: ActionCandidate, b: ActionCandidate) => compareActionScores(a, b, scores);
     const actions = [...(report?.actions ?? [])].sort(byScore);
     const globalActions = [...(report?.global_actions ?? [])].sort(byScore);
@@ -90,14 +92,14 @@ export default function ActionProviderPanel({state, execution}: {state: GameStat
         </div>
         <span className={styles.actionMeta}>
             {action.cost != null && <span className={styles.cost}><span className="ms" aria-hidden="true">{action.cost_resource === "hp" ? "favorite" : "stars"}</span><span>{action.cost}</span><small>{t(`action_provider.${action.cost_resource}`)}</small></span>}
-            <span className={`${styles.availability} ${styles[action.availability]}`}><span className="ms" aria-hidden="true">{pending === action.id ? "hourglass_top" : {available: "play_arrow", unavailable: "block", unknown: "help"}[action.availability]}</span>{t(pending === action.id ? "action_provider.execution.pending" : `action_provider.${action.availability}`)}</span>
+            <span className={`${styles.availability} ${styles[policyBlocked(action) ? "unavailable" : action.availability]}`}><span className="ms" aria-hidden="true">{policyBlocked(action) ? "block" : pending === action.id ? "hourglass_top" : {available: "play_arrow", unavailable: "block", unknown: "help"}[action.availability]}</span>{t(policyBlocked(action) ? "vine.protected_action" : pending === action.id ? "action_provider.execution.pending" : `action_provider.${action.availability}`)}</span>
         </span>
         {action.availability === "available" && scoreBadge(action)}
     </>;
     };
     const rows = (items: ActionCandidate[]) => items.map(action => <li key={action.id}>
         {action.availability === "available" ? <button type="button" className={`${styles.row} ${styles.action}`}
-            disabled={disabled}
+            disabled={disabled || policyBlocked(action)}
             aria-busy={pending === action.id} onClick={() => void execute(action)}>
             {rowContent(action)}
         </button> : <div className={styles.row}>{rowContent(action)}</div>}
@@ -106,6 +108,7 @@ export default function ActionProviderPanel({state, execution}: {state: GameStat
     return <section className={`panel ${styles.panel}`} aria-label={t("action_provider.title")}>
         <div className={styles.header}>
             <h3 className="panel-title"><span className="ms" aria-hidden="true">rule</span>{t("action_provider.title")}</h3>
+            {farmingScores && <span className={styles.context}>{t("vine.title")}</span>}
             <div className={styles.headerActions}>
                 {report && report.stage > 0 && <span className={styles.context}>{t(`action_provider.stages.${report.stage}`, {defaultValue: t("action_provider.stage_id", {id: report.stage})})}
                     {report.interrupt === 1000 && report.stage !== 2 && report.stage !== 16 && <> · {t("action_provider.pack_interrupt")}</>}
@@ -143,12 +146,10 @@ export default function ActionProviderPanel({state, execution}: {state: GameStat
                         {score?.total === null && <p className={styles.message}>{t("action_provider.scoring.out_of_range")}</p>}
                         {score?.rules.length ? <ul className={styles.rules}>
                             {score.rules.map(rule => <li key={rule.rule_id}>
-                                <div><strong>{t(`action_provider.scoring.rules.${rule.rule_id}`)}</strong>
-                                    <p>{rule.score == null ? t("action_provider.scoring.ignored", {reason: t(`action_provider.scoring.reasons.${rule.reason.code}`, {...object(rule.reason.values)})})
-                                        : t(`action_provider.scoring.reasons.${rule.reason.code}`, {...object(rule.reason.values)})}</p></div>
+                                <span>{t(`action_provider.scoring.rules.${rule.rule_id}`)}</span>
                                 <strong className={`${styles.ruleScore} ${scoreTone(rule.score ?? 0)}`}>{signed(rule.score ?? 0)}</strong>
                             </li>)}
-                        </ul> : <p className={styles.message}>{t("action_provider.scoring.no_rules")}</p>}
+                        </ul> : null}
                     </section>;
                 })}
             </div>}

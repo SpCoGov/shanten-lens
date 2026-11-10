@@ -5,12 +5,19 @@ import {getMagicVineStats, onBackendEvent, subscribeBackendEvent} from "../lib/i
 import {formatLevelIdToLabel} from "../lib/levelFormat";
 import Modal from "./Modal";
 import styles from "./MagicVineStats.module.css";
-import {hasObtainedMagicVine, highestTileScore} from "../lib/magicVineMetrics";
+import {hasObtainedMagicVine, highestTileScore, vineMetricTrend, type VineSummaryMetric} from "../lib/magicVineMetrics";
 import {formatNumberWithScientificThreshold} from "../lib/bigNumber";
+import type {LevelRecordItem} from "./LevelRecordPanel";
 
 const obtained = (game: MagicVineGame) => game.pack_obtained + game.shop_obtained + game.regeneration_obtained + game.other_obtained;
 
-export default function MagicVineStats({tileScoreMap, amulets}: {tileScoreMap?: Record<string, string>; amulets?: readonly {id: number}[]}) {
+export default function MagicVineStats({tileScoreMap, amulets, highestRecord, variant = "summary", className}: {
+    tileScoreMap?: Record<string, string>;
+    amulets?: readonly {id: number}[];
+    highestRecord?: Pick<LevelRecordItem,"state"|"best">;
+    variant?: "summary" | "button";
+    className?: string;
+}) {
     const {t, i18n} = useTranslation();
     const [stats, setStats] = React.useState<Stats>({current: null, history: [], loading: true});
     const [open, setOpen] = React.useState(false);
@@ -41,11 +48,12 @@ export default function MagicVineStats({tileScoreMap, amulets}: {tileScoreMap?: 
         }).catch(() => { if (active) setError(true); });
         return () => { active = false; unlisten(); stopResync(); };
     }, []);
-    const visible = hasObtainedMagicVine(stats.current, amulets);
+    const visible = variant === "button" || hasObtainedMagicVine(stats.current, amulets);
     React.useEffect(() => {if (!visible) setOpen(false);}, [visible]);
     if (!visible) return null;
 
     const current = stats.current;
+    const trend = (metric: VineSummaryMetric) => stats.loading ? "unknown" : vineMetricTrend(current,stats.history,metric);
     const hasOther = stats.history.some(game => game.other_obtained > 0);
     const columns = ["game", "pack_obtained", "shop_obtained", "regeneration_obtained", ...(hasOther ? ["other_obtained"] : []), "obtained", "score_triggers", "expansion_extra", "farming_average", "shops_purchases"];
     const cells = (game: MagicVineGame) => <>
@@ -56,23 +64,29 @@ export default function MagicVineStats({tileScoreMap, amulets}: {tileScoreMap?: 
         <td>{game.shops} / {game.shop_obtained}</td>
     </>;
     return <>
-        <div className="home-record-row is-up" data-testid="magic-vine-highest-score">
+        {variant === "button" ? <button type="button" className={className} onClick={() => setOpen(true)} aria-label={t("magic_vine.open")}>
+            <span className="ms" aria-hidden="true">psychiatry</span>{t("magic_vine.title")}
+        </button> : <>
+        <div className={`home-record-row ${highestRecord?.state === "below" ? "is-down" : "is-up"}`} data-testid="magic-vine-highest-score">
             <div className="home-record-content">
                 <div className="home-record-label">{t("magic_vine.highest_score")}</div>
                 <div className="home-record-value-line"><span className="home-record-value">{highest == null ? "—" : formatNumberWithScientificThreshold(highest, 2)}</span></div>
+                {highestRecord?.state === "below" && <div className="home-record-meta"><span>{t("level_records.best_label",{value:formatNumberWithScientificThreshold(BigInt(highestRecord.best),2)})}</span></div>}
             </div>
         </div>
         <button className={styles.summary} onClick={() => setOpen(true)} aria-label={t("magic_vine.open")}>
             <span className={styles.title}><span className="ms" aria-hidden="true">psychiatry</span>{t("magic_vine.title")}<span className="ms" aria-hidden="true">chevron_right</span></span>
             {error ? <span>{t("magic_vine.load_failed")}</span> : <span className={styles.metrics}>
-                <span><small>{t("magic_vine.obtained")}</small><strong>{current ? obtained(current) : "—"}</strong></span>
-                <span><small>{t("magic_vine.per_round")}</small><strong>{current && current.farming_rounds > 0 ? (current.farming_obtained / current.farming_rounds).toFixed(2) : "—"}</strong></span>
-                <span><small>{t("magic_vine.shops_purchases")}</small><strong>{current ? `${current.shops} / ${current.shop_obtained}` : "—"}</strong></span>
+                <span><small>{t("magic_vine.obtained")}</small><strong data-trend={trend("obtained")}>{current ? obtained(current) : "—"}</strong></span>
+                <span><small>{t("magic_vine.per_round")}</small><strong data-trend={trend("average")}>{current && current.farming_rounds > 0 ? (current.farming_obtained / current.farming_rounds).toFixed(2) : "—"}</strong></span>
+                <span><small>{t("magic_vine.shops_purchases")}</small><strong>{current ? <><span data-trend={trend("shops")}>{current.shops}</span>{" / "}<span data-trend={trend("purchases")}>{current.shop_obtained}</span></> : "—"}</strong></span>
             </span>}
         </button>
+        </>}
         <Modal open={open} onClose={close} title={t("magic_vine.history_title")} width={1160}
             actions={current && <span className={styles.phase}>{t("magic_vine.farming_state", {state: t(`magic_vine.states.${current.farming_status || "unformed"}`)})}</span>}>
             {stats.loading && <p className={styles.note}>{t("magic_vine.loading")}</p>}
+            {error && <p role="alert" className={styles.note}>{t("magic_vine.load_failed")}</p>}
             <div className={styles.tableWrap}>
                 <table className={styles.table}>
                     <thead><tr>{columns.map(key => <th key={key}>{t(`magic_vine.${key}`)}</th>)}</tr></thead>
@@ -84,7 +98,7 @@ export default function MagicVineStats({tileScoreMap, amulets}: {tileScoreMap?: 
                     </tr>)}</tbody>
                 </table>
             </div>
-            {stats.history.length === 0 && <p className={styles.note}>{t("magic_vine.empty")}</p>}
+            {!stats.loading && !error && stats.history.length === 0 && <p className={styles.note}>{t("magic_vine.empty")}</p>}
         </Modal>
     </>;
 }

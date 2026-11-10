@@ -45,7 +45,7 @@ struct Cycle {
     triggers: u64,
 }
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 pub(super) struct Farming {
     unlocked: bool,
     active: bool,

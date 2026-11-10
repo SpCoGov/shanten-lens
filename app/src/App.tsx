@@ -25,7 +25,7 @@ import WallStats from "./components/WallStats";
 import ReplacementPanel from "./components/ReplacementPanel";
 import ReplacementStats from "./components/ReplacementStats";
 import AdvisorPanel from "./components/AdvisorPanel";
-import LevelRecordPanel, {useLevelRecordItems} from "./components/LevelRecordPanel";
+import LevelRecordPanel, {useLevelRecordItems, MAX_TILE_SCORE_METRIC_KEY} from "./components/LevelRecordPanel";
 import MagicVineStats from "./components/MagicVineStats";
 import AmuletBar from "./components/AmuletBar";
 import {setAppLanguage} from "./lib/i18n";
@@ -879,7 +879,6 @@ export default function App() {
     const [point, setPoint] = React.useState<string>("0");
     const [targetPoint, setTargetPoint] = React.useState<string>("0");
     const [level, setLevel] = React.useState<number>(0);
-    const [remain, setRemain] = React.useState<number>(0);
     const [hasGame, setHasGame] = React.useState<boolean>(false);
     const [bossBuff, setBossBuff] = React.useState<number[]>([]);
     const [shopBuffList, setShopBuffList] = React.useState<Record<number, number>>({});
@@ -1495,7 +1494,6 @@ export default function App() {
                 setPoint(typeof d.point === "string" ? d.point : String(d.point ?? "0"));
                 setTargetPoint(typeof d.target_point === "string" ? d.target_point : String(d.target_point ?? "0"));
                 setLevel(typeof d.level === "number" ? d.level : Number(d.level ?? 0));
-                setRemain(d.desktop_remain ?? 0);
                 setHasGame(d.stage !== undefined && d.stage >= 0);
                 setBossBuff(Array.isArray((d as any).boss_buff) ? (d as any).boss_buff : []);
                 setShopBuffList((d as any).shop_buff_list && typeof (d as any).shop_buff_list === "object"
@@ -1976,7 +1974,7 @@ export default function App() {
                                                             suuAnkou={planSuuAnkou}
                                                             chiitoi={planChiitoi}
                                                             resolveFace={(id) => deckMap.get(id) ?? null}
-                                                        /><MagicVineStats tileScoreMap={latestGameState?.tile_score_map} amulets={latestGameState?.effect_list}/></>
+                                                        /><MagicVineStats tileScoreMap={latestGameState?.tile_score_map} amulets={latestGameState?.effect_list} highestRecord={levelRecordItems.find(item => item.key === MAX_TILE_SCORE_METRIC_KEY)}/></>
                                                     ) : (
                                                         <LevelRecordPanel level={level} source={latestGameState?.source} node={latestGameState?.node} items={levelRecordItems} tileScoreMap={latestGameState?.tile_score_map} amulets={latestGameState?.effect_list}/>
                                                     )}
@@ -2317,7 +2315,7 @@ export default function App() {
                                     })}
                                 </span>
                             ) : null}
-                            <span className="badge">{t("status.remaining", {count: remain})}</span>
+                            <span className="badge">{t("status.level", {level: formatLevelIdToLabel(level, latestGameState?.source, latestGameState?.node)})}</span>
                             <span className="badge">{t("status.stage", {stage: stage})}</span>
                             <span className="badge">{t("status.coin", {coin})}</span>
                             {bossBuff.length > 0 ? (

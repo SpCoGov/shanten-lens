@@ -608,9 +608,9 @@ mod tests {
         let runtime = tokio::task::spawn_blocking(move || super::super::BackendRuntime::load(root.join("configs")))
             .await.unwrap().unwrap();
         let state = &runtime.state;
-        for profile_id in ["opening-profile", "profile-a"] {
+        for profile_id in ["opening-profile", "opening-fallback", "profile-a"] {
             let mut book: Value = serde_json::from_str(include_str!("../../tests/fixtures/playbook.json")).unwrap();
-            book["selected_profile_id"] = json!(profile_id);
+            book["selected_profile_id"] = json!(if profile_id == "opening-fallback" {"opening-profile"} else {profile_id});
             for (index, stage) in book["profiles"][0]["stages"].as_array_mut().unwrap().iter_mut().enumerate() {
                 stage["start_level"] = json!(102 + index as u64);
                 stage["start_node"] = json!(0);
@@ -619,11 +619,13 @@ mod tests {
             }
             book["profiles"][1]["cutoff_level"] = json!(1299);
             book["profiles"][1]["cutoff_node"] = json!(0);
-            let target = ["1p","1p","1p","2p","2p","2p","3p","3p","3p","4p","4p","4p","5p","5p"];
+            let target = if profile_id == "opening-profile" {
+                ["3p","3p","3p","4p","5p","6p","7p","8p","8p","8p","7p","4s","5s","6s"]
+            } else { ["1p","1p","1p","2p","2p","2p","3p","3p","3p","4p","4p","4p","5p","5p"] };
             book["profiles"][0]["stages"][0]["hands"][0]["target_groups"] = json!(target.map(|face|
                 json!({"kind":"single","rule":{"faces":[face]}})));
             state.services.patch_config(&json!({"autorun":{"playbook":book,"op_interval_ms":100}})).unwrap();
-            let faces = ["1p","1p","1p","2p","2p","2p","3p","3p","3p","4p","4p","4p","5m","5p","5p","9s","8s"];
+            let faces = target[..12].iter().copied().chain(["5m",target[12],target[13],"9s","8s"]).collect::<Vec<_>>();
             let game = json!({"source":"qyzz","qyzz_run_id":profile_id,"qyzz_version":1,"qyzz_deal_id":1,
                 "stage":5,"level":102,"node":0,"deck_map":faces.iter().enumerate()
                     .map(|(i, face)|((i+1).to_string(),json!(face))).collect::<serde_json::Map<_,_>>(),
@@ -691,7 +693,10 @@ mod tests {
                 }
             }).await.expect("round runner did not complete two wins");
             assert_eq!(state.automation.autorun_status()["round_decision"]["strategy"],
-                if profile_id == "opening-profile" { "opening" } else { "full" });
+                if profile_id.starts_with("opening-") { "opening" } else { "full" });
+            if profile_id == "opening-fallback" {
+                assert_eq!(state.automation.autorun_status()["round_decision"]["pinzu_count"],14);
+            }
             assert!(runtime.autorun(crate::ipc::AutorunAction::Stop, false).await.ok);
             assert_eq!(game_task.await.unwrap(), [101,100,8,8]);
             assert_eq!(state.automation.autorun_status()["round_decision"]["status"], "stopped");

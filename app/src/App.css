@@ -3368,21 +3368,21 @@ input:invalid, textarea:invalid, select:invalid {
 }
 
 .home-record-row.is-up .home-record-value {
-    color: #16a34a;
+    color: var(--home-record-up-color);
     text-shadow: 0 0 14px color-mix(in srgb, #22c55e 34%, transparent);
 }
 
 .home-record-row.is-up .home-record-delta {
-    color: #16a34a;
+    color: var(--home-record-up-color);
 }
 
 .home-record-row.is-down .home-record-value {
-    color: #dc2626;
+    color: var(--home-record-down-color);
     text-shadow: 0 0 14px color-mix(in srgb, #ef4444 30%, transparent);
 }
 
 .home-record-row.is-down .home-record-delta {
-    color: #dc2626;
+    color: var(--home-record-down-color);
 }
 
 .home-record-meta {
@@ -3583,6 +3583,13 @@ input:invalid, textarea:invalid, select:invalid {
     margin: 5px 0 0;
     color: var(--muted);
     font-size: 13px;
+}
+
+.switch-guide-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
 }
 
 .switch-guide-status {

@@ -3,6 +3,18 @@ import {newTargetGroup, restoreTargetGroups, type TargetGroup} from "./customTar
 export const CUSTOM_SWITCH_TARGET_KEY = "sl-custom-switch:target-v1";
 export const CUSTOM_SWITCH_WALL_LIMIT_KEY = "sl-custom-switch:wall-limit";
 export const CUSTOM_SWITCH_EXCLUDE_INVALID_SHAPES_KEY = "sl-custom-switch:exclude-invalid-shapes";
+export const CUSTOM_SWITCH_PRESET_KEY = "sl-custom-switch:loaded-preset";
+
+export function rememberCustomSwitchPreset(name: string, options: ReturnType<typeof readCustomSwitchOptions>) {
+    try { localStorage.setItem(CUSTOM_SWITCH_PRESET_KEY, JSON.stringify({name, options})); } catch {}
+}
+
+export function readCustomSwitchPresetName(): string {
+    try {
+        const saved = JSON.parse(localStorage.getItem(CUSTOM_SWITCH_PRESET_KEY) ?? "null");
+        return typeof saved?.name === "string" && JSON.stringify(saved.options) === JSON.stringify(readCustomSwitchOptions()) ? saved.name : "";
+    } catch { return ""; }
+}
 
 export function readCustomSwitchOptions() {
     let groups: TargetGroup[] = Array.from({length: 14}, newTargetGroup);
