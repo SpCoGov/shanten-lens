@@ -3,7 +3,7 @@
   "productName": "Shanten Lens",
   "identifier": "app.shanten.lens",
   "build": {
-    "beforeDevCommand": "vite",
+    "beforeDevCommand": "pnpm run dev",
     "beforeBuildCommand": "pnpm run build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
