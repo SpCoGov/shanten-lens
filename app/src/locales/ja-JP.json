@@ -1692,7 +1692,6 @@
   },
   "dora_indicator": {
     "title": "ドラ表示牌",
-    "unrevealed": "未公開",
     "empty": "ドラ表示牌なし"
   },
   "tile": {

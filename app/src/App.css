@@ -3516,15 +3516,6 @@ input:invalid, textarea:invalid, select:invalid {
     flex: 0 0 auto;
 }
 
-.dora-indicator-unrevealed {
-    display: block;
-    color: var(--color-muted);
-    font-size: 9px;
-    line-height: 16px;
-    text-align: center;
-    white-space: nowrap;
-}
-
 .dora-indicator-empty {
     color: var(--color-muted);
     font-size: 12px;

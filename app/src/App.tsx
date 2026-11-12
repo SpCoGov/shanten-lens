@@ -1353,10 +1353,9 @@ export default function App() {
 
     const doraIndicatorTiles = React.useMemo(
         () => (latestGameState?.dora_tiles ?? [])
-            .map((id) => ({id, tile: deckMap.get(id), unrevealed: latestGameState?.revealed_dora_tiles != null
-                && !latestGameState.revealed_dora_tiles.includes(id)}))
-            .filter((item): item is {id: number; tile: string; unrevealed: boolean} => Boolean(item.tile)),
-        [deckMap, latestGameState?.dora_tiles, latestGameState?.revealed_dora_tiles],
+            .map((id) => ({id, tile: deckMap.get(id)}))
+            .filter((item): item is {id: number; tile: string} => Boolean(item.tile)),
+        [deckMap, latestGameState?.dora_tiles],
     );
 
     const toggleTheme = React.useCallback((event?: React.MouseEvent<HTMLButtonElement>) => {
@@ -2175,7 +2174,7 @@ export default function App() {
                                                 {doraIndicatorTiles.length === 0 ? (
                                                     <div className="dora-indicator-empty">{t("dora_indicator.empty")}</div>
                                                 ) : (
-                                                    doraIndicatorTiles.map(({id, tile, unrevealed}) => (
+                                                    doraIndicatorTiles.map(({id, tile}) => (
                                                         <div className="dora-indicator-tile" key={id}>
                                                             <Tile
                                                                 tile={tile}
@@ -2184,7 +2183,6 @@ export default function App() {
                                                                 width={30}
                                                                 height={40}
                                                             />
-                                                            {unrevealed && <span className="dora-indicator-unrevealed">{t("dora_indicator.unrevealed")}</span>}
                                                         </div>
                                                     ))
                                                 )}
