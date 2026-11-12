@@ -321,10 +321,10 @@ export default function LevelRecordPanel({
                                     </div>
                                 ) : null}
                             </div>
-                        </div>{item.key === HAITEI_FAN_METRIC_KEY && <MagicVineStats tileScoreMap={tileScoreMap} amulets={amulets} highestRecord={highestRecord}/>}</React.Fragment>
+                        </div>{item.key === HAITEI_FAN_METRIC_KEY && <MagicVineStats level={level} tileScoreMap={tileScoreMap} amulets={amulets} highestRecord={highestRecord}/>}</React.Fragment>
                     );
                 })}
-                {!items.some(item => item.key === HAITEI_FAN_METRIC_KEY) && <MagicVineStats tileScoreMap={tileScoreMap} amulets={amulets} highestRecord={highestRecord}/>}
+                {!items.some(item => item.key === HAITEI_FAN_METRIC_KEY) && <MagicVineStats level={level} tileScoreMap={tileScoreMap} amulets={amulets} highestRecord={highestRecord}/>}
             </div>
         </aside>
     );

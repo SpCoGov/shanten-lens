@@ -1,0 +1,313 @@
+{
+  "source": "packet",
+  "stage": 9,
+  "level": 14015,
+  "node": 3,
+  "effect_list": [
+    {
+      "badge": {
+        "id": 600150,
+        "random": 39256,
+        "store": [],
+        "uid": 218
+      },
+      "id": 3771,
+      "store": [],
+      "tags": [],
+      "uid": 154,
+      "volume": 1
+    },
+    {
+      "badge": {
+        "id": 600150,
+        "random": 74485,
+        "store": [],
+        "uid": 232
+      },
+      "id": 1691,
+      "store": [
+        "2"
+      ],
+      "tags": [],
+      "uid": 194,
+      "volume": 1
+    },
+    {
+      "badge": {
+        "id": 600150,
+        "random": 11923,
+        "store": [],
+        "uid": 222
+      },
+      "id": 2321,
+      "store": [
+        "0"
+      ],
+      "tags": [],
+      "uid": 195,
+      "volume": 1
+    },
+    {
+      "badge": {
+        "id": 600070,
+        "random": 86009,
+        "store": [],
+        "uid": 229
+      },
+      "id": 621,
+      "store": [],
+      "tags": [],
+      "uid": 135,
+      "volume": 1
+    },
+    {
+      "badge": {
+        "id": 600070,
+        "random": 50413,
+        "store": [],
+        "uid": 114
+      },
+      "id": 1501,
+      "store": [],
+      "tags": [],
+      "uid": 91,
+      "volume": 1
+    },
+    {
+      "badge": {
+        "id": 600070,
+        "random": 18217,
+        "store": [],
+        "uid": 226
+      },
+      "id": 1661,
+      "store": [],
+      "tags": [],
+      "uid": 141,
+      "volume": 1
+    },
+    {
+      "badge": {
+        "id": 600070,
+        "random": 22327,
+        "store": [],
+        "uid": 208
+      },
+      "id": 1601,
+      "store": [],
+      "tags": [],
+      "uid": 204,
+      "volume": 1
+    },
+    {
+      "id": 3760,
+      "store": [],
+      "tags": [],
+      "uid": 233,
+      "volume": 1
+    }
+  ],
+  "provider_state": {
+    "state": {
+      "current": 9,
+      "interrupt": 0
+    },
+    "shop": {
+      "goods": [
+        {
+          "goodsId": 103,
+          "id": 1,
+          "price": 15,
+          "sold": true
+        },
+        {
+          "goodsId": 102,
+          "id": 2,
+          "price": 10,
+          "sold": false
+        },
+        {
+          "goodsId": 102,
+          "id": 3,
+          "price": 10,
+          "sold": false
+        },
+        {
+          "goodsId": 103,
+          "id": 4,
+          "price": 15,
+          "sold": true
+        },
+        {
+          "goodsId": 102,
+          "id": 5,
+          "price": 10,
+          "sold": false
+        }
+      ],
+      "refreshPrice": 12,
+      "shopRefreshCount": 5,
+      "upgradeGoods": [
+        {
+          "id": 6,
+          "level": 1,
+          "price": 5,
+          "upgradeId": 8002
+        },
+        {
+          "id": 7,
+          "level": 3,
+          "price": 6,
+          "upgradeId": 8003
+        },
+        {
+          "id": 8,
+          "level": 1,
+          "price": 10,
+          "upgradeId": 8004
+        }
+      ]
+    },
+    "map": {
+      "level": 14015,
+      "node": 3
+    },
+    "game": {
+      "coin": "1216"
+    },
+    "character": {
+      "hp": 171,
+      "maxHp": 180
+    },
+    "effect": {
+      "effectList": [
+        {
+          "badge": {
+            "id": 600150,
+            "random": 39256,
+            "store": [],
+            "uid": 218
+          },
+          "id": 3771,
+          "store": [],
+          "tags": [],
+          "uid": 154,
+          "volume": 1
+        },
+        {
+          "badge": {
+            "id": 600150,
+            "random": 74485,
+            "store": [],
+            "uid": 232
+          },
+          "id": 1691,
+          "store": [
+            "2"
+          ],
+          "tags": [],
+          "uid": 194,
+          "volume": 1
+        },
+        {
+          "badge": {
+            "id": 600150,
+            "random": 11923,
+            "store": [],
+            "uid": 222
+          },
+          "id": 2321,
+          "store": [
+            "0"
+          ],
+          "tags": [],
+          "uid": 195,
+          "volume": 1
+        },
+        {
+          "badge": {
+            "id": 600070,
+            "random": 86009,
+            "store": [],
+            "uid": 229
+          },
+          "id": 621,
+          "store": [],
+          "tags": [],
+          "uid": 135,
+          "volume": 1
+        },
+        {
+          "badge": {
+            "id": 600070,
+            "random": 50413,
+            "store": [],
+            "uid": 114
+          },
+          "id": 1501,
+          "store": [],
+          "tags": [],
+          "uid": 91,
+          "volume": 1
+        },
+        {
+          "badge": {
+            "id": 600070,
+            "random": 18217,
+            "store": [],
+            "uid": 226
+          },
+          "id": 1661,
+          "store": [],
+          "tags": [],
+          "uid": 141,
+          "volume": 1
+        },
+        {
+          "badge": {
+            "id": 600070,
+            "random": 22327,
+            "store": [],
+            "uid": 208
+          },
+          "id": 1601,
+          "store": [],
+          "tags": [],
+          "uid": 204,
+          "volume": 1
+        },
+        {
+          "id": 3760,
+          "store": [],
+          "tags": [],
+          "uid": 233,
+          "volume": 1
+        }
+      ],
+      "maxEffectVolume": 8,
+      "shopBuffList": [
+        {
+          "id": 8002,
+          "store": [
+            "0"
+          ]
+        },
+        {
+          "id": 8003,
+          "store": [
+            "2"
+          ]
+        },
+        {
+          "id": 8004,
+          "store": [
+            "0"
+          ]
+        }
+      ],
+      "packCandidates": [],
+      "packDisableSkip": 0,
+      "packGoodsId": 0
+    }
+  }
+}

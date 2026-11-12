@@ -6,8 +6,8 @@ use std::cmp::Ordering;
 pub const STRATEGY: &str = "vine_farming";
 const VINE: u64 = 3760;
 const KNIGHT: u64 = 356;
+pub(crate) const SUPPORTS: &[u64] = &[KNIGHT, 351, 160];
 const EXPANSION: u64 = 600160;
-const ECHO: u64 = 600180;
 const DEMON: u64 = 600310;
 const CORE: &[u64] = &[377, 232, 169, 166, 150, 62];
 
@@ -35,7 +35,6 @@ pub fn valid_options(profile: &Value) -> bool {
 }
 
 pub fn stop_reason(game: &Value, profile: &Value) -> Option<(&'static str, &'static str)> {
-    if echo_present(game) { return Some(("vine_echo","vine.echo_found")); }
     if game["ended"] == true || game["stage"] == 100 { return None; }
     if let Some(target) = profile["stop_ex"].as_u64() {
         if ex_number(game).is_some_and(|n| n > target || (n == target && matches!(game["stage"].as_u64(),Some(9|16)))) {
@@ -68,20 +67,25 @@ pub fn lineup_valid(game: &Value) -> bool {
         && owned.iter().filter(|e| id(e) == VINE).count() <= 1
 }
 
-pub fn recovering(owned: &[Value]) -> bool {
-    !owned.iter().any(|e| (id(e) == KNIGHT * 10 + 1 && matches!(badge(e), 600070 | 600150))
+pub fn support_family(owned: &[Value]) -> Option<u64> {
+    owned.iter().map(|effect| id(effect) / 10).find(|family| SUPPORTS.contains(family))
+}
+
+fn support_target(state: &Value, profile: &Value) -> u64 {
+    profile["support_amulet"].as_u64().filter(|family| SUPPORTS.contains(family))
+        .or_else(|| support_family(items(&state["provider_state"]["effect"]["effectList"]))).unwrap_or(KNIGHT)
+}
+
+fn recovering(owned: &[Value], family: u64) -> bool {
+    !owned.iter().any(|e| (id(e) == family * 10 + 1 && badge(e) == 600070)
         || (id(e) == VINE && badge(e) == EXPANSION))
 }
 
-pub fn wanted_pack(state: &Value, action: &ActionCandidate) -> bool {
+pub fn wanted_pack(state: &Value, action: &ActionCandidate, book: &Value) -> bool {
+    let profile = items(&book["profiles"]).iter().find(|p| p["id"] == book["selected_profile_id"]).unwrap_or(&Value::Null);
     matches!(action.params["goods_id"].as_u64(), Some(103 | 113))
-        || (recovering(items(&state["provider_state"]["effect"]["effectList"]))
+        || (recovering(items(&state["provider_state"]["effect"]["effectList"]), support_target(state,profile))
             && matches!(action.params["goods_id"].as_u64(), Some(102 | 112)))
-}
-
-pub fn echo_present(game: &Value) -> bool {
-    items(&game["candidate_effect_list"]).iter().chain(items(&game["effect_list"]))
-        .any(|e| id(e) / 10 == VINE / 10 && badge(e) == ECHO)
 }
 
 // Compare positive decimal/scientific strings without losing low digits or expanding exponents.
@@ -122,47 +126,73 @@ pub fn first_win_insufficient(game: &Value) -> bool {
 }
 
 // A candidate's target value uses the same 99-point multiplier as configured targets.
-fn target_value(candidate: &Value, owned: &[Value]) -> f64 {
+fn target_value(candidate: &Value, owned: &[Value], family: u64) -> f64 {
     let raw = id(candidate);
-    if raw == VINE && badge(candidate) != ECHO { return 10.0; }
-    if raw / 10 == KNIGHT && !matches!(badge(candidate), EXPANSION | DEMON) {
-        let ready = owned.iter().any(|e| id(e) == KNIGHT * 10 + 1);
-        if recovering(owned) && (!ready || matches!(badge(candidate), 600070 | 600150)) { return 3.0; }
+    if raw == VINE { return 10.0; }
+    if raw / 10 == family && !matches!(badge(candidate), EXPANSION | DEMON) {
+        let ready = owned.iter().any(|e| id(e) == family * 10 + 1);
+        let improves_seal = badge(candidate) == 600070 || (badge(candidate) == 600150
+            && !owned.iter().any(|e| id(e) == family * 10 + 1 && badge(e) == 600150));
+        if recovering(owned,family) && (!ready || improves_seal) { return 3.0; }
+    }
+    if SUPPORTS.contains(&(raw / 10)) && raw / 10 != family && recovering(owned,family)
+        && !matches!(badge(candidate),EXPANSION|DEMON) {
+        let slot = owned.iter().find(|e| SUPPORTS.contains(&(id(e) / 10)));
+        if slot.is_none() || slot.is_some_and(|held| id(held) / 10 == raw / 10
+            && (id(held) % 10 == 0 || (badge(held) != 600070 && badge(candidate) == 600070))) { return 1.0; }
     }
     0.0
 }
 
 pub fn adjust(state: &Value, report: &ActionReport, actions: &[&ActionCandidate], scores: &mut [ActionScore], profile: &Value) {
     let owned = items(&state["provider_state"]["effect"]["effectList"]);
+    let family = support_target(state,profile);
     let candidates: Vec<_> = report.actions.iter().filter(|a| a.kind == "select_candidate"
         && a.availability != Availability::Unknown
         && a.reasons.iter().all(|r| r.code == "capacity")) .collect();
-    let vine = candidates.iter().any(|a| id(&a.params["effect"]) == VINE && badge(&a.params["effect"]) != ECHO);
+    let vine = candidates.iter().any(|a| id(&a.params["effect"]) == VINE);
     let expansion = candidates.iter().any(|a| id(&a.params["effect"]) == VINE && badge(&a.params["effect"]) == EXPANSION);
+    let guidance_support = candidates.iter().any(|a| id(&a.params["effect"]) / 10 == family && badge(&a.params["effect"]) == 600070);
     let held_vine = owned.iter().any(|e| id(e) / 10 == VINE / 10);
-    let held_knight = owned.iter().any(|e| id(e) / 10 == KNIGHT);
-    let restore = recovering(owned);
-    let blue_selection = restore && matches!(state["provider_state"]["effect"]["packGoodsId"].as_u64(), Some(102 | 112));
-    let expendable = |effect: &Value| !CORE.contains(&(id(effect) / 10)) && !matches!(id(effect) / 10, KNIGHT | 376)
+    let held_support = owned.iter().any(|e| SUPPORTS.contains(&(id(e) / 10)));
+    let target_present = candidates.iter().any(|a| id(&a.params["effect"]) / 10 == family
+        && target_value(&a.params["effect"],owned,family) > 0.0);
+    let restore = recovering(owned,family);
+    let expendable = |effect: &Value| !CORE.contains(&(id(effect) / 10)) && !SUPPORTS.contains(&(id(effect) / 10)) && id(effect) / 10 != 376
         && !matches!(badge(effect), EXPANSION | DEMON);
     let has_spare = owned.iter().any(expendable);
+    let recyclable: Vec<_> = actions.iter().zip(scores.iter()).filter(|(action,score)| {
+        let effect = &action.params["effect"];
+        action.kind == "select_candidate" && expendable(effect)
+            && crate::action_provider::RULES["effects"][id(effect).to_string()]["can_sell"] == 1
+            && crate::action_provider::replaced_effect(effect,owned).is_none()
+            && !crate::action_provider::completes_effect_group(effect,owned)
+            && score.total.is_some_and(|total| total > 0.0)
+            && score.rules.iter().all(|rule| rule.score.is_some())
+            && score.rules.iter().any(|rule| rule.rule_id == "amulet_price" && rule.score.is_some_and(|value| value > 0.0))
+            && !score.rules.iter().any(|rule| rule.rule_id == "hp_loss" && rule.score.is_some_and(|value| value < 0.0))
+    }).map(|(action,_)|action.id.clone()).collect();
     let blue_available = restore && actions.iter().any(|a| a.kind == "buy_pack" && matches!(a.params["goods_id"].as_u64(), Some(102 | 112)));
-    let best_target = candidates.iter().map(|a| target_value(&a.params["effect"], owned)).fold(0.0, f64::max) * 99.0;
+    let best_target = candidates.iter().map(|a| target_value(&a.params["effect"], owned,family)).fold(0.0, f64::max) * 99.0;
     let mut allowed = Vec::new();
     for (action, score) in actions.iter().zip(scores.iter_mut()) {
         let effect = &action.params["effect"];
         let (permit, bonus, reason) = match action.kind.as_str() {
             "select_candidate" => {
-                let value = target_value(effect, owned);
+                let value = target_value(effect, owned,family);
                 let target = value > 0.0 && (!vine || id(effect) == VINE)
-                    && !(id(effect) == VINE && (held_vine || (expansion && held_knight)));
-                (target || (blue_selection && !vine && expendable(effect)), 99.0 * value, "vine_target")
+                    && (!guidance_support || id(effect) / 10 != family || badge(effect) == 600070)
+                    && !(id(effect) == VINE && (held_vine || (expansion && held_support)));
+                (target || (restore && !vine && recyclable.contains(&action.id)), 99.0 * value, "vine_target")
             },
             "sell_effect" => {
-                let sell_knight = expansion && held_knight && id(effect) / 10 == KNIGHT;
-                let sell_vine = vine && id(effect) == VINE && !(expansion && held_knight);
+                let sell_support = expansion && held_support && SUPPORTS.contains(&(id(effect) / 10));
+                let sell_temporary = SUPPORTS.contains(&(id(effect) / 10)) && id(effect) / 10 != family
+                    && !vine && (target_present || owned.iter().any(|e| id(e) / 10 == family));
+                let sell_vine = vine && id(effect) == VINE && !(expansion && held_support);
                 let sell_spare = restore && expendable(effect);
-                (sell_knight || sell_vine || sell_spare, if sell_knight || sell_vine { 990.0 } else { 99.0 }, "vine_make_space")
+                (sell_support || sell_temporary || sell_vine || sell_spare,
+                    if sell_support || sell_temporary || sell_vine { 990.0 } else { 99.0 }, "vine_make_space")
             },
             "buy_pack" => {
                 let tier = action.params["goods_id"].as_u64();
@@ -261,7 +291,7 @@ mod tests {
         assert_eq!(choose(&state).kind,"refresh_shop");
     }
     #[test]
-    fn recovery_uses_102_blue_never_101_green_and_stops_as_soon_as_plus_is_restored() {
+    fn recovery_uses_102_blue_never_101_green_and_stops_only_at_guidance_plus() {
         let mut state = fixture();
         remove(&mut state,3561);
         state["provider_state"]["shop"]["goods"] = json!([
@@ -276,6 +306,8 @@ mod tests {
         remove(&mut state,3560);
         state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().push(effect(3561,600150));
         state["provider_state"]["state"]["interrupt"] = json!(0);
+        assert_eq!(choose(&state).params["goods_id"],102,"Friend PLUS is transitional, so keep opening blue");
+        state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().last_mut().unwrap()["badgeId"] = json!(600070);
         assert_eq!(choose(&state).params["goods_id"],103);
     }
     #[test]
@@ -378,6 +410,87 @@ mod tests {
         assert_eq!(choose(&state).params["goods_id"],103,"Keep looking for replacement vine before restoring Knight");
     }
     #[test]
+    fn captured_ex15_black_hole_uses_family_160_and_protects_uid_204() {
+        let mut state: Value = serde_json::from_str(include_str!("../tests/fixtures/vine-ex15-black-hole.json")).unwrap();
+        assert!(lineup_valid(&state));
+        assert_eq!(support_family(items(&state["effect_list"])),Some(160));
+        state["provider_state"]["shop"]["goods"] = json!([
+            {"id":1,"goodsId":102,"price":10,"sold":false},{"id":2,"goodsId":103,"price":15,"sold":false}]);
+        assert_eq!(choose(&state).params["goods_id"],103,"Never sell black hole or open blue to look for Knight");
+        candidates(&mut state,json!([effect(3560,600070),effect(3510,600070)]));
+        assert_eq!(choose(&state).kind,"skip","Neither other support may replace the handed-over black hole");
+        candidates(&mut state,json!([effect(VINE,0)]));
+        assert_eq!(choose(&state).params["effect"]["id"],VINE);
+        candidates(&mut state,json!([effect(VINE,EXPANSION)]));
+        let action = choose(&state);
+        assert_eq!(action.kind,"sell_effect");
+        assert_eq!(action.params["effect"]["id"],1601);
+        assert_eq!(action.params["uid"],204,"UID is only the server sale argument, not the support family");
+    }
+
+    #[test]
+    fn handed_over_supports_are_protected_and_restore_only_the_same_guidance_plus() {
+        for family in SUPPORTS {
+            let mut state = fixture();
+            state["provider_state"]["effect"]["effectList"][6] = effect(family * 10 + 1,600070);
+            state["provider_state"]["shop"]["goods"] = json!([
+                {"id":1,"goodsId":102,"price":10,"sold":false},{"id":2,"goodsId":103,"price":15,"sold":false}]);
+            let options = json!({"support_amulet":family});
+            assert_eq!(support_family(items(&state["provider_state"]["effect"]["effectList"])),Some(*family));
+            assert_eq!(choose_with(&state,&options).params["goods_id"],103,"A complete support never triggers blue recovery");
+            for other in SUPPORTS {
+                candidates(&mut state,json!([effect(other * 10,600070),effect(other * 10,600150)]));
+                assert_eq!(choose_with(&state,&options).kind,"skip","Never replace a formed support for another family or seal");
+            }
+            candidates(&mut state,json!([effect(VINE,EXPANSION)]));
+            assert_eq!(choose_with(&state,&options).params["effect"]["id"],family * 10 + 1);
+            remove(&mut state,family * 10 + 1);
+            assert_eq!(choose_with(&state,&options).params["effect"]["id"],VINE);
+            remove(&mut state,VINE);
+            assert_eq!(choose_with(&state,&options).kind,"select_candidate");
+            state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().push(effect(VINE,EXPANSION));
+            state["provider_state"]["state"]["interrupt"] = json!(0);
+            assert_eq!(choose_with(&state,&options).params["goods_id"],103,"Replace expansion before recovering the support");
+            candidates(&mut state,json!([effect(VINE,0)]));
+            assert_eq!(choose_with(&state,&options).kind,"sell_effect");
+            remove(&mut state,VINE);
+            assert_eq!(choose_with(&state,&options).kind,"select_candidate");
+            state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().push(effect(VINE,0));
+            state["provider_state"]["state"]["interrupt"] = json!(0);
+            assert_eq!(choose_with(&state,&options).params["goods_id"],102,"Recover the handed-over family even while it is absent");
+            for other in SUPPORTS.iter().filter(|other| *other != family) {
+                candidates(&mut state,json!([effect(other * 10,600070)]));
+                assert_eq!(choose_with(&state,&options).kind,"select_candidate","A temporary support can fill the empty slot without changing the target");
+            }
+            for bad in [EXPANSION,DEMON] {
+                candidates(&mut state,json!([effect(family * 10,bad)]));
+                assert_eq!(choose_with(&state,&options).kind,"skip","Reject forbidden seals on the first copy");
+            }
+            candidates(&mut state,json!([effect(family * 10,600150)]));
+            assert_eq!(choose_with(&state,&options).kind,"select_candidate");
+            state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().push(effect(family * 10,600150));
+            for bad in [EXPANSION,DEMON] {
+                candidates(&mut state,json!([effect(family * 10,bad)]));
+                assert_eq!(choose_with(&state,&options).kind,"skip","Reject forbidden seals on the second copy");
+            }
+            candidates(&mut state,json!([effect(family * 10,0)]));
+            assert_eq!(choose_with(&state,&options).kind,"select_candidate","Second ordinary copy can still make PLUS");
+            remove(&mut state,family * 10);
+            state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().push(effect(family * 10 + 1,600150));
+            state["provider_state"]["state"]["interrupt"] = json!(0);
+            assert_eq!(choose_with(&state,&options).params["goods_id"],102,"Friend PLUS remains transitional for every support");
+            for bad in [0,600150,EXPANSION,DEMON] {
+                candidates(&mut state,json!([effect(family * 10,bad)]));
+                assert_eq!(choose_with(&state,&options).kind,"skip");
+            }
+            candidates(&mut state,json!([effect(family * 10,600150),effect(family * 10,600070)]));
+            assert_eq!(choose_with(&state,&options).params["index"],1);
+            state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().last_mut().unwrap()["badgeId"] = json!(600070);
+            state["provider_state"]["state"]["interrupt"] = json!(0);
+            assert_eq!(choose_with(&state,&options).params["goods_id"],103,"Only the original family's guidance PLUS ends recovery");
+        }
+    }
+    #[test]
     fn ordinary_vine_replaces_without_merging_and_wins_over_knight() {
         let mut state = fixture();
         candidates(&mut state,json!([effect(3561,600150),effect(VINE,600070)]));
@@ -417,23 +530,35 @@ mod tests {
         }
     }
     #[test]
-    fn formed_lineup_skips_irrelevant_gold_and_only_accepts_useful_knight_seals() {
-        for held_seal in [600070,600150] {
-            for seal in [0,600010,600070,600150,EXPANSION,DEMON] {
-                let mut state = fixture();
-                state["provider_state"]["effect"]["effectList"][6]["badgeId"] = json!(held_seal);
-                candidates(&mut state,json!([effect(3560,seal),effect(3390,600070)]));
-                assert_eq!(choose(&state).kind,"skip","Never replace a restored PLUS Knight for its seal: held={held_seal} seal={seal}");
-            }
+    fn formed_guidance_plus_skips_irrelevant_gold_and_never_changes_seal() {
+        for seal in [0,600010,600070,600150,EXPANSION,DEMON] {
+            let mut state = fixture();
+            candidates(&mut state,json!([effect(3560,seal),effect(3390,600070)]));
+            assert_eq!(choose(&state).kind,"skip","Never replace a formed guidance PLUS Knight: seal={seal}");
         }
-        let mut state = fixture();
-        candidates(&mut state,json!([effect(VINE,ECHO)]));
-        assert_eq!(choose(&state).kind,"skip"); // Runtime stops before this fallback is executed.
-        state["candidate_effect_list"] = json!([effect(VINE,ECHO)]);
-        assert!(echo_present(&state));
     }
     #[test]
-    fn restored_plus_keeps_opening_blue_until_guidance_or_friend_seal() {
+    fn echo_vine_uses_normal_replacement_and_never_causes_a_special_stop() {
+        let mut state = fixture();
+        candidates(&mut state,json!([effect(VINE,600180)]));
+        state["candidate_effect_list"] = json!([effect(VINE,600180)]);
+        assert!(stop_reason(&state,&json!({})).is_none());
+        assert_eq!(choose(&state).kind,"sell_effect");
+        assert_eq!(choose(&state).params["effect"]["id"],VINE);
+        remove(&mut state,VINE);
+        assert_eq!(choose(&state).kind,"select_candidate");
+        state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().push(effect(VINE,600180));
+        state["effect_list"] = state["provider_state"]["effect"]["effectList"].clone();
+        assert!(lineup_valid(&state));
+        assert!(stop_reason(&state,&json!({})).is_none());
+        candidates(&mut state,json!([effect(VINE,0)]));
+        assert_eq!(choose(&state).kind,"sell_effect","Sell the held Echo vine before taking the next ordinary vine");
+        assert_eq!(choose(&state).params["effect"]["badgeId"],600180);
+        candidates(&mut state,json!([effect(VINE+1,600180)]));
+        assert_eq!(choose(&state).kind,"skip","Echo does not allow PLUS vines");
+    }
+    #[test]
+    fn restored_plus_keeps_opening_blue_until_guidance_seal() {
         for held_seal in [0,600010,600180,600300] {
             for target_seal in [600070,600150] {
                 let mut state = fixture();
@@ -447,10 +572,84 @@ mod tests {
                 assert_eq!(choose(&state).kind,"select_candidate");
                 state["provider_state"]["effect"]["effectList"][6]["badgeId"] = json!(target_seal);
                 state["provider_state"]["state"]["interrupt"] = json!(0);
-                assert_eq!(choose(&state).params["goods_id"],103,"Stop opening blue as soon as the PLUS has either accepted seal");
+                assert_eq!(choose(&state).params["goods_id"],if target_seal == 600070 {103} else {102},
+                    "Only guidance PLUS completes recovery");
             }
         }
     }
+    #[test]
+    fn ex37_friend_is_transitional_and_guidance_never_downgrades() {
+        let mut state = fixture();
+        state["level"] = json!(14037);
+        state["provider_state"]["effect"]["effectList"][6] = json!({"id":3561,"uid":255,"volume":1});
+        state["provider_state"]["effect"]["packGoodsId"] = json!(113);
+        candidates(&mut state,json!([effect(1660,EXPANSION),effect(3560,600150),effect(3460,600190)]));
+        assert_eq!(choose(&state).params["index"],1,"Ex37 reward can improve the unsealed PLUS to friend");
+        state["provider_state"]["effect"]["effectList"][6]["badge"] = json!({"id":600150});
+        state["provider_state"]["state"]["interrupt"] = json!(0);
+        state["provider_state"]["shop"]["goods"] = json!([
+            {"id":1,"goodsId":102,"price":10,"sold":false},{"id":2,"goodsId":103,"price":15,"sold":false}]);
+        assert_eq!(choose(&state).params["goods_id"],102,"Friend PLUS must keep recovering");
+        for seal in [0,600010,600150,EXPANSION,DEMON] {
+            candidates(&mut state,json!([effect(3560,seal)]));
+            assert_eq!(choose(&state).kind,"skip","Do not replace friend with an equal or worse seal: {seal}");
+        }
+        candidates(&mut state,json!([effect(3560,600150),effect(3560,600070)]));
+        assert_eq!(choose(&state).params["index"],1,"Take guidance over friend in the same pack");
+        state["provider_state"]["effect"]["effectList"][6]["badge"]["id"] = json!(600070);
+        candidates(&mut state,json!([effect(3560,600150)]));
+        assert_eq!(choose(&state).kind,"skip","Never downgrade guidance to friend");
+        state["provider_state"]["state"]["interrupt"] = json!(0);
+        assert_eq!(choose(&state).params["goods_id"],103,"Guidance PLUS completes recovery");
+    }
+    #[test]
+    fn recovery_recycles_gold_keeps_temporary_until_target_appears_and_never_sells_core() {
+        let mut state = fixture();
+        remove(&mut state,3561);
+        let options=json!({"support_amulet":160});
+        for pack in [102,103,112,113] {
+            state["provider_state"]["effect"]["packGoodsId"]=json!(pack);
+            candidates(&mut state,json!([effect(3390,0)]));
+            assert_eq!(choose_with(&state,&options).kind,"select_candidate","Recycle safe positive-value cards in pack {pack}");
+        }
+        state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().push(effect(3390,0));
+        state["provider_state"]["state"]["interrupt"]=json!(0);
+        assert_eq!(choose_with(&state,&options).params["effect"]["id"],3390);
+        remove(&mut state,3390);
+        candidates(&mut state,json!([effect(3390,0),effect(3560,0)]));
+        assert_eq!(choose_with(&state,&options).params["effect"]["id"],3560,"Prefer a useful temporary over recycling");
+        state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().push(effect(3560,0));
+        state["provider_state"]["state"]["interrupt"]=json!(0);
+        state["provider_state"]["shop"]["goods"]=json!([]);
+        state["provider_state"]["game"]["coin"]=json!(10);
+        assert_eq!(choose_with(&state,&options).kind,"next_node","Carry the temporary into battle when the refresh budget is exhausted");
+        candidates(&mut state,json!([effect(3390,0)]));
+        assert_eq!(choose_with(&state,&options).kind,"skip","Do not sacrifice a full temporary slot for recycling");
+        candidates(&mut state,json!([effect(3510,600070)]));
+        assert_eq!(choose_with(&state,&options).kind,"skip","Do not churn temporary support families");
+        candidates(&mut state,json!([effect(3560,600150)]));
+        assert_eq!(choose_with(&state,&options).kind,"select_candidate","Can upgrade the same temporary family to PLUS");
+        candidates(&mut state,json!([effect(1600,600070)]));
+        let sale=choose_with(&state,&options);
+        assert_eq!(sale.kind,"sell_effect");assert_eq!(sale.params["effect"]["id"],3560);
+        remove(&mut state,3560);
+        assert_eq!(choose_with(&state,&options).params["effect"]["id"],1600);
+        candidates(&mut state,json!([effect(VINE,0),effect(3560,600070)]));
+        assert_eq!(choose_with(&state,&options).params["effect"]["id"],VINE,"Vine still outranks temporary support");
+        state["provider_state"]["effect"]["effectList"].as_array_mut().unwrap().push(effect(3561,600070));
+        candidates(&mut state,json!([effect(VINE,EXPANSION)]));
+        assert_eq!(choose_with(&state,&options).params["effect"]["id"],3561,"Expansion frees the temporary slot too");
+        let mut formed=fixture();candidates(&mut formed,json!([effect(3390,0)]));
+        assert_eq!(choose(&formed).kind,"skip","A complete lineup still skips non-target gold cards");
+        remove(&mut state,3561);
+        candidates(&mut state,json!([effect(1660,600070)]));
+        assert_eq!(choose_with(&state,&options).kind,"skip","Never recycle by merging or changing a core card");
+        candidates(&mut state,json!([effect(3390,EXPANSION),effect(3390,DEMON)]));
+        assert_eq!(choose_with(&state,&options).kind,"skip");
+        candidates(&mut state,json!([effect(3550,600050)]));
+        assert_eq!(choose_with(&state,&options).kind,"skip","Do not spend health just to recycle a high-resale card");
+    }
+
     #[test]
     fn blue_filler_is_bought_then_sold_without_selling_core() {
         let mut state = fixture();

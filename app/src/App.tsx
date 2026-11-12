@@ -41,7 +41,7 @@ import {
 import {pushToast, useGlobalToast} from "./lib/toast";
 import {AutoRunnerStatus, setAutoStatus, useAutoRunner} from "./lib/autoRunnerStore";
 import GoodsBar from "./components/GoodsBar";
-import {activeBuyPackHotkeys, selectAmuletPack, type BuyPackMode, type BuyPackStrategy} from "./lib/amuletPackHotkeys";
+import {activeBuyPackHotkeys, canSkipAmuletPack, selectAmuletPack, type BuyPackMode, type BuyPackStrategy} from "./lib/amuletPackHotkeys";
 import CandidateBar from "./components/CandidateBar";
 import "./fonts/material-symbols.css";
 import {getCurrentWindow} from "@tauri-apps/api/window";
@@ -1353,8 +1353,8 @@ export default function App() {
 
     const doraIndicatorTiles = React.useMemo(
         () => (latestGameState?.dora_tiles ?? [])
-            .map((id) => deckMap.get(id))
-            .filter((tile): tile is string => Boolean(tile)),
+            .map((id) => ({id, tile: deckMap.get(id)}))
+            .filter((item): item is {id: number; tile: string} => Boolean(item.tile)),
         [deckMap, latestGameState?.dora_tiles],
     );
 
@@ -1732,11 +1732,13 @@ export default function App() {
                 : request.action === "refresh_shop" ? "refresh_shop"
                     : request.action === "sell_recent" || request.action === "sell_effect" ? "sell_recent"
                         : request.action === "sort_effect" ? "sort_effect" : "select_candidate";
-            pushToast(t("amulet_hotkeys.toast_sent", {action: t(`amulet_hotkeys.action.${labelKey}`)}), "success", 1200);
+            pushToast(t("amulet_hotkeys.toast_sent", {action: request.action === "skip"
+                ? t("amulet_hotkeys.skip_amulet") : t(`amulet_hotkeys.action.${labelKey}`)}), "success", 1200);
             return;
         }
         const reason = result.reason || "unknown";
-        const message = reason === "stage-not-allowed" ? t("amulet_hotkeys.stage_unavailable", {stage: result.stage ?? stage})
+        const message = result.reason_key ? t(result.reason_key, result.reason_values ?? {})
+            : reason === "stage-not-allowed" ? t("amulet_hotkeys.stage_unavailable", {stage: result.stage ?? stage})
             : reason === "coin not enough" ? t("amulet_hotkeys.not_enough_coin_short")
                 : reason === "no-effects" ? t("amulet_hotkeys.no_effects")
                     : reason === "selected-effect-not-found" ? t("amulet_hotkeys.selected_effect_missing")
@@ -1770,7 +1772,9 @@ export default function App() {
         void sendAmuletHotkeyAction({action: "refresh_shop"});
     }, [coin, latestGameState?.refresh_price, sendAmuletHotkeyAction, stage, t]);
 
-    const skipCandidateManually = React.useCallback(() => {
+    const skipCandidatePending = React.useRef(false);
+    const skipCandidateSubmitted = React.useRef<GameStateData | null>(null);
+    const skipCandidateManually = React.useCallback(async () => {
         if (![2, 9, 16].includes(stage)) {
             pushToast(t("amulet_hotkeys.stage_unavailable", {stage}), "info", 1400);
             return;
@@ -1779,8 +1783,16 @@ export default function App() {
             pushToast(t("amulet_hotkeys.free_cannot_skip"), "info", 1400);
             return;
         }
-        void sendAmuletHotkeyAction({action: "skip"});
-    }, [sendAmuletHotkeyAction, stage, t]);
+        if (!canSkipAmuletPack(stage, candidates.length) || skipCandidatePending.current
+            || !latestGameState || skipCandidateSubmitted.current === latestGameState) return;
+        skipCandidateSubmitted.current = latestGameState;
+        skipCandidatePending.current = true;
+        try {
+            await sendAmuletHotkeyAction({action: "skip"});
+        } finally {
+            skipCandidatePending.current = false;
+        }
+    }, [candidates.length, latestGameState, sendAmuletHotkeyAction, stage, t]);
 
     const sellOwnedAmulet = React.useCallback((item: EffectItem) => {
         setSellConfirmTarget(null);
@@ -1849,7 +1861,7 @@ export default function App() {
 
             if (key === normalizeHotkeyKey(amuletHotkeys.skipCandidate)) {
                 event.preventDefault();
-                skipCandidateManually();
+                if (!event.repeat) void skipCandidateManually();
                 return;
             }
         }
@@ -1974,7 +1986,7 @@ export default function App() {
                                                             suuAnkou={planSuuAnkou}
                                                             chiitoi={planChiitoi}
                                                             resolveFace={(id) => deckMap.get(id) ?? null}
-                                                        /><MagicVineStats tileScoreMap={latestGameState?.tile_score_map} amulets={latestGameState?.effect_list} highestRecord={levelRecordItems.find(item => item.key === MAX_TILE_SCORE_METRIC_KEY)}/></>
+                                                        /><MagicVineStats level={level} tileScoreMap={latestGameState?.tile_score_map} amulets={latestGameState?.effect_list} highestRecord={levelRecordItems.find(item => item.key === MAX_TILE_SCORE_METRIC_KEY)}/></>
                                                     ) : (
                                                         <LevelRecordPanel level={level} source={latestGameState?.source} node={latestGameState?.node} items={levelRecordItems} tileScoreMap={latestGameState?.tile_score_map} amulets={latestGameState?.effect_list}/>
                                                     )}
@@ -2109,7 +2121,7 @@ export default function App() {
                                         <div className="panel" key="candidates">
                                             <div className="panel-title panel-title-with-action">
                                                 <span>{t("candidate_amulet")}</span>
-                                                {[9, 16].includes(stage) ? (
+                                                {canSkipAmuletPack(stage, candidates.length) ? (
                                                     <button
                                                         className="panel-title-action"
                                                         onClick={skipCandidateManually}
@@ -2162,8 +2174,8 @@ export default function App() {
                                                 {doraIndicatorTiles.length === 0 ? (
                                                     <div className="dora-indicator-empty">{t("dora_indicator.empty")}</div>
                                                 ) : (
-                                                    doraIndicatorTiles.map((tile, index) => (
-                                                        <div className="dora-indicator-tile" key={`${tile}-${index}`}>
+                                                    doraIndicatorTiles.map(({id, tile}) => (
+                                                        <div className="dora-indicator-tile" key={id}>
                                                             <Tile
                                                                 tile={tile}
                                                                 dim={false}

@@ -3,6 +3,61 @@ use crate::{ipc::AutorunAction, pipeline::{Direction, Packet}, protocol::{LiqiCo
 use hudsucker::tokio_tungstenite::tungstenite::Message;
 
 #[tokio::test]
+async fn amulet_skip_hotkey_never_leaves_shop_and_checks_pack_state() {
+    const CHILD_ROOT: &str = "SHANTEN_PACK_SKIP_TEST_ROOT";
+    let root = match std::env::var_os(CHILD_ROOT) {
+        Some(root) => PathBuf::from(root),
+        None => {
+            let root = std::env::temp_dir().join(format!("lens-pack-skip-{}",std::process::id()));
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact","embedded::autorun_tests::amulet_skip_hotkey_never_leaves_shop_and_checks_pack_state","--nocapture"])
+                .env(CHILD_ROOT,&root).output().unwrap();
+            assert!(output.status.success(),"{output:?}");
+            std::fs::remove_dir_all(root).unwrap();return;
+        }
+    };
+    let runtime = tokio::task::spawn_blocking(move || BackendRuntime::load(root.join("configs"))).await.unwrap().unwrap();
+    let state = &runtime.state;
+    let (processor,mut outgoing,_) = state.proxy.register_direct("test",state.module_registry.clone()).await;
+    let flow = processor.lock().unwrap().flow_id;
+    let publish = |stage,interrupt,cards,disabled| state.services.update_game_state_from_flow(&Packet {
+        direction:Direction::Inbound,packet_type:"Res".into(),id:Some(1),method:".lq.Lobby.fetchAmuletActivityData".into(),
+        data:json!({"game":{"state":{"current":stage,"interrupt":interrupt},"map":{"level":14017,"node":2},
+            "effect":{"packCandidates":cards,"packDisableSkip":disabled,"effectList":[]}}}),
+    },flow);
+    let skip = || serde_json::from_value(json!({"action":"skip"})).unwrap();
+    for (stage,interrupt,cards,disabled,reason) in [
+        (9,0,json!([]),false,"stage-not-allowed"),
+        (16,0,json!([]),false,"stage-not-allowed"),
+        (2,0,json!([{"id":3760}]),false,"skip-not-allowed"),
+        (9,0,json!([{"id":3760}]),false,"skip-not-allowed"),
+        (9,1000,json!([{"id":3760}]),true,"skip-not-allowed"),
+        (11,0,json!([{"id":3760}]),false,"stage-not-allowed"),
+    ] {
+        publish(stage,interrupt,cards,disabled);
+        assert_eq!(runtime.amulet_action(skip()).await.reason.as_deref(),Some(reason));
+        assert!(outgoing.try_recv().is_err(),"The skip hotkey must send no next-node operation");
+    }
+    let mut codec = LiqiCodec::new();
+    for stage in [9,16] {
+        publish(stage,if stage==9 {1000} else {0},json!([{"id":3760}]),false);
+        let respond = async {
+            let Message::Binary(frame) = outgoing.recv().await.unwrap() else {panic!("expected pack skip")};
+            let packet = codec.parse(&frame).unwrap();assert_eq!(packet.data["type"],3);
+            assert_eq!(runtime.amulet_action(skip()).await.reason_key.as_deref(),Some("action_provider.execution.busy"));
+            let reply = codec.build(MessageType::Response,packet.id,&packet.method,&json!({"events":[{
+                "state":{"current":9,"interrupt":0},"valueChanges":{"effect":{"packCandidates":{"value":[]}}}
+            }]})).unwrap();
+            processor.lock().unwrap().process(&reply,Direction::Inbound).unwrap();
+        };
+        let (result,()) = tokio::join!(runtime.amulet_action(skip()),respond);assert!(result.ok,"{result:?}");
+        assert_eq!(runtime.amulet_action(skip()).await.reason.as_deref(),Some("stage-not-allowed"));
+        assert!(outgoing.try_recv().is_err(),"After closing the pack, a repeated skip must not leave the shop");
+    }
+    state.proxy.unregister_direct();
+}
+
+#[tokio::test]
 async fn opening_post_win_discards_continue_to_shop_instead_of_remaking() {
     const CHILD_ROOT: &str = "SHANTEN_POST_WIN_TEST_ROOT";
     let root = match std::env::var_os(CHILD_ROOT) {
@@ -601,14 +656,14 @@ async fn invalid_search_tiles_remakes_and_continues_for_any_amulet() {
 }
 
 #[tokio::test]
-async fn vine_farming_shop_protocol_respects_dynamic_budget_and_echo_handoff() {
+async fn vine_farming_shop_protocol_respects_dynamic_budget_and_echo_replacement() {
     const CHILD_ROOT: &str = "SHANTEN_VINE_TEST_ROOT";
     let root = match std::env::var_os(CHILD_ROOT) {
         Some(root) => PathBuf::from(root),
         None => {
             let root = std::env::temp_dir().join(format!("lens-vine-{}",std::process::id()));
             let output = std::process::Command::new(std::env::current_exe().unwrap())
-                .args(["--exact","embedded::autorun_tests::vine_farming_shop_protocol_respects_dynamic_budget_and_echo_handoff","--nocapture"])
+                .args(["--exact","embedded::autorun_tests::vine_farming_shop_protocol_respects_dynamic_budget_and_echo_replacement","--nocapture"])
                 .env(CHILD_ROOT,&root).output().unwrap();
             assert!(output.status.success(),"{output:?}");
             std::fs::remove_dir_all(root).unwrap();
@@ -625,17 +680,17 @@ async fn vine_farming_shop_protocol_respects_dynamic_budget_and_echo_handoff() {
     let flow = processor.lock().unwrap().flow_id;
     let effects: Vec<_> = [3771,2321,1691,1661,1501,621,3561,3760].into_iter()
         .map(|id|json!({"id":id,"uid":id,"volume":1,"badgeId":600070})).collect();
-    let publish = |price: u64, coin: u64, pack: bool, candidates: Value| state.services.update_game_state_from_flow(&Packet {
+    let publish = |price: u64, coin: u64, pack: bool, candidates: Value, owned: &[Value]| state.services.update_game_state_from_flow(&Packet {
         direction:Direction::Inbound,packet_type:"Res".into(),id:Some(1),
         method:".lq.Lobby.fetchAmuletActivityData".into(),data:json!({"game":{
             "state":{"current":9,"interrupt":if candidates.is_null() {0} else {1000}},"map":{"level":14016,"node":1},
             "game":{"coin":coin},"character":{"hp":50},"record":{"levelHuCount":0},
-            "effect":{"effectList":effects,"maxEffectVolume":8,"shopBuffList":[],"packGoodsId":103,"packDisableSkip":false,
+            "effect":{"effectList":owned,"maxEffectVolume":8,"shopBuffList":[],"packGoodsId":103,"packDisableSkip":false,
                 "packCandidates":if candidates.is_null() {json!([])} else {candidates}},
             "shop":{"goods":if pack {json!([{"id":7,"goodsId":103,"price":15,"sold":false}])} else {json!([])},
                 "upgradeGoods":[],"refreshPrice":price}}}),
     },flow);
-    publish(140,169,false,Value::Null);
+    publish(140,169,false,Value::Null,&effects);
     let result = runtime.autorun(AutorunAction::Start,true).await;
     assert!(result.ok,"{result:?}");
     let mut codec = LiqiCodec::new();
@@ -650,24 +705,36 @@ async fn vine_farming_shop_protocol_respects_dynamic_budget_and_echo_handoff() {
         let response = codec.build(MessageType::Response,packet.id,&packet.method,&json!({})).unwrap();
         processor.lock().unwrap().process(&response,Direction::Inbound).unwrap();
         match index {
-            0 => publish(210,240,false,Value::Null),
-            1 => publish(473,30,true,Value::Null),
-            2 => publish(473,15,false,json!([{"id":3390,"badgeId":0,"volume":1}])),
-            3 => publish(710,15,true,Value::Null),
-            _ => publish(710,0,false,json!([{"id":3760,"badgeId":600180,"volume":1}])),
+            0 => publish(210,240,false,Value::Null,&effects),
+            1 => publish(473,30,true,Value::Null,&effects),
+            2 => publish(473,15,false,json!([{"id":3390,"badgeId":0,"volume":1}]),&effects),
+            3 => publish(710,15,true,Value::Null,&effects),
+            _ => publish(710,0,false,json!([{"id":3760,"badgeId":600180,"volume":1}]),&effects),
         }
     }
-    tokio::time::timeout(Duration::from_secs(2),async {
-        while state.automation.autorun_status()["running"] == true { tokio::task::yield_now().await; }
-    }).await.unwrap();
-    assert_eq!(state.automation.autorun_status()["current_step"],"vine_echo");
-    assert!(!state.services.autorun_active());
-    let mut notified = false;
-    while let Ok(event) = events.try_recv() {
-        if event["type"] == "ui_toast" && event["data"]["msg_key"] == "vine.echo_found" { notified = true; }
+    let mut echo_owned=effects.clone();
+    for (kind,args) in [(5,json!([3760])),(16,json!([0])),(3,json!([]))] {
+        let Message::Binary(frame)=tokio::time::timeout(Duration::from_secs(5),outgoing.recv()).await.unwrap().unwrap()
+            else {panic!("Expected normal Echo vine replacement");};
+        let packet=codec.parse(&frame).unwrap();
+        assert_eq!(packet.method.as_ref(),".lq.Lobby.amuletActivityOperate");
+        assert_eq!(packet.data["type"],kind);assert_eq!(packet.data["args"],args);
+        if kind==3 {state.automation.stop_autorun();}
+        let response=codec.build(MessageType::Response,packet.id,&packet.method,&json!({})).unwrap();
+        processor.lock().unwrap().process(&response,Direction::Inbound).unwrap();
+        if kind==5 {
+            echo_owned.retain(|e|e["id"]!=3760);
+            publish(710,0,false,json!([{"id":3760,"badgeId":600180,"volume":1}]),&echo_owned);
+        } else if kind==16 {
+            echo_owned.push(json!({"id":3760,"uid":9999,"volume":1,"badgeId":600180}));
+            publish(710,0,false,Value::Null,&echo_owned);
+            assert_eq!(state.automation.autorun_status()["running"],true);
+        }
     }
-    assert!(notified,"Echo handoff must notify the user");
-    assert!(tokio::time::timeout(Duration::from_millis(300),outgoing.recv()).await.is_err(),"No buy/skip/remake after Echo appears");
+    while let Ok(event)=events.try_recv() {
+        assert_ne!(event["data"]["msg_key"],"vine.echo_found","Echo must not raise the former stop notification");
+    }
+    assert!(tokio::time::timeout(Duration::from_millis(200),outgoing.recv()).await.is_err(),"Wait for the final acknowledgement to settle after the manual stop");
 
     // Sufficient first wins continue; insufficient first wins stop before another operation.
     for (first_score, should_stop) in [("1E100",false),("1",true)] {

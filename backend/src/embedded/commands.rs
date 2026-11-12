@@ -304,6 +304,23 @@ async fn request_reply(state: &State, method: &str, payload: Value) -> CommandRe
 async fn hotkey_reply(state: &State, request: AmuletActionRequest) -> CommandResult {
     let action = request.action.as_str();
     let game = state.services.game_state();
+    if matches!(request.action, AmuletAction::Skip) {
+        if game["stage"] == 2 { return failed("skip-not-allowed"); }
+        if !matches!(game["stage"].as_u64(),Some(9 | 16))
+            || !game["candidate_effect_list"].as_array().is_some_and(|cards|!cards.is_empty()) {
+            return failed("stage-not-allowed");
+        }
+        if game["source"] == "packet" {
+            let Some(skip) = game["action_report"]["actions"].as_array().and_then(|actions|
+                actions.iter().find(|action|action["kind"] == "skip" && action["availability"] == "available"))
+                else { return failed("skip-not-allowed"); };
+            // Use the state-checked executor: type 3 would leave the shop if the pack closed first.
+            return state.action_executor.execute(&state.services,&state.proxy,crate::action_executor::ActionExecutionRequest {
+                action_id:skip["id"].as_str().unwrap_or_default().into(),
+                session_id:game["session_id"].as_u64().unwrap_or(0),revision:game["revision"].as_u64().unwrap_or(0),
+            }).await;
+        }
+    }
     let (method, payload) = match request.action {
         AmuletAction::BuyPack => (
             ".lq.Lobby.amuletActivityOperate",

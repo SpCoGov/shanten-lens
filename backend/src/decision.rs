@@ -176,7 +176,7 @@ pub fn evaluate(state: &Value, actions: &ActionReport, registry: &Value, playboo
     let selecting = actions.actions.iter().chain(&actions.global_actions).any(|action| action.kind == "select_candidate");
     let packs: Vec<_> = actions.actions.iter().chain(&actions.global_actions)
         .filter(|action| action.kind == "buy_pack"
-            && (!crate::vine_farming::selected(playbook) || crate::vine_farming::wanted_pack(state, action))
+            && (!crate::vine_farming::selected(playbook) || crate::vine_farming::wanted_pack(state, action, playbook))
             && matches!(action.params["goods_id"].as_u64(), Some(101..=103 | 111..=113))).collect();
     let affordable_pack = if packs.iter().any(|action| action.availability == Availability::Available) {
         Some(true)

@@ -36,8 +36,12 @@ impl Rewards {
                     "packGoodsId":self.pack,"packCandidates":self.candidates,"currentLevelRewardPack":self.index,"packQueue":self.queue()},
                 "shop":{"goods":self.goods,"upgradeGoods":[],"refreshPrice":710}}})},flow);
     }
-    async fn start(&mut self) {
-        self.effects=Self::core(); self.index=0; self.stage=16; self.pack=103; self.goods=json!([]);
+    async fn start(&mut self) { self.start_with_support(356).await; }
+    async fn start_with_support(&mut self, family: u64) {
+        self.effects=Self::core();
+        let support = self.effects.iter_mut().find(|effect| effect["id"] == 3561).unwrap();
+        support["id"]=json!(family * 10 + 1); support["uid"]=json!(family * 10 + 1);
+        self.index=0; self.stage=16; self.pack=103; self.goods=json!([]);
         self.runtime.state.automation.capture_stop_mail();
         self.publish();
         assert!(self.runtime.autorun(AutorunAction::Start,true).await.ok);
@@ -87,14 +91,14 @@ impl Rewards {
 }
 
 #[tokio::test]
-async fn three_reward_packs_select_replace_recover_and_handoff_echo_without_live_account() {
+async fn three_reward_packs_select_replace_recover_and_echo_without_live_account() {
     const ROOT: &str="SHANTEN_REWARD_TEST_ROOT";
     let root=match std::env::var_os(ROOT) {
         Some(root)=>PathBuf::from(root),
         None=>{
             let root=std::env::temp_dir().join(format!("lens-rewards-{}",std::process::id()));
             let result=std::process::Command::new(std::env::current_exe().unwrap())
-                .args(["--exact","embedded::reward_tests::three_reward_packs_select_replace_recover_and_handoff_echo_without_live_account","--nocapture"])
+                .args(["--exact","embedded::reward_tests::three_reward_packs_select_replace_recover_and_echo_without_live_account","--nocapture"])
                 .env(ROOT,&root).output().unwrap();
             assert!(result.status.success(),"{result:?}"); std::fs::remove_dir_all(root).unwrap(); return;
         }
@@ -120,46 +124,65 @@ async fn three_reward_packs_select_replace_recover_and_handoff_echo_without_live
     assert_eq!(sim.effects.iter().filter(|e|e["id"]==3760).count(),1);
     assert!(!sim.effects.iter().any(|e|e["id"]==3761));
 
-    // Reward 1 expansion, reward 2 ordinary vine, reward 3 first ordinary Knight.
-    sim.candidates=json!([Rewards::effect(3760,0,600160)]);sim.start().await;
-    let request=sim.request(5,json!([3561])).await;sim.remove(356);sim.reply(request);
-    let request=sim.request(5,json!([3760])).await;sim.remove(376);sim.reply(request);
-    let request=sim.request(16,json!([0])).await;sim.effects.push(Rewards::effect(3760,9200,600160));
-    sim.index=1;sim.candidates=json!([Rewards::effect(3760,0,0)]);sim.reply(request);
-    let request=sim.request(5,json!([9200])).await;sim.remove(376);sim.reply(request);
-    let request=sim.request(16,json!([0])).await;sim.effects.push(Rewards::effect(3760,9201,0));
-    sim.index=2;sim.candidates=json!([Rewards::effect(3560,0,600010)]);sim.reply(request);
-    let request=sim.request(16,json!([0])).await;sim.effects.push(Rewards::effect(3560,9202,600010));
-    sim.index=3;sim.stage=9;sim.candidates=json!([]);
-    sim.goods=json!([{"id":20,"goodsId":102,"price":10,"sold":false},{"id":21,"goodsId":102,"price":10,"sold":false},{"id":30,"goodsId":103,"price":15,"sold":false}]);sim.reply(request);
-    let request=sim.request(4,json!([20])).await;sim.goods[0]["sold"]=json!(true);sim.pack=102;
-    sim.candidates=json!([Rewards::effect(3560,0,600310)]);sim.reply(request);
-    let request=sim.request(3,json!([])).await;sim.candidates=json!([]);sim.reply(request);
-    let request=sim.request(4,json!([21])).await;sim.goods[1]["sold"]=json!(true);
-    sim.candidates=json!([Rewards::effect(3560,0,0)]);sim.reply(request);
-    let request=sim.request(16,json!([0])).await;sim.remove(356);sim.effects.push(Rewards::effect(3561,9203,600010));sim.candidates=json!([]);
-    // PLUS alone is not complete: keep opening blue until it has guidance or friendship.
-    sim.goods.as_array_mut().unwrap().push(json!({"id":22,"goodsId":102,"price":10,"sold":false}));sim.reply(request);
-    let request=sim.request(4,json!([22])).await;sim.goods[3]["sold"]=json!(true);
-    sim.candidates=json!([Rewards::effect(3560,0,600070)]);sim.reply(request);
-    let request=sim.request(16,json!([0])).await;sim.remove(356);sim.effects.push(Rewards::effect(3561,9203,600070));sim.candidates=json!([]);
-    sim.goods.as_array_mut().unwrap().push(json!({"id":23,"goodsId":102,"price":10,"sold":false}));sim.reply(request);
-    let request=sim.request(4,json!([30])).await;sim.candidates=json!([Rewards::effect(3390,0,0)]);sim.pack=103;sim.reply(request);sim.stop().await;
-    for family in [377,232,169,166,150,62] {assert!(sim.effects.iter().any(|e|e["id"].as_u64().unwrap()/10==family));}
+    for family in [356,351,160] {
+        let temporary=if family == 356 {351} else {356};
+        // Expansion and ordinary vine, then a gold reward selected and sold to recover coins.
+        sim.candidates=json!([Rewards::effect(3760,0,600160)]);sim.start_with_support(family).await;
+        let request=sim.request(5,json!([family * 10 + 1])).await;sim.remove(family);sim.reply(request);
+        let request=sim.request(5,json!([3760])).await;sim.remove(376);sim.reply(request);
+        let request=sim.request(16,json!([0])).await;sim.effects.push(Rewards::effect(3760,9200,600160));
+        sim.index=1;sim.candidates=json!([Rewards::effect(3760,0,0)]);sim.reply(request);
+        let request=sim.request(5,json!([9200])).await;sim.remove(376);sim.reply(request);
+        let request=sim.request(16,json!([0])).await;sim.effects.push(Rewards::effect(3760,9201,0));
+        sim.index=2;sim.candidates=json!([Rewards::effect(3390,0,0)]);sim.reply(request);
+        let request=sim.request(16,json!([0])).await;sim.effects.push(Rewards::effect(3390,9202,0));
+        sim.index=3;sim.stage=9;sim.candidates=json!([]);
+        sim.goods=json!([{"id":20,"goodsId":103,"price":15,"sold":false},
+            {"id":21,"goodsId":102,"price":10,"sold":false},{"id":22,"goodsId":102,"price":10,"sold":false},
+            {"id":23,"goodsId":102,"price":10,"sold":false},{"id":24,"goodsId":103,"price":15,"sold":false}]);sim.reply(request);
+        let request=sim.request(5,json!([9202])).await;sim.remove(339);sim.reply(request);
+        let request=sim.request(4,json!([21])).await;sim.goods[1]["sold"]=json!(true);sim.pack=102;
+        sim.candidates=json!([Rewards::effect(temporary * 10,0,0)]);sim.reply(request);
+        let request=sim.request(16,json!([0])).await;sim.effects.push(Rewards::effect(temporary * 10,9203,0));sim.candidates=json!([]);sim.reply(request);
+        assert_eq!(sim.runtime.state.automation.autorun_status()["active_profile"]["support_amulet"],family);
+        let request=sim.request(4,json!([22])).await;sim.goods[2]["sold"]=json!(true);
+        sim.candidates=json!([Rewards::effect(family * 10,0,0)]);sim.reply(request);
+        let request=sim.request(5,json!([9203])).await;sim.remove(temporary);sim.reply(request);
+        let request=sim.request(16,json!([0])).await;sim.effects.push(Rewards::effect(family * 10,9204,0));sim.candidates=json!([]);sim.reply(request);
+        let request=sim.request(4,json!([23])).await;sim.goods[3]["sold"]=json!(true);
+        sim.candidates=json!([Rewards::effect(family * 10,0,600150)]);sim.reply(request);
+        let request=sim.request(16,json!([0])).await;sim.remove(family);sim.effects.push(Rewards::effect(family * 10 + 1,9204,600150));sim.candidates=json!([]);sim.reply(request);
+        // Friend PLUS remains temporary: find guidance in a gold pack after blue packs are exhausted.
+        let request=sim.request(4,json!([20])).await;sim.goods[0]["sold"]=json!(true);sim.pack=103;
+        sim.candidates=json!([Rewards::effect(family * 10,0,600070)]);sim.reply(request);
+        let request=sim.request(16,json!([0])).await;sim.remove(family);sim.effects.push(Rewards::effect(family * 10 + 1,9204,600070));sim.candidates=json!([]);sim.reply(request);
+        let request=sim.request(4,json!([24])).await;sim.candidates=json!([Rewards::effect(3390,0,0)]);sim.reply(request);sim.stop().await;
+        for core in [377,232,169,166,150,62] {assert!(sim.effects.iter().any(|e|e["id"].as_u64().unwrap()/10==core));}
+        assert!(sim.effects.iter().any(|e|e["id"]==family * 10 + 1 && e["badgeId"]==600070));
+    }
 
-    // Echo at any of the three reward positions: never choose it, skip it, or process the next reward.
+    // Echo at any reward position follows normal vine replacement and continues through the queue.
     for echo_index in 0..3 {
         sim.candidates=if echo_index==0 {json!([Rewards::effect(3760,0,600180)])} else {json!([Rewards::effect(3390,0,0)])};
         sim.start().await;
         for index in 0..echo_index {
             let request=sim.request(3,json!([])).await;sim.index=index+1;
-            sim.candidates=if sim.index==echo_index {json!([Rewards::effect(3760,0,600180),Rewards::effect(3760,0,0)])} else {json!([Rewards::effect(3390,0,0)])};sim.reply(request);
+            sim.candidates=if sim.index==echo_index {json!([Rewards::effect(3760,0,600180)])} else {json!([Rewards::effect(3390,0,0)])};sim.reply(request);
         }
-        sim.stopped_mail("vine_echo").await;
-        assert!(sim.runtime.state.automation.captured_stop_mail()[0].0.contains("回响魔藤"));
-        assert!(tokio::time::timeout(Duration::from_millis(250),sim.outgoing.recv()).await.is_err(),"Echo must leave this reward and remaining rewards untouched");
-        let game=sim.runtime.state.services.game_state();assert!(game["candidate_effect_list"].as_array().unwrap().iter().any(|e|e["badgeId"]==600180));
-        sim.runtime.state.automation.stop_autorun();assert_eq!(sim.runtime.state.automation.captured_stop_mail().len(),1);
+        let request=sim.request(5,json!([3760])).await;sim.remove(376);sim.reply(request);
+        let request=sim.request(16,json!([0])).await;
+        sim.effects.push(Rewards::effect(3760,9300+echo_index,600180));sim.index=echo_index+1;
+        sim.candidates=if sim.index < 3 {json!([Rewards::effect(3390,0,0)])} else {json!([])};
+        if sim.index==3 {sim.stage=9;} sim.reply(request);
+        for index in (echo_index+1)..3 {
+            let request=sim.request(3,json!([])).await;sim.index=index+1;
+            sim.candidates=if sim.index < 3 {json!([Rewards::effect(3390,0,0)])} else {json!([])};
+            if sim.index==3 {sim.stage=9;} sim.reply(request);
+        }
+        assert_eq!(sim.runtime.state.automation.autorun_status()["running"],true);
+        assert!(sim.runtime.state.automation.captured_stop_mail().is_empty());
+        assert!(sim.effects.iter().any(|e|e["id"]==3760 && e["badgeId"]==600180));
+        sim.stop().await;
     }
 
     // Ex1 event and health stops must leave the real game untouched and send one notification.

@@ -24,7 +24,6 @@
     "need_ex16": "刷魔藤仅支持已连接的雀魂 Ex1 及之后成型对局。",
     "invalid_lineup": "刷魔藤需要雏田、万象、黑客、墨镜猫、姬川响和汪多鱼，且不能持有 PLUS 魔藤或多个魔藤。上述六张核心护身符须带朋友或指引印章。",
     "remake_forbidden": "刷魔藤运行期间禁止重开，请先停止自动化。",
-    "echo_found": "发现回响魔藤，刷魔藤自动化已停止。请自行选择并继续对局。",
     "goal_met": "本关首次和牌分数不足以通过下一关，刷魔藤自动化已停止，请手动继续对局。",
     "first_win": "本关首次和牌分数：{{point}}",
     "no_safe_action": "没有符合刷魔藤规则的可执行操作，已停止。"
@@ -970,7 +969,6 @@
     "tab_vine_farming": "刷魔藤",
     "strategy_vine_farming": "刷魔藤",
     "step_vine_goal": "本关首次和牌分数不足以通过下一关，刷魔藤自动化已停止，请手动继续对局。",
-    "step_vine_echo": "发现回响魔藤，刷魔藤自动化已停止。请自行选择并继续对局。",
     "step_monitoring": "监测当前状态", "step_goal_met": "开局目标已达成", "step_completed": "本局已结束", "step_failed": "运行出错，已停止",
     "state_update_timeout": "操作响应后长时间未收到状态更新，已停止以避免重复提交。", "worker_failed": "自动运行任务异常，已停止。",
     "data_source_changed": "游戏数据源已断开或发生变化，全自动已停止。",
@@ -1024,6 +1022,7 @@
     "badge_interval": "操作间隔：{{ms}}ms",
     "hint_current_step": "当前步骤：{{text}}",
     "hint_last_error": "最近错误：{{text}}",
+    "hint_last_pause": "最新暂停情况：{{text}}",
     "hint_started_at": "启动时间：{{time}}",
     "section_remake_records_title": "重开记录",
     "remake_record_count": "已记录：{{count}} 次",

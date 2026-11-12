@@ -20,6 +20,7 @@ export interface GameStateData {
     hand_tiles: number[];
     last_drawn_tile?: number | null;
     dora_tiles: number[];
+    revealed_dora_tiles?: number[] | null;
     tian_dora_tiles?: string[];
     ming?: MingItem[];
     replacement_tiles: number[];
@@ -51,6 +52,7 @@ export function buildDebugSnapshotFromState(state: GameStateData) {
         stage: state.stage,
         deck_map: state.deck_map || {},
         dora_tiles: state.dora_tiles ?? [],
+        revealed_dora_tiles: state.revealed_dora_tiles ?? null,
         tian_dora_tiles: state.tian_dora_tiles ?? [],
         hand_tiles: Array.isArray(state.hand_tiles) ? state.hand_tiles : [],
         ...(state.last_drawn_tile === undefined ? {} : {last_drawn_tile: state.last_drawn_tile}),
