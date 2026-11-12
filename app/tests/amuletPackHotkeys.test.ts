@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {activeBuyPackHotkeys, selectAmuletPack} from "../src/lib/amuletPackHotkeys";
+import {activeBuyPackHotkeys, canSkipAmuletPack, selectAmuletPack} from "../src/lib/amuletPackHotkeys";
 import type {ActionCandidate, ActionReport} from "../src/bindings";
 import type {GoodsItem} from "../src/lib/gamestate";
 
@@ -9,6 +9,12 @@ const goods: GoodsItem[] = [
     {id: 60, goodsId: 102, price: 6, sold: false},
     {id: 80, goodsId: 113, price: 9, sold: false},
 ];
+assert.equal(canSkipAmuletPack(9,0),false,"Pressing skip in the shop must never enter the next level");
+assert.equal(canSkipAmuletPack(9,3),true);
+assert.equal(canSkipAmuletPack(16,3),true);
+assert.equal(canSkipAmuletPack(16,0),false);
+assert.equal(canSkipAmuletPack(2,3),false,"The initial free choice cannot be skipped");
+for (const stage of [0,3,5,11,12,13,14,15,100]) assert.equal(canSkipAmuletPack(stage,3),false);
 assert.equal(selectAmuletPack(goods, "9", "low_to_high"), goods[1]);
 assert.equal(selectAmuletPack(goods, "9", "high_to_low"), goods[0]);
 assert.equal(selectAmuletPack(goods, "9", "legendary_only"), goods[0]);

@@ -21,6 +21,8 @@ import {formatLevelIdToLabel} from "../lib/levelFormat";
 import AutoPlayConfigPage from "./AutoPlayConfigPage";
 import DirectConnectionPage from "./DirectConnectionPage";
 import styles from "./AutoPlayConfigPage.module.css";
+import zhCN from "../locales/zh-CN.json";
+import jaJP from "../locales/ja-JP.json";
 import AutoPlayTargets from "./AutoPlayTargets";
 import {openingLevels, validateAutoPlayConfig, vineVisiblePrices} from "../lib/autoPlayConfig";
 
@@ -50,16 +52,25 @@ export default function AutoRunnerPage({currentState}: {currentState: GameStateD
 }
 
 function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | null}) {
-    const {t} = useTranslation();
+    const {t, i18n} = useTranslation();
+    const translations = i18n.resolvedLanguage?.startsWith("ja") ? jaJP : zhCN;
+    const statusMessages = translations.autorun;
+    const translateStatus = (key: string, defaultText = key) => {
+        if (key === "custom-search-limit") key = "round.search_timeout";
+        const fallback = key.split(".").reduce<unknown>((value, part) =>
+            value && typeof value === "object" ? (value as Record<string, unknown>)[part] : undefined, translations);
+        return t(key, {defaultValue: typeof fallback === "string" ? fallback : defaultText});
+    };
     const actionExecution = useActionExecution(currentState);
     const {config, status} = useAutoRunner();
     const selectedProfile = config.playbook.profiles.find(profile => profile.id === config.playbook.selected_profile_id);
     const goalMet = status.current_step === "goal_met";
+    const stoppedWithError = status.current_step === "failed" || status.current_step === "disconnected";
     const finished = status.current_step?.startsWith("vine_") || goalMet || status.current_step === "completed" || status.current_step === "failed";
     const profile = status.running ? status.active_profile : selectedProfile;
     const stepText = status.current_step?.startsWith("action:")
         ? t(`action_provider.actions.${status.current_step.slice(7)}`)
-        : t(`autoplay.step_${status.current_step}`, {defaultValue: status.current_step ?? "—"});
+        : translateStatus(`autoplay.step_${status.current_step}`, status.current_step ?? "—");
     const openingProfile = profile?.strategy === "opening" ? profile : undefined;
     const openingCutoff = openingProfile && openingLevels.find(level => level.level === openingProfile.cutoff_level && level.node === openingProfile.cutoff_node);
     const achieved = status.running || goalMet ? status.current_achieved_count : undefined;
@@ -399,7 +410,7 @@ function AutoRunnerMonitorPage({currentState}: {currentState: GameStateData | nu
                 </div>
             </div>}
             {controlError && <p className="notice error" role="alert">{controlError}</p>}
-            {status.last_error && <p className="notice error">{t("autorun.hint_last_error", {text: t(status.last_error, {defaultValue: status.last_error})})}</p>}
+            {status.last_error && <p className={stoppedWithError ? "notice error" : "notice"} role={stoppedWithError ? "alert" : "status"}>{t(stoppedWithError ? "autorun.hint_last_error" : "autorun.hint_last_pause", {defaultValue: stoppedWithError ? statusMessages.hint_last_error : statusMessages.hint_last_pause, text: translateStatus(status.last_error)})}</p>}
             {working && <p className="hint">{t("autoplay.fuse_suspended")}</p>}
             {status.email_status && <p className={`${styles.emailStatus} ${status.email_status === "failed" ? "notice error" : "hint"}`} role="status">
                 <span className="ms" aria-hidden="true">{status.email_status === "failed" ? "error" : "mail"}</span>{t(`autoplay.email_${status.email_status}`, {error: status.email_error ?? ""})}

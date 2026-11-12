@@ -49,6 +49,7 @@ export const vineRefreshPrices = [0,1,2,3,5,8,12,18,27,41,62,93,140,210,315,473,
 export const vineVisiblePrices: readonly number[] = vineRefreshPrices.slice(10,19);
 export const vineRefreshLimits = vineVisiblePrices.slice(0,-1);
 export type VineFarmingProfile = {id: string; name: string; strategy: "vine_farming";
+    support_amulet?: number;
     reward_refresh_limit?: number | null; normal_refresh_limit?: number | null;
     stop_ex?: number | null; pause_half_hp?: boolean};
 export type PlayProfile = FullPlayProfile | OpeningPlayProfile | VineFarmingProfile;

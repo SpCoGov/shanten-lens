@@ -149,6 +149,7 @@ pub(super) fn apply_fetch_state(target: &mut Map<String, Value>, response: &Valu
     crate::action_provider::snapshot(target, game);
     target.insert("ended".into(), Value::Bool(false));
     let round = game.get("round").unwrap_or(&Value::Null);
+    target.insert("revealed_dora_tiles".into(), round.get("dora").map(unwrapped).unwrap_or(Value::Null));
     for (source, dest) in [
         ("hands", "hand_tiles"),
         ("dora", "dora_tiles"),
@@ -252,7 +253,7 @@ fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
     if let Some(round) = changes.get("round") {
         for (source, dest) in [
             ("hands", "hand_tiles"),
-            ("dora", "dora_tiles"),
+            ("dora", "revealed_dora_tiles"),
             ("tianDora", "tian_dora_tiles"),
             ("ming", "ming"),
             ("lockedTile", "locked_tiles"),
@@ -265,6 +266,10 @@ fn apply_event_state(target: &mut Map<String, Value>, item: &Value) {
             ("totalChangeTileCount", "total_change_tile_count"),
         ] {
             set_known(target, round, source, dest);
+        }
+        // A reveal-only update must not replace the ten reserved indicator positions.
+        if ints_from_state(target, "dora_tiles").is_empty() {
+            set_known(target, round, "dora", "dora_tiles");
         }
         if let Some(enemy) = round.get("enemy").map(unwrapped) {
             set_known(target, &enemy, "hp", "point");
@@ -947,6 +952,34 @@ mod pool_tests {
             "used": [], "changeTileCount": 0, "totalChangeTileCount": 5,
             "nextOperation": [{"type": 101}]
         })
+    }
+
+    #[test]
+    fn dora_reveals_keep_reserved_tiles_and_reset_with_the_round() {
+        let mut state = empty_game_state().as_object().unwrap().clone();
+        apply_fetch_state(&mut state, &json!({"game":{"round":initial_round()}}));
+        let reserved = json!((14..24).collect::<Vec<_>>());
+        assert_eq!(state["dora_tiles"], reserved);
+        assert_eq!(state["revealed_dora_tiles"], json!([14]));
+
+        apply_event_state(&mut state, &json!({"valueChanges":{"round":{
+            "dora":{"dirty":true,"value":[14,15]}
+        }}}));
+        assert_eq!(state["dora_tiles"], reserved, "A reveal must keep unrevealed positions in their original order");
+        assert_eq!(state["revealed_dora_tiles"], json!([14,15]));
+        apply_event_state(&mut state, &json!({"valueChanges":{"round":{"desktopRemain":35}}}));
+        assert_eq!(state["revealed_dora_tiles"], json!([14,15]), "Unrelated deltas retain reveal state");
+
+        let mut resumed = initial_round();
+        resumed["dora"] = json!([14,15]);
+        apply_fetch_state(&mut state, &json!({"game":{"round":resumed}}));
+        assert_eq!(state["dora_tiles"], reserved);
+        assert_eq!(state["revealed_dora_tiles"], json!([14,15]), "Reconnect restores revealed IDs, even with identical tile faces");
+
+        apply_event_state(&mut state, &json!({"type":4,"valueChanges":{"round":initial_round()}}));
+        assert_eq!(state["revealed_dora_tiles"], json!([14]));
+        apply_fetch_state(&mut state, &json!({"game":{}}));
+        assert_eq!(state["revealed_dora_tiles"], Value::Null, "Missing reveal information must not be guessed");
     }
 
     #[test]

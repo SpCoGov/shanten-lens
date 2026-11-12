@@ -24,7 +24,6 @@
     "need_ex16": "雀魂の Ex1 以降の接続済み・編成済み対局が必要です。",
     "invalid_lineup": "雛田、万象、ハッカー、スカウトマン、姫川響、ワンと魚が必要です。PLUS 魔蔓や複数の魔蔓は使用できません。上記6種の中核護符には友情または導きの印が必要です。",
     "remake_forbidden": "魔蔓育成中はリスタートできません。先に自動化を停止してください。",
-    "echo_found": "こだまの魔蔓が出現したため自動化を停止しました。手動で選択して対局を続けてください。",
     "goal_met": "初回和了点が次ステージの必要点に足りないため魔蔓育成を停止しました。手動で対局を続けてください。",
     "first_win": "このステージの初回和了点：{{point}}",
     "no_safe_action": "魔蔓育成ルールに適合する操作がないため停止しました。"
@@ -970,7 +969,6 @@
     "tab_vine_farming": "魔蔓育成",
     "strategy_vine_farming": "魔蔓育成",
     "step_vine_goal": "初回和了点が次ステージの必要点に足りないため魔蔓育成を停止しました。手動で対局を続けてください。",
-    "step_vine_echo": "こだまの魔蔓が出現したため自動化を停止しました。手動で選択して対局を続けてください。",
     "step_monitoring": "現在の状態を監視中", "step_goal_met": "序盤の目標を達成", "step_completed": "今回のプレイが終了しました", "step_failed": "エラーのため停止しました",
     "state_update_timeout": "操作への応答後、状態が更新されません。重複送信を避けるため停止しました。", "worker_failed": "自動実行タスクで異常が発生し、停止しました。",
     "data_source_changed": "ゲームのデータソースが切断または変更されたため、自動実行を停止しました。",
@@ -1024,6 +1022,7 @@
     "badge_interval": "操作間隔：{{ms}}ms",
     "hint_current_step": "現在のステップ：{{text}}",
     "hint_last_error": "直近のエラー：{{text}}",
+    "hint_last_pause": "最新の一時停止状況：{{text}}",
     "hint_started_at": "開始時刻：{{time}}",
     "section_remake_records_title": "再開記録",
     "remake_record_count": "記録済み：{{count}} 回",
@@ -1693,6 +1692,7 @@
   },
   "dora_indicator": {
     "title": "ドラ表示牌",
+    "unrevealed": "未公開",
     "empty": "ドラ表示牌なし"
   },
   "tile": {

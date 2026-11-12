@@ -254,6 +254,9 @@ mod tests {
             (json!({"action":"sell_recent"}), json!([2003])),
             (json!({"action":"sell_recent","rawId":20}), json!([2002])),
         ] {
+            let mut game = state.services.game_state();
+            game["candidate_effect_list"] = if request["action"] == "skip" {json!([{"id":3760}])} else {json!([])};
+            state.services.publish_qyzz_state(&game).unwrap();
             let respond = async {
                 let command = receiver.recv().await.unwrap();
                 assert_eq!(command.packet["type"], "operation");
@@ -276,6 +279,14 @@ mod tests {
         assert!(!result.ok);
         assert_eq!(result.reason.as_deref(), Some("not enough coins"));
         assert!(receiver.try_recv().is_err(), "Rejected purchases must not be sent twice");
+        for (stage,cards,reason) in [(9,json!([]),"stage-not-allowed"),(16,json!([]),"stage-not-allowed"),
+            (3,json!([{"id":3760}]),"stage-not-allowed"),(2,json!([{"id":3760}]),"skip-not-allowed")] {
+            let mut game = state.services.game_state();game["stage"]=json!(stage);game["candidate_effect_list"]=cards;
+            state.services.publish_qyzz_state(&game).unwrap();
+            let result = runtime.amulet_action(serde_json::from_value(json!({"action":"skip"})).unwrap()).await;
+            assert!(!result.ok);assert_eq!(result.reason.as_deref(),Some(reason));
+            assert!(receiver.try_recv().is_err(),"A skip outside a pack must send no game operation");
+        }
         *state.qyzz.sender.lock().unwrap() = None;
         let result = runtime.amulet_action(serde_json::from_value(json!({"action":"buy_pack","goodId":0})).unwrap()).await;
         assert!(!result.ok);

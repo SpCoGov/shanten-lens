@@ -11,19 +11,24 @@ import type {LevelRecordItem} from "./LevelRecordPanel";
 
 const obtained = (game: MagicVineGame) => game.pack_obtained + game.shop_obtained + game.regeneration_obtained + game.other_obtained;
 
-export default function MagicVineStats({tileScoreMap, amulets, highestRecord, variant = "summary", className}: {
+export default function MagicVineStats({tileScoreMap, amulets, highestRecord, level, variant = "summary", className}: {
     tileScoreMap?: Record<string, string>;
     amulets?: readonly {id: number}[];
     highestRecord?: Pick<LevelRecordItem,"state"|"best">;
+    level?: number;
     variant?: "summary" | "button";
     className?: string;
 }) {
     const {t, i18n} = useTranslation();
-    const [stats, setStats] = React.useState<Stats>({current: null, history: [], loading: true});
+    const [stats, setStats] = React.useState<Stats>({current: null, history: [], loading: true, highest_tile_scores:{}});
     const [open, setOpen] = React.useState(false);
     const [error, setError] = React.useState(false);
     const close = React.useCallback(() => setOpen(false), []);
     const highest = React.useMemo(() => highestTileScore(tileScoreMap), [tileScoreMap]);
+    const restoredBest = highestTileScore({record: stats.highest_tile_scores?.[String(level)] ?? ""});
+    const localBest = highestRecord ? BigInt(highestRecord.best) : null;
+    const best = restoredBest == null || localBest != null && localBest > restoredBest ? localBest : restoredBest;
+    const belowBest = highest != null && best != null && highest < best;
     React.useEffect(() => {
         let active = true;
         let version = 0;
@@ -67,11 +72,11 @@ export default function MagicVineStats({tileScoreMap, amulets, highestRecord, va
         {variant === "button" ? <button type="button" className={className} onClick={() => setOpen(true)} aria-label={t("magic_vine.open")}>
             <span className="ms" aria-hidden="true">psychiatry</span>{t("magic_vine.title")}
         </button> : <>
-        <div className={`home-record-row ${highestRecord?.state === "below" ? "is-down" : "is-up"}`} data-testid="magic-vine-highest-score">
+        <div className={`home-record-row ${belowBest ? "is-down" : "is-up"}`} data-testid="magic-vine-highest-score">
             <div className="home-record-content">
                 <div className="home-record-label">{t("magic_vine.highest_score")}</div>
                 <div className="home-record-value-line"><span className="home-record-value">{highest == null ? "—" : formatNumberWithScientificThreshold(highest, 2)}</span></div>
-                {highestRecord?.state === "below" && <div className="home-record-meta"><span>{t("level_records.best_label",{value:formatNumberWithScientificThreshold(BigInt(highestRecord.best),2)})}</span></div>}
+                {belowBest && <div className="home-record-meta"><span>{t("level_records.best_label",{value:formatNumberWithScientificThreshold(best!,2)})}</span></div>}
             </div>
         </div>
         <button className={styles.summary} onClick={() => setOpen(true)} aria-label={t("magic_vine.open")}>

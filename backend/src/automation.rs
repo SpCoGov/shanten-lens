@@ -114,11 +114,12 @@ impl Automation {
     pub fn start_autorun(&self) -> Result<(), &'static str> {
         let config = self.services.table("autorun");
         crate::services::playbook::validate(&config["playbook"]).map_err(|_| "autoplay.invalid_config")?;
-        let profile = selected_profile(&config)?.clone();
+        let mut profile = selected_profile(&config)?.clone();
         if profile["strategy"] == crate::vine_farming::STRATEGY {
             let game = self.services.game_state();
             if !crate::vine_farming::eligible(&game) { return Err("vine.need_ex16"); }
             if !crate::vine_farming::lineup_valid(&game) { return Err("vine.invalid_lineup"); }
+            profile["support_amulet"] = json!(self.services.vine_support_amulet(&game));
         }
         let mut status = self.autorun.lock().unwrap();
         if status.running {
@@ -273,7 +274,7 @@ impl Automation {
         let notify = step != "stopped" && !matches!(reason,"autoplay.data_source_changed" | "data-source-changed");
         let enabled = mail["enabled"] == true;
         status.email_status = if !notify { "" } else if enabled { "sending" } else { "disabled" }.into();
-        let outcome = match step { "failed" => "运行出错，已停止", "stopped" => "自动化已停止（手动暂停或控制切换）", "disconnected" => "连接断开或控制切换，已停止", "goal_met" => "开局目标已达成", "vine_echo" => "发现回响魔藤，请手动继续对局", "vine_goal" => "刷魔藤首胡分数不足以通过下一关，已停止", "vine_low_hp" => "血量小于一半，已暂停", "vine_cutoff" => "指定关卡BOSS已击败，奖励包尚未选择，已暂停", "vine_mystery" => "进入神秘商店，已暂停", "vine_trade" => "以物易物出现魔藤，已暂停", _ => "本局已结束" };
+        let outcome = match step { "failed" => "运行出错，已停止", "stopped" => "自动化已停止（手动暂停或控制切换）", "disconnected" => "连接断开或控制切换，已停止", "goal_met" => "开局目标已达成", "vine_goal" => "刷魔藤首胡分数不足以通过下一关，已停止", "vine_low_hp" => "血量小于一半，已暂停", "vine_cutoff" => "指定关卡BOSS已击败，奖励包尚未选择，已暂停", "vine_mystery" => "进入神秘商店，已暂停", "vine_trade" => "以物易物出现魔藤，已暂停", _ => "本局已结束" };
         let subject = format!("Shanten Lens 全自动：{outcome}");
         let body = format!("玩法：{}\n结果：{outcome}\n已运行：{} 秒\n{}",
             status.profile.as_ref().and_then(|p| p["name"].as_str()).unwrap_or(""),
@@ -548,7 +549,7 @@ mod tests {
         let proxy = ProxyControl::new(services.clone(), Arc::new(tokio::sync::RwLock::new(crate::pipeline::PipelineConfig::default())));
         let automation = Automation::new(services.clone(), proxy);
         automation.capture_stop_mail();
-        for (index,step) in ["completed","goal_met","vine_goal","vine_echo","failed","vine_low_hp","vine_cutoff","vine_mystery","vine_trade"].into_iter().enumerate() {
+        for (index,step) in ["completed","goal_met","vine_goal","failed","vine_low_hp","vine_cutoff","vine_mystery","vine_trade"].into_iter().enumerate() {
             automation.start_autorun().unwrap();
             let (generation,_) = automation.round_context().unwrap();
             if step == "stopped" { automation.stop_autorun(); }
@@ -592,14 +593,14 @@ mod tests {
         // No real tsumo loop is launched: only simulate its running flag before a manual stop.
         automation.tsumo.lock().unwrap().running=true;
         automation.stop_tsumo(); automation.stop_tsumo();
-        assert_eq!(automation.captured_stop_mail().len(),11);
+        assert_eq!(automation.captured_stop_mail().len(),10);
         mail["enabled"]=json!(false);
         services.patch_config(&json!({"autorun":{"email_notify":mail}})).unwrap();
         automation.start_autorun().unwrap();
         let (generation,_) = automation.round_context().unwrap();
         automation.finish(generation,"completed","");
         assert_eq!(automation.autorun_status()["email_status"],"disabled");
-        assert_eq!(automation.captured_stop_mail().len(),11);
+        assert_eq!(automation.captured_stop_mail().len(),10);
         drop(automation);drop(services);std::fs::remove_dir_all(root).unwrap();
     }
 

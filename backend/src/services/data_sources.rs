@@ -152,8 +152,17 @@ impl Services {
             next["session_id"] = json!(current["session_id"].as_u64().unwrap_or(0) + u64::from(new_session));
             next["revision"] = json!(current["revision"].as_u64().unwrap_or(0) + 1);
             let actions = crate::action_provider::evaluate(&next);
-            let book = self.vine_farming_profile().map(|profile|json!({"selected_profile_id":profile["id"],"profiles":[profile]}))
+            let active_profile = self.vine_farming_profile();
+            let frozen = active_profile.is_some();
+            let mut book = active_profile.map(|profile|json!({"selected_profile_id":profile["id"],"profiles":[profile]}))
                 .unwrap_or_else(|| self.table("autorun")["playbook"].clone());
+            if !frozen {
+                let selected = book["selected_profile_id"].clone();
+                if let Some(profile) = book["profiles"].as_array_mut().and_then(|profiles|profiles.iter_mut()
+                    .find(|profile| profile["id"] == selected && profile["strategy"] == crate::vine_farming::STRATEGY)) {
+                    profile["support_amulet"] = json!(self.vine_support_amulet(&next));
+                }
+            }
             next["decision_report"] = json!(crate::decision::evaluate(&next, &actions,
                 &self.registry_for_source(active), &book));
             next["action_report"] = json!(actions);

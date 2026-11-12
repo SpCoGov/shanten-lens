@@ -705,6 +705,7 @@ pub(super) fn opening_plan(state: &Value, wall_limit: usize,
     let mut best = json!({"status":"impossible","reason":"custom-not-reachable","search_algorithm":"custom_target"});
     let wall = ids(state.get("wall_tiles")).len();
     let max_wins = wall + usize::from(ids(state.get("hand_tiles")).len() == 14);
+    let mut limited = false;
     for (pinzu, target) in templates {
         let best_score = best["opening_score"].as_u64().map(|score| score as usize);
         if best_score.is_some_and(|score| score >= pinzu * max_wins) { continue; }
@@ -717,13 +718,21 @@ pub(super) fn opening_plan(state: &Value, wall_limit: usize,
             plan["win_count"] = json!(wins);
             plan["opening_score"] = json!(pinzu * wins);
             best = plan;
-        } else if plan["reason"] == "custom-search-limit" && best["status"] == "plan" {
-            best["reason"] = json!("round.search_limit_best");
-            return best;
+            if limited {
+                best["reason"] = json!("round.search_limit_best");
+                return best;
+            }
+        } else if plan["reason"] == "custom-search-limit" {
+            limited = true;
+            if best["status"] == "plan" {
+                best["reason"] = json!("round.search_limit_best");
+                return best;
+            }
         } else if plan["reason"] != "custom-not-reachable" {
             return plan;
         }
     }
+    if limited { best["reason"] = json!("custom-search-limit"); }
     best
 }
 

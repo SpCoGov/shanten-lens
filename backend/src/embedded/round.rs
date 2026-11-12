@@ -390,6 +390,61 @@ mod tests {
     use super::*;
 
     #[test]
+    fn captured_later_opening_search_limits_still_find_a_playable_pinzu_plan() {
+        let mut failures = Vec::new();
+        for (index, raw) in [include_str!("../../tests/fixtures/opening-late-search-limit-1.json"),
+            include_str!("../../tests/fixtures/opening-late-search-limit-2.json")].iter().enumerate() {
+            let root = std::env::temp_dir().join(format!("lens-late-search-{}-{index}", std::process::id()));
+            let (events, _) = tokio::sync::broadcast::channel(32);
+            let services = crate::services::Services::load(root.join("configs"), events).unwrap();
+            services.update_game_state_from_flow(&crate::pipeline::Packet {
+                direction:crate::pipeline::Direction::Inbound,packet_type:"Res".into(),id:Some(1),
+                method:".lq.Lobby.fetchAmuletActivityData".into(),data:serde_json::from_str(raw).unwrap(),
+            },1);
+            let game = services.game_state();
+            assert!(!crate::opening::is_first_battle(&game));
+            let mut last = Value::Null;
+            let started = Instant::now();
+            let plan = choose_plan(&game, &json!({"strategy":"opening"}), &mut |value| last=value, &|| false);
+            eprintln!("snapshot {index}: {}ms, status={}, reason={}, progress={last}", started.elapsed().as_millis(),plan["status"],plan["reason"]);
+            if plan["status"] != "plan" { failures.push(json!({"index":index,"plan":plan,"progress":last})); }
+            else {
+                let mut replay = game.clone();
+                let mut hand = replay["hand_tiles"].as_array().unwrap().clone();
+                let replacement = replay["replacement_tiles"].as_array().unwrap();
+                let wall = replay["wall_tiles"].as_array().unwrap();
+                let (mut exchanged, mut drawn, mut batches) = (0, 0, 0);
+                for step in plan["custom_steps"].as_array().unwrap() {
+                    match step["kind"].as_str().unwrap() {
+                        "exchange" => {
+                            let out = step["out"].as_array().unwrap();
+                            let incoming = step["tiles"].as_array().unwrap();
+                            assert!(out.iter().all(|id|hand.contains(id)));
+                            assert_eq!(out.len(), incoming.len());
+                            assert_eq!(incoming, &replacement[exchanged..exchanged+incoming.len()]);
+                            hand.retain(|id|!out.contains(id));hand.extend(incoming.clone());
+                            exchanged += incoming.len();batches += 1;
+                            assert_eq!(hand.len(), 13);
+                        },
+                        "draw" => {assert_eq!(step["tiles"][0],wall[drawn]);hand.push(wall[drawn].clone());drawn+=1;},
+                        "discard" => {assert!(hand.contains(&step["tiles"][0]));hand.retain(|id|*id!=step["tiles"][0]);},
+                        kind => panic!("Unexpected opening step: {kind}"),
+                    }
+                }
+                assert!(batches <= game["total_change_tile_count"].as_u64().unwrap() as usize);
+                assert_eq!(drawn as u64, plan["draws_needed"].as_u64().unwrap());
+                assert_eq!(hand.len(),14);
+                replay["hand_tiles"] = json!(hand);
+                assert!(recommendations::matches_custom_target(&replay,&plan["target_groups"]));
+                if index == 1 { assert_eq!(plan["reason"], "round.search_limit_best"); }
+            }
+            drop(services);
+            std::fs::remove_dir_all(root).unwrap();
+        }
+        assert!(failures.is_empty(),"{failures:?}");
+    }
+
+    #[test]
     fn captured_five_exchange_fallback_keeps_an_executable_plan() {
         let root = std::env::temp_dir().join(format!("lens-search-limit-{}",std::process::id()));
         let (events, _) = tokio::sync::broadcast::channel(32);

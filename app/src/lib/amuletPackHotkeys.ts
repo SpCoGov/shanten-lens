@@ -5,6 +5,10 @@ import {compareNumericStrings} from "./bigNumber";
 export type BuyPackMode = "single" | "multiple";
 export type BuyPackStrategy = "low_to_high" | "high_to_low" | "legendary_only";
 
+export function canSkipAmuletPack(stage: number, candidateCount: number): boolean {
+    return (stage === 9 || stage === 16) && candidateCount > 0;
+}
+
 export function activeBuyPackHotkeys(settings: {buyPackMode: BuyPackMode; buyPack: string[]}): string[] {
     return settings.buyPackMode === "single" ? settings.buyPack.slice(0, 1) : settings.buyPack;
 }

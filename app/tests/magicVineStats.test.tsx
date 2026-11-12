@@ -30,8 +30,9 @@ export async function runMagicVineStatsTests() {
         finished:true,incomplete:false,pack_obtained:110,shop_obtained:8,regeneration_obtained:1,other_obtained:0,
         score_triggers:120,expansion_extra_triggers:1,shops:38,packs_bought:1166,rounds:39,highest_ex:21,farming_rounds:10,farming_obtained:50,farming_score_triggers:51,farming_status:"ended",farming_periods:[{start_level:13003,start_node:2,end_level:14005,end_node:2,rounds:10,obtained:50,score_triggers:51}]};
     let current: MagicVineGame | null = game;
+    let highestScores: Record<string,string> = {};
     mockIPC(command => {
-        if (command === "backend_get_magic_vine_stats") return {current,history:[game],loading:false};
+        if (command === "backend_get_magic_vine_stats") return {current,history:[game],loading:false,highest_tile_scores:highestScores};
         if (command === "plugin:event|listen") return 1;
         if (command === "plugin:event|unlisten") return null;
         throw new Error(`Unexpected IPC: ${command}`);
@@ -96,6 +97,20 @@ export async function runMagicVineStatsTests() {
         assert(highestRow().classList.contains('is-up'),"matching the record turns green");
         await act(async () => {root.render(<HighestProbe level={14070} scores={{"1p":"9e199"}}/>);});
         assert(highestRow().classList.contains('is-up'),"different levels do not share a comparison baseline");
+        highestScores={"14037":"1.1234567890123456789e200"};
+        localStorage.removeItem(recordKey);
+        await act(async () => {root.render(<></>);});
+        await act(async () => {root.render(<HighestProbe level={14037} scores={{"9m":"1e200"}}/>);});
+        assert(highestRow().classList.contains('is-down') && highestRow().querySelector('.home-record-meta')?.textContent?.includes('1.12e200'),
+            "Legacy same-level backend records turn the score red even when frontend history is absent");
+        await act(async () => {root.render(<HighestProbe level={14037} scores={{"1p":"1.1234567890123456789e200"}}/>);});
+        assert(highestRow().classList.contains('is-up'),"Exactly matching the recovered record turns green");
+        await act(async () => {root.render(<HighestProbe level={14038} scores={{"1p":"9e199"}}/>);});
+        assert(highestRow().classList.contains('is-up'),"Recovered history must not leak to another level");
+        highestScores={"14037":"1e200"};
+        await act(async () => {root.render(<></>);});
+        await act(async () => {root.render(<HighestProbe level={14037} scores={{"1p":"1e200"}}/>);});
+        assert(highestRow().classList.contains('is-down'),"A larger existing frontend record still wins over backend history");
         return "Magic vine UI and per-level highest base score checks passed (mock IPC only).";
     } finally {
         await act(async () => {root.unmount();});

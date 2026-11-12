@@ -3300,6 +3300,7 @@ input:invalid, textarea:invalid, select:invalid {
 
 .home-record-list {
     display: grid;
+    grid-auto-rows: max-content;
     gap: 8px;
     min-height: 0;
     flex: 1 1 auto;
@@ -3309,7 +3310,7 @@ input:invalid, textarea:invalid, select:invalid {
 }
 
 .home-record-row {
-    height: 64px;
+    min-height: 64px;
     min-width: 0;
     display: flex;
     align-items: center;
@@ -3354,7 +3355,7 @@ input:invalid, textarea:invalid, select:invalid {
 .home-record-value {
     color: var(--text);
     font-size: 24px;
-    line-height: 1;
+    line-height: 1.15;
     font-weight: 800;
     letter-spacing: 0;
     overflow-wrap: anywhere;
@@ -3363,8 +3364,9 @@ input:invalid, textarea:invalid, select:invalid {
 .home-record-delta {
     color: currentColor;
     font-size: 13px;
-    line-height: 1;
+    line-height: 1.25;
     font-weight: 800;
+    overflow-wrap: anywhere;
 }
 
 .home-record-row.is-up .home-record-value {
@@ -3500,7 +3502,7 @@ input:invalid, textarea:invalid, select:invalid {
 
 .dora-indicator-list {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0;
     min-height: 40px;
     overflow-x: auto;
@@ -3510,8 +3512,17 @@ input:invalid, textarea:invalid, select:invalid {
 
 .dora-indicator-tile {
     width: 30px;
-    height: 40px;
+    min-height: 40px;
     flex: 0 0 auto;
+}
+
+.dora-indicator-unrevealed {
+    display: block;
+    color: var(--color-muted);
+    font-size: 9px;
+    line-height: 16px;
+    text-align: center;
+    white-space: nowrap;
 }
 
 .dora-indicator-empty {
