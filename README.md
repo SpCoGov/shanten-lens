@@ -194,7 +194,7 @@ cd app
 pnpm run tauri:dev
 ```
 
-已安装 Rust 版 Tauri CLI 时，也可在 `app` 目录运行 `cargo tauri dev`。两种入口都通过 `pnpm run dev` 启动项目内的 Vite，无需全局安装 Vite。
+已安装 Rust 版 Tauri CLI 时，也可在 `app` 目录运行 `cargo tauri dev`。启动钩子直接执行 `vite`，使用 Cargo 入口时须确保 Vite 命令所在目录已加入 PATH；使用上述 pnpm 入口时会自动找到项目本地的 Vite。
 
 默认情况下，MITM 代理监听 `127.0.0.1:10999`。前端与后端通过 Tauri IPC 直接通信。
 

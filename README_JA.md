@@ -192,7 +192,7 @@ cd app
 pnpm run tauri:dev
 ```
 
-Rust 版 Tauri CLI がインストール済みなら、`app` ディレクトリで `cargo tauri dev` も使用できます。どちらの入口も `pnpm run dev` 経由でプロジェクト内の Vite を起動するため、Vite のグローバルインストールは不要です。
+Rust 版 Tauri CLI がインストール済みなら、`app` ディレクトリで `cargo tauri dev` も使用できます。起動フックは `vite` を直接実行するため、Cargo から起動する場合は Vite コマンドのディレクトリを PATH に追加してください。上記の pnpm 経由ではプロジェクト内の Vite が自動的に見つかります。
 
 既定では、MITM プロキシは `127.0.0.1:10999` で待ち受けます。フロントエンドとバックエンドは Tauri IPC で直接通信します。
 
