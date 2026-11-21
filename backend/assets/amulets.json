@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "version": 9,
+  "version": 10,
   "items": [
     {
       "id": 1,
@@ -8764,7 +8764,7 @@
         },
         "descriptions": {
           "chs": "开杠后，如果摸到的是幺九牌，则所有幺九牌的基础分值[tag]+19[/tag]分",
-          "chs_t": "開杠後，如果摸到的是么九牌，則所有么九牌的基礎分值[tag]+19[/tag]分",
+          "chs_t": "開槓後，如果摸到的是么九牌，則所有么九牌的基礎分值[tag]+19[/tag]分",
           "jp": "カンした時、ツモした牌が幺九牌の場合、すべての幺九牌のスコアが[tag]+19[/tag]PT。",
           "en": "If the tile drawn after a Kan is a Terminal or Honor tile, [tag]+19[/tag] PT to the basic PT of all Terminal and Honor tiles.",
           "kr": "깡을 할 때 쯔모한 패가 요구패일 시, 모든 요구패 기본 점수 [tag]+19[/tag]점."
@@ -8789,7 +8789,7 @@
         },
         "descriptions": {
           "chs": "开杠后，如果摸到的是幺九牌，则所有幺九牌的基础分值[tag]+29[/tag]分",
-          "chs_t": "開杠後，如果摸到的是么九牌，則所有么九牌的基礎分值[tag]+29[/tag]分",
+          "chs_t": "開槓後，如果摸到的是么九牌，則所有么九牌的基礎分值[tag]+29[/tag]分",
           "jp": "カンした時、ツモした牌が幺九牌の場合、すべての幺九牌のスコアが[tag]+29[/tag]PT。",
           "en": "If the tile drawn after a Kan is a Terminal or Honor tile, [tag]+29[/tag] PT to the basic PT of all Terminal and Honor tiles.",
           "kr": "깡을 할 때 쯔모한 패가 요구패일 시, 모든 요구패 기본 점수 [tag]+29[/tag]점."
@@ -11485,7 +11485,7 @@
         "descriptions": {
           "chs": "累计换[tag]{0}/36[/tag]张牌后，随机变形为1张稀有度为神话的护身符",
           "chs_t": "累計換[tag]{0}/36[/tag]張牌后，隨機變形為1張稀有度為神話的護身符",
-          "jp": "合計で[tag]{0}/36[/tag]枚の牌の入替を行った場合、ランダムでレジェンドレアのお守りに変化する。",
+          "jp": "合計で[tag]{0}/36[/tag]枚の牌の入替を行った場合、ランダムでウルトラレアのお守りに変化する。",
           "en": "After exchanging [tag]{0}/36[/tag] tiles in total, this talisman randomly transforms into 1 Mythical talisman.",
           "kr": "패를 [tag]{0}/36[/tag]장 누적 교환하면, 임의의 희귀 부적 1장을 신화 부적으로 바꾼다."
         },
@@ -15241,7 +15241,7 @@
   "source": {
     "client_url": "https://game.maj-soul.com/1/",
     "product_version": "4.0.51",
-    "bundle_hash": "aeed8ac264cef3020e36e86df584f1b71a7437ee",
+    "bundle_hash": "1901b6d6c98091c4cf7b140004ab51d30f2ffd29",
     "issuer": "chs_t",
     "name_language": "jp"
   }
